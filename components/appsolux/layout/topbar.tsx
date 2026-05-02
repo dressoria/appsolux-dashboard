@@ -1,4 +1,9 @@
-export function Topbar() {
+import { getCurrentUser } from "@/lib/auth/current-user";
+
+export async function Topbar() {
+  const user = await getCurrentUser();
+  const tenantName = user?.tenant.name ?? "Sin tenant";
+
   return (
     <header className="flex h-16 items-center justify-between border-b bg-background px-6">
       <div>
@@ -9,7 +14,7 @@ export function Topbar() {
       </div>
 
       <div className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
-        Tenant demo
+        {tenantName}
       </div>
     </header>
   );
