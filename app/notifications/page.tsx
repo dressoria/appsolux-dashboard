@@ -1,7 +1,37 @@
+import { NotificationList } from "@/components/appsolux/notifications/notification-list";
+import { NotificationSummary } from "@/components/appsolux/notifications/notification-summary";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { demoNotifications } from "@/lib/notifications/demo-notifications";
+import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
-export default function NotificationsPage() {
+export default async function NotificationsPage() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return (
+      <DashboardShell>
+        <div className="space-y-2">
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Sesion requerida
+          </h1>
+          <p className="text-muted-foreground">
+            Inicia sesion para ver tus notificaciones internas de Appsolux.
+          </p>
+        </div>
+      </DashboardShell>
+    );
+  }
+
+  const tenant = await getCurrentTenant(user);
+  const notifications = demoNotifications
+    .filter((notification) => notification.tenant_id === tenant.id)
+    .sort(
+      (leftNotification, rightNotification) =>
+        new Date(rightNotification.created_at).getTime() -
+        new Date(leftNotification.created_at).getTime()
+    );
+
   return (
     <DashboardShell>
       <div className="space-y-6">
@@ -14,45 +44,13 @@ export default function NotificationsPage() {
             Aqui se mostraran alertas internas de pagos, comprobantes, leads,
             inventario, pedidos, automatizaciones y eventos importantes.
           </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Tenant: {tenant.name}
+          </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>Pagos y comprobantes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Alertas de pagos recibidos, comprobantes pendientes y
-                validaciones automaticas.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Leads y atencion</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Nuevos leads, clientes que requieren respuesta y conversaciones
-                importantes.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Eventos del sistema</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Errores de automatizacion, alertas de inventario y procesos que
-                necesitan revision.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        <NotificationSummary notifications={notifications} />
+        <NotificationList notifications={notifications} />
       </div>
     </DashboardShell>
   );
