@@ -1,3 +1,4 @@
+import { EvolutionQrCard } from "@/components/appsolux/channels/evolution-qr-card";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -17,16 +18,7 @@ export default function ChannelsPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>WhatsApp QR / Evolution API</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Pendiente: generar instancia y mostrar codigo QR.
-              </p>
-            </CardContent>
-          </Card>
+          <EvolutionQrCard />
 
           <Card>
             <CardHeader>
