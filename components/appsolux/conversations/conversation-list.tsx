@@ -1,8 +1,9 @@
+import Link from "next/link";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type {
   ChatwootConversation,
   ChatwootConversationsMeta,
 } from "@/types/chatwoot";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type ConversationListProps = {
   conversations: ChatwootConversation[];
@@ -106,9 +107,10 @@ export function ConversationList({
               const lastMessage = getLastMessage(conversation);
 
               return (
-                <div
+                <Link
                   key={conversation.id}
-                  className="rounded-xl border p-4 transition hover:bg-muted/40"
+                  href={`/conversations/${conversation.id}`}
+                  className="block rounded-xl border p-4 transition hover:bg-muted/40"
                 >
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div className="space-y-1">
@@ -160,7 +162,7 @@ export function ConversationList({
                       </span>
                     )}
                   </div>
-                </div>
+                </Link>
               );
             })
           )}
