@@ -5,6 +5,7 @@ export const demoUser: AppsoluxUser = {
   name: "Andres Soria",
   email: "131studio.ec@gmail.com",
   role: "owner",
+  permissions: [],
   tenant: {
     id: "tenant_demo_milusk",
     name: "Milusk",
@@ -15,7 +16,7 @@ export const demoUser: AppsoluxUser = {
     chatwoot_account_id: 2,
 
     erpnext_customer_id: "CUST-DEMO-001",
-    erpnext_company_id: "MILUSK-DEMO",
+    erpnext_company_id: "Appsolux",
 
     channels: {
       evolution: {

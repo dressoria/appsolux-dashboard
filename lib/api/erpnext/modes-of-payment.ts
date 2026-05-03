@@ -1,10 +1,15 @@
 import "@/lib/security/server-only";
 import { erpnextFetch } from "./client";
+import { getErpnextAccountCurrency } from "./accounts";
 import type {
+  CreateErpnextModeOfPaymentInput,
   ErpnextCreateResponse,
   ErpnextListResponse,
   ErpnextMethodResponse,
   ErpnextModeOfPayment,
+  ErpnextModeOfPaymentAccount,
+  ErpnextModeOfPaymentDetail,
+  PaymentAccountMapping,
 } from "@/types/erpnext";
 
 const modeOfPaymentFields = ["name", "type", "enabled"];
@@ -25,44 +30,39 @@ export async function getErpnextModesOfPayment(): Promise<
   return response.data;
 }
 
-type BankCashAccountResponse = {
-  account?: string;
-};
-
-function getMissingPaymentAccountMessage() {
-  return "El metodo de pago seleccionado no tiene una cuenta de caja o banco configurada para esta empresa. Configura una cuenta para efectivo, banco o pagos por revisar antes de registrar cobros.";
-}
-
-function getAccountFromMethodResponse(payload: unknown) {
-  if (!payload || typeof payload !== "object") {
-    return null;
-  }
-
-  const record = payload as Record<string, unknown>;
-  const account = record.account;
-
-  return typeof account === "string" && account.trim() ? account.trim() : null;
-}
-
-async function getPaymentAccountFromMethod(
-  company: string,
-  modeOfPayment: string
-) {
+export async function createErpnextModeOfPayment(
+  input: CreateErpnextModeOfPaymentInput
+): Promise<ErpnextModeOfPaymentDetail> {
   const response = await erpnextFetch<
-    ErpnextMethodResponse<BankCashAccountResponse | string | null>
-  >("/api/method/erpnext.accounts.doctype.sales_invoice.sales_invoice.get_bank_cash_account", {
+    ErpnextCreateResponse<ErpnextModeOfPaymentDetail>
+  >("/api/resource/Mode%20of%20Payment", {
     method: "POST",
     body: JSON.stringify({
-      mode_of_payment: modeOfPayment,
-      company,
+      mode_of_payment: input.mode_of_payment,
+      type: input.type,
+      enabled: input.enabled === false ? 0 : 1,
     }),
   });
 
-  if (typeof response.message === "string" && response.message.trim()) {
-    return response.message.trim();
-  }
+  return response.data;
+}
 
-  return getAccountFromMethodResponse(response.message);
+export async function getErpnextModeOfPaymentDetail(
+  name: string
+): Promise<ErpnextModeOfPaymentDetail> {
+  const response = await erpnextFetch<
+    ErpnextCreateResponse<ErpnextModeOfPaymentDetail>
+  >(`/api/resource/Mode%20of%20Payment/${encodeURIComponent(name)}`);
+
+  return response.data;
+}
+
+function getMissingPaymentAccountMessage() {
+  return "Este metodo de pago no tiene una cuenta asociada. Configuralo en Ajustes > Pagos.";
+}
+
+function getMissingCompanyPaymentAccountMessage() {
+  return "Este metodo de pago no tiene cuenta configurada para esta empresa.";
 }
 
 async function getPaymentAccountFromModeDocument(
@@ -73,40 +73,121 @@ async function getPaymentAccountFromModeDocument(
     ErpnextCreateResponse<ErpnextModeOfPayment>
   >(`/api/resource/Mode%20of%20Payment/${encodeURIComponent(modeOfPayment)}`);
   const accounts = response.data.accounts ?? [];
+
+  if (accounts.length === 0) {
+    throw new Error(getMissingPaymentAccountMessage());
+  }
+
   const matchingAccount = accounts.find(
     (account) => account.company === company
   );
-  const fallbackAccount =
-    matchingAccount?.default_account ??
-    matchingAccount?.account ??
-    accounts[0]?.default_account ??
-    accounts[0]?.account;
+  const account = matchingAccount?.default_account ?? matchingAccount?.account;
 
-  return fallbackAccount?.trim() || null;
+  if (!matchingAccount) {
+    throw new Error(getMissingCompanyPaymentAccountMessage());
+  }
+
+  if (!account?.trim()) {
+    throw new Error(getMissingPaymentAccountMessage());
+  }
+
+  return account.trim();
+}
+
+export async function getErpnextPaymentAccountMappingForMode(
+  company: string,
+  modeOfPayment: string
+): Promise<PaymentAccountMapping> {
+  const account = await getPaymentAccountFromModeDocument(
+    company,
+    modeOfPayment
+  );
+
+  return {
+    mode_of_payment: modeOfPayment,
+    company,
+    account,
+    account_currency: await getErpnextAccountCurrency(account, company),
+  };
 }
 
 export async function getErpnextPaymentAccountForMode(
   company: string,
   modeOfPayment: string
 ): Promise<string> {
-  try {
-    const account = await getPaymentAccountFromMethod(company, modeOfPayment);
-
-    if (account) {
-      return account;
-    }
-  } catch {
-    // Fallback: some ERPNext setups do not expose the helper reliably.
-  }
-
-  const account = await getPaymentAccountFromModeDocument(
+  const mapping = await getErpnextPaymentAccountMappingForMode(
     company,
     modeOfPayment
   );
 
-  if (account) {
-    return account;
+  return mapping.account;
+}
+
+function buildAccountsTable(
+  accounts: ErpnextModeOfPaymentAccount[],
+  company: string,
+  account: string
+) {
+  let hasCompanyRow = false;
+  const updatedAccounts = accounts.map((row) => {
+    if (row.company !== company) {
+      return row;
+    }
+
+    hasCompanyRow = true;
+
+    return {
+      ...row,
+      default_account: account,
+      account,
+    };
+  });
+
+  if (!hasCompanyRow) {
+    updatedAccounts.push({
+      company,
+      default_account: account,
+      account,
+    });
   }
 
-  throw new Error(getMissingPaymentAccountMessage());
+  return updatedAccounts;
+}
+
+export async function updateModeOfPaymentAccountMapping(
+  modeOfPayment: string,
+  company: string,
+  account: string
+): Promise<PaymentAccountMapping> {
+  const modeOfPaymentDetail = await getErpnextModeOfPaymentDetail(
+    modeOfPayment
+  );
+  const updatedDoc: ErpnextModeOfPaymentDetail & {
+    doctype: "Mode of Payment";
+  } = {
+    ...modeOfPaymentDetail,
+    doctype: "Mode of Payment",
+    accounts: buildAccountsTable(
+      modeOfPaymentDetail.accounts ?? [],
+      company,
+      account
+    ),
+  };
+
+  await erpnextFetch<ErpnextMethodResponse<ErpnextModeOfPaymentDetail>>(
+    "/api/method/frappe.client.save",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        doc: updatedDoc,
+      }),
+    }
+  );
+
+  return {
+    mode_of_payment: modeOfPayment,
+    company,
+    account,
+    account_currency: await getErpnextAccountCurrency(account, company),
+  };
 }

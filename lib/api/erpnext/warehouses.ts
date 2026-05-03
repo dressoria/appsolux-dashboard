@@ -40,6 +40,8 @@ export async function createErpnextWarehouse(
       body: JSON.stringify({
         warehouse_name: input.warehouse_name,
         company: input.company,
+        parent_warehouse: input.parent_warehouse,
+        is_group: 0,
       }),
     }
   );
@@ -49,7 +51,7 @@ export async function createErpnextWarehouse(
 
 export async function updateErpnextWarehouse(
   name: string,
-  input: CreateErpnextWarehouseInput
+  input: Partial<CreateErpnextWarehouseInput> & { disabled?: boolean }
 ): Promise<ErpnextWarehouse> {
   const response = await erpnextFetch<ErpnextCreateResponse<ErpnextWarehouse>>(
     `/api/resource/Warehouse/${encodeURIComponent(name)}`,
@@ -58,6 +60,13 @@ export async function updateErpnextWarehouse(
       body: JSON.stringify({
         warehouse_name: input.warehouse_name,
         company: input.company,
+        parent_warehouse: input.parent_warehouse,
+        disabled:
+          typeof input.disabled === "boolean"
+            ? input.disabled
+              ? 1
+              : 0
+            : undefined,
       }),
     }
   );
@@ -77,14 +86,14 @@ export async function deleteErpnextWarehouse(name: string): Promise<void> {
 export async function disableErpnextWarehouse(
   name: string
 ): Promise<ErpnextWarehouse> {
+  return updateErpnextWarehouse(name, { disabled: true });
+}
+
+export async function getErpnextWarehouseDetail(
+  name: string
+): Promise<ErpnextWarehouse> {
   const response = await erpnextFetch<ErpnextCreateResponse<ErpnextWarehouse>>(
-    `/api/resource/Warehouse/${encodeURIComponent(name)}`,
-    {
-      method: "PUT",
-      body: JSON.stringify({
-        disabled: 1,
-      }),
-    }
+    `/api/resource/Warehouse/${encodeURIComponent(name)}`
   );
 
   return response.data;

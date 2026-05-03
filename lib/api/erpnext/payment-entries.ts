@@ -1,8 +1,8 @@
 import "@/lib/security/server-only";
-import { getErpnextAccountCurrency } from "./accounts";
 import { erpnextFetch } from "./client";
 import { cancelErpnextDocument } from "./documents";
-import { getErpnextPaymentAccountForMode } from "./modes-of-payment";
+import { getErpnextAccountCurrency } from "./accounts";
+import { getErpnextPaymentAccountMappingForMode } from "./modes-of-payment";
 import { getErpnextSalesInvoiceDetail } from "./sales-invoices";
 import type {
   CreatePaymentEntryInput,
@@ -130,14 +130,16 @@ export async function createAndSubmitErpnextPaymentEntry(
 
   // El metodo de pago define a que cuenta entra el dinero.
   // No creamos cuentas automaticamente para evitar afectar el plan contable.
-  const paymentAccount = await getErpnextPaymentAccountForMode(
+  const paymentAccountMapping = await getErpnextPaymentAccountMappingForMode(
     salesInvoice.company,
     input.mode_of_payment
   );
-  const accountCurrency = await getErpnextAccountCurrency(
-    paymentAccount,
-    salesInvoice.company
-  );
+  const paymentAccount = paymentAccountMapping.account;
+  const accountCurrency = paymentAccountMapping.account_currency;
+
+  if (!accountCurrency) {
+    throw new Error("La cuenta asociada al metodo de pago no tiene moneda.");
+  }
   const receivableAccount = salesInvoice.debit_to;
   const receivableAccountCurrency = receivableAccount
     ? await getErpnextAccountCurrency(receivableAccount, salesInvoice.company)

@@ -9,12 +9,33 @@ export function getErpnextConfig() {
   };
 }
 
+function cleanSafeErpnextMessage(message: string) {
+  const cleanMessage = message
+    .replace(/<strong[^>]*>/gi, "\"")
+    .replace(/<\/strong>/gi, "\"")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+  const warehouseExistsMatch = cleanMessage.match(
+    /Almac\S*n\s+"?([^"]+)"?\s+ya existe/i
+  );
+
+  if (warehouseExistsMatch?.[1]) {
+    return `La bodega "${warehouseExistsMatch[1].trim()}" ya existe.`;
+  }
+
+  return cleanMessage;
+}
+
 function getSafeErpnextMessage(payload: unknown): string | null {
   if (typeof payload === "string" && payload.trim()) {
     try {
       return getSafeErpnextMessage(JSON.parse(payload));
     } catch {
-      return payload;
+      return cleanSafeErpnextMessage(payload);
     }
   }
 
@@ -46,11 +67,11 @@ function getSafeErpnextMessage(payload: unknown): string | null {
       try {
         return getSafeErpnextMessage(JSON.parse(directMessage));
       } catch {
-        return directMessage;
+        return cleanSafeErpnextMessage(directMessage);
       }
     }
 
-    return directMessage;
+    return cleanSafeErpnextMessage(directMessage);
   }
 
   if (Array.isArray(directMessage)) {
@@ -102,7 +123,7 @@ export async function erpnextFetch<T>(
         ? payload
         : `ERPNext request failed: ${response.status}`);
 
-    throw new Error(message);
+    throw new Error(cleanSafeErpnextMessage(message));
   }
 
   const text = await response.text();

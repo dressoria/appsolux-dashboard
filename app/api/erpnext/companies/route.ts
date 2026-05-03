@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getErpnextCompanies } from "@/lib/api/erpnext/masters";
+import { getErpnextCompanies } from "@/lib/api/erpnext/companies";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 export async function GET() {
   try {
@@ -19,6 +20,7 @@ export async function GET() {
       );
     }
 
+    await getCurrentTenant(user);
     const companies = await getErpnextCompanies();
 
     return NextResponse.json({

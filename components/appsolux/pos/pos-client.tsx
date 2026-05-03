@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -95,6 +96,7 @@ export function PosClient({
   modesOfPayment,
   tenant,
 }: PosClientProps) {
+  const router = useRouter();
   const usableWarehouses = warehouses.filter(
     (warehouse) => warehouse.disabled !== 1 && warehouse.is_group !== 1
   );
@@ -321,6 +323,7 @@ export function PosClient({
       setReferenceNo("");
       setReferenceDate("");
       setNote("");
+      router.refresh();
     } catch (error) {
       setIsError(true);
       setMessage(
@@ -708,6 +711,11 @@ export function PosClient({
                 }
               >
                 <p>{message}</p>
+                {isError && message.includes("Ajustes > Pagos") ? (
+                  <Button asChild className="mt-2" size="sm" variant="outline">
+                    <Link href={`${routes.settings}`}>Ir a Ajustes &gt; Pagos</Link>
+                  </Button>
+                ) : null}
                 {createdOrderName ? (
                   <p className="mt-1 font-medium">Pedido: {createdOrderName}</p>
                 ) : null}

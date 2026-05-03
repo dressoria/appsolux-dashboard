@@ -43,6 +43,7 @@ export type ErpnextWarehouse = {
 export type CreateErpnextWarehouseInput = {
   warehouse_name: string;
   company?: string;
+  parent_warehouse?: string;
 };
 
 export type ErpnextBin = {
@@ -89,6 +90,24 @@ export type ErpnextCompany = {
   name: string;
   company_name?: string;
   default_currency?: string;
+};
+
+export type ErpnextCompanyDetail = ErpnextCompany & {
+  abbr?: string;
+  country?: string;
+  tax_id?: string;
+  company_email?: string;
+  phone_no?: string;
+  website?: string;
+  default_warehouse?: string;
+  cost_center?: string;
+};
+
+export type UpdateErpnextCompanyBasicInfoInput = {
+  company_email?: string;
+  phone_no?: string;
+  website?: string;
+  tax_id?: string;
 };
 
 export type ErpnextMasters = {
@@ -333,9 +352,44 @@ export type ErpnextModeOfPayment = {
   accounts?: ErpnextModeOfPaymentAccount[];
 };
 
+export type ErpnextModeOfPaymentDetail = ErpnextModeOfPayment;
+
+export type CreateErpnextModeOfPaymentInput = {
+  mode_of_payment: string;
+  type?: string;
+  enabled?: boolean;
+};
+
 export type ErpnextAccount = {
   name: string;
+  account_name?: string;
+  account_type?: string;
+  root_type?: string;
   account_currency?: string;
+  company?: string;
+  parent_account?: string;
+  is_group?: 0 | 1;
+  disabled?: 0 | 1;
+};
+
+export type CreateErpnextCashOrBankAccountInput = {
+  account_name: string;
+  company: string;
+  account_type: "Cash" | "Bank";
+  account_currency?: string;
+  parent_account?: string;
+};
+
+export type PaymentAccountMapping = {
+  mode_of_payment: string;
+  company: string;
+  account: string;
+  account_currency?: string;
+};
+
+export type CompanySettingsSummary = {
+  company?: ErpnextCompanyDetail;
+  payment_accounts: PaymentAccountMapping[];
 };
 
 export type CreatePaymentEntryInput = {

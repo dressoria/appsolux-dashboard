@@ -7,3 +7,9 @@ export function validateTenantAccess(
 ): boolean {
   return user.tenant.id === tenantId;
 }
+
+export function assertTenantAccess(user: AppsoluxUser, tenantId: string) {
+  if (!validateTenantAccess(user, tenantId)) {
+    throw new Error("No tienes acceso a este tenant.");
+  }
+}

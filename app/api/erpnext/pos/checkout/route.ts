@@ -60,11 +60,12 @@ export async function POST(request: Request) {
       );
     }
 
-    await getCurrentTenant(user);
+    const tenant = await getCurrentTenant(user);
 
     const body = (await request.json()) as Record<string, unknown>;
     const customer = getStringField(body, "customer");
-    const company = getStringField(body, "company");
+    const requestedCompany = getStringField(body, "company");
+    const company = tenant.erpnext_company_id ?? requestedCompany;
     const warehouse = getStringField(body, "warehouse");
     const modeOfPayment = getStringField(body, "mode_of_payment");
     const paidAmount = getNumberField(body, "paid_amount");

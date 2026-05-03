@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import {
   createErpnextWarehouse,
   deleteErpnextWarehouse,
-  disableErpnextWarehouse,
   getErpnextWarehouses,
   updateErpnextWarehouse,
 } from "@/lib/api/erpnext/warehouses";
@@ -153,27 +152,15 @@ export async function DELETE(request: Request) {
       );
     }
 
-    try {
-      await deleteErpnextWarehouse(name);
+    await deleteErpnextWarehouse(name);
 
-      return NextResponse.json({
-        success: true,
-        data: {
-          action: "deleted",
-          name,
-        },
-      });
-    } catch {
-      const warehouse = await disableErpnextWarehouse(name);
-
-      return NextResponse.json({
-        success: true,
-        data: {
-          action: "disabled",
-          warehouse,
-        },
-      });
-    }
+    return NextResponse.json({
+      success: true,
+      data: {
+        action: "deleted",
+        name,
+      },
+    });
   } catch (error) {
     const message =
       error instanceof Error
@@ -214,6 +201,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Record<string, unknown>;
     const warehouseName = getStringField(body, "warehouse_name");
     const company = getStringField(body, "company") || tenant.erpnext_company_id;
+    const parentWarehouse = getStringField(body, "parent_warehouse");
 
     if (!warehouseName) {
       return NextResponse.json(
@@ -245,6 +233,7 @@ export async function POST(request: Request) {
     const warehouse = await createErpnextWarehouse({
       warehouse_name: warehouseName,
       company,
+      parent_warehouse: parentWarehouse || undefined,
     });
 
     return NextResponse.json({

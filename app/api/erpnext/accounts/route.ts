@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import {
-  createErpnextModeOfPayment,
-  getErpnextModesOfPayment,
-} from "@/lib/api/erpnext/modes-of-payment";
+  createErpnextCashOrBankAccount,
+  getCashAndBankAccounts,
+  getErpnextAccounts,
+} from "@/lib/api/erpnext/accounts";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
 
@@ -24,23 +25,28 @@ export async function GET() {
     }
 
     await getCurrentTenant(user);
-    const modesOfPayment = await getErpnextModesOfPayment();
+
+    const url = new URL(request.url);
+    const company = url.searchParams.get("company")?.trim() || undefined;
+    const type = url.searchParams.get("type")?.trim();
+    const accounts =
+      type === "cash-bank"
+        ? await getCashAndBankAccounts(company)
+        : await getErpnextAccounts(company);
 
     return NextResponse.json({
       success: true,
-      data: { modes_of_payment: modesOfPayment },
+      data: { accounts },
     });
   } catch (error) {
     const message =
-      error instanceof Error
-        ? error.message
-        : "No se pudieron cargar los metodos de pago";
+      error instanceof Error ? error.message : "No se pudieron cargar cuentas";
 
     return NextResponse.json(
       {
         success: false,
         error: {
-          code: "ERPNEXT_MODES_OF_PAYMENT_ERROR",
+          code: "ERPNEXT_ACCOUNTS_ERROR",
           message,
         },
       },
@@ -52,11 +58,6 @@ export async function GET() {
 function getStringField(body: Record<string, unknown>, field: string) {
   const value = body[field];
   return typeof value === "string" ? value.trim() : "";
-}
-
-function getBooleanField(body: Record<string, unknown>, field: string) {
-  const value = body[field];
-  return typeof value === "boolean" ? value : true;
 }
 
 export async function POST(request: Request) {
@@ -79,62 +80,59 @@ export async function POST(request: Request) {
     await getCurrentTenant(user);
 
     const body = (await request.json()) as Record<string, unknown>;
-    const modeOfPayment = getStringField(body, "mode_of_payment");
-    const type = getStringField(body, "type");
-    const enabled = getBooleanField(body, "enabled");
+    const accountName = getStringField(body, "account_name");
+    const company = getStringField(body, "company");
+    const accountType = getStringField(body, "account_type");
+    const accountCurrency = getStringField(body, "account_currency");
+    const parentAccount = getStringField(body, "parent_account");
 
-    if (!modeOfPayment) {
+    if (!accountName || !company) {
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: "INVALID_MODE_OF_PAYMENT_INPUT",
-            message: "El nombre del metodo de pago es requerido.",
+            code: "INVALID_ACCOUNT_INPUT",
+            message: "Nombre de cuenta y empresa son requeridos.",
           },
         },
         { status: 400 }
       );
     }
 
-    const existingModes = await getErpnextModesOfPayment();
-    const duplicateMode = existingModes.find(
-      (mode) => mode.name.toLowerCase() === modeOfPayment.toLowerCase()
-    );
-
-    if (duplicateMode) {
+    if (accountType !== "Cash" && accountType !== "Bank") {
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: "MODE_OF_PAYMENT_ALREADY_EXISTS",
-            message: "Este metodo de pago ya existe.",
+            code: "INVALID_ACCOUNT_TYPE",
+            message: "Selecciona Caja / efectivo o Banco.",
           },
         },
         { status: 400 }
       );
     }
 
-    const createdModeOfPayment = await createErpnextModeOfPayment({
-      mode_of_payment: modeOfPayment,
-      type: type || undefined,
-      enabled,
+    const account = await createErpnextCashOrBankAccount({
+      account_name: accountName,
+      company,
+      account_type: accountType,
+      account_currency: accountCurrency || undefined,
+      parent_account: parentAccount || undefined,
     });
 
     return NextResponse.json({
       success: true,
-      data: { mode_of_payment: createdModeOfPayment },
+      data: { account },
     });
   } catch (error) {
     const message =
-      error instanceof Error
-        ? error.message
-        : "No se pudo crear el metodo de pago";
+      error instanceof Error ? error.message : "No se pudo crear la cuenta";
 
     return NextResponse.json(
       {
         success: false,
         error: {
-          code: "ERPNEXT_CREATE_MODE_OF_PAYMENT_ERROR",
+          code: "ERPNEXT_CREATE_ACCOUNT_ERROR",
           message,
         },
       },

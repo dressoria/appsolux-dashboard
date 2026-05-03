@@ -1,7 +1,7 @@
 import "@/lib/security/server-only";
 import { erpnextFetch } from "./client";
+import { getErpnextCompanies } from "./companies";
 import type {
-  ErpnextCompany,
   ErpnextItemGroup,
   ErpnextListResponse,
   ErpnextMasters,
@@ -49,14 +49,6 @@ export async function getErpnextTerritories(): Promise<ErpnextTerritory[]> {
   );
 
   return usableTerritories.length > 0 ? usableTerritories : response.data;
-}
-
-export async function getErpnextCompanies(): Promise<ErpnextCompany[]> {
-  const response = await erpnextFetch<ErpnextListResponse<ErpnextCompany>>(
-    getListPath("Company", ["name", "company_name", "default_currency"])
-  );
-
-  return response.data;
 }
 
 export async function getErpnextMasters(): Promise<ErpnextMasters> {
