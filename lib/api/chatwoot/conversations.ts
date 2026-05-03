@@ -6,7 +6,7 @@ export async function getChatwootConversations(
   chatwootAccountId: number
 ): Promise<ChatwootConversationsResponse> {
   if (!chatwootAccountId) {
-    throw new Error("chatwootAccountId is required");
+    throw new Error("La bandeja de conversaciones aun no esta configurada.");
   }
 
   return chatwootFetch<ChatwootConversationsResponse>(

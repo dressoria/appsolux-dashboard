@@ -1,7 +1,18 @@
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
+import { ChatwootProvisionCard } from "@/components/appsolux/dashboard/chatwoot-provision-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { canManageSettings } from "@/lib/auth/permissions";
+import { getTenantIntegrationByProvider } from "@/lib/core/integrations";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+
+async function getChatwootIntegrationStatus(tenantId: string) {
+  try {
+    return await getTenantIntegrationByProvider(tenantId, "chatwoot");
+  } catch {
+    return null;
+  }
+}
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
@@ -22,6 +33,10 @@ export default async function DashboardPage() {
   }
 
   const tenant = await getCurrentTenant(user);
+  const chatwootIntegration = await getChatwootIntegrationStatus(tenant.id);
+  const chatwootAccountId = Number(
+    chatwootIntegration?.externalAccountId ?? tenant.chatwoot_account_id
+  );
 
   const evolutionInstance =
     tenant.channels.evolution?.instance_name ?? "Sin instancia";
@@ -69,19 +84,12 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Chatwoot</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm font-medium">
-                Account ID: {tenant.chatwoot_account_id}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Valor dinamico del tenant
-              </p>
-            </CardContent>
-          </Card>
+          <ChatwootProvisionCard
+            accountId={chatwootAccountId}
+            status={chatwootIntegration?.status ?? "none"}
+            lastError={chatwootIntegration?.lastError ?? undefined}
+            canManage={canManageSettings(user)}
+          />
 
           <Card>
             <CardHeader>

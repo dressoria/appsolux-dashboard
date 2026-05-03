@@ -28,7 +28,7 @@ export async function GET() {
           success: false,
           error: {
             code: "MISSING_CHATWOOT_ACCOUNT_ID",
-            message: "Tenant does not have a Chatwoot account configured",
+            message: "La bandeja de conversaciones aun no esta configurada.",
           },
         },
         { status: 400 }

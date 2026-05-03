@@ -14,7 +14,7 @@ function getMaskedToken(token: string) {
 
 function getChatwootErrorMessage(status: number) {
   if (status === 401) {
-    return "Token de Chatwoot invalido o sin acceso a esta cuenta. Revisa CHATWOOT_API_ACCESS_TOKEN.";
+    return "La bandeja de conversaciones aun no tiene credenciales operativas configuradas o el token no tiene acceso a esta cuenta. Revisa CHATWOOT_API_ACCESS_TOKEN.";
   }
 
   return `Chatwoot request failed: ${status}`;
