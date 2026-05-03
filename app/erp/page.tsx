@@ -1,128 +1,133 @@
+import { ErpTabs } from "@/components/appsolux/erp/erp-tabs";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getErpnextCustomers } from "@/lib/api/erpnext/customers";
+import { getErpnextInventory } from "@/lib/api/erpnext/inventory";
+import { getErpnextItems } from "@/lib/api/erpnext/items";
+import { getErpnextMasters } from "@/lib/api/erpnext/masters";
+import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import type { ErpnextMasters } from "@/types/erpnext";
 
-export default function ErpPage() {
+type LoadResult<T> = {
+  data: T;
+  error: string | null;
+};
+
+async function loadErpResource<T>(
+  loader: () => Promise<T>,
+  fallback: T
+): Promise<LoadResult<T>> {
+  try {
+    return {
+      data: await loader(),
+      error: null,
+    };
+  } catch (error) {
+    return {
+      data: fallback,
+      error:
+        error instanceof Error
+          ? error.message
+          : "No se pudo cargar informacion desde ERPNext",
+    };
+  }
+}
+
+export default async function ErpPage() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return (
+      <DashboardShell>
+        <div className="space-y-2">
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Sesion requerida
+          </h1>
+          <p className="text-muted-foreground">
+            Inicia sesion para ver el modulo ERP de Appsolux.
+          </p>
+        </div>
+      </DashboardShell>
+    );
+  }
+
+  const tenant = await getCurrentTenant(user);
+  const emptyMasters: ErpnextMasters = {
+    itemGroups: [],
+    uoms: [],
+    territories: [],
+    companies: [],
+  };
+  const [
+    itemsResult,
+    warehousesResult,
+    inventoryResult,
+    customersResult,
+    mastersResult,
+  ] = await Promise.all([
+    loadErpResource(getErpnextItems, []),
+    loadErpResource(getErpnextWarehouses, []),
+    loadErpResource(getErpnextInventory, []),
+    loadErpResource(getErpnextCustomers, []),
+    loadErpResource(getErpnextMasters, emptyMasters),
+  ]);
+  const resourceErrors = [
+    { label: "Productos", message: itemsResult.error },
+    { label: "Bodegas", message: warehousesResult.error },
+    { label: "Inventario", message: inventoryResult.error },
+    { label: "Clientes", message: customersResult.error },
+    { label: "Maestros", message: mastersResult.error },
+  ].filter(
+    (resourceError): resourceError is { label: string; message: string } =>
+      Boolean(resourceError.message)
+  );
+  const masterWarnings = [
+    mastersResult.data.itemGroups.length === 0 ? "Sin grupos de producto" : null,
+    mastersResult.data.uoms.length === 0 ? "Sin unidades de medida" : null,
+    mastersResult.data.territories.length === 0 ? "Sin territorios" : null,
+    mastersResult.data.companies.length === 0 ? "Sin empresa configurada" : null,
+  ].filter((warning): warning is string => Boolean(warning));
+
   return (
     <DashboardShell>
       <div className="space-y-6">
         <div>
-          <p className="text-sm text-muted-foreground">ERPNext</p>
+          <p className="text-sm text-muted-foreground">ERP</p>
           <h1 className="text-3xl font-semibold tracking-tight">ERP</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Aqui se centralizara la informacion empresarial del tenant:
-            clientes, inventario, productos, ventas, compras, facturas, pagos,
-            contabilidad y reportes.
+            Inventario, clientes, ventas y gestion operativa conectada a
+            ERPNext.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Tenant: {tenant.name}
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        {resourceErrors.length > 0 ? (
           <Card>
             <CardHeader>
-              <CardTitle>Clientes</CardTitle>
+              <CardTitle>Revision de conexion ERP</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Contactos comerciales, clientes, historial y datos relacionados
-                con ERPNext.
-              </p>
+            <CardContent className="space-y-2">
+              {resourceErrors.map((resourceError) => (
+                <p key={resourceError.label} className="text-sm text-destructive">
+                  {resourceError.label}: {resourceError.message}
+                </p>
+              ))}
             </CardContent>
           </Card>
+        ) : null}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Inventario</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Stock, bodegas, movimientos, alertas de bajo inventario y
-                disponibilidad para ventas.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Productos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Catalogo de productos, precios, variantes, descripcion y estado
-                comercial.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Ventas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Pedidos, oportunidades, cotizaciones y ventas generadas desde
-                canales conectados.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Facturas y pagos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Facturas del negocio del cliente, pagos recibidos, saldos y
-                estado de cuenta.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Compras y proveedores</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Proveedores, compras, costos, recepciones y abastecimiento.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Contabilidad</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Resumen contable, cuentas, impuestos, movimientos y datos
-                fiscales del tenant.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Reportes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Indicadores del negocio, ventas, inventario, rentabilidad y
-                actividad comercial.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Configuracion ERP</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Empresa, bodegas, impuestos, series de documentos y parametros
-                empresariales.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        <ErpTabs
+          items={itemsResult.data}
+          warehouses={warehousesResult.data}
+          inventory={inventoryResult.data}
+          customers={customersResult.data}
+          masters={mastersResult.data}
+          masterWarnings={masterWarnings}
+        />
       </div>
     </DashboardShell>
   );

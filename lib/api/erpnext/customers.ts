@@ -1,0 +1,48 @@
+import "@/lib/security/server-only";
+import { erpnextFetch } from "./client";
+import type {
+  CreateErpnextCustomerInput,
+  ErpnextCreateResponse,
+  ErpnextCustomer,
+  ErpnextListResponse,
+} from "@/types/erpnext";
+
+const customerFields = [
+  "name",
+  "customer_name",
+  "customer_type",
+  "territory",
+  "disabled",
+];
+
+export async function getErpnextCustomers(): Promise<ErpnextCustomer[]> {
+  const params = new URLSearchParams({
+    fields: JSON.stringify(customerFields),
+    limit_page_length: "100",
+    order_by: "modified desc",
+  });
+
+  const response = await erpnextFetch<ErpnextListResponse<ErpnextCustomer>>(
+    `/api/resource/Customer?${params.toString()}`
+  );
+
+  return response.data;
+}
+
+export async function createErpnextCustomer(
+  input: CreateErpnextCustomerInput
+): Promise<ErpnextCustomer> {
+  const response = await erpnextFetch<ErpnextCreateResponse<ErpnextCustomer>>(
+    "/api/resource/Customer",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        customer_name: input.customer_name,
+        customer_type: input.customer_type ?? "Individual",
+        territory: input.territory,
+      }),
+    }
+  );
+
+  return response.data;
+}
