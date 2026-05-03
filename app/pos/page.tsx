@@ -5,6 +5,7 @@ import { getErpnextCustomers } from "@/lib/api/erpnext/customers";
 import { getErpnextInventory } from "@/lib/api/erpnext/inventory";
 import { getErpnextItems } from "@/lib/api/erpnext/items";
 import { getErpnextMasters } from "@/lib/api/erpnext/masters";
+import { getErpnextModesOfPayment } from "@/lib/api/erpnext/modes-of-payment";
 import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
@@ -60,14 +61,21 @@ export default async function PosPage() {
     territories: [],
     companies: [],
   };
-  const [itemsResult, inventoryResult, customersResult, warehousesResult, mastersResult] =
-    await Promise.all([
-      loadErpResource(getErpnextItems, []),
-      loadErpResource(getErpnextInventory, []),
-      loadErpResource(getErpnextCustomers, []),
-      loadErpResource(getErpnextWarehouses, []),
-      loadErpResource(getErpnextMasters, emptyMasters),
-    ]);
+  const [
+    itemsResult,
+    inventoryResult,
+    customersResult,
+    warehousesResult,
+    mastersResult,
+    modesOfPaymentResult,
+  ] = await Promise.all([
+    loadErpResource(getErpnextItems, []),
+    loadErpResource(getErpnextInventory, []),
+    loadErpResource(getErpnextCustomers, []),
+    loadErpResource(getErpnextWarehouses, []),
+    loadErpResource(getErpnextMasters, emptyMasters),
+    loadErpResource(getErpnextModesOfPayment, []),
+  ]);
   const usableWarehouses = warehousesResult.data.filter(
     (warehouse) => warehouse.disabled !== 1 && warehouse.is_group !== 1
   );
@@ -77,6 +85,7 @@ export default async function PosPage() {
     { label: "Clientes", message: customersResult.error },
     { label: "Bodegas", message: warehousesResult.error },
     { label: "Empresas", message: mastersResult.error },
+    { label: "Metodos de pago", message: modesOfPaymentResult.error },
   ].filter(
     (resourceError): resourceError is { label: string; message: string } =>
       Boolean(resourceError.message)
@@ -91,6 +100,7 @@ export default async function PosPage() {
           customers={customersResult.data}
           warehouses={usableWarehouses}
           companies={mastersResult.data.companies}
+          modesOfPayment={modesOfPaymentResult.data}
           tenant={{
             id: tenant.id,
             name: tenant.name,

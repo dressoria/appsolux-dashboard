@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { routes } from "@/config/routes";
 import type { ApiResponse } from "@/types/api";
 
 type CreateInvoiceFromOrderButtonProps = {
@@ -85,7 +87,14 @@ export function CreateInvoiceFromOrderButton({
         >
           <p>{message}</p>
           {invoiceName ? (
-            <p className="mt-1 font-medium">Factura: {invoiceName}</p>
+            <div className="mt-2 space-y-2">
+              <p className="font-medium">Factura: {invoiceName}</p>
+              <Button asChild size="sm" variant="outline">
+                <Link href={`${routes.posInvoices}/${encodeURIComponent(invoiceName)}`}>
+                  Ver facturas y cobros
+                </Link>
+              </Button>
+            </div>
           ) : null}
         </div>
       ) : null}

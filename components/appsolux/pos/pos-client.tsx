@@ -19,8 +19,10 @@ import type {
   ErpnextCompany,
   ErpnextCustomer,
   ErpnextItem,
+  ErpnextModeOfPayment,
   ErpnextWarehouse,
   PosCartItem,
+  PosCheckoutResult,
 } from "@/types/erpnext";
 
 type PosTenant = {
@@ -35,6 +37,7 @@ type PosClientProps = {
   customers: ErpnextCustomer[];
   warehouses: ErpnextWarehouse[];
   companies: ErpnextCompany[];
+  modesOfPayment: ErpnextModeOfPayment[];
   tenant: PosTenant;
 };
 
@@ -46,6 +49,8 @@ type CreateSalesOrderResponse = ApiResponse<{
     status?: string;
   };
 }>;
+
+type PosCheckoutResponse = ApiResponse<PosCheckoutResult>;
 
 const selectClassName =
   "h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
@@ -87,6 +92,7 @@ export function PosClient({
   customers,
   warehouses,
   companies,
+  modesOfPayment,
   tenant,
 }: PosClientProps) {
   const usableWarehouses = warehouses.filter(
@@ -95,6 +101,10 @@ export function PosClient({
   const activeItems = items.filter((item) => item.disabled !== 1);
   const activeCustomers = customers.filter(
     (customer) => customer.disabled !== 1
+  );
+  const enabledModesOfPayment = modesOfPayment.filter(
+    (modeOfPayment) =>
+      modeOfPayment.enabled !== false && modeOfPayment.enabled !== 0
   );
   const [search, setSearch] = useState("");
   const [customer, setCustomer] = useState(
@@ -106,10 +116,21 @@ export function PosClient({
   const [warehouse, setWarehouse] = useState(
     usableWarehouses.length === 1 ? usableWarehouses[0]?.name ?? "" : ""
   );
+  const [modeOfPayment, setModeOfPayment] = useState(
+    enabledModesOfPayment.length === 1
+      ? enabledModesOfPayment[0]?.name ?? ""
+      : ""
+  );
+  const [paidAmount, setPaidAmount] = useState("");
+  const [referenceNo, setReferenceNo] = useState("");
+  const [referenceDate, setReferenceDate] = useState("");
   const [note, setNote] = useState("");
   const [cart, setCart] = useState<PosCartItem[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [createdOrderName, setCreatedOrderName] = useState<string | null>(null);
+  const [checkoutResult, setCheckoutResult] = useState<PosCheckoutResult | null>(
+    null
+  );
   const [isError, setIsError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const totalStockByItem = useMemo(
@@ -135,12 +156,20 @@ export function PosClient({
     (sum, item) => sum + item.qty * item.rate,
     0
   );
+  const checkoutPaidAmount = paidAmount.trim() ? Number(paidAmount) : total;
   const canCreateOrder = Boolean(
     customer.trim() &&
       company.trim() &&
       warehouse.trim() &&
       cart.length > 0 &&
       cart.every((item) => item.qty > 0 && item.rate >= 0)
+  );
+  const canCheckout = Boolean(
+    canCreateOrder &&
+      modeOfPayment.trim() &&
+      Number.isFinite(checkoutPaidAmount) &&
+      checkoutPaidAmount > 0 &&
+      enabledModesOfPayment.length > 0
   );
 
   function getWarehouseStock(itemCode: string) {
@@ -155,6 +184,7 @@ export function PosClient({
     setMessage(null);
     setIsError(false);
     setCreatedOrderName(null);
+    setCheckoutResult(null);
     setCart((currentCart) => {
       const existingItem = currentCart.find(
         (cartItem) => cartItem.item_code === item.item_code
@@ -204,6 +234,7 @@ export function PosClient({
     setMessage(null);
     setIsError(false);
     setCreatedOrderName(null);
+    setCheckoutResult(null);
 
     try {
       const response = await fetch("/api/erpnext/sales-orders", {
@@ -233,6 +264,9 @@ export function PosClient({
       setMessage("Pedido creado correctamente.");
       setCreatedOrderName(result.data.sales_order.name);
       setCart([]);
+      setPaidAmount("");
+      setReferenceNo("");
+      setReferenceDate("");
       setNote("");
     } catch (error) {
       setIsError(true);
@@ -242,6 +276,71 @@ export function PosClient({
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  async function handleCheckout() {
+    setIsSubmitting(true);
+    setMessage(null);
+    setIsError(false);
+    setCreatedOrderName(null);
+    setCheckoutResult(null);
+
+    try {
+      const response = await fetch("/api/erpnext/pos/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer,
+          company,
+          warehouse,
+          mode_of_payment: modeOfPayment,
+          paid_amount: checkoutPaidAmount,
+          note,
+          reference_no: referenceNo,
+          reference_date: referenceDate,
+          items: cart.map((item) => ({
+            item_code: item.item_code,
+            qty: item.qty,
+            rate: item.rate,
+            warehouse,
+          })),
+        }),
+      });
+      const result = (await response.json()) as PosCheckoutResponse;
+
+      if (!result.success) {
+        setIsError(true);
+        setMessage(result.error.message);
+        return;
+      }
+
+      setMessage("Venta registrada correctamente.");
+      setCheckoutResult(result.data);
+      setCart([]);
+      setPaidAmount("");
+      setReferenceNo("");
+      setReferenceDate("");
+      setNote("");
+    } catch (error) {
+      setIsError(true);
+      setMessage(
+        error instanceof Error ? error.message : "No se pudo finalizar la venta"
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function startNewSale() {
+    setMessage(null);
+    setIsError(false);
+    setCreatedOrderName(null);
+    setCheckoutResult(null);
+    setCart([]);
+    setPaidAmount("");
+    setReferenceNo("");
+    setReferenceDate("");
+    setNote("");
   }
 
   return (
@@ -257,15 +356,23 @@ export function PosClient({
             al ERP.
           </p>
         </div>
-        <Button asChild variant="outline">
-          <Link href={routes.posOrders}>Ver pedidos POS</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href={routes.posOrders}>Ver pedidos POS</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.posInvoices}>Ver facturas y cobros</Link>
+          </Button>
+        </div>
       </div>
 
       <Card className="border-blue-200 bg-blue-50/50">
-        <CardContent className="p-4 text-sm text-blue-900">
-          Esta fase crea un pedido de venta. La facturacion, pagos y
-          contabilidad se conectaran en la siguiente fase.
+        <CardContent className="space-y-1 p-4 text-sm text-blue-900">
+          <p>
+            Finalizar venta crea y confirma la factura, registra el pago y
+            actualiza inventario automaticamente.
+          </p>
+          <p>Si aun no cobraste, guarda como pedido pendiente.</p>
         </CardContent>
       </Card>
 
@@ -352,9 +459,9 @@ export function PosClient({
 
         <Card>
           <CardHeader>
-            <CardTitle>Pedido</CardTitle>
+            <CardTitle>Caja</CardTitle>
             <CardDescription>
-              Selecciona cliente, bodega y revisa el carrito.
+              Selecciona cliente, bodega, metodo de pago y revisa el carrito.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -420,6 +527,34 @@ export function PosClient({
                   Configura una bodega utilizable antes de vender.
                 </p>
               ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pos_mode_of_payment">Metodo de pago</Label>
+              <select
+                id="pos_mode_of_payment"
+                className={selectClassName}
+                value={modeOfPayment}
+                onChange={(event) => setModeOfPayment(event.target.value)}
+                disabled={enabledModesOfPayment.length === 0}
+              >
+                <option value="">Selecciona un metodo</option>
+                {enabledModesOfPayment.map((paymentMode) => (
+                  <option key={paymentMode.name} value={paymentMode.name}>
+                    {paymentMode.name}
+                  </option>
+                ))}
+              </select>
+              {enabledModesOfPayment.length === 0 ? (
+                <p className="text-xs text-amber-700">
+                  Primero configura metodos de pago para poder finalizar ventas.
+                </p>
+              ) : null}
+              <p className="text-xs text-muted-foreground">
+                Cada metodo de pago debe tener una cuenta de caja o banco
+                configurada. Ejemplo: Efectivo a Caja general, Transferencia a
+                Banco Pichincha.
+              </p>
             </div>
 
             <div className="space-y-3">
@@ -524,6 +659,43 @@ export function PosClient({
               </div>
             </div>
 
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="pos_paid_amount">Monto recibido</Label>
+                <Input
+                  id="pos_paid_amount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={paidAmount}
+                  onChange={(event) => setPaidAmount(event.target.value)}
+                  placeholder={total > 0 ? String(total) : "0.00"}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Si lo dejas vacio, se cobrara el total.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pos_reference_date">Fecha referencia</Label>
+                <Input
+                  id="pos_reference_date"
+                  type="date"
+                  value={referenceDate}
+                  onChange={(event) => setReferenceDate(event.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pos_reference_no">Referencia opcional</Label>
+              <Input
+                id="pos_reference_no"
+                value={referenceNo}
+                onChange={(event) => setReferenceNo(event.target.value)}
+                placeholder="Ej. transferencia, voucher o numero de autorizacion"
+              />
+            </div>
+
             {message ? (
               <div
                 className={
@@ -536,17 +708,56 @@ export function PosClient({
                 {createdOrderName ? (
                   <p className="mt-1 font-medium">Pedido: {createdOrderName}</p>
                 ) : null}
+                {checkoutResult ? (
+                  <div className="mt-2 space-y-2">
+                    <p className="font-medium">
+                      Factura: {checkoutResult.invoice.name}
+                    </p>
+                    <p className="font-medium">
+                      Pago: {checkoutResult.payment.name}
+                    </p>
+                    <p>
+                      Total cobrado:{" "}
+                      {formatMoney(checkoutResult.payment.paid_amount ?? 0)}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button asChild size="sm" variant="outline">
+                        <Link
+                          href={`${routes.posInvoices}/${encodeURIComponent(
+                            checkoutResult.invoice.name
+                          )}`}
+                        >
+                          Ver factura
+                        </Link>
+                      </Button>
+                      <Button type="button" size="sm" onClick={startNewSale}>
+                        Nueva venta
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
-            <Button
-              type="button"
-              className="w-full"
-              disabled={!canCreateOrder || isSubmitting}
-              onClick={handleCreateOrder}
-            >
-              {isSubmitting ? "Creando pedido..." : "Crear pedido"}
-            </Button>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button
+                type="button"
+                className="w-full"
+                disabled={!canCheckout || isSubmitting}
+                onClick={handleCheckout}
+              >
+                {isSubmitting ? "Finalizando..." : "Finalizar venta"}
+              </Button>
+              <Button
+                type="button"
+                className="w-full"
+                variant="outline"
+                disabled={!canCreateOrder || isSubmitting}
+                onClick={handleCreateOrder}
+              >
+                {isSubmitting ? "Guardando..." : "Guardar como pedido pendiente"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

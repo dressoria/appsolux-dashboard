@@ -200,7 +200,12 @@ export type PosCartItem = {
   rate: number;
 };
 
-export type PosCheckoutInput = CreateSalesOrderInput;
+export type PosCheckoutItemInput = {
+  item_code: string;
+  qty: number;
+  rate: number;
+  warehouse?: string;
+};
 
 export type ErpnextSalesInvoiceItem = {
   item_code: string;
@@ -220,14 +225,103 @@ export type ErpnextSalesInvoice = {
   posting_date?: string;
   due_date?: string;
   grand_total?: number;
+  outstanding_amount?: number;
+  paid_amount?: number;
   status?: string;
   docstatus?: 0 | 1 | 2;
   company?: string;
+  debit_to?: string;
+  currency?: string;
+  company_currency?: string;
   items?: ErpnextSalesInvoiceItem[];
 };
 
 export type CreateSalesInvoiceFromOrderInput = {
   sales_order_name: string;
+};
+
+export type ErpnextPaymentEntry = {
+  name: string;
+  payment_type?: "Receive" | "Pay" | "Internal Transfer";
+  party_type?: string;
+  party?: string;
+  paid_amount?: number;
+  received_amount?: number;
+  mode_of_payment?: string;
+  paid_to?: string;
+  paid_to_account_currency?: string;
+  paid_from?: string;
+  paid_from_account_currency?: string;
+  posting_date?: string;
+  status?: string;
+  docstatus?: 0 | 1 | 2;
+};
+
+export type ErpnextModeOfPaymentAccount = {
+  company?: string;
+  default_account?: string;
+  account?: string;
+};
+
+export type ErpnextModeOfPayment = {
+  name: string;
+  type?: string;
+  enabled?: boolean | 0 | 1;
+  accounts?: ErpnextModeOfPaymentAccount[];
+};
+
+export type ErpnextAccount = {
+  name: string;
+  account_currency?: string;
+};
+
+export type CreatePaymentEntryInput = {
+  sales_invoice_name: string;
+  paid_amount: number;
+  mode_of_payment: string;
+  reference_no?: string;
+  reference_date?: string;
+  note?: string;
+};
+
+export type PosCheckoutInput = {
+  customer: string;
+  company: string;
+  warehouse: string;
+  mode_of_payment: string;
+  paid_amount: number;
+  items: PosCheckoutItemInput[];
+  note?: string;
+  reference_no?: string;
+  reference_date?: string;
+};
+
+export type PosCheckoutInvoiceResult = {
+  name: string;
+  customer: string;
+  grand_total?: number;
+  status?: string;
+  docstatus?: 0 | 1 | 2;
+};
+
+export type PosCheckoutPaymentResult = {
+  name: string;
+  paid_amount?: number;
+  mode_of_payment?: string;
+  party?: string;
+  status?: string;
+  docstatus?: 0 | 1 | 2;
+};
+
+export type PosCheckoutResult = {
+  invoice: PosCheckoutInvoiceResult;
+  payment: PosCheckoutPaymentResult;
+};
+
+export type ErpnextPaymentSummary = {
+  sales_invoice_name: string;
+  outstanding_amount: number;
+  paid_amount: number;
 };
 
 export type ErpnextInvoice = {
