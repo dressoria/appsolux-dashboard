@@ -15,26 +15,30 @@ import { Label } from "@/components/ui/label";
 import type { ApiResponse } from "@/types/api";
 import type {
   ErpnextItem,
-  ErpnextStockEntry,
   ErpnextWarehouse,
+  StockAdjustmentResult,
 } from "@/types/erpnext";
 
-type CreateStockEntryFormProps = {
+type AdjustStockFormProps = {
   items: ErpnextItem[];
   warehouses: ErpnextWarehouse[];
 };
 
-type CreateStockEntryResponse = ApiResponse<{
-  stock_entry: ErpnextStockEntry;
-}>;
+type AdjustStockResponse = ApiResponse<StockAdjustmentResult>;
 
 const selectClassName =
   "h-8 w-full rounded-lg border border-input bg-background px-2.5 py-1 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
 
-export function CreateStockEntryForm({
-  items,
-  warehouses,
-}: CreateStockEntryFormProps) {
+const adjustmentReasons = [
+  "Conteo fisico",
+  "Producto danado",
+  "Producto perdido",
+  "Correccion de registro",
+  "Devolucion",
+  "Otro",
+];
+
+export function AdjustStockForm({ items, warehouses }: AdjustStockFormProps) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
@@ -45,8 +49,7 @@ export function CreateStockEntryForm({
   const usableWarehouses = warehouses.filter(
     (warehouse) => warehouse.disabled !== 1 && warehouse.is_group !== 1
   );
-  const canCreateStockEntry =
-    stockItems.length > 0 && usableWarehouses.length > 0;
+  const canAdjustStock = stockItems.length > 0 && usableWarehouses.length > 0;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -58,17 +61,18 @@ export function CreateStockEntryForm({
     const payload = {
       item_code: String(formData.get("item_code") ?? "").trim(),
       warehouse: String(formData.get("warehouse") ?? "").trim(),
-      qty: Number(formData.get("qty") ?? 0),
-      basic_rate: Number(formData.get("basic_rate") ?? 0),
+      counted_qty: Number(formData.get("counted_qty") ?? 0),
+      reason: String(formData.get("reason") ?? "").trim(),
+      note: String(formData.get("note") ?? "").trim(),
     };
 
     try {
-      const response = await fetch("/api/erpnext/stock-entries", {
+      const response = await fetch("/api/erpnext/stock-adjustments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const result = (await response.json()) as CreateStockEntryResponse;
+      const result = (await response.json()) as AdjustStockResponse;
 
       if (!result.success) {
         setIsError(true);
@@ -76,14 +80,21 @@ export function CreateStockEntryForm({
         return;
       }
 
-      setMessage("Stock agregado correctamente. El inventario fue actualizado.");
+      if (result.data.difference === 0) {
+        setMessage(
+          "El stock contado coincide con el stock actual. No se necesita ajuste."
+        );
+        return;
+      }
+
+      setMessage("Inventario ajustado correctamente.");
       router.refresh();
     } catch (error) {
       setIsError(true);
       setMessage(
         error instanceof Error
           ? error.message
-          : "No se pudo crear el movimiento de inventario"
+          : "No se pudo ajustar el inventario"
       );
     } finally {
       setIsSubmitting(false);
@@ -93,29 +104,29 @@ export function CreateStockEntryForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Agregar stock</CardTitle>
+        <CardTitle>Ajustar stock</CardTitle>
         <CardDescription>
-          Registra unidades disponibles en una bodega o ubicacion. Al guardar,
-          el inventario se actualiza automaticamente.
+          Ajusta el inventario cuando el conteo real no coincide con el sistema.
+          Appsolux registrara un movimiento para mantener trazabilidad.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {!canCreateStockEntry ? (
+        {!canAdjustStock ? (
           <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
             Primero se necesita al menos un producto que maneje inventario y una
-            bodega utilizable para agregar stock.
+            bodega utilizable para ajustar stock.
           </div>
         ) : null}
 
         <form className="mt-3 space-y-3" onSubmit={handleSubmit}>
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="item_code">Producto</Label>
+              <Label htmlFor="adjust_item_code">Producto</Label>
               <select
-                id="item_code"
+                id="adjust_item_code"
                 name="item_code"
                 className={selectClassName}
-                disabled={!canCreateStockEntry}
+                disabled={!canAdjustStock}
                 required
               >
                 <option value="">Selecciona un producto</option>
@@ -127,12 +138,12 @@ export function CreateStockEntryForm({
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="warehouse">Bodega / ubicacion</Label>
+              <Label htmlFor="adjust_warehouse">Bodega / ubicacion</Label>
               <select
-                id="warehouse"
+                id="adjust_warehouse"
                 name="warehouse"
                 className={selectClassName}
-                disabled={!canCreateStockEntry}
+                disabled={!canAdjustStock}
                 required
               >
                 <option value="">Selecciona una bodega</option>
@@ -147,29 +158,44 @@ export function CreateStockEntryForm({
 
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="qty">Cantidad</Label>
+              <Label htmlFor="counted_qty">Stock contado real</Label>
               <Input
-                id="qty"
-                name="qty"
+                id="counted_qty"
+                name="counted_qty"
                 type="number"
-                min="0.01"
+                min="0"
                 step="0.01"
-                disabled={!canCreateStockEntry}
+                disabled={!canAdjustStock}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="basic_rate">Costo unitario</Label>
-              <Input
-                id="basic_rate"
-                name="basic_rate"
-                type="number"
-                min="0"
-                step="0.01"
-                defaultValue="0"
-                disabled={!canCreateStockEntry}
-              />
+              <Label htmlFor="reason">Motivo del ajuste</Label>
+              <select
+                id="reason"
+                name="reason"
+                className={selectClassName}
+                disabled={!canAdjustStock}
+                required
+              >
+                <option value="">Selecciona un motivo</option>
+                {adjustmentReasons.map((reason) => (
+                  <option key={reason} value={reason}>
+                    {reason}
+                  </option>
+                ))}
+              </select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="note">Nota opcional</Label>
+            <Input
+              id="note"
+              name="note"
+              disabled={!canAdjustStock}
+              placeholder="Ej. conteo de cierre, producto vencido, correccion interna"
+            />
           </div>
 
           {message ? (
@@ -184,8 +210,8 @@ export function CreateStockEntryForm({
             </p>
           ) : null}
 
-          <Button type="submit" disabled={!canCreateStockEntry || isSubmitting}>
-            {isSubmitting ? "Agregando..." : "Agregar stock"}
+          <Button type="submit" disabled={!canAdjustStock || isSubmitting}>
+            {isSubmitting ? "Ajustando..." : "Ajustar stock"}
           </Button>
         </form>
       </CardContent>

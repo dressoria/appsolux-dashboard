@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createErpnextStockEntry } from "@/lib/api/erpnext/stock-entries";
+import { createAndSubmitErpnextStockEntry } from "@/lib/api/erpnext/stock-entries";
+import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import type { CreateStockEntryInput } from "@/types/erpnext";
 
@@ -45,13 +46,52 @@ export async function POST(request: Request) {
     const qty = getNumberField(body, "qty");
     const basicRate = getNumberField(body, "basic_rate");
 
-    if (!itemCode || !warehouse || !Number.isFinite(qty) || qty <= 0) {
+    if (
+      !itemCode ||
+      !warehouse ||
+      !Number.isFinite(qty) ||
+      qty <= 0 ||
+      (Number.isFinite(basicRate) && basicRate < 0)
+    ) {
       return NextResponse.json(
         {
           success: false,
           error: {
             code: "INVALID_STOCK_ENTRY_INPUT",
-            message: "item_code, warehouse and qty greater than 0 are required",
+            message:
+              "Producto, bodega, cantidad mayor a 0 y costo no negativo son requeridos",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    const warehouses = await getErpnextWarehouses();
+    const selectedWarehouse = warehouses.find(
+      (erpWarehouse) => erpWarehouse.name === warehouse
+    );
+
+    if (!selectedWarehouse || selectedWarehouse.disabled === 1) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "INVALID_WAREHOUSE",
+            message: "Selecciona una bodega utilizable para agregar stock",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    if (selectedWarehouse.is_group === 1) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "WAREHOUSE_GROUP_NOT_ALLOWED",
+            message:
+              "Las bodegas de grupo solo organizan la estructura y no reciben stock directamente",
           },
         },
         { status: 400 }
@@ -64,7 +104,7 @@ export async function POST(request: Request) {
       qty,
       basic_rate: Number.isFinite(basicRate) ? basicRate : undefined,
     };
-    const stockEntry = await createErpnextStockEntry(input);
+    const stockEntry = await createAndSubmitErpnextStockEntry(input);
 
     return NextResponse.json({
       success: true,

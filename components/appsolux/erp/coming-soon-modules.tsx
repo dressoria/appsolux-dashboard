@@ -6,7 +6,7 @@ const posCapabilities = [
   "Agregar al carrito",
   "Seleccionar cliente",
   "Registrar forma de pago",
-  "Crear venta en ERPNext",
+  "Crear venta en el ERP",
   "Preparar factura o comprobante",
 ];
 
@@ -24,7 +24,7 @@ export function PosPreviewCard() {
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
           Modulo proximo para vender productos, seleccionar cliente, armar
-          carrito, registrar pagos y enviar la venta a ERPNext.
+          carrito, registrar pagos y enviar la venta al ERP.
         </p>
         <div className="grid gap-2 sm:grid-cols-2">
           {posCapabilities.map((capability) => (

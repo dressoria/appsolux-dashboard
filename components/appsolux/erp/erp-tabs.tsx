@@ -5,13 +5,16 @@ import {
   AccountingPreviewCard,
   PosPreviewCard,
 } from "@/components/appsolux/erp/coming-soon-modules";
+import { AdjustStockForm } from "@/components/appsolux/erp/adjust-stock-form";
 import { CreateCustomerForm } from "@/components/appsolux/erp/create-customer-form";
 import { CreateItemForm } from "@/components/appsolux/erp/create-item-form";
 import { CreateStockEntryForm } from "@/components/appsolux/erp/create-stock-entry-form";
+import { CreateWarehouseDialog } from "@/components/appsolux/erp/create-warehouse-dialog";
 import { CustomersTable } from "@/components/appsolux/erp/customers-table";
 import { ErpSummary } from "@/components/appsolux/erp/erp-summary";
 import { InventoryTable } from "@/components/appsolux/erp/inventory-table";
 import { ItemsTable } from "@/components/appsolux/erp/items-table";
+import { StockLedgerTable } from "@/components/appsolux/erp/stock-ledger-table";
 import { WarehousesTable } from "@/components/appsolux/erp/warehouses-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type {
@@ -19,6 +22,7 @@ import type {
   ErpnextCustomer,
   ErpnextItem,
   ErpnextMasters,
+  ErpnextStockLedgerEntry,
   ErpnextWarehouse,
 } from "@/types/erpnext";
 
@@ -35,6 +39,7 @@ type ErpTabsProps = {
   items: ErpnextItem[];
   warehouses: ErpnextWarehouse[];
   inventory: ErpnextBin[];
+  stockLedgerEntries: ErpnextStockLedgerEntry[];
   customers: ErpnextCustomer[];
   masters: ErpnextMasters;
   masterWarnings: string[];
@@ -87,11 +92,11 @@ function ConnectionPanel({ masterWarnings }: { masterWarnings: string[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Conexion ERPNext</CardTitle>
+        <CardTitle>Conexion ERP</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          ERP conectado a ERPNext. Los datos y formularios usan informacion real.
+          ERP conectado. Los datos y formularios usan informacion real.
         </p>
         {masterWarnings.length > 0 ? (
           <div className="flex flex-wrap gap-2">
@@ -106,7 +111,7 @@ function ConnectionPanel({ masterWarnings }: { masterWarnings: string[] }) {
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Maestros principales disponibles para operar productos y clientes.
+            Configuracion principal disponible para operar productos y clientes.
           </p>
         )}
       </CardContent>
@@ -168,8 +173,8 @@ function SummaryTab({
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Crea productos y clientes reales, revisa stock y registra entradas
-            de inventario en borrador. Usa las pestañas para trabajar por area.
+            Crea productos y clientes reales, revisa stock y agrega unidades a
+            tus bodegas. Usa las pestanas para trabajar por area.
           </p>
         </CardContent>
       </Card>
@@ -182,6 +187,7 @@ export function ErpTabs({
   items,
   warehouses,
   inventory,
+  stockLedgerEntries,
   customers,
   masters,
   masterWarnings,
@@ -191,19 +197,8 @@ export function ErpTabs({
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <ErpSummary
-          itemsCount={items.length}
-          warehousesCount={warehouses.length}
-          customersCount={customers.length}
-          inventoryRowsCount={inventory.length}
-        />
-        <ConnectionPanel masterWarnings={masterWarnings} />
-        <QuickAccessPanel onSelectTab={setActiveTab} />
-      </div>
-
-      <div className="space-y-4">
         <div className="overflow-x-auto">
-          <div className="flex min-w-max gap-2 rounded-xl border bg-muted/40 p-1">
+          <div className="flex min-w-max gap-1 rounded-xl border bg-card p-1 shadow-sm">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -211,8 +206,8 @@ export function ErpTabs({
                 onClick={() => setActiveTab(tab.id)}
                 className={
                   activeTab === tab.id
-                    ? "rounded-lg bg-background px-3 py-2 text-sm font-medium shadow-sm"
-                    : "rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
+                    ? "rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background shadow-sm"
+                    : "rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 }
               >
                 {tab.label}
@@ -236,12 +231,12 @@ export function ErpTabs({
           <div className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Productos reales</CardTitle>
+                <CardTitle>Productos</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  Los productos se crean directamente en ERPNext usando grupos y
-                  unidades de medida reales.
+                  Los productos se crean en tu ERP usando categorias y unidades
+                  reales.
                 </p>
               </CardContent>
             </Card>
@@ -249,7 +244,11 @@ export function ErpTabs({
               itemGroups={masters.itemGroups}
               uoms={masters.uoms}
             />
-            <ItemsTable items={items} />
+            <ItemsTable
+              items={items}
+              itemGroups={masters.itemGroups}
+              uoms={masters.uoms}
+            />
           </div>
         ) : null}
 
@@ -257,17 +256,23 @@ export function ErpTabs({
           <div className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Stock e ingresos</CardTitle>
+                <CardTitle>Inventario / stock</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  La entrada de inventario crea un Stock Entry en borrador. No
-                  se hace submit automatico.
+                  Agregar stock registra y confirma el movimiento para
+                  actualizar el inventario automaticamente.
                 </p>
               </CardContent>
             </Card>
             <CreateStockEntryForm items={items} warehouses={warehouses} />
+            <AdjustStockForm items={items} warehouses={warehouses} />
             <InventoryTable inventory={inventory} />
+            <StockLedgerTable
+              entries={stockLedgerEntries}
+              items={items}
+              warehouses={warehouses}
+            />
           </div>
         ) : null}
 
@@ -275,17 +280,20 @@ export function ErpTabs({
           <div className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Clientes reales</CardTitle>
+                <CardTitle>Clientes</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  Los clientes se registran en ERPNext usando territorios reales
-                  para futuras ventas, seguimiento y facturacion.
+                  Los clientes se registran usando ubicaciones reales para
+                  futuras ventas, seguimiento y facturacion.
                 </p>
               </CardContent>
             </Card>
             <CreateCustomerForm territories={masters.territories} />
-            <CustomersTable customers={customers} />
+            <CustomersTable
+              customers={customers}
+              territories={masters.territories}
+            />
           </div>
         ) : null}
 
@@ -293,12 +301,18 @@ export function ErpTabs({
           <div className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Bodegas y estructura</CardTitle>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <CardTitle>Bodegas / ubicaciones</CardTitle>
+                  <CreateWarehouseDialog companies={masters.companies} />
+                </div>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  Las bodegas de grupo ordenan la estructura. Los movimientos de
-                  stock usan solo bodegas no-grupo.
+                  Una bodega o ubicacion es el lugar donde guardas productos:
+                  local principal, sucursal, mostrador o bodega central. Las
+                  bodegas utilizables reciben stock. Las bodegas de grupo solo
+                  organizan la estructura y no se usan directamente para
+                  movimientos.
                 </p>
               </CardContent>
             </Card>

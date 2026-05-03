@@ -6,6 +6,14 @@ export type ErpnextCreateResponse<T> = {
   data: T;
 };
 
+export type ErpnextMethodResponse<T> = {
+  message: T;
+};
+
+export type ErpnextDeleteResponse = {
+  message?: string;
+};
+
 export type ErpnextItem = {
   name: string;
   item_name: string;
@@ -92,13 +100,15 @@ export type ErpnextMasters = {
 
 export type ErpnextStockEntryItem = {
   item_code: string;
-  t_warehouse: string;
+  t_warehouse?: string;
+  s_warehouse?: string;
   qty: number;
   basic_rate: number;
 };
 
 export type ErpnextStockEntry = {
   name: string;
+  doctype?: "Stock Entry";
   stock_entry_type?: string;
   purpose?: string;
   docstatus?: 0 | 1 | 2;
@@ -110,6 +120,35 @@ export type CreateStockEntryInput = {
   warehouse: string;
   qty: number;
   basic_rate?: number;
+};
+
+export type CreateStockAdjustmentInput = {
+  item_code: string;
+  warehouse: string;
+  counted_qty: number;
+  reason: string;
+  note?: string;
+};
+
+export type StockAdjustmentResult = {
+  item_code: string;
+  warehouse: string;
+  previous_qty: number;
+  counted_qty: number;
+  difference: number;
+  document_name: string | null;
+};
+
+export type ErpnextStockLedgerEntry = {
+  name: string;
+  posting_date?: string;
+  posting_time?: string;
+  item_code: string;
+  warehouse: string;
+  actual_qty?: number;
+  qty_after_transaction?: number;
+  voucher_type?: string;
+  voucher_no?: string;
 };
 
 export type ErpnextInvoice = {

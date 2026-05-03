@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -27,11 +28,23 @@ function getTerritoryLabel(territory: ErpnextTerritory) {
   return territory.territory_name ?? territory.name;
 }
 
+function getDefaultTerritory(territories: ErpnextTerritory[]) {
+  return (
+    territories.find((territory) =>
+      [territory.name, territory.territory_name ?? ""].some(
+        (value) => value.toLowerCase() === "ecuador"
+      )
+    )?.name ?? ""
+  );
+}
+
 export function CreateCustomerForm({ territories }: CreateCustomerFormProps) {
+  const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const canCreateCustomer = territories.length > 0;
+  const defaultTerritory = getDefaultTerritory(territories);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -61,7 +74,7 @@ export function CreateCustomerForm({ territories }: CreateCustomerFormProps) {
       }
 
       setMessage(`Cliente creado: ${result.data.customer.customer_name}`);
-      window.setTimeout(() => window.location.reload(), 900);
+      router.refresh();
     } catch (error) {
       setIsError(true);
       setMessage(
@@ -77,14 +90,13 @@ export function CreateCustomerForm({ territories }: CreateCustomerFormProps) {
       <CardHeader>
         <CardTitle>Crear cliente</CardTitle>
         <CardDescription>
-          Registra un cliente real en ERPNext para ventas, seguimiento y
-          facturacion.
+          Registra un cliente para ventas, seguimiento y facturacion.
         </CardDescription>
       </CardHeader>
       <CardContent>
         {!canCreateCustomer ? (
           <div className="mb-3 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-            Primero configura territorios en ERPNext.
+            Primero configura ubicaciones o territorios en el ERP.
           </div>
         ) : null}
 
@@ -114,12 +126,13 @@ export function CreateCustomerForm({ territories }: CreateCustomerFormProps) {
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="territory">Territorio</Label>
+              <Label htmlFor="territory">Ubicacion / territorio</Label>
               <select
                 id="territory"
                 name="territory"
                 className={selectClassName}
                 disabled={!canCreateCustomer}
+                defaultValue={defaultTerritory}
                 required
               >
                 <option value="">Selecciona un territorio</option>
@@ -129,6 +142,9 @@ export function CreateCustomerForm({ territories }: CreateCustomerFormProps) {
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-muted-foreground">
+                Sirve para organizar clientes por zona o pais.
+              </p>
             </div>
           </div>
 

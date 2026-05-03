@@ -18,16 +18,31 @@ function getSafeErpnextMessage(payload: unknown): string | null {
     }
   }
 
+  if (Array.isArray(payload)) {
+    const messages = payload
+      .map((item) => getSafeErpnextMessage(item))
+      .filter((item): item is string => Boolean(item));
+
+    return messages.length > 0 ? messages.join(" ") : null;
+  }
+
   if (!payload || typeof payload !== "object") {
     return null;
   }
 
   const record = payload as Record<string, unknown>;
   const directMessage =
-    record.message ?? record._server_messages ?? record.exception ?? record.exc;
+    record.message ??
+    record._server_messages ??
+    record.exception ??
+    record.exc ??
+    record.error;
 
   if (typeof directMessage === "string" && directMessage.trim()) {
-    if (directMessage.trim().startsWith("[") || directMessage.trim().startsWith("{")) {
+    if (
+      directMessage.trim().startsWith("[") ||
+      directMessage.trim().startsWith("{")
+    ) {
       try {
         return getSafeErpnextMessage(JSON.parse(directMessage));
       } catch {
@@ -44,6 +59,10 @@ function getSafeErpnextMessage(payload: unknown): string | null {
       .filter((item): item is string => Boolean(item));
 
     return messages.length > 0 ? messages.join(" ") : null;
+  }
+
+  if (directMessage && typeof directMessage === "object") {
+    return getSafeErpnextMessage(directMessage);
   }
 
   return null;
@@ -67,11 +86,14 @@ export async function erpnextFetch<T>(
 
   if (!response.ok) {
     let payload: unknown = null;
+    const text = await response.text();
 
-    try {
-      payload = await response.json();
-    } catch {
-      payload = await response.text();
+    if (text.trim()) {
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        payload = text;
+      }
     }
 
     const message =
@@ -83,5 +105,11 @@ export async function erpnextFetch<T>(
     throw new Error(message);
   }
 
-  return response.json() as Promise<T>;
+  const text = await response.text();
+
+  if (!text.trim()) {
+    return {} as T;
+  }
+
+  return JSON.parse(text) as T;
 }

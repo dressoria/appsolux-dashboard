@@ -3,6 +3,7 @@ import { erpnextFetch } from "./client";
 import type {
   CreateErpnextItemInput,
   ErpnextCreateResponse,
+  ErpnextDeleteResponse,
   ErpnextItem,
   ErpnextListResponse,
 } from "@/types/erpnext";
@@ -44,6 +45,54 @@ export async function createErpnextItem(
         stock_uom: input.stock_uom,
         item_group: input.item_group,
         is_stock_item: input.is_stock_item === false ? 0 : 1,
+      }),
+    }
+  );
+
+  return response.data;
+}
+
+export async function updateErpnextItem(
+  name: string,
+  input: Partial<CreateErpnextItemInput>
+): Promise<ErpnextItem> {
+  const response = await erpnextFetch<ErpnextCreateResponse<ErpnextItem>>(
+    `/api/resource/Item/${encodeURIComponent(name)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        item_name: input.item_name,
+        stock_uom: input.stock_uom,
+        item_group: input.item_group,
+        is_stock_item:
+          typeof input.is_stock_item === "boolean"
+            ? input.is_stock_item
+              ? 1
+              : 0
+            : undefined,
+      }),
+    }
+  );
+
+  return response.data;
+}
+
+export async function deleteErpnextItem(name: string): Promise<void> {
+  await erpnextFetch<ErpnextDeleteResponse>(
+    `/api/resource/Item/${encodeURIComponent(name)}`,
+    {
+      method: "DELETE",
+    }
+  );
+}
+
+export async function disableErpnextItem(name: string): Promise<ErpnextItem> {
+  const response = await erpnextFetch<ErpnextCreateResponse<ErpnextItem>>(
+    `/api/resource/Item/${encodeURIComponent(name)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        disabled: 1,
       }),
     }
   );

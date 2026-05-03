@@ -4,6 +4,7 @@ import type {
   CreateErpnextCustomerInput,
   ErpnextCreateResponse,
   ErpnextCustomer,
+  ErpnextDeleteResponse,
   ErpnextListResponse,
 } from "@/types/erpnext";
 
@@ -24,6 +25,50 @@ export async function getErpnextCustomers(): Promise<ErpnextCustomer[]> {
 
   const response = await erpnextFetch<ErpnextListResponse<ErpnextCustomer>>(
     `/api/resource/Customer?${params.toString()}`
+  );
+
+  return response.data;
+}
+
+export async function updateErpnextCustomer(
+  name: string,
+  input: CreateErpnextCustomerInput
+): Promise<ErpnextCustomer> {
+  const response = await erpnextFetch<ErpnextCreateResponse<ErpnextCustomer>>(
+    `/api/resource/Customer/${encodeURIComponent(name)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        customer_name: input.customer_name,
+        customer_type: input.customer_type ?? "Individual",
+        territory: input.territory,
+      }),
+    }
+  );
+
+  return response.data;
+}
+
+export async function deleteErpnextCustomer(name: string): Promise<void> {
+  await erpnextFetch<ErpnextDeleteResponse>(
+    `/api/resource/Customer/${encodeURIComponent(name)}`,
+    {
+      method: "DELETE",
+    }
+  );
+}
+
+export async function disableErpnextCustomer(
+  name: string
+): Promise<ErpnextCustomer> {
+  const response = await erpnextFetch<ErpnextCreateResponse<ErpnextCustomer>>(
+    `/api/resource/Customer/${encodeURIComponent(name)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        disabled: 1,
+      }),
+    }
   );
 
   return response.data;

@@ -5,6 +5,7 @@ import { getErpnextCustomers } from "@/lib/api/erpnext/customers";
 import { getErpnextInventory } from "@/lib/api/erpnext/inventory";
 import { getErpnextItems } from "@/lib/api/erpnext/items";
 import { getErpnextMasters } from "@/lib/api/erpnext/masters";
+import { getErpnextStockLedger } from "@/lib/api/erpnext/stock-ledger";
 import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
@@ -30,7 +31,7 @@ async function loadErpResource<T>(
       error:
         error instanceof Error
           ? error.message
-          : "No se pudo cargar informacion desde ERPNext",
+          : "No se pudo cargar informacion desde el ERP",
     };
   }
 }
@@ -64,12 +65,14 @@ export default async function ErpPage() {
     itemsResult,
     warehousesResult,
     inventoryResult,
+    stockLedgerResult,
     customersResult,
     mastersResult,
   ] = await Promise.all([
     loadErpResource(getErpnextItems, []),
     loadErpResource(getErpnextWarehouses, []),
     loadErpResource(getErpnextInventory, []),
+    loadErpResource(getErpnextStockLedger, []),
     loadErpResource(getErpnextCustomers, []),
     loadErpResource(getErpnextMasters, emptyMasters),
   ]);
@@ -77,15 +80,16 @@ export default async function ErpPage() {
     { label: "Productos", message: itemsResult.error },
     { label: "Bodegas", message: warehousesResult.error },
     { label: "Inventario", message: inventoryResult.error },
+    { label: "Movimientos", message: stockLedgerResult.error },
     { label: "Clientes", message: customersResult.error },
-    { label: "Maestros", message: mastersResult.error },
+    { label: "Configuracion", message: mastersResult.error },
   ].filter(
     (resourceError): resourceError is { label: string; message: string } =>
       Boolean(resourceError.message)
   );
   const masterWarnings = [
-    mastersResult.data.itemGroups.length === 0 ? "Sin grupos de producto" : null,
-    mastersResult.data.uoms.length === 0 ? "Sin unidades de medida" : null,
+    mastersResult.data.itemGroups.length === 0 ? "Sin categorias" : null,
+    mastersResult.data.uoms.length === 0 ? "Sin unidades" : null,
     mastersResult.data.territories.length === 0 ? "Sin territorios" : null,
     mastersResult.data.companies.length === 0 ? "Sin empresa configurada" : null,
   ].filter((warning): warning is string => Boolean(warning));
@@ -97,13 +101,22 @@ export default async function ErpPage() {
           <p className="text-sm text-muted-foreground">ERP</p>
           <h1 className="text-3xl font-semibold tracking-tight">ERP</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Inventario, clientes, ventas y gestion operativa conectada a
-            ERPNext.
+            Inventario, clientes, ventas y gestion operativa conectada al ERP.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             Tenant: {tenant.name}
           </p>
         </div>
+
+        <ErpTabs
+          items={itemsResult.data}
+          warehouses={warehousesResult.data}
+          inventory={inventoryResult.data}
+          stockLedgerEntries={stockLedgerResult.data}
+          customers={customersResult.data}
+          masters={mastersResult.data}
+          masterWarnings={masterWarnings}
+        />
 
         {resourceErrors.length > 0 ? (
           <Card>
@@ -119,15 +132,6 @@ export default async function ErpPage() {
             </CardContent>
           </Card>
         ) : null}
-
-        <ErpTabs
-          items={itemsResult.data}
-          warehouses={warehousesResult.data}
-          inventory={inventoryResult.data}
-          customers={customersResult.data}
-          masters={mastersResult.data}
-          masterWarnings={masterWarnings}
-        />
       </div>
     </DashboardShell>
   );
