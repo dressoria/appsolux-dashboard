@@ -14,9 +14,33 @@ function formatMoney(value: number | undefined) {
   }).format(value ?? 0);
 }
 
-function getStatusLabel(status?: string) {
-  if (!status || status.toLowerCase() === "draft") {
+function getStatusLabel({
+  docstatus,
+  status,
+  outstandingAmount,
+}: {
+  docstatus?: 0 | 1 | 2;
+  status?: string;
+  outstandingAmount?: number;
+}) {
+  if (docstatus === 2) {
+    return "Anulada";
+  }
+
+  if (docstatus === 0 || !status || status.toLowerCase() === "draft") {
     return "Borrador";
+  }
+
+  if ((outstandingAmount ?? 0) <= 0) {
+    return "Pagada";
+  }
+
+  if (docstatus === 1 && (outstandingAmount ?? 0) > 0) {
+    return "Pendiente de pago";
+  }
+
+  if (status.toLowerCase() === "submitted") {
+    return "Confirmada";
   }
 
   return status;
@@ -113,7 +137,11 @@ export default async function PosInvoicesPage() {
                           {salesInvoice.posting_date ?? "-"}
                         </td>
                         <td className="py-2 pr-4">
-                          {getStatusLabel(salesInvoice.status)}
+                          {getStatusLabel({
+                            docstatus: salesInvoice.docstatus,
+                            status: salesInvoice.status,
+                            outstandingAmount: salesInvoice.outstanding_amount,
+                          })}
                         </td>
                         <td className="py-2 pr-4">
                           {formatMoney(salesInvoice.grand_total)}

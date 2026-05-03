@@ -208,6 +208,8 @@ export type PosCheckoutItemInput = {
 };
 
 export type ErpnextSalesInvoiceItem = {
+  doctype?: "Sales Invoice Item";
+  name?: string;
   item_code: string;
   item_name?: string;
   qty: number;
@@ -219,6 +221,7 @@ export type ErpnextSalesInvoiceItem = {
 };
 
 export type ErpnextSalesInvoice = {
+  doctype?: "Sales Invoice";
   name: string;
   customer: string;
   customer_name?: string;
@@ -233,11 +236,44 @@ export type ErpnextSalesInvoice = {
   debit_to?: string;
   currency?: string;
   company_currency?: string;
+  remarks?: string;
   items?: ErpnextSalesInvoiceItem[];
 };
 
+export type ErpnextSalesInvoiceDetail = ErpnextSalesInvoice;
+
 export type CreateSalesInvoiceFromOrderInput = {
   sales_order_name: string;
+};
+
+export type UpdateSalesInvoiceDraftItemInput = {
+  name?: string;
+  item_code: string;
+  qty: number;
+  rate: number;
+  warehouse?: string;
+};
+
+export type UpdateSalesInvoiceDraftInput = {
+  due_date?: string;
+  remarks?: string;
+  items?: UpdateSalesInvoiceDraftItemInput[];
+};
+
+export type CancelSalesInvoiceInput = {
+  reason?: string;
+};
+
+export type DeleteSalesInvoiceInput = {
+  name: string;
+};
+
+export type SalesInvoiceActionResult = {
+  sales_invoice: {
+    name: string;
+    status?: string;
+    docstatus?: 0 | 1 | 2;
+  };
 };
 
 export type ErpnextPaymentEntry = {

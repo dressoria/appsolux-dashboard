@@ -1,10 +1,14 @@
 import Link from "next/link";
+import { EditSalesInvoiceDraftForm } from "@/components/appsolux/pos/edit-sales-invoice-draft-form";
 import { RegisterPaymentForm } from "@/components/appsolux/pos/register-payment-form";
+import { SalesInvoiceActions } from "@/components/appsolux/pos/sales-invoice-actions";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getErpnextItems } from "@/lib/api/erpnext/items";
 import { getErpnextModesOfPayment } from "@/lib/api/erpnext/modes-of-payment";
 import { getErpnextSalesInvoiceDetail } from "@/lib/api/erpnext/sales-invoices";
+import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
@@ -27,9 +31,33 @@ function formatQuantity(value: number | undefined) {
   }).format(value ?? 0);
 }
 
-function getStatusLabel(status?: string) {
-  if (!status || status.toLowerCase() === "draft") {
+function getStatusLabel({
+  docstatus,
+  status,
+  outstandingAmount,
+}: {
+  docstatus?: 0 | 1 | 2;
+  status?: string;
+  outstandingAmount?: number;
+}) {
+  if (docstatus === 2) {
+    return "Anulada";
+  }
+
+  if (docstatus === 0 || !status || status.toLowerCase() === "draft") {
     return "Borrador";
+  }
+
+  if ((outstandingAmount ?? 0) <= 0) {
+    return "Pagada";
+  }
+
+  if (docstatus === 1 && (outstandingAmount ?? 0) > 0) {
+    return "Pendiente de pago";
+  }
+
+  if (status.toLowerCase() === "submitted") {
+    return "Confirmada";
   }
 
   return status;
@@ -59,10 +87,17 @@ export default async function PosInvoiceDetailPage({
 
   const { salesInvoiceName } = await params;
   const decodedName = decodeURIComponent(salesInvoiceName);
-  const [salesInvoice, modesOfPayment] = await Promise.all([
+  const [salesInvoice, modesOfPayment, items, warehouses] = await Promise.all([
     getErpnextSalesInvoiceDetail(decodedName),
     getErpnextModesOfPayment(),
+    getErpnextItems(),
+    getErpnextWarehouses(),
   ]);
+  const visibleStatus = getStatusLabel({
+    docstatus: salesInvoice.docstatus,
+    status: salesInvoice.status,
+    outstandingAmount: salesInvoice.outstanding_amount,
+  });
 
   return (
     <DashboardShell>
@@ -101,7 +136,7 @@ export default async function PosInvoiceDetailPage({
               <CardTitle>Estado</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              {getStatusLabel(salesInvoice.status)}
+              {visibleStatus}
             </CardContent>
           </Card>
           <Card>
@@ -155,7 +190,7 @@ export default async function PosInvoiceDetailPage({
                   </thead>
                   <tbody className="divide-y">
                     {(salesInvoice.items ?? []).map((item) => (
-                      <tr key={`${item.item_code}-${item.sales_order ?? ""}`}>
+                      <tr key={item.name ?? `${item.item_code}-${item.warehouse ?? ""}`}>
                         <td className="py-2 pr-4">
                           <p className="font-medium">
                             {item.item_name ?? item.item_code}
@@ -181,11 +216,56 @@ export default async function PosInvoiceDetailPage({
           </CardContent>
         </Card>
 
-        <RegisterPaymentForm
+        <SalesInvoiceActions
           salesInvoiceName={salesInvoice.name}
-          outstandingAmount={salesInvoice.outstanding_amount ?? 0}
-          modesOfPayment={modesOfPayment}
+          docstatus={salesInvoice.docstatus}
+          status={visibleStatus}
+          outstandingAmount={salesInvoice.outstanding_amount}
         />
+
+        {salesInvoice.docstatus === 0 ? (
+          <>
+            <Card>
+              <CardContent className="p-4 text-sm text-muted-foreground">
+                Esta factura esta en borrador. Puedes editar productos,
+                cantidades y precios antes de confirmarla. Primero confirma la
+                factura para registrar pagos.
+              </CardContent>
+            </Card>
+            <EditSalesInvoiceDraftForm
+              salesInvoice={salesInvoice}
+              availableItems={items}
+              availableWarehouses={warehouses}
+            />
+          </>
+        ) : null}
+
+        {salesInvoice.docstatus === 1 ? (
+          <Card>
+            <CardContent className="p-4 text-sm text-muted-foreground">
+              Esta factura esta confirmada. Para corregirla debes anularla y
+              crear una correccion.
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {salesInvoice.docstatus === 2 ? (
+          <Card>
+            <CardContent className="p-4 text-sm text-muted-foreground">
+              Esta factura esta anulada. Puedes crear una nueva correccion
+              basada en esta factura.
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {salesInvoice.docstatus === 1 &&
+        (salesInvoice.outstanding_amount ?? 0) > 0 ? (
+          <RegisterPaymentForm
+            salesInvoiceName={salesInvoice.name}
+            outstandingAmount={salesInvoice.outstanding_amount ?? 0}
+            modesOfPayment={modesOfPayment}
+          />
+        ) : null}
       </div>
     </DashboardShell>
   );
