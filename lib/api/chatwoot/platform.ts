@@ -1,9 +1,19 @@
 import "@/lib/security/server-only";
-import { getRequiredEnv } from "@/lib/security/env";
+import {
+  getChatwootBaseUrl,
+  getChatwootPlatformToken,
+  getMaskedToken,
+} from "./config";
 
 type ChatwootPlatformAccountResponse = {
   id: number;
   name: string;
+};
+
+type ChatwootPlatformAccountUser = {
+  account_id: number;
+  user_id: number;
+  role: string;
 };
 
 type CreateChatwootAccountInput = {
@@ -14,15 +24,31 @@ type CreateChatwootAccountInput = {
   ownerName: string;
 };
 
+type EnsureChatwootOperationalAccessInput = {
+  chatwootAccountId: number;
+  tenantId: string;
+  tenantName: string;
+  ownerEmail: string;
+  ownerName: string;
+};
+
+type ChatwootOperationalAccessResult =
+  | {
+      status: "ready";
+      operationalUserId: number;
+      role: "administrator";
+      message: string;
+    }
+  | {
+      status: "missing";
+      message: string;
+    };
+
 function getChatwootPlatformConfig() {
   return {
-    baseUrl: getRequiredEnv("CHATWOOT_BASE_URL"),
-    platformApiToken: getRequiredEnv("CHATWOOT_PLATFORM_API_TOKEN"),
+    baseUrl: getChatwootBaseUrl(),
+    platformApiToken: getChatwootPlatformToken(),
   };
-}
-
-function getMaskedToken(token: string) {
-  return token.length > 4 ? `***${token.slice(-4)}` : "***";
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -53,6 +79,40 @@ function parseChatwootPlatformAccount(
   }
 
   return { id, name };
+}
+
+function parseChatwootAccountUsers(
+  value: unknown
+): ChatwootPlatformAccountUser[] {
+  if (!Array.isArray(value)) {
+    throw new Error("Chatwoot no devolvio usuarios de cuenta validos.");
+  }
+
+  return value
+    .map((item) => {
+      if (!isObject(item)) {
+        return null;
+      }
+
+      const accountId = item.account_id;
+      const userId = item.user_id;
+      const role = item.role;
+
+      if (
+        typeof accountId !== "number" ||
+        typeof userId !== "number" ||
+        typeof role !== "string"
+      ) {
+        return null;
+      }
+
+      return {
+        account_id: accountId,
+        user_id: userId,
+        role,
+      };
+    })
+    .filter((item): item is ChatwootPlatformAccountUser => Boolean(item));
 }
 
 async function chatwootPlatformFetch<T>(
@@ -119,4 +179,90 @@ export async function createChatwootAccountForTenant(
   );
 
   return parseChatwootPlatformAccount(response);
+}
+
+async function getChatwootAccountUsers(chatwootAccountId: number) {
+  const response = await chatwootPlatformFetch<unknown>(
+    `/platform/api/v1/accounts/${chatwootAccountId}/account_users`
+  );
+
+  return parseChatwootAccountUsers(response);
+}
+
+async function addChatwootUserToAccount(input: {
+  chatwootAccountId: number;
+  userId: number;
+  role: "administrator";
+}) {
+  await chatwootPlatformFetch<unknown>(
+    `/platform/api/v1/accounts/${input.chatwootAccountId}/account_users`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        user_id: input.userId,
+        role: input.role,
+      }),
+    }
+  );
+}
+
+function getOperationalUserId() {
+  const rawUserId = process.env.CHATWOOT_OPERATIONAL_USER_ID?.trim();
+
+  if (!rawUserId) {
+    return null;
+  }
+
+  const userId = Number(rawUserId);
+
+  if (!Number.isInteger(userId) || userId <= 0) {
+    throw new Error(
+      "CHATWOOT_OPERATIONAL_USER_ID debe ser un ID numerico valido."
+    );
+  }
+
+  return userId;
+}
+
+export async function ensureChatwootOperationalAccessForTenant(
+  input: EnsureChatwootOperationalAccessInput
+): Promise<ChatwootOperationalAccessResult> {
+  const operationalUserId = getOperationalUserId();
+  const operationalEmail = process.env.CHATWOOT_OPERATIONAL_USER_EMAIL?.trim();
+
+  if (!operationalUserId) {
+    return {
+      status: "missing",
+      message: operationalEmail
+        ? "La cuenta Chatwoot fue creada, pero falta configurar CHATWOOT_OPERATIONAL_USER_ID. El email operativo esta documentado, pero Appsolux necesita el ID del usuario para asociarlo sin guardar secretos."
+        : "La cuenta Chatwoot fue creada, pero falta configurar el usuario operativo.",
+    };
+  }
+
+  const existingUsers = await getChatwootAccountUsers(input.chatwootAccountId);
+  const existingUser = existingUsers.find(
+    (accountUser) => accountUser.user_id === operationalUserId
+  );
+
+  if (existingUser) {
+    return {
+      status: "ready",
+      operationalUserId,
+      role: "administrator",
+      message: "La bandeja de atencion ya tiene acceso operativo.",
+    };
+  }
+
+  await addChatwootUserToAccount({
+    chatwootAccountId: input.chatwootAccountId,
+    userId: operationalUserId,
+    role: "administrator",
+  });
+
+  return {
+    status: "ready",
+    operationalUserId,
+    role: "administrator",
+    message: "Acceso operativo configurado correctamente.",
+  };
 }

@@ -23,6 +23,24 @@ type EvolutionQrResponse = {
   error?: {
     code: string;
     message: string;
+    detail?: string;
+  };
+  message?: string;
+  detail?: string;
+};
+
+type EvolutionProvisionResponse = {
+  success: boolean;
+  data?: {
+    message?: string;
+    integration?: {
+      config?: {
+        bridgeStatus?: string;
+      };
+    };
+  };
+  error?: {
+    message: string;
   };
 };
 
@@ -54,6 +72,7 @@ function resolveQrImageSrc(evolution?: {
 
 export function EvolutionQrCard() {
   const [loading, setLoading] = useState(false);
+  const [provisioning, setProvisioning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<EvolutionQrResponse | null>(null);
 
@@ -68,7 +87,10 @@ export function EvolutionQrCard() {
       setResponse(data);
 
       if (!res.ok || !data.success) {
-        throw new Error(data.error?.message ?? "No se pudo generar el QR");
+        const detail = data.error?.detail ?? data.detail;
+        const message = data.error?.message ?? data.message ?? "No se pudo generar el QR";
+
+        throw new Error(detail ? `${message} Detalle: ${detail}` : message);
       }
     } catch (err) {
       setError(
@@ -79,12 +101,52 @@ export function EvolutionQrCard() {
     }
   }
 
+  async function handleProvision() {
+    setProvisioning(true);
+    setError(null);
+
+    try {
+      const hasInstance = Boolean(response?.data?.evolution.instance_name);
+      const res = await fetch(
+        hasInstance
+          ? "/api/integrations/evolution/chatwoot"
+          : "/api/integrations/evolution/provision",
+        {
+          method: "POST",
+        }
+      );
+      const data = (await res.json()) as EvolutionProvisionResponse;
+
+      if (!res.ok || !data.success) {
+        throw new Error(
+          data.error?.message ??
+            (hasInstance
+              ? "No se pudo conectar WhatsApp con Chatwoot"
+              : "No se pudo configurar WhatsApp")
+        );
+      }
+
+      setResponse(null);
+      if (data.data?.integration?.config?.bridgeStatus === "ready") {
+        await handleGenerateQr();
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Error inesperado al configurar WhatsApp"
+      );
+    } finally {
+      setProvisioning(false);
+    }
+  }
+
   const evolution = response?.data?.evolution;
   const qrImageSrc = resolveQrImageSrc(evolution);
   const qrCodeText =
     evolution?.qr_code && !evolution.qr_code.startsWith("data:image")
       ? evolution.qr_code
       : null;
+  const isConnected =
+    evolution?.status === "connected" || evolution?.status === "open";
 
   return (
     <Card>
@@ -111,7 +173,40 @@ export function EvolutionQrCard() {
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-        {qrImageSrc ? (
+        {response?.error?.code === "MISSING_EVOLUTION_INSTANCE_NAME" ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleProvision}
+            disabled={provisioning}
+          >
+            {provisioning ? "Configurando..." : "Configurar WhatsApp"}
+          </Button>
+        ) : null}
+
+        {response?.data?.evolution.instance_name && !qrImageSrc ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleProvision}
+            disabled={provisioning}
+          >
+            {provisioning ? "Conectando..." : "Conectar bandeja"}
+          </Button>
+        ) : null}
+
+        {isConnected ? (
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
+            <p className="text-sm font-medium text-emerald-700">
+              WhatsApp conectado
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Esta instancia ya esta conectada y no necesita QR.
+            </p>
+          </div>
+        ) : null}
+
+        {qrImageSrc && !isConnected ? (
           <div className="rounded-xl border p-4">
             <Image
               src={qrImageSrc}
@@ -124,7 +219,7 @@ export function EvolutionQrCard() {
           </div>
         ) : null}
 
-        {qrCodeText ? (
+        {qrCodeText && !isConnected ? (
           <div className="rounded-xl border p-4">
             <p className="text-sm font-medium">QR recibido como texto:</p>
             <p className="mt-2 break-all text-xs text-muted-foreground">
@@ -133,7 +228,7 @@ export function EvolutionQrCard() {
           </div>
         ) : null}
 
-        {!qrImageSrc && !qrCodeText && evolution?.status ? (
+        {!qrImageSrc && !qrCodeText && evolution?.status && !isConnected ? (
           <div className="rounded-xl border p-4">
             <p className="text-sm text-muted-foreground">
               Estado de la instancia: {evolution.status}

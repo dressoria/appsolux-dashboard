@@ -6,8 +6,12 @@ export async function getChatwootConversations(
   chatwootAccountId: number
 ): Promise<ChatwootConversationsResponse> {
   if (!chatwootAccountId) {
-    throw new Error("La bandeja de conversaciones aun no esta configurada.");
+    throw new Error(
+      "Este tenant todavia no tiene bandeja de conversaciones configurada."
+    );
   }
+
+  console.info(`[Chatwoot] Using account_id ${chatwootAccountId}`);
 
   return chatwootFetch<ChatwootConversationsResponse>(
     `/api/v1/accounts/${chatwootAccountId}/conversations`

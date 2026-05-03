@@ -1,5 +1,6 @@
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { ChatwootProvisionCard } from "@/components/appsolux/dashboard/chatwoot-provision-card";
+import { EvolutionProvisionCard } from "@/components/appsolux/dashboard/evolution-provision-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { canManageSettings } from "@/lib/auth/permissions";
@@ -12,6 +13,27 @@ async function getChatwootIntegrationStatus(tenantId: string) {
   } catch {
     return null;
   }
+}
+
+function getChatwootOperationalAccess(config: unknown) {
+  if (!config || typeof config !== "object") {
+    return "missing";
+  }
+
+  const operationalAccess = (config as Record<string, unknown>)
+    .operationalAccess;
+
+  return operationalAccess === "ready" ? "ready" : "missing";
+}
+
+function getConfigString(config: unknown, key: string) {
+  if (!config || typeof config !== "object") {
+    return undefined;
+  }
+
+  const value = (config as Record<string, unknown>)[key];
+
+  return typeof value === "string" ? value : undefined;
 }
 
 export default async function DashboardPage() {
@@ -34,15 +56,27 @@ export default async function DashboardPage() {
 
   const tenant = await getCurrentTenant(user);
   const chatwootIntegration = await getChatwootIntegrationStatus(tenant.id);
+  const evolutionIntegration = await getTenantIntegrationByProvider(
+    tenant.id,
+    "evolution"
+  ).catch(() => null);
   const chatwootAccountId = Number(
     chatwootIntegration?.externalAccountId ?? tenant.chatwoot_account_id
   );
 
   const evolutionInstance =
-    tenant.channels.evolution?.instance_name ?? "Sin instancia";
+    evolutionIntegration?.externalInstanceName ??
+    tenant.channels.evolution?.instance_name ??
+    "Sin instancia";
 
   const evolutionStatus =
-    tenant.channels.evolution?.status ?? "disconnected";
+    getConfigString(evolutionIntegration?.config, "connectionStatus") ??
+    tenant.channels.evolution?.status ??
+    "disconnected";
+  const evolutionBridgeStatus = getConfigString(
+    evolutionIntegration?.config,
+    "bridgeStatus"
+  );
 
   const subscriptionPlan = tenant.subscription?.plan ?? "Sin plan";
   const subscriptionStatus = tenant.subscription?.status ?? "Sin estado";
@@ -87,21 +121,23 @@ export default async function DashboardPage() {
           <ChatwootProvisionCard
             accountId={chatwootAccountId}
             status={chatwootIntegration?.status ?? "none"}
+            operationalAccess={getChatwootOperationalAccess(
+              chatwootIntegration?.config
+            )}
             lastError={chatwootIntegration?.lastError ?? undefined}
             canManage={canManageSettings(user)}
           />
 
-          <Card>
-            <CardHeader>
-              <CardTitle>WhatsApp</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm font-medium">{evolutionInstance}</p>
-              <p className="text-xs text-muted-foreground">
-                Estado: {evolutionStatus}
-              </p>
-            </CardContent>
-          </Card>
+          <EvolutionProvisionCard
+            instanceName={
+              evolutionInstance === "Sin instancia"
+                ? undefined
+                : evolutionInstance
+            }
+            status={evolutionStatus}
+            bridgeStatus={evolutionBridgeStatus}
+            canManage={canManageSettings(user)}
+          />
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">

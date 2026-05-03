@@ -1,20 +1,23 @@
 import "@/lib/security/server-only";
-import { getRequiredEnv } from "@/lib/security/env";
+import {
+  getChatwootBaseUrl,
+  getChatwootBotToken,
+  getMaskedToken,
+} from "./config";
 
 export function getChatwootConfig() {
-  return {
-    baseUrl: getRequiredEnv("CHATWOOT_BASE_URL"),
-    apiAccessToken: getRequiredEnv("CHATWOOT_API_ACCESS_TOKEN"),
-  };
-}
+  const botToken = getChatwootBotToken();
 
-function getMaskedToken(token: string) {
-  return token.length > 4 ? `***${token.slice(-4)}` : "***";
+  return {
+    baseUrl: getChatwootBaseUrl(),
+    apiAccessToken: botToken.token,
+    tokenSource: botToken.source,
+  };
 }
 
 function getChatwootErrorMessage(status: number) {
   if (status === 401) {
-    return "La bandeja de conversaciones aun no tiene credenciales operativas configuradas o el token no tiene acceso a esta cuenta. Revisa CHATWOOT_API_ACCESS_TOKEN.";
+    return "El token de Appsolux Bot no tiene acceso a esta cuenta. Verifica que el bot este asignado al account y que CHATWOOT_BOT_API_ACCESS_TOKEN sea correcto.";
   }
 
   return `Chatwoot request failed: ${status}`;
@@ -27,7 +30,7 @@ export async function chatwootFetch<T>(
   const { baseUrl, apiAccessToken } = getChatwootConfig();
 
   console.info(
-    `[Chatwoot] Application API token loaded: ${getMaskedToken(apiAccessToken)}`
+    `[Chatwoot] Bot token loaded: yes (${getMaskedToken(apiAccessToken)})`
   );
 
   const response = await fetch(`${baseUrl}${path}`, {

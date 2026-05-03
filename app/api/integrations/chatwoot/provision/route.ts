@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { createChatwootAccountForTenant } from "@/lib/api/chatwoot/platform";
+import {
+  createChatwootAccountForTenant,
+  ensureChatwootOperationalAccessForTenant,
+} from "@/lib/api/chatwoot/platform";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/auth/current-tenant";
 import { isTenantAdmin } from "@/lib/auth/permissions";
@@ -8,6 +11,7 @@ import {
   markTenantIntegrationActive,
   markTenantIntegrationFailed,
   markTenantIntegrationProvisioning,
+  updateTenantIntegration,
   upsertIntegrationInstance,
 } from "@/lib/core/integrations";
 
@@ -21,13 +25,41 @@ function getIntegrationResponse(integration: {
   externalAccountId: string | null;
   status: string;
   lastError: string | null;
+  config?: unknown;
 }) {
   return {
     provider: "chatwoot",
     external_account_id: integration.externalAccountId,
     status: integration.status,
     last_error: integration.lastError,
+    config: integration.config,
   };
+}
+
+function getOperationalConfig(
+  result: Awaited<ReturnType<typeof ensureChatwootOperationalAccessForTenant>>
+) {
+  if (result.status === "ready") {
+    return {
+      operationalAccess: "ready",
+      operationalUserId: result.operationalUserId,
+      operationalRole: result.role,
+    };
+  }
+
+  return {
+    operationalAccess: "missing",
+  };
+}
+
+function parseAccountId(value: string | null | undefined) {
+  const accountId = Number(value);
+
+  if (!Number.isInteger(accountId) || accountId <= 0) {
+    throw new Error("La cuenta de conversaciones no tiene un ID valido.");
+  }
+
+  return accountId;
 }
 
 export async function POST() {
@@ -67,19 +99,6 @@ export async function POST() {
       "chatwoot"
     );
 
-    if (
-      existingIntegration?.status === "active" &&
-      existingIntegration.externalAccountId
-    ) {
-      return NextResponse.json({
-        success: true,
-        data: {
-          integration: getIntegrationResponse(existingIntegration),
-          message: "La bandeja de conversaciones ya esta configurada.",
-        },
-      });
-    }
-
     const instance = await upsertIntegrationInstance({
       provider: "chatwoot",
       name: "chatwoot_main",
@@ -87,31 +106,64 @@ export async function POST() {
       status: "active",
     });
 
-    await markTenantIntegrationProvisioning({
-      tenantId: tenant.id,
-      instanceId: instance.id,
-      provider: "chatwoot",
-    });
+    const existingAccountId = existingIntegration?.externalAccountId;
+    let chatwootAccountId = existingAccountId
+      ? parseAccountId(existingAccountId)
+      : null;
 
-    const account = await createChatwootAccountForTenant({
-      tenantId: tenant.id,
-      tenantName: tenant.name,
-      tenantSlug: tenant.slug,
-      ownerEmail: user.email,
-      ownerName: user.name,
-    });
+    if (!chatwootAccountId) {
+      await markTenantIntegrationProvisioning({
+        tenantId: tenant.id,
+        instanceId: instance.id,
+        provider: "chatwoot",
+      });
 
-    const integration = await markTenantIntegrationActive({
-      tenantId: tenant.id,
-      provider: "chatwoot",
-      externalAccountId: String(account.id),
-    });
+      const account = await createChatwootAccountForTenant({
+        tenantId: tenant.id,
+        tenantName: tenant.name,
+        tenantSlug: tenant.slug,
+        ownerEmail: user.email,
+        ownerName: user.name,
+      });
+
+      chatwootAccountId = account.id;
+    }
+
+    const operationalAccess =
+      await ensureChatwootOperationalAccessForTenant({
+        chatwootAccountId,
+        tenantId: tenant.id,
+        tenantName: tenant.name,
+        ownerEmail: user.email,
+        ownerName: user.name,
+      });
+
+    const operationalConfig = getOperationalConfig(operationalAccess);
+    const integration =
+      operationalAccess.status === "ready"
+        ? await markTenantIntegrationActive({
+            tenantId: tenant.id,
+            provider: "chatwoot",
+            externalAccountId: String(chatwootAccountId),
+            config: operationalConfig,
+          })
+        : await updateTenantIntegration(tenant.id, "chatwoot", {
+            externalAccountId: String(chatwootAccountId),
+            status: "active",
+            config: operationalConfig,
+            lastError: operationalAccess.message,
+          });
+
+    const message =
+      operationalAccess.status === "ready"
+        ? "Bandeja de conversaciones configurada correctamente."
+        : operationalAccess.message;
 
     return NextResponse.json({
       success: true,
       data: {
         integration: getIntegrationResponse(integration),
-        message: "Bandeja de conversaciones configurada correctamente.",
+        message,
       },
     });
   } catch (error) {

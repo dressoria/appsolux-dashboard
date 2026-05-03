@@ -109,6 +109,29 @@ export async function getTenantIntegrationByProvider(
   });
 }
 
+export async function getTenantIntegrationByExternalInstanceName(
+  externalInstanceName: string
+) {
+  const prisma = getPrismaClient();
+
+  return prisma.tenantIntegration.findFirst({
+    where: {
+      provider: "evolution",
+      externalInstanceName,
+    },
+    include: {
+      instance: true,
+      tenant: {
+        include: {
+          integrations: {
+            include: { instance: true },
+          },
+        },
+      },
+    },
+  });
+}
+
 export async function upsertTenantIntegration(
   input: CreateTenantIntegrationInput
 ) {
@@ -196,12 +219,14 @@ export async function markTenantIntegrationActive(input: {
   externalSiteName?: string;
   externalCompanyId?: string;
   externalInstanceName?: string;
+  config?: Prisma.InputJsonObject;
 }) {
   return updateTenantIntegration(input.tenantId, input.provider, {
     externalAccountId: input.externalAccountId,
     externalSiteName: input.externalSiteName,
     externalCompanyId: input.externalCompanyId,
     externalInstanceName: input.externalInstanceName,
+    config: input.config,
     status: "active",
     lastError: null,
   });

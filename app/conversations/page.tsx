@@ -3,6 +3,7 @@ import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getChatwootConversations } from "@/lib/api/chatwoot/conversations";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getTenantIntegrationByProvider } from "@/lib/core/integrations";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import type {
   ChatwootConversation,
@@ -43,6 +44,30 @@ async function loadConversations(
   }
 }
 
+async function hasMissingOperationalAccess(tenantId: string) {
+  try {
+    const integration = await getTenantIntegrationByProvider(
+      tenantId,
+      "chatwoot"
+    );
+
+    if (!integration?.externalAccountId) {
+      return false;
+    }
+
+    if (!integration.config || typeof integration.config !== "object") {
+      return true;
+    }
+
+    const operationalAccess = (integration.config as Record<string, unknown>)
+      .operationalAccess;
+
+    return operationalAccess !== "ready";
+  } catch {
+    return false;
+  }
+}
+
 export default async function ConversationsPage() {
   const user = await getCurrentUser();
 
@@ -62,7 +87,14 @@ export default async function ConversationsPage() {
   }
 
   const tenant = await getCurrentTenant(user);
-  const result = await loadConversations(tenant.chatwoot_account_id);
+  const missingOperationalAccess = await hasMissingOperationalAccess(tenant.id);
+  const result = missingOperationalAccess
+    ? {
+        success: false as const,
+        message:
+          "Tu bandeja fue creada, pero todavia falta completar el acceso operativo.",
+      }
+    : await loadConversations(tenant.chatwoot_account_id);
 
   return (
     <DashboardShell>

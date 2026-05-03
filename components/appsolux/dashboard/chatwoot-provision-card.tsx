@@ -16,6 +16,7 @@ type ChatwootProvisionStatus =
 type ChatwootProvisionCardProps = {
   accountId: number;
   status: ChatwootProvisionStatus;
+  operationalAccess: "ready" | "missing";
   lastError?: string;
   canManage: boolean;
 };
@@ -35,9 +36,17 @@ type ProvisionResponse = {
   };
 };
 
-function getStatusLabel(status: ChatwootProvisionStatus, accountId: number) {
+function getStatusLabel(
+  status: ChatwootProvisionStatus,
+  accountId: number,
+  operationalAccess: "ready" | "missing"
+) {
+  if ((accountId > 0 || status === "active") && operationalAccess === "ready") {
+    return "Bandeja de atencion lista";
+  }
+
   if (accountId > 0 || status === "active") {
-    return `Account ID: ${accountId}`;
+    return "Bandeja creada, falta acceso operativo";
   }
 
   if (status === "provisioning") {
@@ -54,6 +63,7 @@ function getStatusLabel(status: ChatwootProvisionStatus, accountId: number) {
 export function ChatwootProvisionCard({
   accountId,
   status,
+  operationalAccess,
   lastError,
   canManage,
 }: ChatwootProvisionCardProps) {
@@ -62,9 +72,14 @@ export function ChatwootProvisionCard({
   const [message, setMessage] = useState("");
   const [error, setError] = useState(lastError ?? "");
 
-  const isConfigured = accountId > 0 || status === "active";
+  const isConfigured =
+    (accountId > 0 || status === "active") && operationalAccess === "ready";
   const canProvision =
-    canManage && !isConfigured && (status === "none" || status === "failed");
+    canManage &&
+    !isConfigured &&
+    (status === "none" ||
+      status === "failed" ||
+      operationalAccess === "missing");
 
   async function handleProvision() {
     setIsLoading(true);
@@ -107,10 +122,10 @@ export function ChatwootProvisionCard({
       <CardContent className="space-y-3">
         <div>
           <p className="text-sm font-medium">
-            {getStatusLabel(status, accountId)}
+            {getStatusLabel(status, accountId, operationalAccess)}
           </p>
           <p className="text-xs text-muted-foreground">
-            Bandeja de atencion conectada al tenant actual.
+            {accountId > 0 ? `Account ID: ${accountId}` : "Tenant actual"}
           </p>
         </div>
 
@@ -121,7 +136,11 @@ export function ChatwootProvisionCard({
             onClick={handleProvision}
             disabled={isLoading}
           >
-            {isLoading ? "Configurando..." : "Configurar conversaciones"}
+            {isLoading
+              ? "Configurando..."
+              : accountId > 0
+                ? "Completar acceso"
+                : "Configurar conversaciones"}
           </Button>
         ) : null}
 

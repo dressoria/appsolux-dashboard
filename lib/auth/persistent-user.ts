@@ -35,6 +35,16 @@ function mapTenant(tenant: MembershipWithTenant["tenant"]): AppsoluxTenant {
   const chatwootIntegration = getIntegration(tenant, "chatwoot");
   const erpnextIntegration = getIntegration(tenant, "erpnext");
   const evolutionIntegration = getIntegration(tenant, "evolution");
+  const evolutionConfig =
+    evolutionIntegration?.config && typeof evolutionIntegration.config === "object"
+      ? (evolutionIntegration.config as Record<string, unknown>)
+      : null;
+  const evolutionStatus =
+    typeof evolutionConfig?.connectionStatus === "string"
+      ? evolutionConfig.connectionStatus
+      : evolutionIntegration
+        ? "pending"
+        : "pending";
 
   return {
     id: tenant.id,
@@ -46,7 +56,11 @@ function mapTenant(tenant: MembershipWithTenant["tenant"]): AppsoluxTenant {
       evolution: {
         enabled: Boolean(evolutionIntegration?.externalInstanceName),
         instance_name: evolutionIntegration?.externalInstanceName ?? undefined,
-        status: evolutionIntegration ? "connected" : "pending",
+        status: evolutionIntegration
+          ? evolutionStatus === "open"
+            ? "connected"
+            : "pending"
+          : "pending",
       },
     },
     subscription: isSubscriptionPlan(tenant.planKey)
