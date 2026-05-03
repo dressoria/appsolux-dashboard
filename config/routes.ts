@@ -13,6 +13,8 @@ export const routes = {
   pos: "/pos",
   posOrders: "/pos/orders",
   posInvoices: "/pos/invoices",
+  posPayments: "/pos/payments",
+  reports: "/reports",
   billing: "/billing",
   settings: "/settings",
 

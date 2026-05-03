@@ -363,6 +363,9 @@ export function PosClient({
           <Button asChild variant="outline">
             <Link href={routes.posInvoices}>Ver facturas y cobros</Link>
           </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.posPayments}>Caja y cobros</Link>
+          </Button>
         </div>
       </div>
 

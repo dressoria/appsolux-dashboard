@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { createAndSubmitErpnextPaymentEntry } from "@/lib/api/erpnext/payment-entries";
+import {
+  createAndSubmitErpnextPaymentEntry,
+  getErpnextPaymentEntries,
+} from "@/lib/api/erpnext/payment-entries";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import type { CreatePaymentEntryInput } from "@/types/erpnext";
@@ -21,6 +24,47 @@ function getNumberField(body: Record<string, unknown>, field: string) {
   }
 
   return Number.NaN;
+}
+
+export async function GET() {
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "UNAUTHORIZED",
+            message: "User session is required",
+          },
+        },
+        { status: 401 }
+      );
+    }
+
+    await getCurrentTenant(user);
+    const paymentEntries = await getErpnextPaymentEntries();
+
+    return NextResponse.json({
+      success: true,
+      data: { payment_entries: paymentEntries },
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "No se pudieron cargar los pagos";
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: "ERPNEXT_PAYMENT_ENTRIES_ERROR",
+          message,
+        },
+      },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request: Request) {

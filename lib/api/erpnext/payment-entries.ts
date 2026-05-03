@@ -1,14 +1,33 @@
 import "@/lib/security/server-only";
 import { getErpnextAccountCurrency } from "./accounts";
 import { erpnextFetch } from "./client";
+import { cancelErpnextDocument } from "./documents";
 import { getErpnextPaymentAccountForMode } from "./modes-of-payment";
 import { getErpnextSalesInvoiceDetail } from "./sales-invoices";
 import type {
   CreatePaymentEntryInput,
   ErpnextCreateResponse,
+  ErpnextListResponse,
   ErpnextMethodResponse,
   ErpnextPaymentEntry,
 } from "@/types/erpnext";
+
+const paymentEntryFields = [
+  "name",
+  "posting_date",
+  "payment_type",
+  "party_type",
+  "party",
+  "mode_of_payment",
+  "paid_amount",
+  "received_amount",
+  "company",
+  "status",
+  "docstatus",
+  "reference_no",
+  "reference_date",
+  "remarks",
+];
 
 function getTodayDate() {
   return new Date().toISOString().slice(0, 10);
@@ -16,6 +35,20 @@ function getTodayDate() {
 
 function getPaymentEntryPath(name: string) {
   return `/api/resource/Payment%20Entry/${encodeURIComponent(name)}`;
+}
+
+export async function getErpnextPaymentEntries(): Promise<ErpnextPaymentEntry[]> {
+  const params = new URLSearchParams({
+    fields: JSON.stringify(paymentEntryFields),
+    limit_page_length: "100",
+    order_by: "modified desc",
+  });
+
+  const response = await erpnextFetch<ErpnextListResponse<ErpnextPaymentEntry>>(
+    `/api/resource/Payment%20Entry?${params.toString()}`
+  );
+
+  return response.data;
 }
 
 export async function getErpnextPaymentEntry(
@@ -26,6 +59,39 @@ export async function getErpnextPaymentEntry(
   );
 
   return response.data;
+}
+
+export async function getErpnextPaymentEntryDetail(
+  name: string
+): Promise<ErpnextPaymentEntry> {
+  return getErpnextPaymentEntry(name);
+}
+
+export async function getPaymentEntriesForSalesInvoice(
+  salesInvoiceName: string
+): Promise<ErpnextPaymentEntry[]> {
+  const paymentEntries = await getErpnextPaymentEntries();
+  const detailedPaymentEntries = await Promise.all(
+    paymentEntries.map((paymentEntry) =>
+      getErpnextPaymentEntryDetail(paymentEntry.name)
+    )
+  );
+
+  return detailedPaymentEntries.filter((paymentEntry) =>
+    (paymentEntry.references ?? []).some(
+      (reference) =>
+        reference.reference_doctype === "Sales Invoice" &&
+        reference.reference_name === salesInvoiceName
+    )
+  );
+}
+
+export async function cancelErpnextPaymentEntry(
+  name: string
+): Promise<ErpnextPaymentEntry> {
+  await cancelErpnextDocument("Payment Entry", name);
+
+  return getErpnextPaymentEntryDetail(name);
 }
 
 export async function submitErpnextPaymentEntry(

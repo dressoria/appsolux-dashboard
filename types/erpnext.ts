@@ -281,8 +281,10 @@ export type ErpnextPaymentEntry = {
   payment_type?: "Receive" | "Pay" | "Internal Transfer";
   party_type?: string;
   party?: string;
+  party_name?: string;
   paid_amount?: number;
   received_amount?: number;
+  company?: string;
   mode_of_payment?: string;
   paid_to?: string;
   paid_to_account_currency?: string;
@@ -291,6 +293,31 @@ export type ErpnextPaymentEntry = {
   posting_date?: string;
   status?: string;
   docstatus?: 0 | 1 | 2;
+  reference_no?: string;
+  reference_date?: string;
+  remarks?: string;
+  references?: ErpnextPaymentEntryReference[];
+};
+
+export type ErpnextPaymentEntryReference = {
+  reference_doctype: string;
+  reference_name: string;
+  allocated_amount: number;
+  total_amount?: number;
+  outstanding_amount?: number;
+};
+
+export type ErpnextPaymentEntryDetail = ErpnextPaymentEntry;
+
+export type PaymentEntryStatus = "Borrador" | "Confirmado" | "Anulado" | string;
+
+export type CashRegisterSummary = {
+  total_payments: number;
+  total_amount: number;
+  cash_amount: number;
+  bank_amount: number;
+  pending_review_amount: number;
+  cancelled_amount: number;
 };
 
 export type ErpnextModeOfPaymentAccount = {

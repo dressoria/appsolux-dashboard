@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getErpnextItems } from "@/lib/api/erpnext/items";
 import { getErpnextModesOfPayment } from "@/lib/api/erpnext/modes-of-payment";
+import { getPaymentEntriesForSalesInvoice } from "@/lib/api/erpnext/payment-entries";
 import { getErpnextSalesInvoiceDetail } from "@/lib/api/erpnext/sales-invoices";
 import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -87,12 +88,14 @@ export default async function PosInvoiceDetailPage({
 
   const { salesInvoiceName } = await params;
   const decodedName = decodeURIComponent(salesInvoiceName);
-  const [salesInvoice, modesOfPayment, items, warehouses] = await Promise.all([
-    getErpnextSalesInvoiceDetail(decodedName),
-    getErpnextModesOfPayment(),
-    getErpnextItems(),
-    getErpnextWarehouses(),
-  ]);
+  const [salesInvoice, modesOfPayment, items, warehouses, associatedPayments] =
+    await Promise.all([
+      getErpnextSalesInvoiceDetail(decodedName),
+      getErpnextModesOfPayment(),
+      getErpnextItems(),
+      getErpnextWarehouses(),
+      getPaymentEntriesForSalesInvoice(decodedName),
+    ]);
   const visibleStatus = getStatusLabel({
     docstatus: salesInvoice.docstatus,
     status: salesInvoice.status,
@@ -222,6 +225,76 @@ export default async function PosInvoiceDetailPage({
           status={visibleStatus}
           outstandingAmount={salesInvoice.outstanding_amount}
         />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Pagos asociados</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {associatedPayments.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                Esta factura aun no tiene pagos registrados.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Si la factura tiene pagos confirmados, primero puede ser
+                  necesario anular el pago asociado.
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="border-b text-xs text-muted-foreground">
+                      <tr>
+                        <th className="py-2 pr-4 font-medium">Pago</th>
+                        <th className="py-2 pr-4 font-medium">Fecha</th>
+                        <th className="py-2 pr-4 font-medium">Metodo</th>
+                        <th className="py-2 pr-4 font-medium">Monto</th>
+                        <th className="py-2 pr-4 font-medium">Estado</th>
+                        <th className="py-2 font-medium">Accion</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {associatedPayments.map((paymentEntry) => (
+                        <tr key={paymentEntry.name}>
+                          <td className="py-2 pr-4 font-medium">
+                            {paymentEntry.name}
+                          </td>
+                          <td className="py-2 pr-4">
+                            {paymentEntry.posting_date ?? "-"}
+                          </td>
+                          <td className="py-2 pr-4">
+                            {paymentEntry.mode_of_payment ?? "-"}
+                          </td>
+                          <td className="py-2 pr-4">
+                            {formatMoney(paymentEntry.paid_amount)}
+                          </td>
+                          <td className="py-2 pr-4">
+                            {paymentEntry.docstatus === 2
+                              ? "Anulado"
+                              : paymentEntry.docstatus === 1
+                                ? "Confirmado"
+                                : "Borrador"}
+                          </td>
+                          <td className="py-2">
+                            <Button asChild size="sm" variant="outline">
+                              <Link
+                                href={`/pos/payments/${encodeURIComponent(
+                                  paymentEntry.name
+                                )}`}
+                              >
+                                Ver pago
+                              </Link>
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {salesInvoice.docstatus === 0 ? (
           <>
