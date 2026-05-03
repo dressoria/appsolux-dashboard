@@ -168,10 +168,14 @@ export type ErpnextSalesOrder = {
   transaction_date?: string;
   delivery_date?: string;
   status?: string;
+  docstatus?: 0 | 1 | 2;
   grand_total?: number;
+  net_total?: number;
   company: string;
   items?: ErpnextSalesOrderItem[];
 };
+
+export type ErpnextSalesOrderDetail = ErpnextSalesOrder;
 
 export type CreateSalesOrderItemInput = {
   item_code: string;
@@ -197,6 +201,34 @@ export type PosCartItem = {
 };
 
 export type PosCheckoutInput = CreateSalesOrderInput;
+
+export type ErpnextSalesInvoiceItem = {
+  item_code: string;
+  item_name?: string;
+  qty: number;
+  rate: number;
+  amount?: number;
+  warehouse?: string;
+  sales_order?: string;
+  so_detail?: string;
+};
+
+export type ErpnextSalesInvoice = {
+  name: string;
+  customer: string;
+  customer_name?: string;
+  posting_date?: string;
+  due_date?: string;
+  grand_total?: number;
+  status?: string;
+  docstatus?: 0 | 1 | 2;
+  company?: string;
+  items?: ErpnextSalesInvoiceItem[];
+};
+
+export type CreateSalesInvoiceFromOrderInput = {
+  sales_order_name: string;
+};
 
 export type ErpnextInvoice = {
   name: string;

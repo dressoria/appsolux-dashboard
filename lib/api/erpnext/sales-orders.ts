@@ -14,7 +14,9 @@ const salesOrderFields = [
   "transaction_date",
   "delivery_date",
   "status",
+  "docstatus",
   "grand_total",
+  "net_total",
   "company",
 ];
 
@@ -31,6 +33,16 @@ export async function getErpnextSalesOrders(): Promise<ErpnextSalesOrder[]> {
 
   const response = await erpnextFetch<ErpnextListResponse<ErpnextSalesOrder>>(
     `/api/resource/Sales%20Order?${params.toString()}`
+  );
+
+  return response.data;
+}
+
+export async function getErpnextSalesOrderDetail(
+  name: string
+): Promise<ErpnextSalesOrder> {
+  const response = await erpnextFetch<ErpnextCreateResponse<ErpnextSalesOrder>>(
+    `/api/resource/Sales%20Order/${encodeURIComponent(name)}`
   );
 
   return response.data;

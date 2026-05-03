@@ -39,9 +39,14 @@ export function PosPreviewCard() {
             </div>
           ))}
         </div>
-        <Button asChild>
-          <Link href={routes.pos}>Abrir POS</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild>
+            <Link href={routes.pos}>Ir al POS</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.posOrders}>Ver pedidos POS</Link>
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

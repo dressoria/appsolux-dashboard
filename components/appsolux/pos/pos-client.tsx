@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { routes } from "@/config/routes";
 import type { ApiResponse } from "@/types/api";
 import type {
   ErpnextBin,
@@ -244,15 +246,20 @@ export function PosClient({
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm text-muted-foreground">Tenant: {tenant.name}</p>
-        <h1 className="text-3xl font-semibold tracking-tight">
-          POS / Punto de venta
-        </h1>
-        <p className="mt-2 max-w-3xl text-muted-foreground">
-          Vende productos usando clientes, stock y bodegas reales conectados al
-          ERP.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm text-muted-foreground">Tenant: {tenant.name}</p>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            POS / Punto de venta
+          </h1>
+          <p className="mt-2 max-w-3xl text-muted-foreground">
+            Vende productos usando clientes, stock y bodegas reales conectados
+            al ERP.
+          </p>
+        </div>
+        <Button asChild variant="outline">
+          <Link href={routes.posOrders}>Ver pedidos POS</Link>
+        </Button>
       </div>
 
       <Card className="border-blue-200 bg-blue-50/50">

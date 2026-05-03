@@ -11,6 +11,7 @@ export const routes = {
   notifications: "/notifications",
   erp: "/erp",
   pos: "/pos",
+  posOrders: "/pos/orders",
   billing: "/billing",
   settings: "/settings",
 
