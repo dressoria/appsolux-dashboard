@@ -3,45 +3,39 @@ import {
   getCoreDbUnavailableMessage,
   isCoreDbRequired,
 } from "@/lib/core/core-db-config";
-import {
-  createOnboardingRequest as createCoreOnboardingRequest,
-  updateOnboardingRequestStatus,
-} from "@/lib/core/onboarding-requests";
+import { updateOnboardingRequestStatus } from "@/lib/core/onboarding-requests";
+import { setAuthSession } from "@/lib/auth/session";
 import { createOnboardingRequest } from "@/lib/onboarding/create-onboarding-request";
 import { provisionOnboardingRequest } from "@/lib/onboarding/provisioning";
+import {
+  registerAccountFromOnboardingRequest,
+  RegisterAccountError,
+} from "@/lib/onboarding/register-account";
 
 type NormalizedOnboardingRequest = ReturnType<typeof createOnboardingRequest>;
-type PersistedOnboardingRequest = {
-  id: string;
-} | null;
+type RegisteredOnboardingAccount = Awaited<
+  ReturnType<typeof registerAccountFromOnboardingRequest>
+> | null;
 
 function logCoreDbWarning(message: string, error?: unknown) {
   const detail = error instanceof Error ? ` ${error.message}` : "";
   console.warn(`[CoreDB] ${message}${detail}`);
 }
 
-async function tryCreateOnboardingRequest(
+async function tryRegisterAccount(
   onboardingRequest: NormalizedOnboardingRequest
-): Promise<PersistedOnboardingRequest> {
+): Promise<RegisteredOnboardingAccount> {
   try {
-    const persistedRequest = await createCoreOnboardingRequest({
-      email: onboardingRequest.email,
-      companyName: onboardingRequest.company_name,
-      contactName: onboardingRequest.user_name,
-      phone: onboardingRequest.phone,
-      country: onboardingRequest.country,
-      currency: onboardingRequest.base_currency,
-      planKey: onboardingRequest.initial_plan,
-      status: "provisioning",
-      payload: {
-        ...onboardingRequest,
-      },
-    });
+    const account = await registerAccountFromOnboardingRequest(onboardingRequest);
 
-    console.info("[CoreDB] OnboardingRequest saved");
+    console.info("[CoreDB] User, Tenant, Membership and OnboardingRequest saved");
 
-    return persistedRequest;
+    return account;
   } catch (error) {
+    if (error instanceof RegisterAccountError) {
+      throw error;
+    }
+
     if (isCoreDbRequired()) {
       console.error("[CoreDB] Required database unavailable", error);
       throw new Error(getCoreDbUnavailableMessage());
@@ -57,16 +51,16 @@ async function tryCreateOnboardingRequest(
 }
 
 async function tryUpdateOnboardingRequest(
-  persistedRequest: PersistedOnboardingRequest,
+  account: RegisteredOnboardingAccount,
   status: "ready" | "failed",
   lastError?: string
 ) {
-  if (!persistedRequest) {
+  if (!account) {
     return;
   }
 
   try {
-    await updateOnboardingRequestStatus(persistedRequest.id, status, {
+    await updateOnboardingRequestStatus(account.onboardingRequestId, status, {
       lastError,
     });
   } catch (error) {
@@ -86,12 +80,12 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const onboardingRequest = createOnboardingRequest(body);
-    const persistedRequest = await tryCreateOnboardingRequest(onboardingRequest);
+    const account = await tryRegisterAccount(onboardingRequest);
     const provisioning = await provisionOnboardingRequest(onboardingRequest);
 
     if (provisioning.status === "failed") {
       await tryUpdateOnboardingRequest(
-        persistedRequest,
+        account,
         "failed",
         provisioning.message
       );
@@ -112,16 +106,25 @@ export async function POST(request: Request) {
       );
     }
 
-    await tryUpdateOnboardingRequest(persistedRequest, "ready");
+    await tryUpdateOnboardingRequest(account, "ready");
+
+    if (account) {
+      await setAuthSession({
+        userId: account.userId,
+        tenantId: account.tenantId,
+      });
+    }
 
     return NextResponse.json({
       success: true,
       data: {
         status: provisioning.status,
         message:
-          provisioning.status === "ready"
+          account && provisioning.status === "ready"
             ? "Registro recibido. Tu dashboard se esta preparando."
-            : provisioning.message,
+            : account
+              ? provisioning.message
+              : "Registro recibido. La cuenta persistente no se guardo porque la base central no esta disponible en desarrollo.",
         redirect_to: "/dashboard",
       },
     });
@@ -136,9 +139,11 @@ export async function POST(request: Request) {
         success: false,
         error: {
           code:
-            message === getCoreDbUnavailableMessage()
-              ? "CORE_DATABASE_UNAVAILABLE"
-              : "ONBOARDING_REGISTER_ERROR",
+            error instanceof RegisterAccountError
+              ? error.code
+              : message === getCoreDbUnavailableMessage()
+                ? "CORE_DATABASE_UNAVAILABLE"
+                : "ONBOARDING_REGISTER_ERROR",
           message,
         },
         data: {
@@ -146,7 +151,14 @@ export async function POST(request: Request) {
           message,
         },
       },
-      { status: 400 }
+      {
+        status:
+          error instanceof RegisterAccountError
+            ? error.status
+            : message === getCoreDbUnavailableMessage()
+              ? 503
+              : 400,
+      }
     );
   }
 }

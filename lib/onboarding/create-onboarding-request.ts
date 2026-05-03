@@ -24,6 +24,10 @@ export function createOnboardingRequest(
   const input: CreateOnboardingRequestInput = {
     user_name: getStringField(record, "user_name") || getStringField(record, "name"),
     email: getStringField(record, "email").toLowerCase(),
+    password: getStringField(record, "password"),
+    password_confirm:
+      getStringField(record, "password_confirm") ||
+      getStringField(record, "confirm_password"),
     company_name:
       getStringField(record, "company_name") || getStringField(record, "company"),
     phone: normalizeOptional(getStringField(record, "phone")),
@@ -42,18 +46,31 @@ export function createOnboardingRequest(
     throw new Error("Ingresa un correo valido.");
   }
 
+  if (!input.password || input.password.length < 8) {
+    throw new Error("La contrasena debe tener al menos 8 caracteres.");
+  }
+
+  if (input.password_confirm && input.password !== input.password_confirm) {
+    throw new Error("Las contrasenas no coinciden.");
+  }
+
   if (!input.company_name) {
     throw new Error("El nombre de empresa es requerido.");
+  }
+
+  if (!input.country) {
+    throw new Error("El pais es requerido.");
   }
 
   return {
     user_name: input.user_name,
     email: input.email,
+    password: input.password,
     company_name: input.company_name,
     phone: input.phone,
     business_type: input.business_type,
     country: input.country,
-    base_currency: input.base_currency,
+    base_currency: input.base_currency ?? "USD",
     initial_plan: input.initial_plan,
     source: input.source ?? "appsolux_register",
   };

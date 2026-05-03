@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,6 +58,8 @@ export default function RegisterPage() {
     const payload = {
       user_name: String(formData.get("user_name") ?? ""),
       email: String(formData.get("email") ?? ""),
+      password: String(formData.get("password") ?? ""),
+      password_confirm: String(formData.get("password_confirm") ?? ""),
       company_name: String(formData.get("company_name") ?? ""),
       phone: String(formData.get("phone") ?? ""),
       business_type: String(formData.get("business_type") ?? ""),
@@ -155,6 +158,32 @@ export default function RegisterPage() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="password">Contrasena</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  minLength={8}
+                  placeholder="Minimo 8 caracteres"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password_confirm">Confirmar contrasena</Label>
+                <Input
+                  id="password_confirm"
+                  name="password_confirm"
+                  type="password"
+                  minLength={8}
+                  placeholder="Repite tu contrasena"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="phone">Telefono</Label>
                 <Input
                   id="phone"
@@ -180,6 +209,7 @@ export default function RegisterPage() {
                   id="country"
                   name="country"
                   placeholder="Ecuador"
+                  required
                   disabled={isLoading}
                 />
               </div>
@@ -218,6 +248,13 @@ export default function RegisterPage() {
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Preparando cuenta..." : "Crear cuenta"}
             </Button>
+
+            <p className="text-center text-sm text-muted-foreground">
+              Ya tienes cuenta?{" "}
+              <Link className="font-medium text-foreground underline" href="/login">
+                Inicia sesion
+              </Link>
+            </p>
 
             {message ? (
               <div

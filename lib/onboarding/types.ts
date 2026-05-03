@@ -5,6 +5,8 @@ export type OnboardingStatus = "pending" | "provisioning" | "ready" | "failed";
 export type CreateOnboardingRequestInput = {
   user_name: string;
   email: string;
+  password: string;
+  password_confirm?: string;
   company_name: string;
   phone?: string;
   business_type?: string;
@@ -17,10 +19,11 @@ export type CreateOnboardingRequestInput = {
 export type NormalizedOnboardingRequest = {
   user_name: string;
   email: string;
+  password: string;
   company_name: string;
   phone?: string;
   business_type?: string;
-  country?: string;
+  country: string;
   base_currency?: string;
   initial_plan?: string;
   source: string;
