@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { LogoutButton } from "./logout-button";
 
 export async function Topbar() {
   const user = await getCurrentUser();
@@ -13,8 +14,11 @@ export async function Topbar() {
         </p>
       </div>
 
-      <div className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
-        {tenantName}
+      <div className="flex items-center gap-2">
+        <div className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
+          {tenantName}
+        </div>
+        <LogoutButton />
       </div>
     </header>
   );

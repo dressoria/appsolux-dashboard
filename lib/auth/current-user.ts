@@ -1,11 +1,24 @@
 import "@/lib/security/server-only";
 import { getDevSessionUser } from "./dev-session";
+import { getPersistentUserFromSession } from "./persistent-user";
+import { getSessionPayload } from "./session";
 import type { AppsoluxUser } from "@/types/user";
 
 async function getCurrentUserFromRealSession(): Promise<AppsoluxUser | null> {
-  // Auth adapter placeholder.
-  // Fase 14 can replace this with Auth.js, Supabase, Clerk or a first-party DB.
-  return null;
+  const session = await getSessionPayload();
+
+  if (!session) {
+    return null;
+  }
+
+  try {
+    return await getPersistentUserFromSession({
+      userId: session.userId,
+      tenantId: session.tenantId,
+    });
+  } catch {
+    return null;
+  }
 }
 
 export async function getCurrentUser(): Promise<AppsoluxUser | null> {
