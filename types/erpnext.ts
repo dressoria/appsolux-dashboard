@@ -151,6 +151,53 @@ export type ErpnextStockLedgerEntry = {
   voucher_no?: string;
 };
 
+export type ErpnextSalesOrderItem = {
+  name?: string;
+  item_code: string;
+  item_name?: string;
+  qty: number;
+  rate: number;
+  amount?: number;
+  warehouse?: string;
+};
+
+export type ErpnextSalesOrder = {
+  name: string;
+  customer: string;
+  customer_name?: string;
+  transaction_date?: string;
+  delivery_date?: string;
+  status?: string;
+  grand_total?: number;
+  company: string;
+  items?: ErpnextSalesOrderItem[];
+};
+
+export type CreateSalesOrderItemInput = {
+  item_code: string;
+  qty: number;
+  rate: number;
+  warehouse?: string;
+};
+
+export type CreateSalesOrderInput = {
+  customer: string;
+  company: string;
+  warehouse: string;
+  items: CreateSalesOrderItemInput[];
+  note?: string;
+};
+
+export type PosCartItem = {
+  item_code: string;
+  item_name: string;
+  stock_uom?: string;
+  qty: number;
+  rate: number;
+};
+
+export type PosCheckoutInput = CreateSalesOrderInput;
+
 export type ErpnextInvoice = {
   name: string;
   customer: string;

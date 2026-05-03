@@ -1,4 +1,7 @@
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { routes } from "@/config/routes";
 
 const posCapabilities = [
   "Buscar productos",
@@ -17,14 +20,14 @@ export function PosPreviewCard() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <CardTitle>POS / Punto de venta</CardTitle>
           <span className="inline-flex h-6 items-center rounded-full border border-blue-200 bg-blue-50 px-2 text-xs font-medium text-blue-700">
-            Proximo modulo
+            Fase 1 disponible
           </span>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Modulo proximo para vender productos, seleccionar cliente, armar
-          carrito, registrar pagos y enviar la venta al ERP.
+          Seras llevado al POS de Appsolux para crear pedidos de venta con
+          productos, clientes, bodegas y stock reales.
         </p>
         <div className="grid gap-2 sm:grid-cols-2">
           {posCapabilities.map((capability) => (
@@ -36,6 +39,9 @@ export function PosPreviewCard() {
             </div>
           ))}
         </div>
+        <Button asChild>
+          <Link href={routes.pos}>Abrir POS</Link>
+        </Button>
       </CardContent>
     </Card>
   );

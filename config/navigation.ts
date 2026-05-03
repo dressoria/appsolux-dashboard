@@ -42,6 +42,12 @@ export const dashboardNavigation: NavigationItem[] = [
       "Clientes, inventario, productos, ventas, compras, facturas y contabilidad.",
   },
   {
+    title: "POS",
+    href: routes.pos,
+    description:
+      "Punto de venta para crear pedidos desde productos, clientes e inventario.",
+  },
+  {
     title: "Mi plan",
     href: routes.billing,
     description: "Plan Appsolux, pagos, suscripcion y facturas del servicio.",

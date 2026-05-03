@@ -10,6 +10,7 @@ export const routes = {
   automations: "/automations",
   notifications: "/notifications",
   erp: "/erp",
+  pos: "/pos",
   billing: "/billing",
   settings: "/settings",
 
