@@ -63,19 +63,32 @@ enum OnboardingStatus {
   failed
 }
 
-model User {
-  id              String              @id @default(cuid())
-  name            String
-  email           String              @unique
-  passwordHash    String?
-  status          UserStatus          @default(invited)
-  emailVerifiedAt DateTime?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+enum ProvisioningJobType {
+  erpnext_dedicated_site
+}
 
-  memberships        Membership[]
-  onboardingRequests OnboardingRequest[]
-  auditLogs          AuditLog[]
+enum ProvisioningJobStatus {
+  queued
+  running
+  succeeded
+  failed
+  canceled
+}
+
+model User {
+  id              String     @id @default(cuid())
+  name            String
+  email           String     @unique
+  passwordHash    String?
+  status          UserStatus @default(invited)
+  emailVerifiedAt DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  memberships               Membership[]
+  onboardingRequests        OnboardingRequest[]
+  auditLogs                 AuditLog[]
+  requestedProvisioningJobs ProvisioningJob[]   @relation("RequestedByUser")
 }
 
 model Tenant {
@@ -94,6 +107,7 @@ model Tenant {
   integrations       TenantIntegration[]
   onboardingRequests OnboardingRequest[]
   auditLogs          AuditLog[]
+  provisioningJobs   ProvisioningJob[]
 }
 
 model Membership {
@@ -110,6 +124,34 @@ model Membership {
 
   @@unique([userId, tenantId])
   @@index([tenantId])
+}
+
+model ProvisioningJob {
+  id                String                @id @default(cuid())
+  tenantId          String
+  requestedByUserId String?
+  type              ProvisioningJobType
+  status            ProvisioningJobStatus @default(queued)
+  priority          Int                   @default(100)
+  attempts          Int                   @default(0)
+  maxAttempts       Int                   @default(3)
+  payload           Json?
+  result            Json?
+  lastError         String?
+  lockedAt          DateTime?
+  lockedBy          String?
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  tenant          Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedByUser User?  @relation("RequestedByUser", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([type, status])
+  @@index([createdAt])
 }
 
 model IntegrationInstance {
