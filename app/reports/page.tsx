@@ -1,3 +1,4 @@
+﻿import { ErpDedicatedProvisionCard } from "@/components/appsolux/dashboard/erp-dedicated-provision-card";
 import { PaymentMethodsTable } from "@/components/appsolux/reports/payment-methods-table";
 import { ReportsSummary } from "@/components/appsolux/reports/reports-summary";
 import { TopProductsTable } from "@/components/appsolux/reports/top-products-table";
@@ -9,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { buildReportsDashboardData } from "@/lib/api/erpnext/reports";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { canManageSettings } from "@/lib/auth/permissions";
+import { getErpProvisioningState } from "@/lib/core/erp-provisioning-status";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import type { ReportDateRange } from "@/types/reports";
 
@@ -42,6 +45,49 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   }
 
   const tenant = await getCurrentTenant(user);
+  const erpProvisioning = await getErpProvisioningState(tenant);
+
+  if (!erpProvisioning.isReady) {
+    return (
+      <DashboardShell>
+        <div className="space-y-6">
+          <div>
+            <p className="text-sm text-muted-foreground">Reportes</p>
+            <h1 className="text-3xl font-semibold tracking-tight">Reportes</h1>
+            <p className="mt-2 max-w-3xl text-muted-foreground">
+              Los reportes necesitan ventas, pagos e inventario desde ERP.
+              Activa primero el ERP dedicado para este tenant.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Tenant: {tenant.name}
+            </p>
+          </div>
+
+          <ErpDedicatedProvisionCard
+            status={erpProvisioning.status}
+            desiredSiteName={erpProvisioning.desiredSiteName}
+            desiredCompanyName={erpProvisioning.desiredCompanyName}
+            latestJobId={erpProvisioning.latestJobId}
+            lastError={erpProvisioning.lastError}
+            canManage={canManageSettings(user)}
+          />
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Reportes protegidos</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>
+                Appsolux no calculara reportes reales hasta que el ERP este
+                activo. Asi evitamos errores cuando el tenant esta en onboarding.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardShell>
+    );
+  }
+
   const resolvedSearchParams = await searchParams;
   const range: ReportDateRange = {
     from: normalizeDate(resolvedSearchParams.from),

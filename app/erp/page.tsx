@@ -1,4 +1,5 @@
-import { ErpTabs } from "@/components/appsolux/erp/erp-tabs";
+﻿import { ErpTabs } from "@/components/appsolux/erp/erp-tabs";
+import { ErpDedicatedProvisionCard } from "@/components/appsolux/dashboard/erp-dedicated-provision-card";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getErpnextCustomers } from "@/lib/api/erpnext/customers";
@@ -8,6 +9,8 @@ import { getErpnextMasters } from "@/lib/api/erpnext/masters";
 import { getErpnextStockLedger } from "@/lib/api/erpnext/stock-ledger";
 import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { canManageSettings } from "@/lib/auth/permissions";
+import { getErpProvisioningState } from "@/lib/core/erp-provisioning-status";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import type { ErpnextMasters } from "@/types/erpnext";
 
@@ -55,6 +58,54 @@ export default async function ErpPage() {
   }
 
   const tenant = await getCurrentTenant(user);
+  const erpProvisioning = await getErpProvisioningState(tenant);
+
+  if (!erpProvisioning.isReady) {
+    return (
+      <DashboardShell>
+        <div className="space-y-6">
+          <div>
+            <p className="text-sm text-muted-foreground">ERP</p>
+            <h1 className="text-3xl font-semibold tracking-tight">ERP</h1>
+            <p className="mt-2 max-w-3xl text-muted-foreground">
+              Este tenant todavia no tiene un ERP activo. Primero activa el ERP
+              dedicado; Appsolux creara un job y el worker de infraestructura lo
+              preparara fuera del dashboard.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Tenant: {tenant.name}
+            </p>
+          </div>
+
+          <ErpDedicatedProvisionCard
+            status={erpProvisioning.status}
+            desiredSiteName={erpProvisioning.desiredSiteName}
+            desiredCompanyName={erpProvisioning.desiredCompanyName}
+            latestJobId={erpProvisioning.latestJobId}
+            lastError={erpProvisioning.lastError}
+            canManage={canManageSettings(user)}
+          />
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Datos ERP protegidos</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>
+                Productos, bodegas, clientes, inventario y movimientos no se
+                cargaran hasta que el ERP este activo.
+              </p>
+              <p>
+                Esto evita errores en tenants reales que aun no tienen un sitio
+                ERPNext dedicado.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardShell>
+    );
+  }
+
   const emptyMasters: ErpnextMasters = {
     itemGroups: [],
     uoms: [],
