@@ -61,6 +61,8 @@ export default async function ErpPage() {
   const erpProvisioning = await getErpProvisioningState(tenant);
 
   if (!erpProvisioning.isReady) {
+    const isSimulated = erpProvisioning.status === "active_simulated";
+
     return (
       <DashboardShell>
         <div className="space-y-6">
@@ -68,9 +70,9 @@ export default async function ErpPage() {
             <p className="text-sm text-muted-foreground">ERP</p>
             <h1 className="text-3xl font-semibold tracking-tight">ERP</h1>
             <p className="mt-2 max-w-3xl text-muted-foreground">
-              Este tenant todavia no tiene un ERP activo. Primero activa el ERP
-              dedicado; Appsolux creara un job y el worker de infraestructura lo
-              preparara fuera del dashboard.
+              {isSimulated
+                ? "El sitio ERPNext fue validado en simulación pero todavía no existe en producción. Los datos reales no se cargarán hasta que el worker complete el aprovisionamiento real."
+                : "Este tenant todavia no tiene un ERP activo. Primero activa el ERP dedicado; Appsolux creara un job y el worker de infraestructura lo preparara fuera del dashboard."}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Tenant: {tenant.name}
@@ -91,14 +93,27 @@ export default async function ErpPage() {
               <CardTitle>Datos ERP protegidos</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
-              <p>
-                Productos, bodegas, clientes, inventario y movimientos no se
-                cargaran hasta que el ERP este activo.
-              </p>
-              <p>
-                Esto evita errores en tenants reales que aun no tienen un sitio
-                ERPNext dedicado.
-              </p>
+              {isSimulated ? (
+                <>
+                  <p>
+                    El worker ejecutó el script en modo dry-run. No se creó ningún sitio ERPNext real.
+                  </p>
+                  <p>
+                    Productos, bodegas, clientes, inventario y movimientos permanecen bloqueados hasta que el aprovisionamiento real se complete en la VM.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>
+                    Productos, bodegas, clientes, inventario y movimientos no se
+                    cargaran hasta que el ERP este activo.
+                  </p>
+                  <p>
+                    Esto evita errores en tenants reales que aun no tienen un sitio
+                    ERPNext dedicado.
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

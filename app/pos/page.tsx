@@ -61,6 +61,8 @@ export default async function PosPage() {
   const erpProvisioning = await getErpProvisioningState(tenant);
 
   if (!erpProvisioning.isReady) {
+    const isSimulated = erpProvisioning.status === "active_simulated";
+
     return (
       <DashboardShell>
         <div className="space-y-6">
@@ -68,8 +70,9 @@ export default async function PosPage() {
             <p className="text-sm text-muted-foreground">POS</p>
             <h1 className="text-3xl font-semibold tracking-tight">POS</h1>
             <p className="mt-2 max-w-3xl text-muted-foreground">
-              El punto de venta necesita productos, bodegas, clientes, metodos
-              de pago e inventario desde ERP. Activa primero el ERP dedicado.
+              {isSimulated
+                ? "El sitio ERPNext fue validado en simulación pero todavía no existe en producción. El POS permanece protegido hasta que el aprovisionamiento real se complete."
+                : "El punto de venta necesita productos, bodegas, clientes, metodos de pago e inventario desde ERP. Activa primero el ERP dedicado."}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Tenant: {tenant.name}
@@ -90,10 +93,16 @@ export default async function PosPage() {
               <CardTitle>POS protegido</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
-              <p>
-                El POS no cargara productos ni intentara vender hasta que el ERP
-                este activo para este tenant.
-              </p>
+              {isSimulated ? (
+                <p>
+                  El worker ejecutó el dry-run correctamente. El POS no cargará productos ni intentará vender hasta que el sitio ERPNext real esté activo.
+                </p>
+              ) : (
+                <p>
+                  El POS no cargara productos ni intentara vender hasta que el ERP
+                  este activo para este tenant.
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>

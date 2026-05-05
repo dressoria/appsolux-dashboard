@@ -1,4 +1,4 @@
-﻿import "@/lib/security/server-only";
+import "@/lib/security/server-only";
 
 import { ProvisioningJobType } from "@prisma/client";
 
@@ -12,6 +12,7 @@ export type ErpProvisioningUiStatus =
   | "queued"
   | "running"
   | "active"
+  | "active_simulated"
   | "failed"
   | "disabled";
 
@@ -20,6 +21,7 @@ export type ErpProvisioningState = {
   integrationStatus?: string;
   jobStatus?: string;
   isReady: boolean;
+  isSimulated: boolean;
   canStartProvisioning: boolean;
   desiredSiteName?: string;
   desiredCompanyName?: string;
@@ -42,6 +44,15 @@ function readConfigString(config: unknown, key: string) {
   }
 
   return getString(config[key]);
+}
+
+function readConfigBool(config: unknown, key: string): boolean | undefined {
+  if (!isObject(config)) {
+    return undefined;
+  }
+
+  const val = config[key];
+  return typeof val === "boolean" ? val : undefined;
 }
 
 function readPayloadString(payload: unknown, key: string) {
@@ -70,20 +81,46 @@ export async function getErpProvisioningState(
   ]);
 
   if (integration?.status === "active") {
+    const cfg = integration.config;
+    const isSimulated =
+      readConfigBool(cfg, "simulatedProvisioning") === true ||
+      readConfigBool(cfg, "scriptDryRun") === true;
+
+    if (isSimulated) {
+      return {
+        status: "active_simulated",
+        integrationStatus: integration.status,
+        jobStatus: latestJob?.status,
+        isReady: false,
+        isSimulated: true,
+        canStartProvisioning: false,
+        desiredSiteName:
+          integration.externalSiteName ??
+          readConfigString(cfg, "desiredSiteName"),
+        desiredCompanyName:
+          integration.externalCompanyId ??
+          readConfigString(cfg, "desiredCompanyName"),
+        latestJobId:
+          readConfigString(cfg, "latestJobId") ?? latestJob?.id,
+        mode: "dedicated_site",
+      };
+    }
+
     return {
       status: "active",
       integrationStatus: integration.status,
       jobStatus: latestJob?.status,
       isReady: true,
+      isSimulated: false,
       canStartProvisioning: false,
       desiredSiteName:
         integration.externalSiteName ??
-        readConfigString(integration.config, "desiredSiteName"),
+        readConfigString(cfg, "desiredSiteName"),
       desiredCompanyName:
         integration.externalCompanyId ??
-        readConfigString(integration.config, "desiredCompanyName"),
+        readConfigString(cfg, "desiredCompanyName"),
       latestJobId:
-        readConfigString(integration.config, "latestJobId") ?? latestJob?.id,
+        readConfigString(cfg, "latestJobId") ?? latestJob?.id,
       mode: "dedicated_site",
     };
   }
@@ -92,6 +129,7 @@ export async function getErpProvisioningState(
     return {
       status: "active",
       isReady: true,
+      isSimulated: false,
       canStartProvisioning: false,
       desiredCompanyName: tenant.erpnext_company_id,
       mode: "legacy_or_demo",
@@ -104,6 +142,7 @@ export async function getErpProvisioningState(
       integrationStatus: integration?.status,
       jobStatus: latestJob.status,
       isReady: false,
+      isSimulated: false,
       canStartProvisioning: false,
       desiredSiteName:
         integration?.externalSiteName ??
@@ -125,6 +164,7 @@ export async function getErpProvisioningState(
       integrationStatus: integration?.status,
       jobStatus: latestJob.status,
       isReady: false,
+      isSimulated: false,
       canStartProvisioning: false,
       desiredSiteName:
         integration?.externalSiteName ??
@@ -146,6 +186,7 @@ export async function getErpProvisioningState(
       integrationStatus: integration?.status,
       jobStatus: latestJob?.status,
       isReady: false,
+      isSimulated: false,
       canStartProvisioning: true,
       desiredSiteName:
         integration?.externalSiteName ??
@@ -168,6 +209,7 @@ export async function getErpProvisioningState(
       integrationStatus: integration.status,
       jobStatus: latestJob?.status,
       isReady: false,
+      isSimulated: false,
       canStartProvisioning: false,
       desiredSiteName:
         integration.externalSiteName ??
@@ -188,6 +230,7 @@ export async function getErpProvisioningState(
       integrationStatus: integration.status,
       jobStatus: latestJob?.status,
       isReady: false,
+      isSimulated: false,
       canStartProvisioning: integration.status === "pending",
       desiredSiteName:
         integration.externalSiteName ??
@@ -205,6 +248,7 @@ export async function getErpProvisioningState(
   return {
     status: "not_configured",
     isReady: false,
+    isSimulated: false,
     canStartProvisioning: true,
     mode: "none",
   };

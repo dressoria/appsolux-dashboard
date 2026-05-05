@@ -40,6 +40,10 @@ function getStatusLabel(status: ErpProvisioningUiStatus) {
     return "ERP activo";
   }
 
+  if (status === "active_simulated") {
+    return "ERP validado en simulación";
+  }
+
   if (status === "queued") {
     return "ERP en cola de preparación";
   }
@@ -66,6 +70,10 @@ function getStatusLabel(status: ErpProvisioningUiStatus) {
 function getStatusDescription(status: ErpProvisioningUiStatus) {
   if (status === "active") {
     return "Tu empresa ya puede usar inventario, POS y reportes conectados al ERP.";
+  }
+
+  if (status === "active_simulated") {
+    return "El worker ejecutó el dry-run correctamente, pero el sitio ERPNext real todavía no fue creado. ERP, POS y Reportes permanecen protegidos hasta que el aprovisionamiento real se complete.";
   }
 
   if (status === "queued") {
@@ -176,7 +184,7 @@ export function ErpDedicatedProvisionCard({
           </Button>
         ) : null}
 
-        {!canManage && status !== "active" ? (
+        {!canManage && status !== "active" && status !== "active_simulated" ? (
           <p className="text-xs text-muted-foreground">
             Pide a un owner o admin activar el ERP dedicado.
           </p>

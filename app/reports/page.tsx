@@ -48,6 +48,8 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const erpProvisioning = await getErpProvisioningState(tenant);
 
   if (!erpProvisioning.isReady) {
+    const isSimulated = erpProvisioning.status === "active_simulated";
+
     return (
       <DashboardShell>
         <div className="space-y-6">
@@ -55,8 +57,9 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             <p className="text-sm text-muted-foreground">Reportes</p>
             <h1 className="text-3xl font-semibold tracking-tight">Reportes</h1>
             <p className="mt-2 max-w-3xl text-muted-foreground">
-              Los reportes necesitan ventas, pagos e inventario desde ERP.
-              Activa primero el ERP dedicado para este tenant.
+              {isSimulated
+                ? "El sitio ERPNext fue validado en simulación pero todavía no existe en producción. Los reportes permanecen protegidos hasta que el aprovisionamiento real se complete."
+                : "Los reportes necesitan ventas, pagos e inventario desde ERP. Activa primero el ERP dedicado para este tenant."}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Tenant: {tenant.name}
@@ -77,10 +80,16 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               <CardTitle>Reportes protegidos</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
-              <p>
-                Appsolux no calculara reportes reales hasta que el ERP este
-                activo. Asi evitamos errores cuando el tenant esta en onboarding.
-              </p>
+              {isSimulated ? (
+                <p>
+                  El worker ejecutó el dry-run correctamente. Appsolux no calculará reportes reales hasta que el sitio ERPNext esté aprovisionado en producción.
+                </p>
+              ) : (
+                <p>
+                  Appsolux no calculara reportes reales hasta que el ERP este
+                  activo. Asi evitamos errores cuando el tenant esta en onboarding.
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
