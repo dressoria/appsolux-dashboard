@@ -146,11 +146,7 @@ export default async function DashboardPage() {
           />
 
           <ErpDedicatedProvisionCard
-            status={erpProvisioning.status}
-            desiredSiteName={erpProvisioning.desiredSiteName}
-            desiredCompanyName={erpProvisioning.desiredCompanyName}
-            latestJobId={erpProvisioning.latestJobId}
-            lastError={erpProvisioning.lastError}
+            provisioning={erpProvisioning}
             canManage={canManage}
           />
         </div>

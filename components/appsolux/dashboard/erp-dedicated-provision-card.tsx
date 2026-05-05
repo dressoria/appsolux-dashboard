@@ -5,14 +5,10 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { ErpProvisioningUiStatus } from "@/lib/core/erp-provisioning-status";
+import type { ErpProvisioningState } from "@/lib/core/erp-provisioning-status";
 
 type ErpDedicatedProvisionCardProps = {
-  status: ErpProvisioningUiStatus;
-  desiredSiteName?: string;
-  desiredCompanyName?: string;
-  latestJobId?: string;
-  lastError?: string;
+  provisioning: ErpProvisioningState;
   canManage: boolean;
 };
 
@@ -35,82 +31,40 @@ type ProvisionResponse = {
   };
 };
 
-function getStatusLabel(status: ErpProvisioningUiStatus) {
-  if (status === "active") {
-    return "ERP activo";
+
+function getStatusDescription(state: ErpProvisioningState) {
+  if (state.mode === "legacy_or_demo" && state.isRealActive) {
+    return "ERP activo: este tenant tiene acceso a un ERPNext compartido o de demostracion.";
   }
-
-  if (status === "active_simulated") {
-    return "ERP validado en simulación";
+  if (state.isRealActive) {
+    return "ERP real activo: tu empresa ya puede usar inventario, POS y reportes conectados al ERP.";
   }
-
-  if (status === "queued") {
-    return "ERP en cola de preparación";
+  if (state.isSimulated) {
+    return "La validacion tecnica termino, pero ERP/POS/Reportes seguiran bloqueados hasta completar el provisioning real.";
   }
-
-  if (status === "running") {
-    return "ERP en preparación";
+  if (state.isPending) {
+    return "ERP en preparacion: la solicitud ya fue creada y un worker externo preparara el sitio ERPNext dedicado.";
   }
-
-  if (status === "pending") {
-    return "ERP pendiente de activar";
+  if (state.isFailed) {
+    return "Error preparando ERP: la ultima preparacion fallo. Puedes volver a poner el ERP en cola.";
   }
-
-  if (status === "failed") {
-    return "ERP requiere revisión";
-  }
-
-  if (status === "disabled") {
-    return "ERP deshabilitado";
-  }
-
-  return "ERP no configurado";
-}
-
-function getStatusDescription(status: ErpProvisioningUiStatus) {
-  if (status === "active") {
-    return "Tu empresa ya puede usar inventario, POS y reportes conectados al ERP.";
-  }
-
-  if (status === "active_simulated") {
-    return "El worker ejecutó el dry-run correctamente, pero el sitio ERPNext real todavía no fue creado. ERP, POS y Reportes permanecen protegidos hasta que el aprovisionamiento real se complete.";
-  }
-
-  if (status === "queued") {
-    return "La solicitud ya fue creada. Un worker externo preparará el sitio ERPNext dedicado.";
-  }
-
-  if (status === "running") {
-    return "La preparación está en proceso fuera del dashboard.";
-  }
-
-  if (status === "failed") {
-    return "La última preparación falló. Puedes volver a poner el ERP en cola.";
-  }
-
-  if (status === "disabled") {
+  if (state.status === "disabled") {
     return "El ERP está deshabilitado para este tenant.";
   }
-
-  return "Activa un ERPNext dedicado para este tenant. Appsolux solo crea el job; la VM lo ejecutará después.";
+  if (state.status === "not_configured") {
+    return "ERP no solicitado: activa un ERPNext dedicado para este tenant. Appsolux solo crea el job; la VM lo ejecutará después.";
+  }
+  return "Estado desconocido.";
 }
 
-export function ErpDedicatedProvisionCard({
-  status,
-  desiredSiteName,
-  desiredCompanyName,
-  latestJobId,
-  lastError,
-  canManage,
-}: ErpDedicatedProvisionCardProps) {
+export function ErpDedicatedProvisionCard({ provisioning, canManage }: ErpDedicatedProvisionCardProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [error, setError] = useState(lastError ?? "");
+  const [error, setError] = useState(provisioning.lastError ?? "");
 
   const canStart =
-    canManage &&
-    (status === "not_configured" || status === "pending" || status === "failed");
+    canManage && provisioning.canStartProvisioning && !provisioning.isPending;
 
   async function handleProvision() {
     setIsLoading(true);
@@ -149,27 +103,27 @@ export function ErpDedicatedProvisionCard({
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="space-y-1">
-          <p className="text-sm font-medium">{getStatusLabel(status)}</p>
+          <p className="text-sm font-medium">{provisioning.displayStatus}</p>
           <p className="text-xs text-muted-foreground">
-            {getStatusDescription(status)}
+            {getStatusDescription(provisioning)}
           </p>
         </div>
 
-        {desiredSiteName ? (
+        {provisioning.expectedSiteName ? (
           <p className="text-xs text-muted-foreground">
-            Sitio esperado: {desiredSiteName}
+            Sitio esperado: {provisioning.expectedSiteName}
           </p>
         ) : null}
 
-        {desiredCompanyName ? (
+        {provisioning.desiredCompanyName ? (
           <p className="text-xs text-muted-foreground">
-            Empresa ERP: {desiredCompanyName}
+            Empresa ERP: {provisioning.desiredCompanyName}
           </p>
         ) : null}
 
-        {latestJobId ? (
+        {provisioning.latestJobId ? (
           <p className="text-xs text-muted-foreground">
-            Job: {latestJobId}
+            Job: {provisioning.latestJobId}
           </p>
         ) : null}
 
@@ -180,11 +134,11 @@ export function ErpDedicatedProvisionCard({
             onClick={handleProvision}
             disabled={isLoading}
           >
-            {isLoading ? "Preparando..." : "Activar ERP dedicado"}
+            {isLoading ? "Preparando..." : "Solicitar ERP dedicado"}
           </Button>
         ) : null}
 
-        {!canManage && status !== "active" && status !== "active_simulated" ? (
+        {!canManage && !provisioning.isRealActive && !provisioning.isSimulated ? (
           <p className="text-xs text-muted-foreground">
             Pide a un owner o admin activar el ERP dedicado.
           </p>

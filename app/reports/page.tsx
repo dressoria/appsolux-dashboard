@@ -26,6 +26,22 @@ function normalizeDate(value: string | undefined) {
   return value?.trim() || undefined;
 }
 
+function getReportsBlockedDescription(
+  erpProvisioning: Awaited<ReturnType<typeof getErpProvisioningState>>
+) {
+  if (erpProvisioning.isSimulated) {
+    return "La validacion tecnica termino, pero ERP/POS/Reportes seguiran bloqueados hasta completar el provisioning real.";
+  }
+  if (erpProvisioning.isPending || erpProvisioning.isFailed) {
+    return erpProvisioning.displayStatus;
+  }
+  if (erpProvisioning.status === "not_configured") {
+    return "Los reportes necesitan ventas, pagos e inventario desde ERP. Solicita primero el ERP dedicado para este tenant.";
+  }
+
+  return erpProvisioning.displayStatus;
+}
+
 export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const user = await getCurrentUser();
 
@@ -47,9 +63,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const tenant = await getCurrentTenant(user);
   const erpProvisioning = await getErpProvisioningState(tenant);
 
-  if (!erpProvisioning.isReady) {
-    const isSimulated = erpProvisioning.status === "active_simulated";
-
+  if (!erpProvisioning.isRealActive) {
     return (
       <DashboardShell>
         <div className="space-y-6">
@@ -57,9 +71,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             <p className="text-sm text-muted-foreground">Reportes</p>
             <h1 className="text-3xl font-semibold tracking-tight">Reportes</h1>
             <p className="mt-2 max-w-3xl text-muted-foreground">
-              {isSimulated
-                ? "El sitio ERPNext fue validado en simulación pero todavía no existe en producción. Los reportes permanecen protegidos hasta que el aprovisionamiento real se complete."
-                : "Los reportes necesitan ventas, pagos e inventario desde ERP. Activa primero el ERP dedicado para este tenant."}
+              {getReportsBlockedDescription(erpProvisioning)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Tenant: {tenant.name}
@@ -67,11 +79,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           </div>
 
           <ErpDedicatedProvisionCard
-            status={erpProvisioning.status}
-            desiredSiteName={erpProvisioning.desiredSiteName}
-            desiredCompanyName={erpProvisioning.desiredCompanyName}
-            latestJobId={erpProvisioning.latestJobId}
-            lastError={erpProvisioning.lastError}
+            provisioning={erpProvisioning}
             canManage={canManageSettings(user)}
           />
 
@@ -80,10 +88,14 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               <CardTitle>Reportes protegidos</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
-              {isSimulated ? (
+              {erpProvisioning.isSimulated ? (
                 <p>
-                  El worker ejecutó el dry-run correctamente. Appsolux no calculará reportes reales hasta que el sitio ERPNext esté aprovisionado en producción.
+                  El worker ejecuto el dry-run correctamente. Appsolux no
+                  calculara reportes reales hasta que el sitio ERPNext este
+                  aprovisionado en produccion.
                 </p>
+              ) : erpProvisioning.isPending || erpProvisioning.isFailed ? (
+                <p>{erpProvisioning.displayStatus}</p>
               ) : (
                 <p>
                   Appsolux no calculara reportes reales hasta que el ERP este

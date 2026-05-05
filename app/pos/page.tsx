@@ -39,6 +39,22 @@ async function loadErpResource<T>(
   }
 }
 
+function getPosBlockedDescription(
+  erpProvisioning: Awaited<ReturnType<typeof getErpProvisioningState>>
+) {
+  if (erpProvisioning.isSimulated) {
+    return "La validacion tecnica termino, pero ERP/POS/Reportes seguiran bloqueados hasta completar el provisioning real.";
+  }
+  if (erpProvisioning.isPending || erpProvisioning.isFailed) {
+    return erpProvisioning.displayStatus;
+  }
+  if (erpProvisioning.status === "not_configured") {
+    return "El punto de venta necesita productos, bodegas, clientes, metodos de pago e inventario desde ERP. Solicita primero el ERP dedicado.";
+  }
+
+  return erpProvisioning.displayStatus;
+}
+
 export default async function PosPage() {
   const user = await getCurrentUser();
 
@@ -60,9 +76,7 @@ export default async function PosPage() {
   const tenant = await getCurrentTenant(user);
   const erpProvisioning = await getErpProvisioningState(tenant);
 
-  if (!erpProvisioning.isReady) {
-    const isSimulated = erpProvisioning.status === "active_simulated";
-
+  if (!erpProvisioning.isRealActive) {
     return (
       <DashboardShell>
         <div className="space-y-6">
@@ -70,9 +84,7 @@ export default async function PosPage() {
             <p className="text-sm text-muted-foreground">POS</p>
             <h1 className="text-3xl font-semibold tracking-tight">POS</h1>
             <p className="mt-2 max-w-3xl text-muted-foreground">
-              {isSimulated
-                ? "El sitio ERPNext fue validado en simulación pero todavía no existe en producción. El POS permanece protegido hasta que el aprovisionamiento real se complete."
-                : "El punto de venta necesita productos, bodegas, clientes, metodos de pago e inventario desde ERP. Activa primero el ERP dedicado."}
+              {getPosBlockedDescription(erpProvisioning)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Tenant: {tenant.name}
@@ -80,11 +92,7 @@ export default async function PosPage() {
           </div>
 
           <ErpDedicatedProvisionCard
-            status={erpProvisioning.status}
-            desiredSiteName={erpProvisioning.desiredSiteName}
-            desiredCompanyName={erpProvisioning.desiredCompanyName}
-            latestJobId={erpProvisioning.latestJobId}
-            lastError={erpProvisioning.lastError}
+            provisioning={erpProvisioning}
             canManage={canManageSettings(user)}
           />
 
@@ -93,10 +101,14 @@ export default async function PosPage() {
               <CardTitle>POS protegido</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
-              {isSimulated ? (
+              {erpProvisioning.isSimulated ? (
                 <p>
-                  El worker ejecutó el dry-run correctamente. El POS no cargará productos ni intentará vender hasta que el sitio ERPNext real esté activo.
+                  El worker ejecuto el dry-run correctamente. El POS no cargara
+                  productos ni intentara vender hasta que el sitio ERPNext real
+                  este activo.
                 </p>
+              ) : erpProvisioning.isPending || erpProvisioning.isFailed ? (
+                <p>{erpProvisioning.displayStatus}</p>
               ) : (
                 <p>
                   El POS no cargara productos ni intentara vender hasta que el ERP

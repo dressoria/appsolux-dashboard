@@ -22,11 +22,16 @@ export type ErpProvisioningState = {
   jobStatus?: string;
   isReady: boolean;
   isSimulated: boolean;
+  isRealActive: boolean;
+  isPending: boolean;
+  isFailed: boolean;
   canStartProvisioning: boolean;
   desiredSiteName?: string;
   desiredCompanyName?: string;
+  expectedSiteName?: string;
   latestJobId?: string;
   lastError?: string;
+  displayStatus: string;
   mode: "dedicated_site" | "legacy_or_demo" | "none";
 };
 
@@ -86,6 +91,13 @@ export async function getErpProvisioningState(
       readConfigBool(cfg, "simulatedProvisioning") === true ||
       readConfigBool(cfg, "scriptDryRun") === true;
 
+    const siteName =
+      integration.externalSiteName ?? readConfigString(cfg, "desiredSiteName");
+    const companyName =
+      integration.externalCompanyId ??
+      readConfigString(cfg, "desiredCompanyName");
+    const jobId = readConfigString(cfg, "latestJobId") ?? latestJob?.id;
+
     if (isSimulated) {
       return {
         status: "active_simulated",
@@ -93,34 +105,41 @@ export async function getErpProvisioningState(
         jobStatus: latestJob?.status,
         isReady: false,
         isSimulated: true,
+        isRealActive: false,
+        isPending: false,
+        isFailed: false,
         canStartProvisioning: false,
-        desiredSiteName:
-          integration.externalSiteName ??
-          readConfigString(cfg, "desiredSiteName"),
-        desiredCompanyName:
-          integration.externalCompanyId ??
-          readConfigString(cfg, "desiredCompanyName"),
-        latestJobId:
-          readConfigString(cfg, "latestJobId") ?? latestJob?.id,
+        desiredSiteName: siteName,
+        desiredCompanyName: companyName,
+        expectedSiteName: siteName,
+        latestJobId: jobId,
+        displayStatus: "ERP validado en simulación",
         mode: "dedicated_site",
       };
     }
+
+    const isRealActive =
+      readConfigBool(cfg, "realProvisioning") === true &&
+      readConfigBool(cfg, "siteProvisioningReady") === true &&
+      Boolean(integration.externalSiteName);
 
     return {
       status: "active",
       integrationStatus: integration.status,
       jobStatus: latestJob?.status,
-      isReady: true,
+      isReady: isRealActive,
       isSimulated: false,
+      isRealActive,
+      isPending: false,
+      isFailed: false,
       canStartProvisioning: false,
-      desiredSiteName:
-        integration.externalSiteName ??
-        readConfigString(cfg, "desiredSiteName"),
-      desiredCompanyName:
-        integration.externalCompanyId ??
-        readConfigString(cfg, "desiredCompanyName"),
-      latestJobId:
-        readConfigString(cfg, "latestJobId") ?? latestJob?.id,
+      desiredSiteName: siteName,
+      desiredCompanyName: companyName,
+      expectedSiteName: siteName,
+      latestJobId: jobId,
+      displayStatus: isRealActive
+        ? "ERP real activo"
+        : "ERP pendiente de activar",
       mode: "dedicated_site",
     };
   }
@@ -130,117 +149,168 @@ export async function getErpProvisioningState(
       status: "active",
       isReady: true,
       isSimulated: false,
+      isRealActive: true,
+      isPending: false,
+      isFailed: false,
       canStartProvisioning: false,
       desiredCompanyName: tenant.erpnext_company_id,
+      expectedSiteName: undefined,
+      displayStatus: "ERP activo",
       mode: "legacy_or_demo",
     };
   }
 
   if (latestJob?.status === "queued") {
+    const siteName =
+      integration?.externalSiteName ??
+      readConfigString(integration?.config, "desiredSiteName") ??
+      readPayloadString(latestJob.payload, "desiredSiteName");
+    const companyName =
+      integration?.externalCompanyId ??
+      readConfigString(integration?.config, "desiredCompanyName") ??
+      readPayloadString(latestJob.payload, "desiredCompanyName");
+
     return {
       status: "queued",
       integrationStatus: integration?.status,
       jobStatus: latestJob.status,
       isReady: false,
       isSimulated: false,
+      isRealActive: false,
+      isPending: true,
+      isFailed: false,
       canStartProvisioning: false,
-      desiredSiteName:
-        integration?.externalSiteName ??
-        readConfigString(integration?.config, "desiredSiteName") ??
-        readPayloadString(latestJob.payload, "desiredSiteName"),
-      desiredCompanyName:
-        integration?.externalCompanyId ??
-        readConfigString(integration?.config, "desiredCompanyName") ??
-        readPayloadString(latestJob.payload, "desiredCompanyName"),
+      desiredSiteName: siteName,
+      desiredCompanyName: companyName,
+      expectedSiteName: siteName,
       latestJobId: latestJob.id,
       lastError: integration?.lastError ?? latestJob.lastError ?? undefined,
+      displayStatus: "ERP en preparación",
       mode: "dedicated_site",
     };
   }
 
   if (latestJob?.status === "running") {
+    const siteName =
+      integration?.externalSiteName ??
+      readConfigString(integration?.config, "desiredSiteName") ??
+      readPayloadString(latestJob.payload, "desiredSiteName");
+    const companyName =
+      integration?.externalCompanyId ??
+      readConfigString(integration?.config, "desiredCompanyName") ??
+      readPayloadString(latestJob.payload, "desiredCompanyName");
+
     return {
       status: "running",
       integrationStatus: integration?.status,
       jobStatus: latestJob.status,
       isReady: false,
       isSimulated: false,
+      isRealActive: false,
+      isPending: true,
+      isFailed: false,
       canStartProvisioning: false,
-      desiredSiteName:
-        integration?.externalSiteName ??
-        readConfigString(integration?.config, "desiredSiteName") ??
-        readPayloadString(latestJob.payload, "desiredSiteName"),
-      desiredCompanyName:
-        integration?.externalCompanyId ??
-        readConfigString(integration?.config, "desiredCompanyName") ??
-        readPayloadString(latestJob.payload, "desiredCompanyName"),
+      desiredSiteName: siteName,
+      desiredCompanyName: companyName,
+      expectedSiteName: siteName,
       latestJobId: latestJob.id,
       lastError: integration?.lastError ?? latestJob.lastError ?? undefined,
+      displayStatus: "ERP en preparación",
       mode: "dedicated_site",
     };
   }
 
   if (integration?.status === "failed" || latestJob?.status === "failed") {
+    const siteName =
+      integration?.externalSiteName ??
+      readConfigString(integration?.config, "desiredSiteName") ??
+      readPayloadString(latestJob?.payload, "desiredSiteName");
+    const companyName =
+      integration?.externalCompanyId ??
+      readConfigString(integration?.config, "desiredCompanyName") ??
+      readPayloadString(latestJob?.payload, "desiredCompanyName");
+
     return {
       status: "failed",
       integrationStatus: integration?.status,
       jobStatus: latestJob?.status,
       isReady: false,
       isSimulated: false,
+      isRealActive: false,
+      isPending: false,
+      isFailed: true,
       canStartProvisioning: true,
-      desiredSiteName:
-        integration?.externalSiteName ??
-        readConfigString(integration?.config, "desiredSiteName") ??
-        readPayloadString(latestJob?.payload, "desiredSiteName"),
-      desiredCompanyName:
-        integration?.externalCompanyId ??
-        readConfigString(integration?.config, "desiredCompanyName") ??
-        readPayloadString(latestJob?.payload, "desiredCompanyName"),
+      desiredSiteName: siteName,
+      desiredCompanyName: companyName,
+      expectedSiteName: siteName,
       latestJobId:
         readConfigString(integration?.config, "latestJobId") ?? latestJob?.id,
       lastError: integration?.lastError ?? latestJob?.lastError ?? undefined,
+      displayStatus: "Error preparando ERP",
       mode: "dedicated_site",
     };
   }
 
   if (integration?.status === "disabled") {
+    const siteName =
+      integration.externalSiteName ??
+      readConfigString(integration.config, "desiredSiteName");
+    const companyName =
+      integration.externalCompanyId ??
+      readConfigString(integration.config, "desiredCompanyName");
+
     return {
       status: "disabled",
       integrationStatus: integration.status,
       jobStatus: latestJob?.status,
       isReady: false,
       isSimulated: false,
+      isRealActive: false,
+      isPending: false,
+      isFailed: false,
       canStartProvisioning: false,
-      desiredSiteName:
-        integration.externalSiteName ??
-        readConfigString(integration.config, "desiredSiteName"),
-      desiredCompanyName:
-        integration.externalCompanyId ??
-        readConfigString(integration.config, "desiredCompanyName"),
+      desiredSiteName: siteName,
+      desiredCompanyName: companyName,
+      expectedSiteName: siteName,
       latestJobId:
         readConfigString(integration.config, "latestJobId") ?? latestJob?.id,
       lastError: integration.lastError ?? undefined,
+      displayStatus: "ERP deshabilitado",
       mode: "dedicated_site",
     };
   }
 
-  if (integration?.status === "pending" || integration?.status === "provisioning") {
+  if (
+    integration?.status === "pending" ||
+    integration?.status === "provisioning"
+  ) {
+    const uiStatus =
+      integration.status === "provisioning" ? "queued" : "pending";
+    const siteName =
+      integration.externalSiteName ??
+      readConfigString(integration.config, "desiredSiteName");
+    const companyName =
+      integration.externalCompanyId ??
+      readConfigString(integration.config, "desiredCompanyName");
+
     return {
-      status: integration.status === "provisioning" ? "queued" : "pending",
+      status: uiStatus,
       integrationStatus: integration.status,
       jobStatus: latestJob?.status,
       isReady: false,
       isSimulated: false,
+      isRealActive: false,
+      isPending: true,
+      isFailed: false,
       canStartProvisioning: integration.status === "pending",
-      desiredSiteName:
-        integration.externalSiteName ??
-        readConfigString(integration.config, "desiredSiteName"),
-      desiredCompanyName:
-        integration.externalCompanyId ??
-        readConfigString(integration.config, "desiredCompanyName"),
+      desiredSiteName: siteName,
+      desiredCompanyName: companyName,
+      expectedSiteName: siteName,
       latestJobId:
         readConfigString(integration.config, "latestJobId") ?? latestJob?.id,
       lastError: integration.lastError ?? undefined,
+      displayStatus:
+        uiStatus === "queued" ? "ERP en preparación" : "ERP pendiente de activar",
       mode: "dedicated_site",
     };
   }
@@ -249,7 +319,11 @@ export async function getErpProvisioningState(
     status: "not_configured",
     isReady: false,
     isSimulated: false,
+    isRealActive: false,
+    isPending: false,
+    isFailed: false,
     canStartProvisioning: true,
+    displayStatus: "ERP no solicitado",
     mode: "none",
   };
 }

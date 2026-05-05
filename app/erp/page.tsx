@@ -39,6 +39,25 @@ async function loadErpResource<T>(
   }
 }
 
+function getErpBlockedDescription(
+  erpProvisioning: Awaited<ReturnType<typeof getErpProvisioningState>>
+) {
+  if (erpProvisioning.isSimulated) {
+    return "La validacion tecnica termino, pero ERP/POS/Reportes seguiran bloqueados hasta completar el provisioning real.";
+  }
+  if (erpProvisioning.isPending) {
+    return erpProvisioning.displayStatus;
+  }
+  if (erpProvisioning.isFailed) {
+    return `${erpProvisioning.displayStatus}. Revisa el ultimo error o reintenta la solicitud si tienes permisos.`;
+  }
+  if (erpProvisioning.status === "not_configured") {
+    return "Este tenant todavia no tiene un ERP solicitado. Primero solicita el ERP dedicado; Appsolux creara un job y el worker de infraestructura lo preparara fuera del dashboard.";
+  }
+
+  return erpProvisioning.displayStatus;
+}
+
 export default async function ErpPage() {
   const user = await getCurrentUser();
 
@@ -60,9 +79,7 @@ export default async function ErpPage() {
   const tenant = await getCurrentTenant(user);
   const erpProvisioning = await getErpProvisioningState(tenant);
 
-  if (!erpProvisioning.isReady) {
-    const isSimulated = erpProvisioning.status === "active_simulated";
-
+  if (!erpProvisioning.isRealActive) {
     return (
       <DashboardShell>
         <div className="space-y-6">
@@ -70,9 +87,7 @@ export default async function ErpPage() {
             <p className="text-sm text-muted-foreground">ERP</p>
             <h1 className="text-3xl font-semibold tracking-tight">ERP</h1>
             <p className="mt-2 max-w-3xl text-muted-foreground">
-              {isSimulated
-                ? "El sitio ERPNext fue validado en simulación pero todavía no existe en producción. Los datos reales no se cargarán hasta que el worker complete el aprovisionamiento real."
-                : "Este tenant todavia no tiene un ERP activo. Primero activa el ERP dedicado; Appsolux creara un job y el worker de infraestructura lo preparara fuera del dashboard."}
+              {getErpBlockedDescription(erpProvisioning)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Tenant: {tenant.name}
@@ -80,11 +95,7 @@ export default async function ErpPage() {
           </div>
 
           <ErpDedicatedProvisionCard
-            status={erpProvisioning.status}
-            desiredSiteName={erpProvisioning.desiredSiteName}
-            desiredCompanyName={erpProvisioning.desiredCompanyName}
-            latestJobId={erpProvisioning.latestJobId}
-            lastError={erpProvisioning.lastError}
+            provisioning={erpProvisioning}
             canManage={canManageSettings(user)}
           />
 
@@ -93,15 +104,20 @@ export default async function ErpPage() {
               <CardTitle>Datos ERP protegidos</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
-              {isSimulated ? (
+              {erpProvisioning.isSimulated ? (
                 <>
                   <p>
-                    El worker ejecutó el script en modo dry-run. No se creó ningún sitio ERPNext real.
+                    El worker ejecuto el script en modo dry-run. No se creo
+                    ningun sitio ERPNext real.
                   </p>
                   <p>
-                    Productos, bodegas, clientes, inventario y movimientos permanecen bloqueados hasta que el aprovisionamiento real se complete en la VM.
+                    Productos, bodegas, clientes, inventario y movimientos
+                    permanecen bloqueados hasta que el aprovisionamiento real se
+                    complete en la VM.
                   </p>
                 </>
+              ) : erpProvisioning.isPending || erpProvisioning.isFailed ? (
+                <p>{erpProvisioning.displayStatus}</p>
               ) : (
                 <>
                   <p>
