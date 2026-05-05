@@ -1,0 +1,326 @@
+import "@/lib/security/server-only";
+
+import { getPrismaClient } from "@/lib/db/prisma";
+
+export type PlanKey = "free" | "trial" | "pro" | "enterprise";
+export type PlanFeatureKey =
+  | "basic_pos"
+  | "basic_products"
+  | "basic_customers"
+  | "basic_sales"
+  | "basic_credit"
+  | "dedicated_erp"
+  | "sri"
+  | "advanced_reports"
+  | "automations";
+export type PlanLimitKey =
+  | "products"
+  | "customers"
+  | "receipts"
+  | "openOrders"
+  | "activeCredits"
+  | "users"
+  | "warehouses";
+
+export type PlanFeatures = Record<PlanFeatureKey, boolean | "manual" | "future">;
+export type PlanLimits = Record<PlanLimitKey, number>;
+
+export type TenantPlanGateState = {
+  planKey: PlanKey;
+  planName: string;
+  status: "active" | "trialing" | "past_due" | "canceled" | "manual";
+  features: PlanFeatures;
+  limits: PlanLimits;
+  canUseBasicPos: boolean;
+  canUseBasicProducts: boolean;
+  canUseBasicCustomers: boolean;
+  canUseBasicSales: boolean;
+  canUseCreditSales: boolean;
+  canRequestDedicatedErp: boolean;
+  canUseAdvancedReports: boolean;
+  canUseSri: boolean;
+  isFreeLike: boolean;
+  isPaidLike: boolean;
+};
+
+export const defaultPlanDefinitions: Record<
+  PlanKey,
+  {
+    key: PlanKey;
+    name: string;
+    description: string;
+    limits: PlanLimits;
+    features: PlanFeatures;
+  }
+> = {
+  free: {
+    key: "free",
+    name: "Free",
+    description: "Modo basico para iniciar ventas, clientes y stock simple.",
+    limits: {
+      products: 20,
+      customers: 20,
+      receipts: 20,
+      openOrders: 10,
+      activeCredits: 5,
+      users: 1,
+      warehouses: 1,
+    },
+    features: {
+      basic_pos: true,
+      basic_products: true,
+      basic_customers: true,
+      basic_sales: true,
+      basic_credit: true,
+      dedicated_erp: false,
+      sri: false,
+      advanced_reports: false,
+      automations: false,
+    },
+  },
+  trial: {
+    key: "trial",
+    name: "Trial",
+    description: "Prueba del modo basico antes de activar un plan pagado.",
+    limits: {
+      products: 50,
+      customers: 50,
+      receipts: 50,
+      openOrders: 20,
+      activeCredits: 10,
+      users: 1,
+      warehouses: 1,
+    },
+    features: {
+      basic_pos: true,
+      basic_products: true,
+      basic_customers: true,
+      basic_sales: true,
+      basic_credit: true,
+      dedicated_erp: false,
+      sri: false,
+      advanced_reports: false,
+      automations: false,
+    },
+  },
+  pro: {
+    key: "pro",
+    name: "Pro",
+    description: "Plan operativo con ERP dedicado y reportes avanzados.",
+    limits: {
+      products: 5000,
+      customers: 5000,
+      receipts: 10000,
+      openOrders: 1000,
+      activeCredits: 500,
+      users: 10,
+      warehouses: 5,
+    },
+    features: {
+      basic_pos: true,
+      basic_products: true,
+      basic_customers: true,
+      basic_sales: true,
+      basic_credit: true,
+      dedicated_erp: true,
+      sri: "future",
+      advanced_reports: true,
+      automations: true,
+    },
+  },
+  enterprise: {
+    key: "enterprise",
+    name: "Enterprise",
+    description: "Plan con limites altos, ERP dedicado y soporte manual.",
+    limits: {
+      products: 100000,
+      customers: 100000,
+      receipts: 100000,
+      openOrders: 10000,
+      activeCredits: 10000,
+      users: 100,
+      warehouses: 50,
+    },
+    features: {
+      basic_pos: true,
+      basic_products: true,
+      basic_customers: true,
+      basic_sales: true,
+      basic_credit: true,
+      dedicated_erp: true,
+      sri: "manual",
+      advanced_reports: true,
+      automations: true,
+    },
+  },
+};
+
+function isPlanKey(value: string | null | undefined): value is PlanKey {
+  return (
+    value === "free" ||
+    value === "trial" ||
+    value === "pro" ||
+    value === "enterprise"
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readFeatures(value: unknown, fallback: PlanFeatures): PlanFeatures {
+  if (!isRecord(value)) {
+    return fallback;
+  }
+
+  return {
+    ...fallback,
+    ...Object.fromEntries(
+      Object.entries(value).filter(([, item]) => item === true || item === false || item === "manual" || item === "future")
+    ),
+  } as PlanFeatures;
+}
+
+function readLimits(value: unknown, fallback: PlanLimits): PlanLimits {
+  if (!isRecord(value)) {
+    return fallback;
+  }
+
+  const next = { ...fallback };
+
+  for (const key of Object.keys(next) as PlanLimitKey[]) {
+    const limit = value[key];
+
+    if (typeof limit === "number" && Number.isFinite(limit) && limit >= 0) {
+      next[key] = limit;
+    }
+  }
+
+  return next;
+}
+
+function featureEnabled(features: PlanFeatures, key: PlanFeatureKey) {
+  return features[key] === true;
+}
+
+export function getDefaultPlanKey(): PlanKey {
+  return "free";
+}
+
+export function getPlanLimits(planKey: string | null | undefined): PlanLimits {
+  return defaultPlanDefinitions[isPlanKey(planKey) ? planKey : getDefaultPlanKey()].limits;
+}
+
+export function getPlanFeatures(planKey: string | null | undefined): PlanFeatures {
+  return defaultPlanDefinitions[isPlanKey(planKey) ? planKey : getDefaultPlanKey()].features;
+}
+
+export async function getTenantSubscription(tenantId: string) {
+  const prisma = getPrismaClient();
+
+  return prisma.tenantSubscription.findFirst({
+    where: {
+      tenantId,
+      status: {
+        in: ["active", "trialing", "manual"],
+      },
+    },
+    include: {
+      plan: true,
+    },
+    orderBy: {
+      startedAt: "desc",
+    },
+  });
+}
+
+export async function getTenantPlanState(
+  tenantId: string
+): Promise<TenantPlanGateState> {
+  const prisma = getPrismaClient();
+  const fallbackPlanKey = getDefaultPlanKey();
+  let planKey: PlanKey = fallbackPlanKey;
+  let planName = defaultPlanDefinitions[fallbackPlanKey].name;
+  let status: TenantPlanGateState["status"] = "active";
+  let limits = defaultPlanDefinitions[fallbackPlanKey].limits;
+  let features = defaultPlanDefinitions[fallbackPlanKey].features;
+
+  try {
+    const subscription = await getTenantSubscription(tenantId);
+
+    if (subscription && isPlanKey(subscription.plan.key)) {
+      planKey = subscription.plan.key;
+      planName = subscription.plan.name;
+      status = subscription.status;
+      limits = readLimits(
+        subscription.plan.limits,
+        defaultPlanDefinitions[planKey].limits
+      );
+      features = readFeatures(
+        subscription.plan.features,
+        defaultPlanDefinitions[planKey].features
+      );
+    } else {
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { planKey: true },
+      });
+
+      if (isPlanKey(tenant?.planKey)) {
+        planKey = tenant.planKey;
+        planName = defaultPlanDefinitions[planKey].name;
+        limits = defaultPlanDefinitions[planKey].limits;
+        features = defaultPlanDefinitions[planKey].features;
+      }
+    }
+  } catch {
+    planKey = fallbackPlanKey;
+    planName = defaultPlanDefinitions[fallbackPlanKey].name;
+    limits = defaultPlanDefinitions[fallbackPlanKey].limits;
+    features = defaultPlanDefinitions[fallbackPlanKey].features;
+  }
+
+  const isFreeLike = planKey === "free" || planKey === "trial";
+  const isPaidLike = planKey === "pro" || planKey === "enterprise";
+
+  return {
+    planKey,
+    planName,
+    status,
+    features,
+    limits,
+    canUseBasicPos: featureEnabled(features, "basic_pos"),
+    canUseBasicProducts: featureEnabled(features, "basic_products"),
+    canUseBasicCustomers: featureEnabled(features, "basic_customers"),
+    canUseBasicSales: featureEnabled(features, "basic_sales"),
+    canUseCreditSales: featureEnabled(features, "basic_credit"),
+    canRequestDedicatedErp: featureEnabled(features, "dedicated_erp"),
+    canUseAdvancedReports: featureEnabled(features, "advanced_reports"),
+    canUseSri: featureEnabled(features, "sri"),
+    isFreeLike,
+    isPaidLike,
+  };
+}
+
+export async function canUseFeature(
+  tenantId: string,
+  featureKey: PlanFeatureKey
+) {
+  const plan = await getTenantPlanState(tenantId);
+
+  return featureEnabled(plan.features, featureKey);
+}
+
+export async function canRequestDedicatedErp(tenantId: string) {
+  return canUseFeature(tenantId, "dedicated_erp");
+}
+
+export async function getLimit(tenantId: string, limitKey: PlanLimitKey) {
+  const plan = await getTenantPlanState(tenantId);
+
+  return plan.limits[limitKey];
+}
+
+export async function buildPlanGateState(tenantId: string) {
+  return getTenantPlanState(tenantId);
+}

@@ -11,7 +11,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "seed:auth": "node scripts/seed-auth.mjs",
-    "maintenance:mark-vitabell-erp-real": "node scripts/maintenance/mark-vitabell-erp-real.mjs"
+    "maintenance:mark-vitabell-erp-real": "node scripts/maintenance/mark-vitabell-erp-real.mjs",
+    "maintenance:ensure-plans": "node scripts/maintenance/ensure-plans.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

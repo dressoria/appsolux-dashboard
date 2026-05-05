@@ -75,6 +75,14 @@ enum ProvisioningJobStatus {
   canceled
 }
 
+enum TenantSubscriptionStatus {
+  active
+  trialing
+  past_due
+  canceled
+  manual
+}
+
 model User {
   id              String     @id @default(cuid())
   name            String
@@ -108,6 +116,40 @@ model Tenant {
   onboardingRequests OnboardingRequest[]
   auditLogs          AuditLog[]
   provisioningJobs   ProvisioningJob[]
+  subscriptions      TenantSubscription[]
+}
+
+model Plan {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  limits      Json
+  features    Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  subscriptions TenantSubscription[]
+}
+
+model TenantSubscription {
+  id                  String                   @id @default(cuid())
+  tenantId            String
+  planId              String
+  status              TenantSubscriptionStatus @default(active)
+  startedAt           DateTime                 @default(now())
+  trialEndsAt         DateTime?
+  currentPeriodEndsAt DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  @@index([tenantId])
+  @@index([planId])
+  @@index([status])
 }
 
 model Membership {

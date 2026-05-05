@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { canManageSettings } from "@/lib/auth/permissions";
 import { getTenantIntegrationByProvider } from "@/lib/core/integrations";
 import { getErpProvisioningState } from "@/lib/core/erp-provisioning-status";
+import { getTenantPlanState } from "@/lib/core/plans";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 async function getChatwootIntegrationStatus(tenantId: string) {
@@ -65,6 +66,7 @@ export default async function DashboardPage() {
     "evolution"
   ).catch(() => null);
   const erpProvisioning = await getErpProvisioningState(tenant);
+  const planState = await getTenantPlanState(tenant.id);
 
   const chatwootAccountId = Number(
     chatwootIntegration?.externalAccountId ?? tenant.chatwoot_account_id
@@ -83,9 +85,6 @@ export default async function DashboardPage() {
     evolutionIntegration?.config,
     "bridgeStatus"
   );
-
-  const subscriptionPlan = tenant.subscription?.plan ?? "Sin plan";
-  const subscriptionStatus = tenant.subscription?.status ?? "Sin estado";
 
   return (
     <DashboardShell>
@@ -116,10 +115,14 @@ export default async function DashboardPage() {
             <CardHeader>
               <CardTitle>Plan</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm font-medium">{subscriptionPlan}</p>
+            <CardContent className="space-y-1">
+              <p className="text-sm font-medium">{planState.planName}</p>
               <p className="text-xs text-muted-foreground">
-                {subscriptionStatus}
+                Estado: {planState.status}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                ERP dedicado:{" "}
+                {planState.canRequestDedicatedErp ? "incluido" : "no incluido"}
               </p>
             </CardContent>
           </Card>

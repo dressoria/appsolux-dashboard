@@ -9,6 +9,7 @@ import {
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { canManageSettings } from "@/lib/auth/permissions";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { getErpProvisioningState } from "@/lib/core/erp-provisioning-status";
 import {
   getTenantIntegrationByProvider,
   updateTenantIntegration,
@@ -19,6 +20,7 @@ import {
   createErpnextDedicatedSiteJobForTenant,
   getActiveProvisioningJobForTenant,
 } from "@/lib/core/provisioning-jobs";
+import { canRequestDedicatedErp } from "@/lib/core/plans";
 
 const ERP_INSTANCE_NAME = "erp_cluster_01";
 
@@ -83,18 +85,30 @@ export async function POST() {
 
     const tenant = await getCurrentTenant(user);
 
+    const erpProvisioning = await getErpProvisioningState(tenant);
     const existingIntegration = await getTenantIntegrationByProvider(
       tenant.id,
       "erpnext" as IntegrationProvider
     );
 
-    if (existingIntegration?.status === "active") {
+    if (erpProvisioning.isRealActive) {
       return NextResponse.json({
         ok: true,
         alreadyActive: true,
         integration: existingIntegration,
         message: "ERP ya está conectado.",
       });
+    }
+
+    if (!(await canRequestDedicatedErp(tenant.id))) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "Tu plan actual no incluye ERP dedicado. Mejora tu plan para activar inventario avanzado, POS completo y reportes.",
+        },
+        { status: 403 }
+      );
     }
 
     const activeJob = await getActiveProvisioningJobForTenant(
