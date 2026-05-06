@@ -17,6 +17,10 @@ export const routes = {
   reports: "/reports",
   billing: "/billing",
   settings: "/settings",
+  basicProducts: "/basic/products",
+  basicCustomers: "/basic/customers",
+  basicSales: "/basic/sales",
+  basicPos: "/basic/pos",
 
   whatsappEvolution: "/channels/whatsapp-evolution",
   whatsappCloud: "/channels/whatsapp-cloud",

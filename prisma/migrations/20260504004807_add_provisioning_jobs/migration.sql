@@ -27,18 +27,6 @@ CREATE TABLE "ProvisioningJob" (
     CONSTRAINT "ProvisioningJob_pkey" PRIMARY KEY ("id")
 );
 
--- CreateIndex
-CREATE INDEX "ProvisioningJob_tenantId_idx" ON "ProvisioningJob"("tenantId");
-
--- CreateIndex
-CREATE INDEX "ProvisioningJob_status_idx" ON "ProvisioningJob"("status");
-
--- CreateIndex
-CREATE INDEX "ProvisioningJob_type_status_idx" ON "ProvisioningJob"("type", "status");
-
--- CreateIndex
-CREATE INDEX "ProvisioningJob_createdAt_idx" ON "ProvisioningJob"("createdAt");
-
 -- AddForeignKey
 ALTER TABLE "ProvisioningJob" ADD CONSTRAINT "ProvisioningJob_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

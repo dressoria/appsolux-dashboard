@@ -83,6 +83,30 @@ enum TenantSubscriptionStatus {
   manual
 }
 
+enum LightweightSaleStatus {
+  open
+  paid
+  canceled
+}
+
+enum LightweightPaymentStatus {
+  paid
+  pending
+  partial
+}
+
+enum LightweightPaymentMethod {
+  cash
+  transfer
+  card
+  credit
+}
+
+enum LightweightStockMovementType {
+  sale
+  adjustment
+}
+
 model User {
   id              String     @id @default(cuid())
   name            String
@@ -111,12 +135,16 @@ model Tenant {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  memberships        Membership[]
-  integrations       TenantIntegration[]
-  onboardingRequests OnboardingRequest[]
-  auditLogs          AuditLog[]
-  provisioningJobs   ProvisioningJob[]
-  subscriptions      TenantSubscription[]
+  memberships               Membership[]
+  integrations              TenantIntegration[]
+  onboardingRequests        OnboardingRequest[]
+  auditLogs                 AuditLog[]
+  provisioningJobs          ProvisioningJob[]
+  subscriptions             TenantSubscription[]
+  lightweightProducts       LightweightProduct[]
+  lightweightCustomers      LightweightCustomer[]
+  lightweightSales          LightweightSale[]
+  lightweightStockMovements LightweightStockMovement[]
 }
 
 model Plan {
@@ -166,6 +194,111 @@ model Membership {
 
   @@unique([userId, tenantId])
   @@index([tenantId])
+}
+
+model LightweightProduct {
+  id        String    @id @default(cuid())
+  tenantId  String
+  name      String
+  price     Decimal   @db.Decimal(12, 2)
+  cost      Decimal?  @db.Decimal(12, 2)
+  stock     Int       @default(0)
+  minStock  Int?
+  barcode   String?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenant         Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  saleItems      LightweightSaleItem[]
+  stockMovements LightweightStockMovement[]
+
+  @@index([tenantId])
+  @@index([tenantId, name])
+  @@index([tenantId, barcode])
+}
+
+model LightweightCustomer {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  balance   Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sales  LightweightSale[]
+
+  @@index([tenantId])
+  @@index([tenantId, name])
+}
+
+model LightweightSale {
+  id            String                   @id @default(cuid())
+  tenantId      String
+  customerId    String?
+  status        LightweightSaleStatus    @default(paid)
+  total         Decimal                  @db.Decimal(12, 2)
+  paymentStatus LightweightPaymentStatus @default(paid)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  tenant   Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer LightweightCustomer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  items    LightweightSaleItem[]
+  payments LightweightPayment[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([customerId])
+  @@index([createdAt])
+}
+
+model LightweightSaleItem {
+  id        String  @id @default(cuid())
+  saleId    String
+  productId String
+  quantity  Int
+  price     Decimal @db.Decimal(12, 2)
+  total     Decimal @db.Decimal(12, 2)
+
+  sale    LightweightSale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product LightweightProduct @relation(fields: [productId], references: [id])
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+model LightweightPayment {
+  id        String                   @id @default(cuid())
+  saleId    String
+  method    LightweightPaymentMethod
+  amount    Decimal                  @db.Decimal(12, 2)
+  createdAt DateTime                 @default(now())
+
+  sale LightweightSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+  @@index([method])
+}
+
+model LightweightStockMovement {
+  id        String                       @id @default(cuid())
+  tenantId  String
+  productId String
+  type      LightweightStockMovementType
+  quantity  Int
+  createdAt DateTime                     @default(now())
+
+  tenant  Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product LightweightProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([productId])
+  @@index([type])
 }
 
 model ProvisioningJob {
