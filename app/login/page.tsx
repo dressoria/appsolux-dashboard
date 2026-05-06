@@ -1,8 +1,6 @@
-"use client";
-
 import Link from "next/link";
-import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+
+import { loginAction } from "@/app/login/actions";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,48 +11,32 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { ApiResponse } from "@/types/api";
 
-type LoginResponse = ApiResponse<{
-  redirect_to: string;
-}>;
+type LoginPageProps = {
+  searchParams: Promise<{
+    error?: string;
+  }>;
+};
 
-export default function LoginPage() {
-  const router = useRouter();
-  const [message, setMessage] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setIsSubmitting(true);
-    setMessage(null);
-
-    const formData = new FormData(event.currentTarget);
-
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: String(formData.get("email") ?? "").trim(),
-          password: String(formData.get("password") ?? ""),
-        }),
-      });
-      const result = (await response.json()) as LoginResponse;
-
-      if (!result.success) {
-        setMessage(result.error.message);
-        return;
-      }
-
-      router.push(result.data.redirect_to);
-      router.refresh();
-    } catch {
-      setMessage("No pudimos iniciar sesion.");
-    } finally {
-      setIsSubmitting(false);
-    }
+function getLoginErrorMessage(error: string | undefined) {
+  if (error === "membership") {
+    return "Tu usuario no tiene una empresa activa asignada.";
   }
+
+  if (error === "login") {
+    return "No pudimos iniciar sesion.";
+  }
+
+  if (error) {
+    return "Credenciales incorrectas.";
+  }
+
+  return null;
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const resolvedSearchParams = await searchParams;
+  const message = getLoginErrorMessage(resolvedSearchParams.error);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
@@ -66,7 +48,7 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="space-y-5" onSubmit={handleSubmit}>
+          <form action={loginAction} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="email">Correo</Label>
               <Input
@@ -75,7 +57,7 @@ export default function LoginPage() {
                 type="email"
                 placeholder="admin@appsolux.com"
                 required
-                disabled={isSubmitting}
+                autoComplete="email"
               />
             </div>
             <div className="space-y-2">
@@ -85,7 +67,7 @@ export default function LoginPage() {
                 name="password"
                 type="password"
                 required
-                disabled={isSubmitting}
+                autoComplete="current-password"
               />
             </div>
 
@@ -95,12 +77,12 @@ export default function LoginPage() {
               </div>
             ) : null}
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Ingresando..." : "Iniciar sesion"}
+            <Button type="submit" className="w-full">
+              Iniciar sesion
             </Button>
 
             <p className="text-center text-sm text-muted-foreground">
-              ¿Aun no tienes cuenta?{" "}
+              Aun no tienes cuenta?{" "}
               <Link className="font-medium text-foreground underline" href="/register">
                 Crear cuenta
               </Link>
