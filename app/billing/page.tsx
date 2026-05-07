@@ -59,6 +59,16 @@ function getSubscriptionNotice(status: string) {
   return "Durante la beta, la activacion y cambios de plan se realizan manualmente por Appsolux.";
 }
 
+function getTrialWarning(status: string, trialEndsAt?: Date | null) {
+  if (status !== "trialing" || !trialEndsAt) {
+    return null;
+  }
+
+  return trialEndsAt.getTime() < Date.now()
+    ? "Tu trial ya vencio. No haremos downgrade automatico en este bloque, pero conviene solicitar activacion Pro."
+    : null;
+}
+
 export default async function BillingPage() {
   const user = await getCurrentUser();
 
@@ -83,6 +93,13 @@ export default async function BillingPage() {
     getTenantUpgradeRequests(tenant.id),
   ]);
   const erpProvisioning = tenantMode.erpProvisioning;
+  const pendingUpgrade = upgradeRequests.find(
+    (request) => request.status === "pending"
+  );
+  const trialWarning = getTrialWarning(
+    tenantMode.subscriptionStatus,
+    tenantMode.trialEndsAt
+  );
 
   return (
     <DashboardShell>
@@ -110,6 +127,17 @@ export default async function BillingPage() {
                 Fin de periodo: {formatDate(tenantMode.currentPeriodEndsAt)}
               </p>
             </div>
+            {trialWarning ? (
+              <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">
+                {trialWarning}
+              </p>
+            ) : null}
+            {pendingUpgrade ? (
+              <p className="rounded-md border bg-muted/40 p-3">
+                Solicitud en revision para plan {pendingUpgrade.requestedPlanKey}.
+                El equipo Appsolux la revisara manualmente durante la beta.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -223,18 +251,39 @@ export default async function BillingPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              {tenantMode.canRequestDedicatedErp
-                ? "Tu plan permite solicitar un ERPNext dedicado para inventario avanzado, POS completo y reportes conectados."
-                : "Tu plan actual usa el modo basico de Appsolux Core DB. Solicita activacion Pro para habilitar ERP dedicado, inventario avanzado, POS completo y reportes."}
+              {erpProvisioning.isRealActive
+                ? "Tu ERP dedicado ya esta activo. Puedes operar en el modo avanzado y mantener el modo basico como respaldo."
+                : erpProvisioning.isPending
+                  ? "El ERP dedicado esta en preparacion. Puedes seguir vendiendo en Appsolux Basico mientras termina."
+                  : tenantMode.canRequestDedicatedErp
+                    ? "Tu plan permite solicitar un ERPNext dedicado para inventario avanzado, POS completo y reportes conectados."
+                    : "Tu plan actual usa el modo basico de Appsolux Core DB. Solicita activacion Pro para habilitar ERP dedicado, inventario avanzado, POS completo y reportes."}
             </p>
             <div className="flex flex-wrap gap-2">
               <Button asChild variant={tenantMode.canRequestDedicatedErp ? "outline" : "default"}>
-                <Link href={tenantMode.canRequestDedicatedErp ? routes.dashboard : routes.settings}>
-                  {tenantMode.canRequestDedicatedErp
-                    ? "Ver estado en dashboard"
-                    : "Solicitar activacion Pro"}
+                <Link href={tenantMode.canRequestDedicatedErp ? routes.dashboard : routes.billing}>
+                  {erpProvisioning.isRealActive
+                    ? "Ir al dashboard"
+                    : tenantMode.canRequestDedicatedErp
+                      ? "Ver estado en dashboard"
+                      : pendingUpgrade
+                        ? "Solicitud en revision"
+                        : "Solicitar activacion Pro"}
                 </Link>
               </Button>
+              {erpProvisioning.isRealActive ? (
+                <>
+                  <Button asChild variant="outline">
+                    <Link href={routes.erp}>ERP avanzado</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href={routes.pos}>POS avanzado</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href={routes.reports}>Reportes avanzados</Link>
+                  </Button>
+                </>
+              ) : null}
               <Button asChild variant="outline">
                 <Link href={routes.basic}>Seguir usando basico</Link>
               </Button>

@@ -54,7 +54,7 @@ function getAvailableTargets(planKey: PlanKey) {
     return ["enterprise"] as const;
   }
 
-  return ["pro", "enterprise"] as const;
+  return ["pro"] as const;
 }
 
 export function UpgradeRequestCard({
@@ -102,7 +102,8 @@ export function UpgradeRequestCard({
         <p className="font-medium">Solicitud de mejora de plan</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Durante la beta, Appsolux revisara tu solicitud y activara el plan
-          manualmente. No hay pago automatico conectado todavia.
+          manualmente. Pago en linea proximamente; no hay cobro automatico
+          conectado todavia.
         </p>
 
         {pendingRequest ? (
@@ -134,7 +135,9 @@ export function UpgradeRequestCard({
                   disabled={isPending}
                   onClick={() => void submitRequest(target)}
                 >
-                  Solicitar {target === "pro" ? "Pro" : "Enterprise"}
+                  {target === "pro"
+                    ? "Solicitar Pro"
+                    : "Solicitar Enterprise"}
                 </Button>
               ))}
             </div>

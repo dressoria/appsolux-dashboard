@@ -40,6 +40,22 @@ function formatDate(value: Date | string | null) {
   }).format(new Date(value));
 }
 
+function statusLabel(status: UpgradeRequestRow["status"]) {
+  if (status === "pending") {
+    return "Pendiente";
+  }
+
+  if (status === "approved") {
+    return "Aprobada";
+  }
+
+  if (status === "rejected") {
+    return "Rechazada";
+  }
+
+  return "Cancelada";
+}
+
 export function UpgradeRequestsTable({
   requests,
 }: {
@@ -126,7 +142,7 @@ export function UpgradeRequestsTable({
                   {request.message ?? "Sin mensaje"}
                 </td>
                 <td className="px-3 py-3">
-                  <p className="font-medium">{request.status}</p>
+                  <p className="font-medium">{statusLabel(request.status)}</p>
                   <p className="text-xs text-muted-foreground">
                     Revisado: {formatDate(request.reviewedAt)}
                   </p>

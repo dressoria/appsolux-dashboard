@@ -12,6 +12,7 @@ import { canManageSettings } from "@/lib/auth/permissions";
 import { getBasicMigrationSummary } from "@/lib/core/basic-to-erp-migration";
 import { getTenantIntegrationByProvider } from "@/lib/core/integrations";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
+import { getTenantUpgradeRequests } from "@/lib/core/upgrade-requests";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 async function getChatwootIntegrationStatus(tenantId: string) {
@@ -63,14 +64,24 @@ export default async function DashboardPage() {
 
   const tenant = await getCurrentTenant(user);
   const canManage = canManageSettings(user);
-  const [chatwootIntegration, evolutionIntegration, tenantMode, basicMigration] =
+  const [
+    chatwootIntegration,
+    evolutionIntegration,
+    tenantMode,
+    basicMigration,
+    upgradeRequests,
+  ] =
     await Promise.all([
       getChatwootIntegrationStatus(tenant.id),
       getTenantIntegrationByProvider(tenant.id, "evolution").catch(() => null),
       getTenantModeState(tenant),
       getBasicMigrationSummary(tenant.id),
+      getTenantUpgradeRequests(tenant.id),
     ]);
   const erpProvisioning = tenantMode.erpProvisioning;
+  const pendingUpgrade = upgradeRequests.find(
+    (request) => request.status === "pending"
+  );
   const chatwootAccountId = Number(
     chatwootIntegration?.externalAccountId ?? tenant.chatwoot_account_id
   );
@@ -175,6 +186,8 @@ export default async function DashboardPage() {
                 ? "Tu tenant ya puede operar en el modo avanzado conectado al ERP dedicado."
                 : erpProvisioning.isPending
                   ? "Puedes seguir vendiendo en el modo basico mientras el worker externo prepara el ERP dedicado."
+                  : pendingUpgrade
+                    ? "Tu solicitud de mejora esta en revision. Mientras tanto, puedes seguir operando en Appsolux Basico."
                   : tenantMode.isFreeLike
                     ? "El modo basico incluido te permite vender, cobrar, manejar clientes, fiados, caja y stock en Core DB."
                     : "Tu plan permite ERP dedicado. Puedes solicitarlo y seguir usando el modo basico mientras se prepara."}
@@ -211,7 +224,9 @@ export default async function DashboardPage() {
                   </Button>
                   <Button asChild variant="outline">
                     <Link href={routes.billing}>
-                      {tenantMode.canRequestDedicatedErp
+                      {pendingUpgrade
+                        ? "Ver solicitud"
+                        : tenantMode.canRequestDedicatedErp
                         ? "Solicitar ERP dedicado"
                         : "Mejorar plan"}
                     </Link>
@@ -224,6 +239,12 @@ export default async function DashboardPage() {
                 Datos basicos listos para futura migracion:{" "}
                 {basicMigration.products} productos, {basicMigration.customers}{" "}
                 clientes y {basicMigration.openCreditSales} ventas fiadas abiertas.
+              </p>
+            ) : null}
+            {pendingUpgrade ? (
+              <p className="rounded-md border bg-muted/40 p-3 text-sm">
+                Solicitud en revision para plan {pendingUpgrade.requestedPlanKey}.
+                Appsolux revisara la activacion manualmente durante la beta.
               </p>
             ) : null}
             {tenantMode.subscriptionStatus === "past_due" ||

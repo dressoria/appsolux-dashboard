@@ -8,6 +8,7 @@ import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { assertInternalAdmin } from "@/lib/auth/internal-admin";
 import { listTenantBillingStates } from "@/lib/core/billing-admin";
+import { listUpgradeRequestsForAdmin } from "@/lib/core/upgrade-requests";
 
 export default async function AdminBillingPage() {
   const user = await getCurrentUser();
@@ -45,7 +46,13 @@ export default async function AdminBillingPage() {
     );
   }
 
-  const tenants = await listTenantBillingStates();
+  const [tenants, upgradeRequests] = await Promise.all([
+    listTenantBillingStates(),
+    listUpgradeRequestsForAdmin(),
+  ]);
+  const pendingUpgradeCount = upgradeRequests.filter(
+    (request) => request.status === "pending"
+  ).length;
 
   return (
     <DashboardShell>
@@ -62,10 +69,38 @@ export default async function AdminBillingPage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <Button asChild variant="outline">
               <Link href={routes.adminBillingUpgradeRequests}>
-                Ver solicitudes de upgrade
+                Ver solicitudes de upgrade ({pendingUpgradeCount} pendientes)
               </Link>
             </Button>
           </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader>
+              <CardTitle>Tenants</CardTitle>
+            </CardHeader>
+            <CardContent className="text-2xl font-semibold">
+              {tenants.length}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Solicitudes pendientes</CardTitle>
+            </CardHeader>
+            <CardContent className="text-2xl font-semibold">
+              {pendingUpgradeCount}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Beta manual</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              Cambios de plan y aprobaciones quedan auditados. Pago en linea se
+              integra en una fase posterior.
+            </CardContent>
+          </Card>
         </div>
 
         <Card>

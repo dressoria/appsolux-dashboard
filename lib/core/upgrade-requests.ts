@@ -116,8 +116,7 @@ export async function getTenantUpgradeRequests(tenantId: string) {
 
 export async function listUpgradeRequestsForAdmin() {
   const prisma = getPrismaClient();
-
-  return prisma.planUpgradeRequest.findMany({
+  const requests = await prisma.planUpgradeRequest.findMany({
     include: {
       tenant: {
         select: {
@@ -130,11 +129,20 @@ export async function listUpgradeRequestsForAdmin() {
       requestedBy: { select: { name: true, email: true } },
       reviewedBy: { select: { name: true, email: true } },
     },
-    orderBy: [
-      { status: "asc" },
-      { createdAt: "desc" },
-    ],
+    orderBy: [{ createdAt: "desc" }],
     take: 100,
+  });
+
+  return requests.sort((a, b) => {
+    if (a.status === PlanUpgradeRequestStatus.pending && b.status !== PlanUpgradeRequestStatus.pending) {
+      return -1;
+    }
+
+    if (a.status !== PlanUpgradeRequestStatus.pending && b.status === PlanUpgradeRequestStatus.pending) {
+      return 1;
+    }
+
+    return b.createdAt.getTime() - a.createdAt.getTime();
   });
 }
 
