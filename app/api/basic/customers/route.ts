@@ -9,7 +9,7 @@ function getString(body: Record<string, unknown>, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -17,7 +17,10 @@ export async function GET() {
   }
 
   const tenant = await getCurrentTenant(user);
-  const customers = await listCustomers(tenant.id);
+  const { searchParams } = new URL(request.url);
+  const customers = await listCustomers(tenant.id, {
+    search: searchParams.get("q") ?? undefined,
+  });
 
   return NextResponse.json({ ok: true, customers });
 }

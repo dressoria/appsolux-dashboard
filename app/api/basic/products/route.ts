@@ -23,7 +23,7 @@ function getNumber(body: Record<string, unknown>, key: string) {
   return undefined;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -31,7 +31,10 @@ export async function GET() {
   }
 
   const tenant = await getCurrentTenant(user);
-  const products = await listProducts(tenant.id);
+  const { searchParams } = new URL(request.url);
+  const products = await listProducts(tenant.id, {
+    search: searchParams.get("q") ?? undefined,
+  });
 
   return NextResponse.json({ ok: true, products });
 }

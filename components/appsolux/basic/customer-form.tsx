@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function CustomerForm() {
+export function CustomerForm({ disabled = false }: { disabled?: boolean }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -57,22 +57,22 @@ export function CustomerForm() {
     <form onSubmit={handleSubmit} className="grid gap-3 md:grid-cols-2">
       <div className="space-y-2">
         <Label htmlFor="name">Cliente</Label>
-        <Input id="name" name="name" required disabled={isLoading} />
+        <Input id="name" name="name" required disabled={isLoading || disabled} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="phone">Telefono</Label>
-        <Input id="phone" name="phone" disabled={isLoading} />
+        <Input id="phone" name="phone" disabled={isLoading || disabled} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="email">Correo</Label>
-        <Input id="email" name="email" type="email" disabled={isLoading} />
+        <Input id="email" name="email" type="email" disabled={isLoading || disabled} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="address">Direccion</Label>
-        <Input id="address" name="address" disabled={isLoading} />
+        <Input id="address" name="address" disabled={isLoading || disabled} />
       </div>
       <div className="flex items-end">
-        <Button type="submit" disabled={isLoading}>
+        <Button type="submit" disabled={isLoading || disabled}>
           {isLoading ? "Guardando..." : "Crear cliente"}
         </Button>
       </div>

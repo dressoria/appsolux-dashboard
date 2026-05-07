@@ -53,11 +53,13 @@ export default async function BasicPosPage() {
         </div>
 
         <BasicPosClient
+          tenantName={tenant.name}
           products={products.map((product) => ({
             id: product.id,
             name: product.name,
             price: product.price.toString(),
             stock: product.stock,
+            barcode: product.barcode,
           }))}
           customers={customers.map((customer) => ({
             id: customer.id,

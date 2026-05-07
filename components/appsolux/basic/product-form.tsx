@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function ProductForm() {
+export function ProductForm({ disabled = false }: { disabled?: boolean }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -60,34 +60,34 @@ export function ProductForm() {
     <form onSubmit={handleSubmit} className="grid gap-3 md:grid-cols-2">
       <div className="space-y-2">
         <Label htmlFor="name">Producto</Label>
-        <Input id="name" name="name" required disabled={isLoading} />
+        <Input id="name" name="name" required disabled={isLoading || disabled} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="price">Precio</Label>
-        <Input id="price" name="price" type="number" step="0.01" min="0" required disabled={isLoading} />
+        <Input id="price" name="price" type="number" step="0.01" min="0" required disabled={isLoading || disabled} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="cost">Costo</Label>
-        <Input id="cost" name="cost" type="number" step="0.01" min="0" disabled={isLoading} />
+        <Input id="cost" name="cost" type="number" step="0.01" min="0" disabled={isLoading || disabled} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="stock">Stock</Label>
-        <Input id="stock" name="stock" type="number" min="0" defaultValue="0" disabled={isLoading} />
+        <Input id="stock" name="stock" type="number" min="0" defaultValue="0" disabled={isLoading || disabled} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="minStock">Stock minimo</Label>
-        <Input id="minStock" name="minStock" type="number" min="0" disabled={isLoading} />
+        <Input id="minStock" name="minStock" type="number" min="0" disabled={isLoading || disabled} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="barcode">Codigo de barras</Label>
-        <Input id="barcode" name="barcode" disabled={isLoading} />
+        <Input id="barcode" name="barcode" disabled={isLoading || disabled} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="expiresAt">Vence</Label>
-        <Input id="expiresAt" name="expiresAt" type="date" disabled={isLoading} />
+        <Input id="expiresAt" name="expiresAt" type="date" disabled={isLoading || disabled} />
       </div>
       <div className="flex items-end">
-        <Button type="submit" disabled={isLoading}>
+        <Button type="submit" disabled={isLoading || disabled}>
           {isLoading ? "Guardando..." : "Crear producto"}
         </Button>
       </div>

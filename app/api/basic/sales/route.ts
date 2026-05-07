@@ -31,7 +31,7 @@ function readItems(value: unknown) {
   });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -39,7 +39,14 @@ export async function GET() {
   }
 
   const tenant = await getCurrentTenant(user);
-  const sales = await listSales(tenant.id);
+  const { searchParams } = new URL(request.url);
+  const status = searchParams.get("status");
+  const sales = await listSales(tenant.id, {
+    status:
+      status === "paid" || status === "pending" || status === "canceled"
+        ? status
+        : "all",
+  });
 
   return NextResponse.json({ ok: true, sales });
 }

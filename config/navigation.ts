@@ -69,6 +69,11 @@ export const dashboardNavigation: NavigationItem[] = [
     description: "Recibos simples creados desde el POS basico.",
   },
   {
+    title: "Reportes basicos",
+    href: routes.basicReports,
+    description: "Ventas, cobros pendientes y alertas de stock desde Core DB.",
+  },
+  {
     title: "Reportes",
     href: routes.reports,
     description: "Indicadores de ventas, cobros, inventario y productos.",
