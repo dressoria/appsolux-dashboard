@@ -1,5 +1,6 @@
 ﻿import { ErpTabs } from "@/components/appsolux/erp/erp-tabs";
 import { ErpDedicatedProvisionCard } from "@/components/appsolux/dashboard/erp-dedicated-provision-card";
+import { AdvancedModeBlockedCard } from "@/components/appsolux/dashboard/advanced-mode-blocked-card";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getErpnextCustomers } from "@/lib/api/erpnext/customers";
@@ -11,6 +12,7 @@ import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { canManageSettings } from "@/lib/auth/permissions";
 import { getErpProvisioningState } from "@/lib/core/erp-provisioning-status";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import type { ErpnextMasters } from "@/types/erpnext";
 
@@ -77,7 +79,8 @@ export default async function ErpPage() {
   }
 
   const tenant = await getCurrentTenant(user);
-  const erpProvisioning = await getErpProvisioningState(tenant);
+  const tenantMode = await getTenantModeState(tenant);
+  const erpProvisioning = tenantMode.erpProvisioning;
 
   if (!erpProvisioning.isRealActive) {
     return (
@@ -97,6 +100,7 @@ export default async function ErpPage() {
           <ErpDedicatedProvisionCard
             provisioning={erpProvisioning}
             canManage={canManageSettings(user)}
+            canRequestDedicatedErp={tenantMode.canRequestDedicatedErp}
           />
 
           <Card>
@@ -132,6 +136,12 @@ export default async function ErpPage() {
               )}
             </CardContent>
           </Card>
+
+          <AdvancedModeBlockedCard
+            title="Modo basico disponible"
+            erpProvisioning={erpProvisioning}
+            canRequestDedicatedErp={tenantMode.canRequestDedicatedErp}
+          />
         </div>
       </DashboardShell>
     );

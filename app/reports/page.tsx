@@ -1,5 +1,6 @@
 ﻿import { ErpDedicatedProvisionCard } from "@/components/appsolux/dashboard/erp-dedicated-provision-card";
 import { PaymentMethodsTable } from "@/components/appsolux/reports/payment-methods-table";
+import { AdvancedModeBlockedCard } from "@/components/appsolux/dashboard/advanced-mode-blocked-card";
 import { ReportsSummary } from "@/components/appsolux/reports/reports-summary";
 import { TopProductsTable } from "@/components/appsolux/reports/top-products-table";
 import { LowStockTable } from "@/components/appsolux/reports/low-stock-table";
@@ -12,6 +13,7 @@ import { buildReportsDashboardData } from "@/lib/api/erpnext/reports";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { canManageSettings } from "@/lib/auth/permissions";
 import { getErpProvisioningState } from "@/lib/core/erp-provisioning-status";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import type { ReportDateRange } from "@/types/reports";
 
@@ -61,7 +63,8 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   }
 
   const tenant = await getCurrentTenant(user);
-  const erpProvisioning = await getErpProvisioningState(tenant);
+  const tenantMode = await getTenantModeState(tenant);
+  const erpProvisioning = tenantMode.erpProvisioning;
 
   if (!erpProvisioning.isRealActive) {
     return (
@@ -81,6 +84,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           <ErpDedicatedProvisionCard
             provisioning={erpProvisioning}
             canManage={canManageSettings(user)}
+            canRequestDedicatedErp={tenantMode.canRequestDedicatedErp}
           />
 
           <Card>
@@ -104,6 +108,12 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               )}
             </CardContent>
           </Card>
+
+          <AdvancedModeBlockedCard
+            title="Reportes basicos disponibles"
+            erpProvisioning={erpProvisioning}
+            canRequestDedicatedErp={tenantMode.canRequestDedicatedErp}
+          />
         </div>
       </DashboardShell>
     );

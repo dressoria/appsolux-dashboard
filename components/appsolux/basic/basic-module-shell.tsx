@@ -39,6 +39,11 @@ export function BasicModuleShell({
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
                 {description}
               </p>
+              <p className="mt-1 max-w-3xl text-xs text-muted-foreground">
+                Este es tu modo basico incluido en el plan. Para inventario
+                avanzado, multiples bodegas, POS completo y reportes avanzados,
+                activa ERP dedicado desde Mi plan.
+              </p>
             </div>
             <Button asChild>
               <Link href={routes.basicPos}>Nueva venta</Link>

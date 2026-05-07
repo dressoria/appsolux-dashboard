@@ -10,6 +10,8 @@ import type { ErpProvisioningState } from "@/lib/core/erp-provisioning-status";
 type ErpDedicatedProvisionCardProps = {
   provisioning: ErpProvisioningState;
   canManage: boolean;
+  canRequestDedicatedErp?: boolean;
+  blockedPlanMessage?: string;
 };
 
 type ProvisionResponse = {
@@ -57,14 +59,22 @@ function getStatusDescription(state: ErpProvisioningState) {
   return "Estado desconocido.";
 }
 
-export function ErpDedicatedProvisionCard({ provisioning, canManage }: ErpDedicatedProvisionCardProps) {
+export function ErpDedicatedProvisionCard({
+  provisioning,
+  canManage,
+  canRequestDedicatedErp = true,
+  blockedPlanMessage,
+}: ErpDedicatedProvisionCardProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState(provisioning.lastError ?? "");
 
   const canStart =
-    canManage && provisioning.canStartProvisioning && !provisioning.isPending;
+    canManage &&
+    canRequestDedicatedErp &&
+    provisioning.canStartProvisioning &&
+    !provisioning.isPending;
 
   async function handleProvision() {
     setIsLoading(true);
@@ -136,6 +146,13 @@ export function ErpDedicatedProvisionCard({ provisioning, canManage }: ErpDedica
           >
             {isLoading ? "Preparando..." : "Solicitar ERP dedicado"}
           </Button>
+        ) : null}
+
+        {!canRequestDedicatedErp && !provisioning.isRealActive ? (
+          <p className="text-xs text-muted-foreground">
+            {blockedPlanMessage ??
+              "Tu plan actual no incluye ERP dedicado. Mejora tu plan para activarlo."}
+          </p>
         ) : null}
 
         {!canManage && !provisioning.isRealActive && !provisioning.isSimulated ? (

@@ -1,13 +1,17 @@
-﻿import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
+import Link from "next/link";
+
 import { ChatwootProvisionCard } from "@/components/appsolux/dashboard/chatwoot-provision-card";
 import { ErpDedicatedProvisionCard } from "@/components/appsolux/dashboard/erp-dedicated-provision-card";
 import { EvolutionProvisionCard } from "@/components/appsolux/dashboard/evolution-provision-card";
+import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { canManageSettings } from "@/lib/auth/permissions";
+import { getBasicMigrationSummary } from "@/lib/core/basic-to-erp-migration";
 import { getTenantIntegrationByProvider } from "@/lib/core/integrations";
-import { getErpProvisioningState } from "@/lib/core/erp-provisioning-status";
-import { getTenantPlanState } from "@/lib/core/plans";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 async function getChatwootIntegrationStatus(tenantId: string) {
@@ -59,24 +63,21 @@ export default async function DashboardPage() {
 
   const tenant = await getCurrentTenant(user);
   const canManage = canManageSettings(user);
-
-  const chatwootIntegration = await getChatwootIntegrationStatus(tenant.id);
-  const evolutionIntegration = await getTenantIntegrationByProvider(
-    tenant.id,
-    "evolution"
-  ).catch(() => null);
-  const erpProvisioning = await getErpProvisioningState(tenant);
-  const planState = await getTenantPlanState(tenant.id);
-
+  const [chatwootIntegration, evolutionIntegration, tenantMode, basicMigration] =
+    await Promise.all([
+      getChatwootIntegrationStatus(tenant.id),
+      getTenantIntegrationByProvider(tenant.id, "evolution").catch(() => null),
+      getTenantModeState(tenant),
+      getBasicMigrationSummary(tenant.id),
+    ]);
+  const erpProvisioning = tenantMode.erpProvisioning;
   const chatwootAccountId = Number(
     chatwootIntegration?.externalAccountId ?? tenant.chatwoot_account_id
   );
-
   const evolutionInstance =
     evolutionIntegration?.externalInstanceName ??
     tenant.channels.evolution?.instance_name ??
     "Sin instancia";
-
   const evolutionStatus =
     getConfigString(evolutionIntegration?.config, "connectionStatus") ??
     tenant.channels.evolution?.status ??
@@ -95,8 +96,8 @@ export default async function DashboardPage() {
             Dashboard de {tenant.name}
           </h1>
           <p className="mt-2 text-muted-foreground">
-            Tu entorno esta preparado. Desde aqui conectaremos conversaciones,
-            canales, automatizaciones, notificaciones y ERP.
+            Tu entorno esta preparado. Desde aqui eliges entre modo basico Core
+            DB y modo avanzado con ERP dedicado.
           </p>
         </div>
 
@@ -116,13 +117,13 @@ export default async function DashboardPage() {
               <CardTitle>Plan</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1">
-              <p className="text-sm font-medium">{planState.planName}</p>
+              <p className="text-sm font-medium">{tenantMode.planName}</p>
               <p className="text-xs text-muted-foreground">
-                Estado: {planState.status}
+                Estado: {tenantMode.subscriptionStatus}
               </p>
               <p className="text-xs text-muted-foreground">
                 ERP dedicado:{" "}
-                {planState.canRequestDedicatedErp ? "incluido" : "no incluido"}
+                {tenantMode.canRequestDedicatedErp ? "incluido" : "no incluido"}
               </p>
             </CardContent>
           </Card>
@@ -151,45 +152,82 @@ export default async function DashboardPage() {
           <ErpDedicatedProvisionCard
             provisioning={erpProvisioning}
             canManage={canManage}
+            canRequestDedicatedErp={tenantMode.canRequestDedicatedErp}
+            blockedPlanMessage="Tu plan actual trabaja en modo basico. Mejora tu plan para solicitar ERP dedicado."
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>Conversaciones</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Se consultaran desde Chatwoot usando el account ID dinamico del
-                tenant autenticado.
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {tenantMode.shouldUseAdvancedMode
+                ? "ERP dedicado activo"
+                : erpProvisioning.isPending
+                  ? "ERP en preparacion"
+                  : erpProvisioning.isSimulated
+                    ? "ERP validado en simulacion"
+                    : "Estas usando Appsolux Basico"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {tenantMode.shouldUseAdvancedMode
+                ? "Tu tenant ya puede operar en el modo avanzado conectado al ERP dedicado."
+                : erpProvisioning.isPending
+                  ? "Puedes seguir vendiendo en el modo basico mientras el worker externo prepara el ERP dedicado."
+                  : tenantMode.isFreeLike
+                    ? "El modo basico incluido te permite vender, cobrar, manejar clientes, fiados, caja y stock en Core DB."
+                    : "Tu plan permite ERP dedicado. Puedes solicitarlo y seguir usando el modo basico mientras se prepara."}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {tenantMode.shouldUseAdvancedMode ? (
+                <>
+                  <Button asChild>
+                    <Link href={routes.erp}>Ir a ERP avanzado</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href={routes.pos}>Ir a POS avanzado</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href={routes.reports}>Reportes avanzados</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href={routes.basic}>Modo basico</Link>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button asChild>
+                    <Link href={routes.basic}>Ir al modo basico</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href={routes.basicPos}>Crear venta</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href={routes.basicProducts}>Crear producto</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href={routes.basicCash}>Ver caja</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href={routes.billing}>
+                      {tenantMode.canRequestDedicatedErp
+                        ? "Solicitar ERP dedicado"
+                        : "Mejorar plan"}
+                    </Link>
+                  </Button>
+                </>
+              )}
+            </div>
+            {basicMigration.isReadyForFutureMigration ? (
+              <p className="text-xs text-muted-foreground">
+                Datos basicos listos para futura migracion:{" "}
+                {basicMigration.products} productos, {basicMigration.customers}{" "}
+                clientes y {basicMigration.openCreditSales} ventas fiadas abiertas.
               </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Canales</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                WhatsApp, Instagram, Messenger, Evolution API y Meta.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>ERP</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Clientes, inventario, ventas, facturacion, compras y
-                contabilidad.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+            ) : null}
+          </CardContent>
+        </Card>
       </div>
     </DashboardShell>
   );

@@ -1,10 +1,14 @@
 import Link from "next/link";
 
+import { ErpDedicatedProvisionCard } from "@/components/appsolux/dashboard/erp-dedicated-provision-card";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { getTenantPlanState } from "@/lib/core/plans";
+import { canManageSettings } from "@/lib/auth/permissions";
+import { defaultPlanDefinitions } from "@/lib/core/plans";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 function formatFeature(value: boolean | "manual" | "future") {
@@ -42,7 +46,8 @@ export default async function BillingPage() {
   }
 
   const tenant = await getCurrentTenant(user);
-  const planState = await getTenantPlanState(tenant.id);
+  const tenantMode = await getTenantModeState(tenant);
+  const erpProvisioning = tenantMode.erpProvisioning;
 
   return (
     <DashboardShell>
@@ -51,8 +56,8 @@ export default async function BillingPage() {
           <p className="text-sm text-muted-foreground">Appsolux</p>
           <h1 className="text-3xl font-semibold tracking-tight">Mi plan</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Plan actual, limites iniciales y funciones disponibles para este
-            tenant.
+            Controla tu plan, limites y activacion de ERP dedicado. Durante la
+            beta, la activacion de planes puede ser manual.
           </p>
         </div>
 
@@ -62,32 +67,31 @@ export default async function BillingPage() {
               <CardTitle>Plan actual</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <p className="text-sm font-medium">{planState.planName}</p>
+              <p className="text-sm font-medium">{tenantMode.planName}</p>
               <p className="text-xs text-muted-foreground">
-                Clave: {planState.planKey}
+                Clave: {tenantMode.planKey}
               </p>
               <p className="text-xs text-muted-foreground">
-                Estado: {planState.status}
+                Estado: {tenantMode.subscriptionStatus}
               </p>
               <p className="text-xs text-muted-foreground">
                 ERP dedicado:{" "}
-                {planState.canRequestDedicatedErp ? "incluido" : "no incluido"}
+                {tenantMode.canRequestDedicatedErp ? "incluido" : "no incluido"}
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Limites basicos</CardTitle>
+              <CardTitle>Limites del plan</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1 text-sm text-muted-foreground">
-              <p>Productos: {planState.limits.products}</p>
-              <p>Clientes: {planState.limits.customers}</p>
-              <p>Ventas/recibos: {planState.limits.receipts}</p>
-              <p>Pedidos abiertos: {planState.limits.openOrders}</p>
-              <p>Creditos activos: {planState.limits.activeCredits}</p>
-              <p>Usuarios: {planState.limits.users}</p>
-              <p>Bodegas/locales: {planState.limits.warehouses}</p>
+              <p>Productos: {tenantMode.limits.products}</p>
+              <p>Clientes: {tenantMode.limits.customers}</p>
+              <p>Ventas/recibos: {tenantMode.limits.receipts}</p>
+              <p>Creditos activos: {tenantMode.limits.activeCredits}</p>
+              <p>Usuarios: {tenantMode.limits.users}</p>
+              <p>Bodegas/locales: {tenantMode.limits.warehouses}</p>
             </CardContent>
           </Card>
 
@@ -96,18 +100,20 @@ export default async function BillingPage() {
               <CardTitle>Funciones</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1 text-sm text-muted-foreground">
-              <p>POS basico: {formatFeature(planState.features.basic_pos)}</p>
+              <p>POS basico: {formatFeature(tenantMode.features.basic_pos)}</p>
               <p>
-                Ventas fiadas: {formatFeature(planState.features.basic_credit)}
+                Ventas fiadas: {formatFeature(tenantMode.features.basic_credit)}
               </p>
               <p>
                 Reportes avanzados:{" "}
-                {formatFeature(planState.features.advanced_reports)}
+                {formatFeature(tenantMode.features.advanced_reports)}
               </p>
-              <p>ERP dedicado: {formatFeature(planState.features.dedicated_erp)}</p>
-              <p>SRI: {formatFeature(planState.features.sri)}</p>
               <p>
-                Automatizaciones: {formatFeature(planState.features.automations)}
+                ERP dedicado: {formatFeature(tenantMode.features.dedicated_erp)}
+              </p>
+              <p>SRI: {formatFeature(tenantMode.features.sri)}</p>
+              <p>
+                Automatizaciones: {formatFeature(tenantMode.features.automations)}
               </p>
             </CardContent>
           </Card>
@@ -115,27 +121,63 @@ export default async function BillingPage() {
 
         <Card>
           <CardHeader>
+            <CardTitle>Comparacion rapida</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-4">
+            {Object.values(defaultPlanDefinitions).map((plan) => (
+              <div key={plan.key} className="rounded-md border p-3 text-sm">
+                <p className="font-medium">{plan.name}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {plan.limits.products} productos · {plan.limits.customers} clientes
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  ERP dedicado:{" "}
+                  {plan.features.dedicated_erp === true ? "incluido" : "no incluido"}
+                </p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>
-              {planState.canRequestDedicatedErp
-                ? "ERP dedicado disponible"
-                : "Mejora tu plan"}
+              {erpProvisioning.isRealActive
+                ? "ERP dedicado activo"
+                : erpProvisioning.isPending
+                  ? "ERP en preparacion"
+                  : tenantMode.canRequestDedicatedErp
+                    ? "Solicitar ERP dedicado"
+                    : "Mejora tu plan"}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              {planState.canRequestDedicatedErp
+              {tenantMode.canRequestDedicatedErp
                 ? "Tu plan permite solicitar un ERPNext dedicado para inventario avanzado, POS completo y reportes conectados."
                 : "Tu plan actual usa el modo basico de Appsolux Core DB. Mejora tu plan para activar ERP dedicado, inventario avanzado, POS completo y reportes."}
             </p>
-            <Button asChild size="sm">
-              <Link href={planState.canRequestDedicatedErp ? "/dashboard" : "/settings"}>
-                {planState.canRequestDedicatedErp
-                  ? "Activar ERP dedicado"
-                  : "Mejorar plan"}
-              </Link>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant={tenantMode.canRequestDedicatedErp ? "outline" : "default"}>
+                <Link href={tenantMode.canRequestDedicatedErp ? routes.dashboard : routes.settings}>
+                  {tenantMode.canRequestDedicatedErp
+                    ? "Ver estado en dashboard"
+                    : "Mejorar plan para activar ERP dedicado"}
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href={routes.basic}>Seguir usando basico</Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
+
+        <ErpDedicatedProvisionCard
+          provisioning={erpProvisioning}
+          canManage={canManageSettings(user)}
+          canRequestDedicatedErp={tenantMode.canRequestDedicatedErp}
+          blockedPlanMessage="Free/trial no crea ERP dedicado. Mejora tu plan para activar inventario avanzado, POS completo y reportes."
+        />
       </div>
     </DashboardShell>
   );
