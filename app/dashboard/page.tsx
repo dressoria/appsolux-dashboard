@@ -226,6 +226,14 @@ export default async function DashboardPage() {
                 clientes y {basicMigration.openCreditSales} ventas fiadas abiertas.
               </p>
             ) : null}
+            {tenantMode.subscriptionStatus === "past_due" ||
+            tenantMode.subscriptionStatus === "canceled" ? (
+              <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                Tu plan esta {tenantMode.subscriptionStatus}. Puedes seguir
+                operando el modo basico, pero las nuevas activaciones de ERP
+                dedicado estan bloqueadas durante este estado.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       </div>

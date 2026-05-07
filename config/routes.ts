@@ -16,6 +16,7 @@ export const routes = {
   posPayments: "/pos/payments",
   reports: "/reports",
   billing: "/billing",
+  adminBilling: "/admin/billing",
   settings: "/settings",
   basic: "/basic",
   basicProducts: "/basic/products",

@@ -17,6 +17,8 @@ export async function getTenantModeState(tenant: AppsoluxTenant) {
     planKey: plan.planKey,
     planName: plan.planName,
     subscriptionStatus: plan.status,
+    trialEndsAt: plan.trialEndsAt,
+    currentPeriodEndsAt: plan.currentPeriodEndsAt,
     limits: plan.limits,
     features: plan.features,
     isFreeLike: plan.isFreeLike,

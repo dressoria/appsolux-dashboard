@@ -27,6 +27,36 @@ function formatFeature(value: boolean | "manual" | "future") {
   return "No incluido";
 }
 
+function formatDate(value?: Date | null) {
+  if (!value) {
+    return "Sin fecha";
+  }
+
+  return new Intl.DateTimeFormat("es-EC", {
+    dateStyle: "medium",
+  }).format(value);
+}
+
+function getSubscriptionNotice(status: string) {
+  if (status === "manual") {
+    return "Plan activado manualmente durante la beta.";
+  }
+
+  if (status === "trialing") {
+    return "Tu tenant esta en periodo de prueba.";
+  }
+
+  if (status === "past_due") {
+    return "Tu suscripcion esta vencida. Las nuevas activaciones de ERP dedicado estan bloqueadas hasta regularizar el plan.";
+  }
+
+  if (status === "canceled") {
+    return "Tu suscripcion esta cancelada. El modo basico sigue disponible, pero las funciones pagadas no pueden activarse.";
+  }
+
+  return "Durante la beta, la activacion y cambios de plan se realizan manualmente por Appsolux.";
+}
+
 export default async function BillingPage() {
   const user = await getCurrentUser();
 
@@ -57,9 +87,26 @@ export default async function BillingPage() {
           <h1 className="text-3xl font-semibold tracking-tight">Mi plan</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
             Controla tu plan, limites y activacion de ERP dedicado. Durante la
-            beta, la activacion de planes puede ser manual.
+            beta, la activacion se realiza manualmente por Appsolux.
           </p>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Estado comercial</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p className="text-muted-foreground">
+              {getSubscriptionNotice(tenantMode.subscriptionStatus)}
+            </p>
+            <div className="grid gap-2 text-muted-foreground sm:grid-cols-2">
+              <p>Fin de trial: {formatDate(tenantMode.trialEndsAt)}</p>
+              <p>
+                Fin de periodo: {formatDate(tenantMode.currentPeriodEndsAt)}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
@@ -73,6 +120,12 @@ export default async function BillingPage() {
               </p>
               <p className="text-xs text-muted-foreground">
                 Estado: {tenantMode.subscriptionStatus}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Trial: {formatDate(tenantMode.trialEndsAt)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Periodo: {formatDate(tenantMode.currentPeriodEndsAt)}
               </p>
               <p className="text-xs text-muted-foreground">
                 ERP dedicado:{" "}
@@ -155,14 +208,14 @@ export default async function BillingPage() {
             <p className="text-sm text-muted-foreground">
               {tenantMode.canRequestDedicatedErp
                 ? "Tu plan permite solicitar un ERPNext dedicado para inventario avanzado, POS completo y reportes conectados."
-                : "Tu plan actual usa el modo basico de Appsolux Core DB. Mejora tu plan para activar ERP dedicado, inventario avanzado, POS completo y reportes."}
+                : "Tu plan actual usa el modo basico de Appsolux Core DB. Solicita activacion Pro para habilitar ERP dedicado, inventario avanzado, POS completo y reportes."}
             </p>
             <div className="flex flex-wrap gap-2">
               <Button asChild variant={tenantMode.canRequestDedicatedErp ? "outline" : "default"}>
                 <Link href={tenantMode.canRequestDedicatedErp ? routes.dashboard : routes.settings}>
                   {tenantMode.canRequestDedicatedErp
                     ? "Ver estado en dashboard"
-                    : "Mejorar plan para activar ERP dedicado"}
+                    : "Solicitar activacion Pro"}
                 </Link>
               </Button>
               <Button asChild variant="outline">

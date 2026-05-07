@@ -29,6 +29,8 @@ export type TenantPlanGateState = {
   planKey: PlanKey;
   planName: string;
   status: "active" | "trialing" | "past_due" | "canceled" | "manual";
+  trialEndsAt?: Date | null;
+  currentPeriodEndsAt?: Date | null;
   features: PlanFeatures;
   limits: PlanLimits;
   canUseBasicPos: boolean;
@@ -221,9 +223,6 @@ export async function getTenantSubscription(tenantId: string) {
   return prisma.tenantSubscription.findFirst({
     where: {
       tenantId,
-      status: {
-        in: ["active", "trialing", "manual"],
-      },
     },
     include: {
       plan: true,
@@ -242,6 +241,8 @@ export async function getTenantPlanState(
   let planKey: PlanKey = fallbackPlanKey;
   let planName = defaultPlanDefinitions[fallbackPlanKey].name;
   let status: TenantPlanGateState["status"] = "active";
+  let trialEndsAt: Date | null | undefined;
+  let currentPeriodEndsAt: Date | null | undefined;
   let limits = defaultPlanDefinitions[fallbackPlanKey].limits;
   let features = defaultPlanDefinitions[fallbackPlanKey].features;
 
@@ -252,6 +253,8 @@ export async function getTenantPlanState(
       planKey = subscription.plan.key;
       planName = subscription.plan.name;
       status = subscription.status;
+      trialEndsAt = subscription.trialEndsAt;
+      currentPeriodEndsAt = subscription.currentPeriodEndsAt;
       limits = readLimits(
         subscription.plan.limits,
         defaultPlanDefinitions[planKey].limits
@@ -282,21 +285,32 @@ export async function getTenantPlanState(
 
   const isFreeLike = planKey === "free" || planKey === "trial";
   const isPaidLike = planKey === "pro" || planKey === "enterprise";
+  const effectiveFeatures: PlanFeatures =
+    status === "past_due" || status === "canceled"
+      ? {
+          ...features,
+          dedicated_erp: false,
+          advanced_reports: false,
+          automations: false,
+        }
+      : features;
 
   return {
     planKey,
     planName,
     status,
-    features,
+    trialEndsAt,
+    currentPeriodEndsAt,
+    features: effectiveFeatures,
     limits,
-    canUseBasicPos: featureEnabled(features, "basic_pos"),
-    canUseBasicProducts: featureEnabled(features, "basic_products"),
-    canUseBasicCustomers: featureEnabled(features, "basic_customers"),
-    canUseBasicSales: featureEnabled(features, "basic_sales"),
-    canUseCreditSales: featureEnabled(features, "basic_credit"),
-    canRequestDedicatedErp: featureEnabled(features, "dedicated_erp"),
-    canUseAdvancedReports: featureEnabled(features, "advanced_reports"),
-    canUseSri: featureEnabled(features, "sri"),
+    canUseBasicPos: featureEnabled(effectiveFeatures, "basic_pos"),
+    canUseBasicProducts: featureEnabled(effectiveFeatures, "basic_products"),
+    canUseBasicCustomers: featureEnabled(effectiveFeatures, "basic_customers"),
+    canUseBasicSales: featureEnabled(effectiveFeatures, "basic_sales"),
+    canUseCreditSales: featureEnabled(effectiveFeatures, "basic_credit"),
+    canRequestDedicatedErp: featureEnabled(effectiveFeatures, "dedicated_erp"),
+    canUseAdvancedReports: featureEnabled(effectiveFeatures, "advanced_reports"),
+    canUseSri: featureEnabled(effectiveFeatures, "sri"),
     isFreeLike,
     isPaidLike,
   };
