@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { UpgradeRequestCard } from "@/components/appsolux/billing/upgrade-request-card";
 import { ErpDedicatedProvisionCard } from "@/components/appsolux/dashboard/erp-dedicated-provision-card";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { canManageSettings } from "@/lib/auth/permissions";
 import { defaultPlanDefinitions } from "@/lib/core/plans";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
+import { getTenantUpgradeRequests } from "@/lib/core/upgrade-requests";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 function formatFeature(value: boolean | "manual" | "future") {
@@ -76,7 +78,10 @@ export default async function BillingPage() {
   }
 
   const tenant = await getCurrentTenant(user);
-  const tenantMode = await getTenantModeState(tenant);
+  const [tenantMode, upgradeRequests] = await Promise.all([
+    getTenantModeState(tenant),
+    getTenantUpgradeRequests(tenant.id),
+  ]);
   const erpProvisioning = tenantMode.erpProvisioning;
 
   return (
@@ -189,6 +194,18 @@ export default async function BillingPage() {
                 </p>
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Solicitud de mejora de plan</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <UpgradeRequestCard
+              planKey={tenantMode.planKey}
+              requests={upgradeRequests}
+            />
           </CardContent>
         </Card>
 

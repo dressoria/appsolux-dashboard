@@ -1,0 +1,22 @@
+[
+  {
+    "id": "4b25c7da-aa34-437d-b2f1-3b5d87d54048",
+    "migration_name": "20260505153000_add_plan_gates",
+    "checksum": "a062769e2afa646450ab6626e9bac0458320a4a2132ebe57d584947c7f93dd59",
+    "started_at": "2026-05-05T17:15:47.224Z",
+    "finished_at": null,
+    "rolled_back_at": "2026-05-05T17:16:28.723Z",
+    "applied_steps_count": 0,
+    "logs_summary": "A migration failed to apply. New migrations cannot be applied before the error is recovered from. Read more about how to resolve migration issues in a production database: https://pris.ly/d/migrate-resolve Migration name: 20260505153000_add_plan_gates Database error code: 42601 Database error: ERROR: syntax error at or near \" \" Position: 0 1 -- CreateEnum DbError { severity: \"ERROR\", parsed_severity: Some(Error), code: SqlState(E42601), message: \"syntax error at or near \\\"\\u{feff}\\\"\", detail: No"
+  },
+  {
+    "id": "ba4aedbb-fb2d-4dd3-89b3-1e6125a134b0",
+    "migration_name": "20260505153000_add_plan_gates",
+    "checksum": "e15cc2da4091f95de513a38c737bc6a20b70196130479933e28796055e2e170a",
+    "started_at": "2026-05-05T17:16:45.333Z",
+    "finished_at": "2026-05-05T17:16:45.676Z",
+    "rolled_back_at": null,
+    "applied_steps_count": 1,
+    "logs_summary": null
+  }
+]

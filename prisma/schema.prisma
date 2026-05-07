@@ -83,6 +83,13 @@ enum TenantSubscriptionStatus {
   manual
 }
 
+enum PlanUpgradeRequestStatus {
+  pending
+  approved
+  rejected
+  canceled
+}
+
 enum LightweightSaleStatus {
   open
   paid
@@ -121,6 +128,8 @@ model User {
   onboardingRequests        OnboardingRequest[]
   auditLogs                 AuditLog[]
   requestedProvisioningJobs ProvisioningJob[]   @relation("RequestedByUser")
+  requestedPlanUpgrades     PlanUpgradeRequest[] @relation("RequestedPlanUpgrades")
+  reviewedPlanUpgrades      PlanUpgradeRequest[] @relation("ReviewedPlanUpgrades")
 }
 
 model Tenant {
@@ -141,6 +150,7 @@ model Tenant {
   auditLogs                 AuditLog[]
   provisioningJobs          ProvisioningJob[]
   subscriptions             TenantSubscription[]
+  planUpgradeRequests       PlanUpgradeRequest[]
   lightweightProducts       LightweightProduct[]
   lightweightCustomers      LightweightCustomer[]
   lightweightSales          LightweightSale[]
@@ -178,6 +188,31 @@ model TenantSubscription {
   @@index([tenantId])
   @@index([planId])
   @@index([status])
+}
+
+model PlanUpgradeRequest {
+  id               String                   @id @default(cuid())
+  tenantId         String
+  requestedPlanKey String
+  currentPlanKey   String?
+  status           PlanUpgradeRequestStatus @default(pending)
+  message          String?
+  adminNote        String?
+  requestedById    String?
+  reviewedById     String?
+  reviewedAt       DateTime?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedBy User?  @relation("RequestedPlanUpgrades", fields: [requestedById], references: [id])
+  reviewedBy  User?  @relation("ReviewedPlanUpgrades", fields: [reviewedById], references: [id])
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([requestedPlanKey])
+  @@index([requestedById])
+  @@index([reviewedById])
 }
 
 model Membership {

@@ -1,15 +1,15 @@
 import Link from "next/link";
 
-import { BillingAdminTable } from "@/components/appsolux/admin/billing-admin-table";
+import { UpgradeRequestsTable } from "@/components/appsolux/admin/upgrade-requests-table";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { assertInternalAdmin } from "@/lib/auth/internal-admin";
-import { listTenantBillingStates } from "@/lib/core/billing-admin";
+import { listUpgradeRequestsForAdmin } from "@/lib/core/upgrade-requests";
 
-export default async function AdminBillingPage() {
+export default async function AdminUpgradeRequestsPage() {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -20,7 +20,7 @@ export default async function AdminBillingPage() {
             Sesion requerida
           </h1>
           <p className="text-muted-foreground">
-            Inicia sesion para administrar planes beta.
+            Inicia sesion para revisar solicitudes de upgrade.
           </p>
         </div>
       </DashboardShell>
@@ -45,7 +45,7 @@ export default async function AdminBillingPage() {
     );
   }
 
-  const tenants = await listTenantBillingStates();
+  const requests = await listUpgradeRequestsForAdmin();
 
   return (
     <DashboardShell>
@@ -53,27 +53,25 @@ export default async function AdminBillingPage() {
         <div>
           <p className="text-sm text-muted-foreground">Beta comercial</p>
           <h1 className="text-3xl font-semibold tracking-tight">
-            Admin billing
+            Solicitudes de upgrade
           </h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Activa planes manualmente durante la beta. No hay pasarela de pagos
-            conectada y esta pantalla no modifica limites o features arbitrarias.
+            Aprueba o rechaza solicitudes de Pro/Enterprise. Aprobar cambia el
+            plan del tenant a estado manual; no ejecuta provisioning ni pagos.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button asChild variant="outline">
-              <Link href={routes.adminBillingUpgradeRequests}>
-                Ver solicitudes de upgrade
-              </Link>
+              <Link href={routes.adminBilling}>Volver a admin billing</Link>
             </Button>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Tenants y suscripciones</CardTitle>
+            <CardTitle>Solicitudes</CardTitle>
           </CardHeader>
           <CardContent>
-            <BillingAdminTable tenants={tenants} />
+            <UpgradeRequestsTable requests={requests} />
           </CardContent>
         </Card>
       </div>

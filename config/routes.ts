@@ -17,6 +17,7 @@ export const routes = {
   reports: "/reports",
   billing: "/billing",
   adminBilling: "/admin/billing",
+  adminBillingUpgradeRequests: "/admin/billing/upgrade-requests",
   settings: "/settings",
   basic: "/basic",
   basicProducts: "/basic/products",
