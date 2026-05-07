@@ -59,6 +59,7 @@ export type CreateSaleInput = {
 
 type ListInput = {
   search?: string;
+  take?: number;
 };
 
 type AddSalePaymentInput = {
@@ -96,6 +97,14 @@ function normalizeSearch(search: string | undefined) {
   return search?.trim() || undefined;
 }
 
+function clampTake(take: number | undefined) {
+  if (!take || !Number.isFinite(take)) {
+    return 50;
+  }
+
+  return Math.min(Math.max(Math.floor(take), 1), 50);
+}
+
 export async function listProducts(tenantId: string, input: ListInput = {}) {
   const prisma = getPrismaClient();
   const search = normalizeSearch(input.search);
@@ -113,6 +122,7 @@ export async function listProducts(tenantId: string, input: ListInput = {}) {
         : {}),
     },
     orderBy: { createdAt: "desc" },
+    take: clampTake(input.take),
   });
 }
 
@@ -271,6 +281,7 @@ export async function listCustomers(tenantId: string, input: ListInput = {}) {
         : {}),
     },
     orderBy: { createdAt: "desc" },
+    take: clampTake(input.take),
   });
 }
 
@@ -733,6 +744,8 @@ export async function getBasicReports(tenantId: string) {
     saleCount,
     sales,
     monthSales,
+    pendingCustomers,
+    topItems,
   ] = await Promise.all([
     prisma.lightweightProduct.findMany({
       where: { tenantId },
@@ -759,6 +772,27 @@ export async function getBasicReports(tenantId: string) {
       },
       include: { payments: true },
     }),
+    prisma.lightweightCustomer.findMany({
+      where: {
+        tenantId,
+        balance: { gt: 0 },
+      },
+      orderBy: { balance: "desc" },
+      take: 10,
+    }),
+    prisma.lightweightSaleItem.findMany({
+      where: {
+        sale: {
+          tenantId,
+          status: { not: "canceled" },
+          createdAt: { gte: startOfMonth },
+        },
+      },
+      include: {
+        product: true,
+      },
+      take: 200,
+    }),
   ]);
 
   const sumSales = (rows: typeof sales) =>
@@ -777,12 +811,44 @@ export async function getBasicReports(tenantId: string) {
 
   const monthTotal = sumSales(monthSales);
   const monthPaid = sumPaid(monthSales);
+  const paymentsByMethod = monthSales.reduce<Record<string, Prisma.Decimal>>(
+    (accumulator, sale) => {
+      for (const payment of sale.payments) {
+        accumulator[payment.method] = (
+          accumulator[payment.method] ?? new Prisma.Decimal(0)
+        ).add(payment.amount);
+      }
+
+      return accumulator;
+    },
+    {}
+  );
+  const topProductsMap = new Map<
+    string,
+    { name: string; quantity: number; total: Prisma.Decimal }
+  >();
+
+  for (const item of topItems) {
+    const current = topProductsMap.get(item.productId) ?? {
+      name: item.product.name,
+      quantity: 0,
+      total: new Prisma.Decimal(0),
+    };
+    current.quantity += item.quantity;
+    current.total = current.total.add(item.total);
+    topProductsMap.set(item.productId, current);
+  }
 
   return {
     salesToday: sumSales(sales),
     salesMonth: monthTotal,
     collectedMonth: monthPaid,
     pendingMonth: monthTotal.sub(monthPaid),
+    paymentsByMethod,
+    topProducts: [...topProductsMap.values()]
+      .sort((first, second) => second.quantity - first.quantity)
+      .slice(0, 5),
+    pendingCustomers,
     lowStockProducts: products.filter(
       (product) =>
         product.stock > 0 &&
@@ -795,5 +861,115 @@ export async function getBasicReports(tenantId: string) {
       customers: customerCount,
       receipts: saleCount,
     },
+  };
+}
+
+export async function listStockMovements(
+  tenantId: string,
+  input: {
+    productId?: string;
+    type?: "sale" | "adjustment";
+    take?: number;
+  } = {}
+) {
+  const prisma = getPrismaClient();
+
+  return prisma.lightweightStockMovement.findMany({
+    where: {
+      tenantId,
+      ...(input.productId ? { productId: input.productId } : {}),
+      ...(input.type ? { type: input.type } : {}),
+    },
+    include: {
+      product: true,
+    },
+    orderBy: { createdAt: "desc" },
+    take: clampTake(input.take),
+  });
+}
+
+export async function getBasicUsageCounts(tenantId: string) {
+  const prisma = getPrismaClient();
+  const [products, customers, receipts] = await Promise.all([
+    prisma.lightweightProduct.count({ where: { tenantId } }),
+    prisma.lightweightCustomer.count({ where: { tenantId } }),
+    prisma.lightweightSale.count({
+      where: {
+        tenantId,
+        status: { not: "canceled" },
+      },
+    }),
+  ]);
+
+  return { products, customers, receipts };
+}
+
+export async function getDailyCashSummary(tenantId: string) {
+  const prisma = getPrismaClient();
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const [salesToday, paymentsToday, canceledSales] = await Promise.all([
+    prisma.lightweightSale.findMany({
+      where: {
+        tenantId,
+        createdAt: { gte: startOfDay },
+        status: { not: "canceled" },
+      },
+      include: { payments: true, customer: true },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    }),
+    prisma.lightweightPayment.findMany({
+      where: {
+        createdAt: { gte: startOfDay },
+        sale: {
+          tenantId,
+          status: { not: "canceled" },
+        },
+      },
+      include: {
+        sale: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    }),
+    prisma.lightweightSale.count({
+      where: {
+        tenantId,
+        createdAt: { gte: startOfDay },
+        status: "canceled",
+      },
+    }),
+  ]);
+
+  const byMethod = paymentsToday.reduce<Record<string, Prisma.Decimal>>(
+    (accumulator, payment) => {
+      accumulator[payment.method] = (
+        accumulator[payment.method] ?? new Prisma.Decimal(0)
+      ).add(payment.amount);
+
+      return accumulator;
+    },
+    {}
+  );
+  const totalSales = salesToday.reduce(
+    (sum, sale) => sum.add(sale.total),
+    new Prisma.Decimal(0)
+  );
+  const totalCollected = paymentsToday.reduce(
+    (sum, payment) => sum.add(payment.amount),
+    new Prisma.Decimal(0)
+  );
+
+  return {
+    salesToday,
+    paymentsToday,
+    canceledSales,
+    totalSales,
+    totalCollected,
+    creditGenerated: totalSales.sub(totalCollected),
+    byMethod,
+    estimatedNet: totalCollected,
   };
 }

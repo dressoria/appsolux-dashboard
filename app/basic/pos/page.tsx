@@ -1,6 +1,7 @@
+import { BasicModuleShell } from "@/components/appsolux/basic/basic-module-shell";
 import { BasicPosClient } from "@/components/appsolux/basic/pos-client";
-import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { listCustomers, listProducts } from "@/lib/core/lightweight-pos";
 import { getTenantPlanState } from "@/lib/core/plans";
@@ -11,9 +12,13 @@ export default async function BasicPosPage() {
 
   if (!user) {
     return (
-      <DashboardShell>
+      <BasicModuleShell
+        title="POS basico"
+        description="Venta rapida con stock automatico y recibo simple."
+        activeHref={routes.basicPos}
+      >
         <p className="text-muted-foreground">Sesion requerida.</p>
-      </DashboardShell>
+      </BasicModuleShell>
     );
   }
 
@@ -26,7 +31,11 @@ export default async function BasicPosPage() {
 
   if (!plan.canUseBasicPos) {
     return (
-      <DashboardShell>
+      <BasicModuleShell
+        title="POS basico"
+        description="Venta rapida con stock automatico y recibo simple."
+        activeHref={routes.basicPos}
+      >
         <Card>
           <CardHeader>
             <CardTitle>POS basico no disponible</CardTitle>
@@ -37,21 +46,17 @@ export default async function BasicPosPage() {
             </p>
           </CardContent>
         </Card>
-      </DashboardShell>
+      </BasicModuleShell>
     );
   }
 
   return (
-    <DashboardShell>
+    <BasicModuleShell
+      title="POS basico"
+      description="Selecciona productos, cobra o deja fiado, y entrega un recibo simple."
+      activeHref={routes.basicPos}
+    >
       <div className="space-y-6">
-        <div>
-          <p className="text-sm text-muted-foreground">Basico</p>
-          <h1 className="text-3xl font-semibold tracking-tight">POS basico</h1>
-          <p className="mt-2 text-muted-foreground">
-            Venta rapida con stock automatico y recibo simple.
-          </p>
-        </div>
-
         <BasicPosClient
           tenantName={tenant.name}
           products={products.map((product) => ({
@@ -67,6 +72,6 @@ export default async function BasicPosPage() {
           }))}
         />
       </div>
-    </DashboardShell>
+    </BasicModuleShell>
   );
 }

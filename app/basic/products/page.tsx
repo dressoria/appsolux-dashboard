@@ -1,13 +1,14 @@
 import Link from "next/link";
 
+import { BasicModuleShell } from "@/components/appsolux/basic/basic-module-shell";
 import { ProductForm } from "@/components/appsolux/basic/product-form";
 import { ProductInventory } from "@/components/appsolux/basic/product-inventory";
-import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { listProducts } from "@/lib/core/lightweight-pos";
+import { getBasicUsageCounts, listProducts } from "@/lib/core/lightweight-pos";
 import { getTenantPlanState } from "@/lib/core/plans";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
@@ -24,31 +25,38 @@ export default async function BasicProductsPage({
 
   if (!user) {
     return (
-      <DashboardShell>
+      <BasicModuleShell
+        title="Productos"
+        description="Agrega productos para comenzar a vender y controla stock minimo."
+        activeHref={routes.basicProducts}
+      >
         <p className="text-muted-foreground">Sesion requerida.</p>
-      </DashboardShell>
+      </BasicModuleShell>
     );
   }
 
   const tenant = await getCurrentTenant(user);
   const resolvedSearchParams = await searchParams;
   const plan = await getTenantPlanState(tenant.id);
-  const products = await listProducts(tenant.id, {
-    search: resolvedSearchParams.q,
-  });
-  const allProducts = await listProducts(tenant.id);
-  const limitReached = allProducts.length >= plan.limits.products;
+  const [products, counts] = await Promise.all([
+    listProducts(tenant.id, {
+      search: resolvedSearchParams.q,
+      take: 50,
+    }),
+    getBasicUsageCounts(tenant.id),
+  ]);
+  const limitReached = counts.products >= plan.limits.products;
 
   return (
-    <DashboardShell>
+    <BasicModuleShell
+      title="Productos"
+      description="Catalogo ligero con precios, codigos, stock minimo y ajustes manuales."
+      activeHref={routes.basicProducts}
+    >
       <div className="space-y-6">
-        <div>
-          <p className="text-sm text-muted-foreground">Basico</p>
-          <h1 className="text-3xl font-semibold tracking-tight">Productos</h1>
-          <p className="mt-2 text-muted-foreground">
-            {allProducts.length} / {plan.limits.products} productos del plan.
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          {counts.products} / {plan.limits.products} productos del plan.
+        </p>
 
         <Card>
           <CardHeader>
@@ -94,6 +102,6 @@ export default async function BasicProductsPage({
           </CardContent>
         </Card>
       </div>
-    </DashboardShell>
+    </BasicModuleShell>
   );
 }

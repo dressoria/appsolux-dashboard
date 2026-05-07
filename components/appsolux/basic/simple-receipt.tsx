@@ -52,10 +52,11 @@ export function SimpleReceipt({
   const pending = Math.max(Number(sale.total) - paid, 0);
 
   return (
-    <div className="space-y-4 rounded-md border bg-background p-4 text-sm print:border-0">
+    <div className="mx-auto max-w-2xl space-y-4 rounded-md border bg-background p-5 text-sm print:max-w-none print:border-0 print:p-0">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-lg font-semibold">{tenantName}</p>
+          <p className="text-xl font-semibold">{tenantName}</p>
+          <p className="text-sm font-medium">Recibo simple</p>
           <p className="text-xs text-muted-foreground">
             Recibo #{shortId} · {date.toLocaleString("es-EC")}
           </p>
@@ -74,14 +75,20 @@ export function SimpleReceipt({
       </div>
 
       <div className="space-y-2">
+        <div className="grid grid-cols-[1fr_70px_90px] border-b pb-2 text-xs font-medium text-muted-foreground">
+          <span>Producto</span>
+          <span className="text-right">Cant.</span>
+          <span className="text-right">Total</span>
+        </div>
         {sale.items.map((item, index) => (
-          <div key={`${item.product.name}-${index}`} className="grid grid-cols-[1fr_auto] gap-3 border-b pb-2">
+          <div key={`${item.product.name}-${index}`} className="grid grid-cols-[1fr_70px_90px] gap-3 border-b pb-2">
             <div>
               <p className="font-medium">{item.product.name}</p>
               <p className="text-xs text-muted-foreground">
-                {item.quantity} x {formatMoney(item.price)}
+                {formatMoney(item.price)} c/u
               </p>
             </div>
+            <p className="text-right">{item.quantity}</p>
             <p>{formatMoney(item.total)}</p>
           </div>
         ))}

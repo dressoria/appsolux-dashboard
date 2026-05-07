@@ -1,9 +1,10 @@
 import Link from "next/link";
 
+import { BasicModuleShell } from "@/components/appsolux/basic/basic-module-shell";
 import { SalesList } from "@/components/appsolux/basic/sales-list";
-import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { listSales } from "@/lib/core/lightweight-pos";
 import { getTenantPlanState } from "@/lib/core/plans";
@@ -30,9 +31,13 @@ export default async function BasicSalesPage({
 
   if (!user) {
     return (
-      <DashboardShell>
+      <BasicModuleShell
+        title="Ventas"
+        description="Consulta recibos, cancela ventas y cobra abonos."
+        activeHref={routes.basicSales}
+      >
         <p className="text-muted-foreground">Sesion requerida.</p>
-      </DashboardShell>
+      </BasicModuleShell>
     );
   }
 
@@ -47,16 +52,15 @@ export default async function BasicSalesPage({
   const activeSales = allSales.filter((sale) => sale.status !== "canceled");
 
   return (
-    <DashboardShell>
+    <BasicModuleShell
+      title="Ventas"
+      description="Historial de recibos, fiados, pagos parciales y cancelaciones."
+      activeHref={routes.basicSales}
+    >
       <div className="space-y-6">
-        <div>
-          <p className="text-sm text-muted-foreground">Basico</p>
-          <h1 className="text-3xl font-semibold tracking-tight">Ventas</h1>
-          <p className="mt-2 text-muted-foreground">
-            {activeSales.length} / {plan.limits.receipts} ventas o recibos del
-            plan.
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          {activeSales.length} / {plan.limits.receipts} ventas o recibos del plan.
+        </p>
 
         <Card>
           <CardHeader>
@@ -103,6 +107,6 @@ export default async function BasicSalesPage({
           </CardContent>
         </Card>
       </div>
-    </DashboardShell>
+    </BasicModuleShell>
   );
 }

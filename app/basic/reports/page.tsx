@@ -1,5 +1,9 @@
-import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
+import Link from "next/link";
+
+import { BasicModuleShell } from "@/components/appsolux/basic/basic-module-shell";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getBasicReports } from "@/lib/core/lightweight-pos";
 import { getTenantPlanState } from "@/lib/core/plans";
@@ -14,9 +18,13 @@ export default async function BasicReportsPage() {
 
   if (!user) {
     return (
-      <DashboardShell>
+      <BasicModuleShell
+        title="Reportes basicos"
+        description="Indicadores simples desde Appsolux Core DB."
+        activeHref={routes.basicReports}
+      >
         <p className="text-muted-foreground">Sesion requerida.</p>
-      </DashboardShell>
+      </BasicModuleShell>
     );
   }
 
@@ -27,18 +35,12 @@ export default async function BasicReportsPage() {
   ]);
 
   return (
-    <DashboardShell>
+    <BasicModuleShell
+      title="Reportes basicos"
+      description="Ventas, cobros, fiados, productos top y alertas de stock."
+      activeHref={routes.basicReports}
+    >
       <div className="space-y-6">
-        <div>
-          <p className="text-sm text-muted-foreground">Basico</p>
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Reportes basicos
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            Indicadores simples desde Appsolux Core DB.
-          </p>
-        </div>
-
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader>
@@ -70,6 +72,76 @@ export default async function BasicReportsPage() {
             </CardHeader>
             <CardContent className="text-2xl font-semibold">
               {money(reports.pendingMonth)}
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Accesos operativos</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <Link href={routes.basicCash}>Ver caja diaria</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={routes.basicStock}>Ver movimientos de stock</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card>
+            <CardHeader>
+              <CardTitle>Ventas por metodo</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {Object.entries(reports.paymentsByMethod).map(([method, total]) => (
+                <p key={method}>
+                  {method}: {money(total)}
+                </p>
+              ))}
+              {Object.keys(reports.paymentsByMethod).length === 0 ? (
+                <p className="text-muted-foreground">
+                  Aun no hay pagos este mes.
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Productos mas vendidos</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {reports.topProducts.map((product) => (
+                <p key={product.name}>
+                  {product.name}: {product.quantity} uds · {money(product.total)}
+                </p>
+              ))}
+              {reports.topProducts.length === 0 ? (
+                <p className="text-muted-foreground">
+                  Aun no hay ventas para calcular productos top.
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Clientes con saldo</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {reports.pendingCustomers.map((customer) => (
+                <p key={customer.id}>
+                  {customer.name}: {money(customer.balance)}
+                </p>
+              ))}
+              {reports.pendingCustomers.length === 0 ? (
+                <p className="text-muted-foreground">
+                  No tienes saldos pendientes.
+                </p>
+              ) : null}
             </CardContent>
           </Card>
         </div>
@@ -130,6 +202,6 @@ export default async function BasicReportsPage() {
           </CardContent>
         </Card>
       </div>
-    </DashboardShell>
+    </BasicModuleShell>
   );
 }

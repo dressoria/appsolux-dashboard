@@ -48,30 +48,9 @@ export const dashboardNavigation: NavigationItem[] = [
       "Punto de venta para crear pedidos desde productos, clientes e inventario.",
   },
   {
-    title: "POS basico",
-    href: routes.basicPos,
-    description:
-      "Ventas simples con productos, clientes, stock automatico y recibos basicos.",
-  },
-  {
-    title: "Productos basicos",
-    href: routes.basicProducts,
-    description: "Catalogo ligero de productos guardado en Appsolux Core DB.",
-  },
-  {
-    title: "Clientes basicos",
-    href: routes.basicCustomers,
-    description: "Clientes ligeros, saldos y ventas fiadas en Core DB.",
-  },
-  {
-    title: "Ventas basicas",
-    href: routes.basicSales,
-    description: "Recibos simples creados desde el POS basico.",
-  },
-  {
-    title: "Reportes basicos",
-    href: routes.basicReports,
-    description: "Ventas, cobros pendientes y alertas de stock desde Core DB.",
+    title: "Basico",
+    href: routes.basic,
+    description: "Centro de ventas, productos, clientes, caja y stock simple.",
   },
   {
     title: "Reportes",

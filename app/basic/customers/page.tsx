@@ -1,13 +1,14 @@
 import Link from "next/link";
 
+import { BasicModuleShell } from "@/components/appsolux/basic/basic-module-shell";
 import { CustomerForm } from "@/components/appsolux/basic/customer-form";
 import { CustomerList } from "@/components/appsolux/basic/customer-list";
-import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { listCustomers } from "@/lib/core/lightweight-pos";
+import { getBasicUsageCounts, listCustomers } from "@/lib/core/lightweight-pos";
 import { getTenantPlanState } from "@/lib/core/plans";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
@@ -24,31 +25,35 @@ export default async function BasicCustomersPage({
 
   if (!user) {
     return (
-      <DashboardShell>
+      <BasicModuleShell
+        title="Clientes"
+        description="Registra clientes para llevar historial y ventas fiadas."
+        activeHref={routes.basicCustomers}
+      >
         <p className="text-muted-foreground">Sesion requerida.</p>
-      </DashboardShell>
+      </BasicModuleShell>
     );
   }
 
   const tenant = await getCurrentTenant(user);
   const resolvedSearchParams = await searchParams;
   const plan = await getTenantPlanState(tenant.id);
-  const [customers, allCustomers] = await Promise.all([
+  const [customers, counts] = await Promise.all([
     listCustomers(tenant.id, { search: resolvedSearchParams.q }),
-    listCustomers(tenant.id),
+    getBasicUsageCounts(tenant.id),
   ]);
-  const limitReached = allCustomers.length >= plan.limits.customers;
+  const limitReached = counts.customers >= plan.limits.customers;
 
   return (
-    <DashboardShell>
+    <BasicModuleShell
+      title="Clientes"
+      description="Clientes ligeros, contacto y saldos pendientes para ventas fiadas."
+      activeHref={routes.basicCustomers}
+    >
       <div className="space-y-6">
-        <div>
-          <p className="text-sm text-muted-foreground">Basico</p>
-          <h1 className="text-3xl font-semibold tracking-tight">Clientes</h1>
-          <p className="mt-2 text-muted-foreground">
-            {allCustomers.length} / {plan.limits.customers} clientes del plan.
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          {counts.customers} / {plan.limits.customers} clientes del plan.
+        </p>
 
         <Card>
           <CardHeader>
@@ -93,6 +98,6 @@ export default async function BasicCustomersPage({
           </CardContent>
         </Card>
       </div>
-    </DashboardShell>
+    </BasicModuleShell>
   );
 }

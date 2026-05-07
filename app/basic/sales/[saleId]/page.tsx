@@ -1,6 +1,8 @@
+import { BasicModuleShell } from "@/components/appsolux/basic/basic-module-shell";
+import { SaleDetailActions } from "@/components/appsolux/basic/sale-detail-actions";
 import { SimpleReceipt } from "@/components/appsolux/basic/simple-receipt";
-import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Card, CardContent } from "@/components/ui/card";
+import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getSaleById } from "@/lib/core/lightweight-pos";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
@@ -18,9 +20,13 @@ export default async function BasicSaleDetailPage({
 
   if (!user) {
     return (
-      <DashboardShell>
+      <BasicModuleShell
+        title="Recibo simple"
+        description="Inicia sesion para consultar la venta."
+        activeHref={routes.basicSales}
+      >
         <p className="text-muted-foreground">Sesion requerida.</p>
-      </DashboardShell>
+      </BasicModuleShell>
     );
   }
 
@@ -30,48 +36,60 @@ export default async function BasicSaleDetailPage({
 
   if (!sale) {
     return (
-      <DashboardShell>
+      <BasicModuleShell
+        title="Recibo simple"
+        description="Detalle de venta y comprobante simple."
+        activeHref={routes.basicSales}
+      >
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
             Venta no encontrada.
           </CardContent>
         </Card>
-      </DashboardShell>
+      </BasicModuleShell>
     );
   }
 
-  return (
-    <DashboardShell>
-      <div className="space-y-6">
-        <div className="print:hidden">
-          <p className="text-sm text-muted-foreground">Basico</p>
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Recibo simple
-          </h1>
-        </div>
+  const paid = sale.payments.reduce(
+    (sum, payment) => sum + Number(payment.amount),
+    0
+  );
+  const pending = Math.max(Number(sale.total) - paid, 0);
 
-        <SimpleReceipt
-          tenantName={tenant.name}
-          sale={{
-            id: sale.id,
-            createdAt: sale.createdAt,
-            total: sale.total.toString(),
-            status: sale.status,
-            paymentStatus: sale.paymentStatus,
-            customer: sale.customer ? { name: sale.customer.name } : null,
-            items: sale.items.map((item) => ({
-              quantity: item.quantity,
-              price: item.price.toString(),
-              total: item.total.toString(),
-              product: { name: item.product.name },
-            })),
-            payments: sale.payments.map((payment) => ({
-              method: payment.method,
-              amount: payment.amount.toString(),
-            })),
-          }}
-        />
-      </div>
-    </DashboardShell>
+  return (
+    <BasicModuleShell
+      title="Detalle de venta"
+      description="Recibo simple, pagos, saldo pendiente y acciones de la venta."
+      activeHref={routes.basicSales}
+    >
+      <SaleDetailActions
+        saleId={sale.id}
+        canCancel={sale.status !== "canceled"}
+        canPay={sale.status !== "canceled" && pending > 0}
+        pendingAmount={pending}
+      />
+
+      <SimpleReceipt
+        tenantName={tenant.name}
+        sale={{
+          id: sale.id,
+          createdAt: sale.createdAt,
+          total: sale.total.toString(),
+          status: sale.status,
+          paymentStatus: sale.paymentStatus,
+          customer: sale.customer ? { name: sale.customer.name } : null,
+          items: sale.items.map((item) => ({
+            quantity: item.quantity,
+            price: item.price.toString(),
+            total: item.total.toString(),
+            product: { name: item.product.name },
+          })),
+          payments: sale.payments.map((payment) => ({
+            method: payment.method,
+            amount: payment.amount.toString(),
+          })),
+        }}
+      />
+    </BasicModuleShell>
   );
 }
