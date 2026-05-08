@@ -36,10 +36,10 @@ export function NotesSection({ conversationId }: NotesSectionProps) {
   const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
-    setLoadState("loading");
-    setNotes([]);
-
     async function loadNotes() {
+      setLoadState("loading");
+      setNotes([]);
+
       try {
         const response = await fetch(
           `/api/conversations/${conversationId}/notes`

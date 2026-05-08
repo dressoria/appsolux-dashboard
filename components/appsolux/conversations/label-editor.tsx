@@ -34,15 +34,17 @@ export function LabelEditor({
   onLabelsChange,
 }: LabelEditorProps) {
   const [labels, setLabels] = useState<string[]>(currentLabels);
+  const [prevConversationId, setPrevConversationId] = useState(conversationId);
   const [accountLabels, setAccountLabels] = useState<string[]>([]);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [addState, setAddState] = useState<"idle" | "loading">("idle");
   const [addError, setAddError] = useState("");
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  if (prevConversationId !== conversationId) {
+    setPrevConversationId(conversationId);
     setLabels(currentLabels);
-  }, [currentLabels, conversationId]);
+  }
 
   useEffect(() => {
     async function loadAccountLabels() {
