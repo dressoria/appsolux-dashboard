@@ -29,9 +29,21 @@ type ConversationInboxProps = {
 type LoadState = "idle" | "loading" | "error";
 type SendState = "idle" | "sending" | "error";
 type ConversationFilter = "all" | "unassigned" | "assigned" | "mine";
+type StatusFilter = "all" | "open" | "resolved" | "pending" | "snoozed";
+type SortOption =
+  | "last_activity_desc"
+  | "last_activity_asc"
+  | "created_desc"
+  | "created_asc"
+  | "unread_desc"
+  | "unread_asc";
 type Attachment = NonNullable<ChatwootMessage["attachments"]>[number];
 
-const SYSTEM_EVENT_MARKERS = ["connection successfully established"];
+const SYSTEM_EVENT_MARKERS = [
+  "connection successfully established",
+  "conversation was created",
+  "contact joined",
+];
 const TECHNICAL_ATTRIBUTE_MARKERS = [
   "avatar",
   "hash",
@@ -81,6 +93,14 @@ function formatDate(timestamp?: number) {
     day: "2-digit",
     month: "short",
   }).format(new Date(timestamp * 1000));
+}
+
+function normalizeText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
 }
 
 function getSenderName(conversation?: ChatwootConversation | null) {
@@ -136,8 +156,18 @@ function getChannel(conversation?: ChatwootConversation | null) {
 }
 
 function normalizeSystemContent(content: string) {
-  if (content.toLowerCase().includes("connection successfully established")) {
+  const normalized = content.toLowerCase();
+
+  if (normalized.includes("connection successfully established")) {
     return "Conexion establecida";
+  }
+
+  if (normalized.includes("conversation was created")) {
+    return "Conversacion creada";
+  }
+
+  if (normalized.includes("contact joined")) {
+    return "Contacto conectado";
   }
 
   return content;
@@ -283,10 +313,30 @@ function statusLabel(status?: string) {
   }
 
   if (status === "snoozed") {
-    return "Pausada";
+    return "En pausa";
   }
 
   return "Sin estado";
+}
+
+function statusBadgeClass(status?: string) {
+  if (status === "open") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+
+  if (status === "resolved") {
+    return "border-slate-200 bg-slate-50 text-slate-700";
+  }
+
+  if (status === "pending") {
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }
+
+  if (status === "snoozed") {
+    return "border-blue-200 bg-blue-50 text-blue-700";
+  }
+
+  return "border-border bg-background text-muted-foreground";
 }
 
 function getAssignmentSignal(conversation: ChatwootConversation) {
@@ -319,6 +369,72 @@ function filterConversationsByTab(
   }
 
   return conversations.filter((conversation) => !getAssignmentSignal(conversation));
+}
+
+function sortConversations(
+  conversations: ChatwootConversation[],
+  sortOption: SortOption
+) {
+  return [...conversations].sort((a, b) => {
+    if (sortOption === "last_activity_asc") {
+      return (a.last_activity_at ?? 0) - (b.last_activity_at ?? 0);
+    }
+
+    if (sortOption === "created_desc") {
+      return (b.created_at ?? 0) - (a.created_at ?? 0);
+    }
+
+    if (sortOption === "created_asc") {
+      return (a.created_at ?? 0) - (b.created_at ?? 0);
+    }
+
+    if (sortOption === "unread_desc") {
+      return (b.unread_count ?? 0) - (a.unread_count ?? 0);
+    }
+
+    if (sortOption === "unread_asc") {
+      return (a.unread_count ?? 0) - (b.unread_count ?? 0);
+    }
+
+    return (b.last_activity_at ?? 0) - (a.last_activity_at ?? 0);
+  });
+}
+
+function getStatusOptions(conversations: ChatwootConversation[]) {
+  const statuses = new Set(conversations.map((conversation) => conversation.status));
+  const options: Array<{ label: string; value: StatusFilter }> = [
+    { label: "Todas", value: "all" },
+  ];
+
+  if (statuses.has("open")) {
+    options.push({ label: "Abiertas", value: "open" });
+  }
+
+  if (statuses.has("resolved")) {
+    options.push({ label: "Resueltas", value: "resolved" });
+  }
+
+  if (statuses.has("pending")) {
+    options.push({ label: "Pendientes", value: "pending" });
+  }
+
+  if (statuses.has("snoozed")) {
+    options.push({ label: "En pausa", value: "snoozed" });
+  }
+
+  return options;
+}
+
+function getChannelOptions(conversations: ChatwootConversation[]) {
+  return Array.from(
+    new Set(conversations.map((conversation) => getChannel(conversation)))
+  ).sort((a, b) => a.localeCompare(b));
+}
+
+function getLabelOptions(conversations: ChatwootConversation[]) {
+  return Array.from(
+    new Set(conversations.flatMap((conversation) => conversation.labels ?? []))
+  ).sort((a, b) => a.localeCompare(b));
 }
 
 function shouldShowAttribute(key: string, value: unknown) {
@@ -619,22 +735,73 @@ export function ConversationInbox({
   const [sendError, setSendError] = useState("");
   const [contactOpen, setContactOpen] = useState(Boolean(initialConversationId));
   const [filter, setFilter] = useState<ConversationFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [channelFilter, setChannelFilter] = useState("all");
+  const [labelFilter, setLabelFilter] = useState("all");
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [sortOption, setSortOption] =
+    useState<SortOption>("last_activity_desc");
+  const [showFilters, setShowFilters] = useState(false);
+  const [showSort, setShowSort] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const canUseAssignmentFilters = hasAssignmentData(conversations);
+  const statusOptions = useMemo(
+    () => getStatusOptions(conversations),
+    [conversations]
+  );
+  const channelOptions = useMemo(
+    () => getChannelOptions(conversations),
+    [conversations]
+  );
+  const labelOptions = useMemo(
+    () => getLabelOptions(conversations),
+    [conversations]
+  );
+  const hasActiveFilters =
+    filter !== "all" ||
+    statusFilter !== "all" ||
+    channelFilter !== "all" ||
+    labelFilter !== "all" ||
+    unreadOnly ||
+    query.trim().length > 0;
 
   const filteredConversations = useMemo(() => {
-    const cleanQuery = query.trim().toLowerCase();
+    const cleanQuery = normalizeText(query);
     const conversationsByFilter = filterConversationsByTab(
       conversations,
       filter,
       canUseAssignmentFilters
     );
 
-    if (!cleanQuery) {
-      return conversationsByFilter;
-    }
+    const filtered = conversationsByFilter.filter((conversation) => {
+      if (statusFilter !== "all" && conversation.status !== statusFilter) {
+        return false;
+      }
 
-    return conversationsByFilter.filter((conversation) => {
+      if (channelFilter !== "all" && getChannel(conversation) !== channelFilter) {
+        return false;
+      }
+
+      if (labelFilter === "__none" && (conversation.labels ?? []).length > 0) {
+        return false;
+      }
+
+      if (
+        labelFilter !== "all" &&
+        labelFilter !== "__none" &&
+        !(conversation.labels ?? []).includes(labelFilter)
+      ) {
+        return false;
+      }
+
+      if (unreadOnly && conversation.unread_count <= 0) {
+        return false;
+      }
+
+      if (!cleanQuery) {
+        return true;
+      }
+
       const haystack = [
         getSenderName(conversation),
         getSenderPhone(conversation),
@@ -644,11 +811,25 @@ export function ConversationInbox({
         ...(conversation.labels ?? []),
       ]
         .join(" ")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase();
 
       return haystack.includes(cleanQuery);
     });
-  }, [canUseAssignmentFilters, conversations, filter, query]);
+
+    return sortConversations(filtered, sortOption);
+  }, [
+    canUseAssignmentFilters,
+    channelFilter,
+    conversations,
+    filter,
+    labelFilter,
+    query,
+    sortOption,
+    statusFilter,
+    unreadOnly,
+  ]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -783,6 +964,15 @@ export function ConversationInbox({
     }
   }
 
+  function clearFilters() {
+    setFilter("all");
+    setStatusFilter("all");
+    setChannelFilter("all");
+    setLabelFilter("all");
+    setUnreadOnly(false);
+    setQuery("");
+  }
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden rounded-2xl border bg-background shadow-sm">
       <aside
@@ -800,7 +990,7 @@ export function ConversationInbox({
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-1.5 text-xs">
+          <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 text-xs">
             <FilterChip
               active={filter === "all"}
               label="Todas"
@@ -850,18 +1040,183 @@ export function ConversationInbox({
             placeholder="Buscar cliente, telefono o mensaje"
             onChange={(event) => setQuery(event.target.value)}
           />
+
+          <div className="relative flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setShowFilters((current) => !current);
+                setShowSort(false);
+              }}
+            >
+              Filtros
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setShowSort((current) => !current);
+                setShowFilters(false);
+              }}
+            >
+              Ordenar
+            </Button>
+            {hasActiveFilters ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+              >
+                Limpiar filtros
+              </Button>
+            ) : null}
+
+            {showFilters ? (
+              <div className="absolute left-0 top-10 z-20 w-[min(330px,calc(100vw-2rem))] rounded-xl border bg-background p-3 shadow-xl">
+                <div className="space-y-3">
+                  <FieldSelect
+                    label="Estado"
+                    value={statusFilter}
+                    onChange={(value) => setStatusFilter(value as StatusFilter)}
+                    options={statusOptions}
+                  />
+                  <FieldSelect
+                    label="Canal"
+                    value={channelFilter}
+                    onChange={setChannelFilter}
+                    options={[
+                      { label: "Todos los canales", value: "all" },
+                      ...channelOptions.map((channel) => ({
+                        label: channel,
+                        value: channel,
+                      })),
+                    ]}
+                  />
+                  {labelOptions.length > 0 ? (
+                    <FieldSelect
+                      label="Etiqueta"
+                      value={labelFilter}
+                      onChange={setLabelFilter}
+                      options={[
+                        { label: "Todas las etiquetas", value: "all" },
+                        { label: "Sin etiquetas", value: "__none" },
+                        ...labelOptions.map((label) => ({
+                          label,
+                          value: label,
+                        })),
+                      ]}
+                    />
+                  ) : null}
+                  <label className="flex items-center gap-2 rounded-lg border p-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={unreadOnly}
+                      onChange={(event) => setUnreadOnly(event.target.checked)}
+                    />
+                    Solo no leidas
+                  </label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={clearFilters}
+                  >
+                    Limpiar filtros
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            {showSort ? (
+              <div className="absolute left-20 top-10 z-20 w-[min(300px,calc(100vw-2rem))] rounded-xl border bg-background p-2 shadow-xl">
+                <SortButton
+                  active={sortOption === "last_activity_desc"}
+                  label="Actividad mas reciente"
+                  onClick={() => setSortOption("last_activity_desc")}
+                />
+                <SortButton
+                  active={sortOption === "last_activity_asc"}
+                  label="Actividad mas antigua"
+                  onClick={() => setSortOption("last_activity_asc")}
+                />
+                <SortButton
+                  active={sortOption === "created_desc"}
+                  label="Creacion mas reciente"
+                  onClick={() => setSortOption("created_desc")}
+                />
+                <SortButton
+                  active={sortOption === "created_asc"}
+                  label="Creacion mas antigua"
+                  onClick={() => setSortOption("created_asc")}
+                />
+                <SortButton
+                  active={sortOption === "unread_desc"}
+                  label="Mas mensajes sin leer"
+                  onClick={() => setSortOption("unread_desc")}
+                />
+                <SortButton
+                  active={sortOption === "unread_asc"}
+                  label="Menos mensajes sin leer"
+                  onClick={() => setSortOption("unread_asc")}
+                />
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {filteredConversations.length === 0 ? (
             <div className="p-6 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">
-                Aun no tienes conversaciones.
-              </p>
-              <p className="mt-1">
-                Cuando tus clientes escriban desde tus canales conectados,
-                apareceran aqui.
-              </p>
+              {conversations.length === 0 ? (
+                <>
+                  <p className="font-medium text-foreground">
+                    Aun no tienes conversaciones.
+                  </p>
+                  <p className="mt-1">
+                    Cuando tus clientes escriban desde tus canales conectados,
+                    apareceran aqui.
+                  </p>
+                </>
+              ) : query.trim() ? (
+                <>
+                  <p className="font-medium text-foreground">
+                    No encontramos conversaciones con esa busqueda.
+                  </p>
+                  <p className="mt-1">
+                    Prueba con otro nombre, telefono, canal o etiqueta.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={clearFilters}
+                  >
+                    Limpiar filtros
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium text-foreground">
+                    No hay conversaciones que coincidan con estos filtros.
+                  </p>
+                  <p className="mt-1">Ajusta los filtros para ver mas resultados.</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={clearFilters}
+                  >
+                    Limpiar filtros
+                  </Button>
+                </>
+              )}
             </div>
           ) : (
             filteredConversations.map((conversation) => {
@@ -893,8 +1248,7 @@ export function ConversationInbox({
                             {getSenderName(conversation)}
                           </p>
                           <p className="truncate text-xs text-muted-foreground">
-                            {getChannel(conversation)} -{" "}
-                            {statusLabel(conversation.status)}
+                            {getChannel(conversation)}
                           </p>
                         </div>
                         <p className="shrink-0 text-xs text-muted-foreground">
@@ -907,9 +1261,24 @@ export function ConversationInbox({
                       </p>
 
                       <div className="mt-3 flex flex-wrap gap-2">
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-xs ${statusBadgeClass(
+                            conversation.status
+                          )}`}
+                        >
+                          {statusLabel(conversation.status)}
+                        </span>
+                        <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+                          {getAssignmentSignal(conversation)
+                            ? "Asignada"
+                            : "Sin asignar"}
+                        </span>
                         {conversation.unread_count > 0 ? (
                           <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
-                            {conversation.unread_count} sin leer
+                            {conversation.unread_count}{" "}
+                            {conversation.unread_count === 1
+                              ? "sin leer"
+                              : "sin leer"}
                           </span>
                         ) : null}
                         {labels.slice(0, 2).map((label) => (
@@ -1162,7 +1531,7 @@ function FilterChip({
     <button
       type="button"
       disabled={disabled}
-      title={title}
+      title={disabled ? "Asignacion de agentes proximamente" : title}
       className={
         active
           ? "rounded-full bg-primary px-3 py-1 font-medium text-primary-foreground"
@@ -1171,6 +1540,59 @@ function FilterChip({
       onClick={onClick}
     >
       {label} ({value})
+    </button>
+  );
+}
+
+function FieldSelect({
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  options: Array<{ label: string; value: string }>;
+  value: string;
+}) {
+  return (
+    <label className="block space-y-1 text-sm">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <select
+        value={value}
+        className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function SortButton({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={
+        active
+          ? "block w-full rounded-lg bg-primary px-3 py-2 text-left text-sm font-medium text-primary-foreground"
+          : "block w-full rounded-lg px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+      }
+      onClick={onClick}
+    >
+      {label}
     </button>
   );
 }
