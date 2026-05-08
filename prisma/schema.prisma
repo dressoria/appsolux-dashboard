@@ -130,6 +130,7 @@ model User {
   requestedProvisioningJobs ProvisioningJob[]   @relation("RequestedByUser")
   requestedPlanUpgrades     PlanUpgradeRequest[] @relation("RequestedPlanUpgrades")
   reviewedPlanUpgrades      PlanUpgradeRequest[] @relation("ReviewedPlanUpgrades")
+  conversationNotes ConversationNote[]
 }
 
 model Tenant {
@@ -155,6 +156,7 @@ model Tenant {
   lightweightCustomers      LightweightCustomer[]
   lightweightSales          LightweightSale[]
   lightweightStockMovements LightweightStockMovement[]
+  conversationNotes ConversationNote[]
 }
 
 model Plan {
@@ -439,4 +441,21 @@ model AuditLog {
   @@index([tenantId])
   @@index([userId])
   @@index([action])
+}
+
+model ConversationNote {
+  id                     String   @id @default(cuid())
+  tenantId               String
+  conversationExternalId String
+  authorUserId           String?
+  body                   String
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  author User?  @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, conversationExternalId])
+  @@index([createdAt])
+  @@index([authorUserId])
 }
