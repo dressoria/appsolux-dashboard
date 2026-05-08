@@ -106,41 +106,49 @@ export default async function ConversationsPage({
     : await loadConversations(tenant.chatwoot_account_id);
 
   return (
-    <DashboardShell>
-      <div className="space-y-6">
-        <div>
-          <p className="text-sm text-muted-foreground">
+    <DashboardShell
+      hideTopbar
+      mainClassName="p-0"
+      contentClassName="max-w-none"
+    >
+      <div className="flex h-screen min-h-0 flex-col overflow-hidden bg-muted/20">
+        <header className="border-b bg-background px-4 py-4 sm:px-6">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Bandeja de conversaciones
           </p>
-          <h1 className="text-3xl font-semibold tracking-tight">
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
             Conversaciones
           </h1>
-          <p className="mt-2 max-w-3xl text-muted-foreground">
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             Gestiona los mensajes de tus clientes desde tus canales conectados.
           </p>
-        </div>
+        </header>
 
         {result.success ? (
-          <ConversationInbox
-            conversations={result.conversations}
-            meta={result.meta}
-            initialConversationId={
-              Number.isInteger(initialConversationId) &&
-              initialConversationId &&
-              initialConversationId > 0
-                ? initialConversationId
-                : undefined
-            }
-          />
+          <div className="min-h-0 flex-1 p-3 sm:p-4">
+            <ConversationInbox
+              conversations={result.conversations}
+              meta={result.meta}
+              initialConversationId={
+                Number.isInteger(initialConversationId) &&
+                initialConversationId &&
+                initialConversationId > 0
+                  ? initialConversationId
+                  : undefined
+              }
+            />
+          </div>
         ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Error al cargar conversaciones</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-destructive">{result.message}</p>
-            </CardContent>
-          </Card>
+          <div className="p-4 sm:p-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Error al cargar conversaciones</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-destructive">{result.message}</p>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     </DashboardShell>

@@ -1,6 +1,14 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -9,6 +17,7 @@ import type {
   ChatwootConversation,
   ChatwootConversationsMeta,
   ChatwootMessage,
+  ChatwootSender,
 } from "@/types/chatwoot";
 
 type ConversationInboxProps = {
@@ -19,6 +28,9 @@ type ConversationInboxProps = {
 
 type LoadState = "idle" | "loading" | "error";
 type SendState = "idle" | "sending" | "error";
+type Attachment = NonNullable<ChatwootMessage["attachments"]>[number];
+
+const SYSTEM_EVENT_MARKERS = ["connection successfully established"];
 
 function formatDate(timestamp?: number) {
   if (!timestamp) {
@@ -41,8 +53,46 @@ function getSenderPhone(conversation?: ChatwootConversation | null) {
   return conversation?.meta?.sender?.phone_number ?? "Sin telefono";
 }
 
+function getSenderEmail(conversation?: ChatwootConversation | null) {
+  return conversation?.meta?.sender?.email ?? null;
+}
+
+function getSenderInitial(conversation?: ChatwootConversation | null) {
+  return getSenderName(conversation).trim().charAt(0).toUpperCase() || "C";
+}
+
+function formatChannel(rawChannel?: string) {
+  const channel = rawChannel?.toLowerCase() ?? "";
+
+  if (channel.includes("whatsapp")) {
+    return "WhatsApp";
+  }
+
+  if (channel.includes("instagram")) {
+    return "Instagram";
+  }
+
+  if (channel.includes("messenger") || channel.includes("facebook")) {
+    return "Messenger";
+  }
+
+  if (channel.includes("web")) {
+    return "Web";
+  }
+
+  return "Canal conectado";
+}
+
 function getChannel(conversation?: ChatwootConversation | null) {
-  return conversation?.meta?.channel ?? "Canal conectado";
+  return formatChannel(conversation?.meta?.channel);
+}
+
+function normalizeSystemContent(content: string) {
+  if (content.toLowerCase().includes("connection successfully established")) {
+    return "Conexion establecida";
+  }
+
+  return content;
 }
 
 function getLastMessage(conversation: ChatwootConversation) {
@@ -50,22 +100,36 @@ function getLastMessage(conversation: ChatwootConversation) {
     conversation.last_non_activity_message?.processed_message_content ??
     conversation.last_non_activity_message?.content;
 
-  return content?.trim() || "Sin ultimo mensaje";
+  return content?.trim()
+    ? normalizeSystemContent(content.trim())
+    : "Sin ultimo mensaje";
 }
 
 function getMessageContent(message: ChatwootMessage) {
-  return (
-    message.processed_message_content?.trim() ??
-    message.content?.trim() ??
+  const content =
+    message.processed_message_content?.trim() ?? message.content?.trim() ?? "";
+
+  return normalizeSystemContent(content);
+}
+
+function isSystemMessage(message: ChatwootMessage) {
+  const content = (
+    message.processed_message_content ??
+    message.content ??
     ""
+  ).toLowerCase();
+
+  return (
+    message.message_type === 2 ||
+    SYSTEM_EVENT_MARKERS.some((marker) => content.includes(marker))
   );
 }
 
-function isImageAttachment(attachment: NonNullable<ChatwootMessage["attachments"]>[number]) {
+function isImageAttachment(attachment: Attachment) {
   return attachment.file_type === "image";
 }
 
-function getAttachmentUrl(attachment: NonNullable<ChatwootMessage["attachments"]>[number]) {
+function getAttachmentUrl(attachment: Attachment) {
   return (
     attachment.data_url ??
     attachment.file_url ??
@@ -94,12 +158,18 @@ function AttachmentList({ message }: { message: ChatwootMessage }) {
 
         if (isImageAttachment(attachment)) {
           return (
-            <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer">
+            <a
+              key={`${url}-${index}`}
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="block"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={url}
                 alt={name}
-                className="max-h-72 rounded-lg border object-contain"
+                className="max-h-72 rounded-xl border object-contain shadow-sm"
               />
             </a>
           );
@@ -111,7 +181,7 @@ function AttachmentList({ message }: { message: ChatwootMessage }) {
             href={url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex rounded-md border bg-background px-3 py-2 text-sm text-foreground hover:bg-muted"
+            className="inline-flex rounded-lg border bg-background px-3 py-2 text-sm text-foreground shadow-sm hover:bg-muted"
           >
             {name}
           </a>
@@ -141,6 +211,189 @@ function statusLabel(status?: string) {
   return "Sin estado";
 }
 
+function getReadableAttributes(sender?: ChatwootSender) {
+  const attributes = {
+    ...(sender?.additional_attributes ?? {}),
+    ...(sender?.custom_attributes ?? {}),
+  };
+
+  return Object.entries(attributes)
+    .filter(([, value]) => {
+      if (value === null || value === undefined) {
+        return false;
+      }
+
+      if (typeof value === "object") {
+        return false;
+      }
+
+      return String(value).trim().length > 0;
+    })
+    .slice(0, 6);
+}
+
+function ContactInfoPanel({
+  conversation,
+  onClose,
+}: {
+  conversation: ChatwootConversation | null;
+  onClose: () => void;
+}) {
+  const sender = conversation?.meta?.sender;
+  const attributes = getReadableAttributes(sender);
+  const labels = conversation?.labels ?? [];
+
+  return (
+    <aside className="absolute inset-y-0 right-0 z-20 flex w-full max-w-sm flex-col border-l bg-background shadow-2xl xl:static xl:z-auto xl:w-[340px] xl:shrink-0 xl:shadow-none">
+      <div className="flex items-center justify-between border-b px-4 py-3">
+        <div>
+          <p className="text-sm font-semibold">Contacto</p>
+          <p className="text-xs text-muted-foreground">
+            Informacion del cliente
+          </p>
+        </div>
+        <Button type="button" variant="outline" size="sm" onClick={onClose}>
+          Cerrar
+        </Button>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        {!conversation ? (
+          <p className="text-sm text-muted-foreground">
+            Selecciona una conversacion para ver el contacto.
+          </p>
+        ) : (
+          <div className="space-y-5">
+            <div className="rounded-xl border bg-muted/30 p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-lg font-semibold text-primary">
+                  {getSenderInitial(conversation)}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">
+                    {getSenderName(conversation)}
+                  </p>
+                  <p className="truncate text-sm text-muted-foreground">
+                    {getSenderPhone(conversation)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-2 text-sm">
+                <InfoRow label="Email" value={getSenderEmail(conversation)} />
+                <InfoRow label="Canal" value={getChannel(conversation)} />
+                <InfoRow
+                  label="Estado"
+                  value={statusLabel(conversation.status)}
+                />
+                <InfoRow
+                  label="Ultima actividad"
+                  value={formatDate(conversation.last_activity_at)}
+                />
+              </div>
+            </div>
+
+            <PanelSection title="Etiquetas">
+              {labels.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {labels.map((label) => (
+                    <span
+                      key={label}
+                      className="rounded-full border px-2 py-1 text-xs text-muted-foreground"
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <EmptyPanelText />
+              )}
+            </PanelSection>
+
+            <PanelSection title="Atributos">
+              {attributes.length > 0 ? (
+                <div className="space-y-2 text-sm">
+                  {attributes.map(([key, value]) => (
+                    <InfoRow
+                      key={key}
+                      label={key.replaceAll("_", " ")}
+                      value={String(value)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <EmptyPanelText />
+              )}
+            </PanelSection>
+
+            <PanelSection title="Notas">
+              <p className="text-sm text-muted-foreground">
+                Notas internas proximamente.
+              </p>
+            </PanelSection>
+
+            <PanelSection title="Archivos">
+              <p className="text-sm text-muted-foreground">
+                Archivos compartidos apareceran aqui.
+              </p>
+            </PanelSection>
+
+            <PanelSection title="Automatizaciones">
+              <p className="text-sm text-muted-foreground">
+                Automatizaciones proximamente.
+              </p>
+            </PanelSection>
+
+            <PanelSection title="Integraciones">
+              <p className="text-sm text-muted-foreground">
+                Canales conectados.
+              </p>
+            </PanelSection>
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+function InfoRow({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | null;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="max-w-[60%] text-right font-medium">
+        {value?.trim() || "Sin informacion"}
+      </span>
+    </div>
+  );
+}
+
+function PanelSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border bg-background p-4">
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <div className="mt-3">{children}</div>
+    </section>
+  );
+}
+
+function EmptyPanelText() {
+  return (
+    <p className="text-sm text-muted-foreground">Sin informacion registrada.</p>
+  );
+}
+
 export function ConversationInbox({
   conversations,
   meta,
@@ -164,6 +417,7 @@ export function ConversationInbox({
   const [attachment, setAttachment] = useState<File | null>(null);
   const [sendState, setSendState] = useState<SendState>("idle");
   const [sendError, setSendError] = useState("");
+  const [contactOpen, setContactOpen] = useState(Boolean(initialConversationId));
 
   const filteredConversations = useMemo(() => {
     const cleanQuery = query.trim().toLowerCase();
@@ -176,6 +430,7 @@ export function ConversationInbox({
       const haystack = [
         getSenderName(conversation),
         getSenderPhone(conversation),
+        getSenderEmail(conversation),
         getLastMessage(conversation),
         getChannel(conversation),
       ]
@@ -247,6 +502,7 @@ export function ConversationInbox({
     setMessages([]);
     setSendError("");
     setSendState("idle");
+    setContactOpen(true);
     router.replace(`/conversations?conversationId=${conversation.id}`, {
       scroll: false,
     });
@@ -319,45 +575,47 @@ export function ConversationInbox({
   }
 
   return (
-    <div className="flex h-[calc(100vh-13rem)] min-h-[620px] flex-col overflow-hidden rounded-lg border bg-background lg:flex-row">
+    <div className="flex h-full min-h-0 overflow-hidden rounded-2xl border bg-background shadow-sm">
       <aside
         className={
           selectedId
-            ? "hidden min-h-0 border-r lg:flex lg:w-[360px] lg:flex-col"
-            : "flex min-h-0 flex-1 flex-col lg:w-[360px] lg:flex-none lg:border-r"
+            ? "hidden min-h-0 border-r bg-background lg:flex lg:w-[370px] lg:shrink-0 lg:flex-col"
+            : "flex min-h-0 flex-1 flex-col bg-background lg:w-[370px] lg:shrink-0 lg:border-r"
         }
       >
-        <div className="space-y-3 border-b p-4">
-          <div className="grid grid-cols-4 gap-2 text-center text-xs">
-            <div className="rounded-md border p-2">
-              <p className="font-semibold">{meta.all_count}</p>
-              <p className="text-muted-foreground">Todas</p>
-            </div>
-            <div className="rounded-md border p-2">
-              <p className="font-semibold">{meta.unassigned_count}</p>
-              <p className="text-muted-foreground">Sin asignar</p>
-            </div>
-            <div className="rounded-md border p-2">
-              <p className="font-semibold">{meta.assigned_count}</p>
-              <p className="text-muted-foreground">Asignadas</p>
-            </div>
-            <div className="rounded-md border p-2">
-              <p className="font-semibold">{meta.mine_count}</p>
-              <p className="text-muted-foreground">Mias</p>
-            </div>
+        <div className="space-y-4 border-b p-4">
+          <div>
+            <p className="text-sm font-semibold">Bandeja</p>
+            <p className="text-xs text-muted-foreground">
+              Conversaciones de tus canales conectados
+            </p>
           </div>
+
+          <div className="grid grid-cols-4 gap-2 text-center text-xs">
+            <MetricPill label="Todas" value={meta.all_count} />
+            <MetricPill label="Sin asignar" value={meta.unassigned_count} />
+            <MetricPill label="Asignadas" value={meta.assigned_count} />
+            <MetricPill label="Mias" value={meta.mine_count} />
+          </div>
+
           <Input
             value={query}
-            placeholder="Buscar por cliente o mensaje"
+            placeholder="Buscar cliente, telefono o mensaje"
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {filteredConversations.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground">
-              Aun no tienes conversaciones.
-            </p>
+            <div className="p-6 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">
+                Aun no tienes conversaciones.
+              </p>
+              <p className="mt-1">
+                Cuando tus clientes escriban desde tus canales conectados,
+                apareceran aqui.
+              </p>
+            </div>
           ) : (
             filteredConversations.map((conversation) => {
               const active = selectedId === conversation.id;
@@ -369,41 +627,54 @@ export function ConversationInbox({
                   type="button"
                   className={
                     active
-                      ? "w-full border-b bg-muted/60 p-4 text-left"
-                      : "w-full border-b p-4 text-left hover:bg-muted/40"
+                      ? "relative w-full border-b bg-primary/5 p-4 text-left"
+                      : "relative w-full border-b p-4 text-left hover:bg-muted/40"
                   }
                   onClick={() => selectConversation(conversation)}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">
-                        {getSenderName(conversation)}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {getChannel(conversation)} - {statusLabel(conversation.status)}
-                      </p>
+                  {active ? (
+                    <span className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-primary" />
+                  ) : null}
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold">
+                      {getSenderInitial(conversation)}
                     </div>
-                    <p className="shrink-0 text-xs text-muted-foreground">
-                      {formatDate(conversation.last_activity_at)}
-                    </p>
-                  </div>
-                  <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
-                    {getLastMessage(conversation)}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {conversation.unread_count > 0 ? (
-                      <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
-                        {conversation.unread_count} sin leer
-                      </span>
-                    ) : null}
-                    {labels.slice(0, 2).map((label) => (
-                      <span
-                        key={label}
-                        className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground"
-                      >
-                        {label}
-                      </span>
-                    ))}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">
+                            {getSenderName(conversation)}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {getChannel(conversation)} ·{" "}
+                            {statusLabel(conversation.status)}
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-xs text-muted-foreground">
+                          {formatDate(conversation.last_activity_at)}
+                        </p>
+                      </div>
+
+                      <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                        {getLastMessage(conversation)}
+                      </p>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {conversation.unread_count > 0 ? (
+                          <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+                            {conversation.unread_count} sin leer
+                          </span>
+                        ) : null}
+                        {labels.slice(0, 2).map((label) => (
+                          <span
+                            key={label}
+                            className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground"
+                          >
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </button>
               );
@@ -412,154 +683,211 @@ export function ConversationInbox({
         </div>
       </aside>
 
-      <section
+      <div
         className={
           selectedId
-            ? "flex min-h-0 flex-1 flex-col"
-            : "hidden min-h-0 flex-1 flex-col lg:flex"
+            ? "relative flex min-h-0 flex-1"
+            : "relative hidden min-h-0 flex-1 lg:flex"
         }
       >
-        {!selectedId ? (
-          <div className="flex flex-1 items-center justify-center p-6 text-center">
-            <div>
-              <p className="text-lg font-medium">Selecciona una conversacion</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Elige un cliente de la bandeja para ver sus mensajes.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <>
-            <header className="flex items-start justify-between gap-3 border-b p-4">
-              <div className="min-w-0">
-                <button
-                  type="button"
-                  className="mb-2 text-sm text-muted-foreground lg:hidden"
-                  onClick={() => {
-                    setSelectedId(null);
-                    router.replace("/conversations", { scroll: false });
-                  }}
-                >
-                  Volver a conversaciones
-                </button>
-                <p className="truncate text-lg font-semibold">
-                  {getSenderName(selectedConversation)}
+        <section className="flex min-h-0 flex-1 flex-col bg-muted/20">
+          {!selectedId ? (
+            <div className="flex flex-1 items-center justify-center p-6 text-center">
+              <div className="max-w-sm rounded-2xl border bg-background p-6 shadow-sm">
+                <p className="text-lg font-semibold">
+                  Selecciona una conversacion
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  {getSenderPhone(selectedConversation)} -{" "}
-                  {getChannel(selectedConversation)}
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Elige un cliente de la bandeja para ver mensajes, responder y
+                  consultar la informacion del contacto.
                 </p>
               </div>
-              <span className="rounded-full border px-2 py-1 text-xs text-muted-foreground">
-                {statusLabel(selectedConversation?.status)}
-              </span>
-            </header>
+            </div>
+          ) : (
+            <>
+              <header className="flex items-center justify-between gap-3 border-b bg-background px-4 py-3">
+                <div className="min-w-0">
+                  <button
+                    type="button"
+                    className="mb-2 text-sm text-muted-foreground lg:hidden"
+                    onClick={() => {
+                      setSelectedId(null);
+                      setContactOpen(false);
+                      router.replace("/conversations", { scroll: false });
+                    }}
+                  >
+                    Volver a conversaciones
+                  </button>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary sm:flex">
+                      {getSenderInitial(selectedConversation)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-semibold">
+                        {getSenderName(selectedConversation)}
+                      </p>
+                      <p className="truncate text-sm text-muted-foreground">
+                        {getSenderPhone(selectedConversation)} ·{" "}
+                        {getChannel(selectedConversation)} ·{" "}
+                        {statusLabel(selectedConversation?.status)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setContactOpen((current) => !current)}
+                >
+                  {contactOpen ? "Ocultar contacto" : "Ver contacto"}
+                </Button>
+              </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto bg-muted/20 p-4">
-              {loadState === "loading" ? (
-                <p className="text-sm text-muted-foreground">
-                  Cargando mensajes...
-                </p>
-              ) : null}
-              {loadState === "error" ? (
-                <p className="text-sm text-destructive">{loadError}</p>
-              ) : null}
-              {loadState !== "loading" && messages.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No hay mensajes para mostrar.
-                </p>
-              ) : null}
-              <div className="space-y-3">
-                {messages.map((message) => {
-                  const isOutgoing = message.message_type === 1;
-                  const messageContent = getMessageContent(message);
-                  const hasAttachments = Boolean(message.attachments?.length);
+              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                {loadState === "loading" ? (
+                  <p className="text-sm text-muted-foreground">
+                    Cargando mensajes...
+                  </p>
+                ) : null}
+                {loadState === "error" ? (
+                  <p className="text-sm text-destructive">{loadError}</p>
+                ) : null}
+                {loadState !== "loading" && messages.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-center">
+                    <div className="max-w-sm rounded-2xl border bg-background p-6 shadow-sm">
+                      <p className="font-semibold">No hay mensajes para mostrar.</p>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Si la bandeja muestra actividad reciente, intenta
+                        recargar la conversacion.
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
 
-                  if (!messageContent && !hasAttachments) {
-                    return null;
-                  }
+                <div className="space-y-4">
+                  {messages.map((message) => {
+                    const outgoing = message.message_type === 1;
+                    const system = isSystemMessage(message);
+                    const messageContent = getMessageContent(message);
+                    const hasAttachments = Boolean(message.attachments?.length);
 
-                  return (
-                    <div
-                      key={message.id}
-                      className={isOutgoing ? "flex justify-end" : "flex justify-start"}
-                    >
+                    if (!messageContent && !hasAttachments) {
+                      return null;
+                    }
+
+                    if (system) {
+                      return (
+                        <div key={message.id} className="flex justify-center">
+                          <div className="rounded-full border bg-background/80 px-3 py-1 text-xs text-muted-foreground shadow-sm">
+                            {messageContent || "Evento de sistema"} ·{" "}
+                            {formatDate(message.created_at)}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
                       <div
-                        className={
-                          isOutgoing
-                            ? "max-w-[78%] rounded-2xl bg-primary px-4 py-3 text-primary-foreground"
-                            : "max-w-[78%] rounded-2xl border bg-background px-4 py-3"
-                        }
+                        key={message.id}
+                        className={outgoing ? "flex justify-end" : "flex justify-start"}
                       >
-                        {messageContent ? (
-                          <p className="whitespace-pre-wrap text-sm">
-                            {messageContent}
-                          </p>
-                        ) : null}
-                        <AttachmentList message={message} />
-                        <p
+                        <div
                           className={
-                            isOutgoing
-                              ? "mt-2 text-xs text-primary-foreground/70"
-                              : "mt-2 text-xs text-muted-foreground"
+                            outgoing
+                              ? "max-w-[82%] rounded-2xl rounded-br-md bg-primary px-4 py-3 text-primary-foreground shadow-sm md:max-w-[68%]"
+                              : "max-w-[82%] rounded-2xl rounded-bl-md border bg-background px-4 py-3 shadow-sm md:max-w-[68%]"
                           }
                         >
-                          {message.sender?.name ?? (isOutgoing ? "Equipo" : "Cliente")} -{" "}
-                          {formatDate(message.created_at)}
-                        </p>
+                          {messageContent ? (
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                              {messageContent}
+                            </p>
+                          ) : null}
+                          <AttachmentList message={message} />
+                          <p
+                            className={
+                              outgoing
+                                ? "mt-2 text-xs text-primary-foreground/70"
+                                : "mt-2 text-xs text-muted-foreground"
+                            }
+                          >
+                            {message.sender?.name ?? (outgoing ? "Equipo" : "Cliente")} ·{" "}
+                            {formatDate(message.created_at)}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-                <div ref={messageEndRef} />
-              </div>
-            </div>
-
-            <form onSubmit={sendMessage} className="border-t bg-background p-4">
-              <textarea
-                value={content}
-                disabled={sendState === "sending"}
-                onKeyDown={handleKeyDown}
-                onChange={(event) => setContent(event.target.value)}
-                placeholder="Escribe una respuesta..."
-                className="min-h-20 w-full resize-none rounded-md border bg-background p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-              />
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    accept="image/jpeg,image/png,image/webp,application/pdf"
-                    onChange={(event) =>
-                      setAttachment(event.target.files?.[0] ?? null)
-                    }
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={sendState === "sending"}
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    Adjuntar
-                  </Button>
-                  {attachment ? (
-                    <span className="text-xs text-muted-foreground">
-                      {attachment.name}
-                    </span>
-                  ) : null}
+                    );
+                  })}
+                  <div ref={messageEndRef} />
                 </div>
-                <Button type="submit" disabled={sendState === "sending"}>
-                  {sendState === "sending" ? "Enviando..." : "Enviar"}
-                </Button>
               </div>
-              {sendError ? (
-                <p className="mt-2 text-xs text-destructive">{sendError}</p>
-              ) : null}
-            </form>
-          </>
-        )}
-      </section>
+
+              <form
+                onSubmit={sendMessage}
+                className="border-t bg-background px-4 py-3"
+              >
+                <textarea
+                  value={content}
+                  disabled={sendState === "sending"}
+                  onKeyDown={handleKeyDown}
+                  onChange={(event) => setContent(event.target.value)}
+                  placeholder="Escribe un mensaje..."
+                  className="min-h-20 w-full resize-none rounded-xl border bg-background p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                />
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                      onChange={(event) =>
+                        setAttachment(event.target.files?.[0] ?? null)
+                      }
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={sendState === "sending"}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      Adjuntar
+                    </Button>
+                    {attachment ? (
+                      <span className="truncate text-xs text-muted-foreground">
+                        {attachment.name}
+                      </span>
+                    ) : null}
+                  </div>
+                  <Button type="submit" disabled={sendState === "sending"}>
+                    {sendState === "sending" ? "Enviando..." : "Enviar"}
+                  </Button>
+                </div>
+                {sendError ? (
+                  <p className="mt-2 text-xs text-destructive">{sendError}</p>
+                ) : null}
+              </form>
+            </>
+          )}
+        </section>
+
+        {contactOpen ? (
+          <ContactInfoPanel
+            conversation={selectedConversation}
+            onClose={() => setContactOpen(false)}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function MetricPill({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border bg-background p-2">
+      <p className="font-semibold">{value}</p>
+      <p className="truncate text-muted-foreground">{label}</p>
     </div>
   );
 }
