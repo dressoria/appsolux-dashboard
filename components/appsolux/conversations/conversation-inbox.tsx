@@ -19,6 +19,8 @@ import type {
   ChatwootMessage,
   ChatwootSender,
 } from "@/types/chatwoot";
+import { LabelEditor } from "./label-editor";
+import { NotesSection } from "./notes-section";
 
 type ConversationInboxProps = {
   conversations: ChatwootConversation[];
@@ -502,15 +504,16 @@ function ContactInfoPanel({
   conversations,
   onSelectConversation,
   onClose,
+  onLabelsChange,
 }: {
   conversation: ChatwootConversation | null;
   conversations: ChatwootConversation[];
   onSelectConversation: (conversation: ChatwootConversation) => void;
   onClose: () => void;
+  onLabelsChange: (conversationId: number, newLabels: string[]) => void;
 }) {
   const sender = conversation?.meta?.sender;
   const attributes = getReadableAttributes(sender);
-  const labels = conversation?.labels ?? [];
   const senderKey = getSenderKey(conversation);
   const previousConversations = senderKey
     ? conversations
@@ -573,26 +576,15 @@ function ContactInfoPanel({
             </div>
 
             <PanelSection title="Etiquetas">
-              {labels.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {labels.map((label) => (
-                    <span
-                      key={label}
-                      className="rounded-full border px-2 py-1 text-xs text-muted-foreground"
-                    >
-                      {label}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">Sin etiquetas.</p>
-                  {/* TODO: Implementar creación/asignación de etiquetas por tenant usando backend seguro. */}
-                  <Button type="button" variant="outline" size="sm" disabled>
-                    Agregar etiqueta proximamente
-                  </Button>
-                </div>
-              )}
+              {conversation ? (
+                <LabelEditor
+                  conversationId={conversation.id}
+                  currentLabels={conversation.labels ?? []}
+                  onLabelsChange={(newLabels) =>
+                    onLabelsChange(conversation.id, newLabels)
+                  }
+                />
+              ) : null}
             </PanelSection>
 
             <PanelSection title="Atributos">
@@ -648,10 +640,10 @@ function ContactInfoPanel({
               )}
             </PanelSection>
 
-            <PanelSection title="Notas">
-              <p className="text-sm text-muted-foreground">
-                Notas internas proximamente.
-              </p>
+            <PanelSection title="Notas internas">
+              {conversation ? (
+                <NotesSection conversationId={conversation.id} />
+              ) : null}
             </PanelSection>
 
             <PanelSection title="Archivos">
@@ -971,6 +963,12 @@ export function ConversationInbox({
     setLabelFilter("all");
     setUnreadOnly(false);
     setQuery("");
+  }
+
+  function handleLabelsChange(conversationId: number, newLabels: string[]) {
+    setSelectedConversation((prev) =>
+      prev?.id === conversationId ? { ...prev, labels: newLabels } : prev
+    );
   }
 
   return (
@@ -1505,6 +1503,7 @@ export function ConversationInbox({
             conversations={conversations}
             onSelectConversation={selectConversation}
             onClose={() => setContactOpen(false)}
+            onLabelsChange={handleLabelsChange}
           />
         ) : null}
       </div>
