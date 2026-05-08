@@ -41,6 +41,16 @@ export type ChatwootMessage = {
   sender_id?: number;
   processed_message_content?: string | null;
   sender?: ChatwootSender;
+  attachments?: Array<{
+    id?: number;
+    file_type?: "image" | "audio" | "video" | "file" | string;
+    data_url?: string;
+    thumb_url?: string;
+    file_url?: string;
+    download_url?: string;
+    extension?: string | null;
+    name?: string | null;
+  }>;
 };
 
 export type ChatwootConversationMeta = {

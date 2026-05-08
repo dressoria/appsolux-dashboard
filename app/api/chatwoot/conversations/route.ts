@@ -31,7 +31,7 @@ export async function GET() {
           success: false,
           error: {
             code: "UNAUTHORIZED",
-            message: "User session is required",
+            message: "Sesion requerida.",
           },
         },
         { status: 401 }
@@ -45,7 +45,7 @@ export async function GET() {
         {
           success: false,
           error: {
-            code: "MISSING_CHATWOOT_ACCOUNT_ID",
+            code: "MISSING_CONVERSATION_INBOX",
             message:
               "Este tenant todavia no tiene bandeja de conversaciones configurada.",
           },
@@ -59,7 +59,7 @@ export async function GET() {
         {
           success: false,
           error: {
-            code: "CHATWOOT_OPERATIONAL_ACCESS_MISSING",
+            code: "CONVERSATION_ACCESS_MISSING",
             message:
               "Tu bandeja fue creada, pero todavia falta completar el acceso operativo.",
           },
@@ -72,10 +72,6 @@ export async function GET() {
       tenant.chatwoot_account_id
     );
 
-    console.info(
-      `[Chatwoot] Loading conversations for account_id ${tenant.chatwoot_account_id}`
-    );
-
     return NextResponse.json({
       success: true,
       data: {
@@ -83,23 +79,17 @@ export async function GET() {
           id: tenant.id,
           name: tenant.name,
           slug: tenant.slug,
-          chatwoot_account_id: tenant.chatwoot_account_id,
         },
         conversations,
       },
     });
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Unexpected Chatwoot conversations error";
-
+  } catch {
     return NextResponse.json(
       {
         success: false,
         error: {
-          code: "CHATWOOT_CONVERSATIONS_ERROR",
-          message,
+          code: "CONVERSATIONS_ERROR",
+          message: "No pudimos cargar tus conversaciones. Intenta nuevamente.",
         },
       },
       { status: 500 }

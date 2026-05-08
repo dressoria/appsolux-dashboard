@@ -11,8 +11,6 @@ export async function getChatwootConversations(
     );
   }
 
-  console.info(`[Chatwoot] Using account_id ${chatwootAccountId}`);
-
   return chatwootFetch<ChatwootConversationsResponse>(
     `/api/v1/accounts/${chatwootAccountId}/conversations`
   );

@@ -1,4 +1,4 @@
-import { ConversationList } from "@/components/appsolux/conversations/conversation-list";
+import { ConversationInbox } from "@/components/appsolux/conversations/conversation-inbox";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getChatwootConversations } from "@/lib/api/chatwoot/conversations";
@@ -21,6 +21,12 @@ type ConversationsLoadResult =
       message: string;
     };
 
+type ConversationsPageProps = {
+  searchParams?: Promise<{
+    conversationId?: string;
+  }>;
+};
+
 async function loadConversations(
   chatwootAccountId: number
 ): Promise<ConversationsLoadResult> {
@@ -33,13 +39,10 @@ async function loadConversations(
       conversations: conversationsResponse.data.payload,
       meta: conversationsResponse.data.meta,
     };
-  } catch (error) {
+  } catch {
     return {
       success: false,
-      message:
-        error instanceof Error
-          ? error.message
-          : "No se pudieron cargar las conversaciones",
+      message: "No pudimos cargar tus conversaciones. Intenta nuevamente.",
     };
   }
 }
@@ -68,7 +71,9 @@ async function hasMissingOperationalAccess(tenantId: string) {
   }
 }
 
-export default async function ConversationsPage() {
+export default async function ConversationsPage({
+  searchParams,
+}: ConversationsPageProps) {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -87,6 +92,10 @@ export default async function ConversationsPage() {
   }
 
   const tenant = await getCurrentTenant(user);
+  const resolvedSearchParams = await searchParams;
+  const initialConversationId = resolvedSearchParams?.conversationId
+    ? Number(resolvedSearchParams.conversationId)
+    : undefined;
   const missingOperationalAccess = await hasMissingOperationalAccess(tenant.id);
   const result = missingOperationalAccess
     ? {
@@ -100,20 +109,28 @@ export default async function ConversationsPage() {
     <DashboardShell>
       <div className="space-y-6">
         <div>
-          <p className="text-sm text-muted-foreground">Chatwoot</p>
+          <p className="text-sm text-muted-foreground">
+            Bandeja de conversaciones
+          </p>
           <h1 className="text-3xl font-semibold tracking-tight">
             Conversaciones
           </h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Todos los chats del tenant {tenant.name}, consultados desde Chatwoot
-            usando el chatwoot_account_id dinamico.
+            Gestiona los mensajes de tus clientes desde tus canales conectados.
           </p>
         </div>
 
         {result.success ? (
-          <ConversationList
+          <ConversationInbox
             conversations={result.conversations}
             meta={result.meta}
+            initialConversationId={
+              Number.isInteger(initialConversationId) &&
+              initialConversationId &&
+              initialConversationId > 0
+                ? initialConversationId
+                : undefined
+            }
           />
         ) : (
           <Card>

@@ -131,8 +131,7 @@ export function ConversationList({
                       </div>
 
                       <p className="text-xs text-muted-foreground">
-                        {getSenderPhone(conversation)} · Inbox{" "}
-                        {conversation.inbox_id}
+                        {getSenderPhone(conversation)}
                       </p>
 
                       <p className="line-clamp-2 max-w-3xl text-sm text-muted-foreground">
@@ -142,7 +141,6 @@ export function ConversationList({
 
                     <div className="text-xs text-muted-foreground md:text-right">
                       <p>{formatDate(conversation.last_activity_at)}</p>
-                      <p>ID #{conversation.id}</p>
                     </div>
                   </div>
 

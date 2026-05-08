@@ -19,7 +19,7 @@ export async function GET(_request: Request, context: RouteContext) {
           success: false,
           error: {
             code: "UNAUTHORIZED",
-            message: "User session is required",
+            message: "Sesion requerida.",
           },
         },
         { status: 401 }
@@ -35,7 +35,7 @@ export async function GET(_request: Request, context: RouteContext) {
           success: false,
           error: {
             code: "INVALID_CONVERSATION_ID",
-            message: "Conversation ID must be a positive number",
+            message: "Conversacion invalida.",
           },
         },
         { status: 400 }
@@ -56,23 +56,17 @@ export async function GET(_request: Request, context: RouteContext) {
           id: tenant.id,
           name: tenant.name,
           slug: tenant.slug,
-          chatwoot_account_id: tenant.chatwoot_account_id,
         },
         messages,
       },
     });
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Unexpected Chatwoot messages error";
-
+  } catch {
     return NextResponse.json(
       {
         success: false,
         error: {
-          code: "CHATWOOT_MESSAGES_ERROR",
-          message,
+          code: "MESSAGES_ERROR",
+          message: "No pudimos cargar los mensajes.",
         },
       },
       { status: 500 }
