@@ -112,20 +112,15 @@ export default async function ConversationsPage({
       contentClassName="max-w-none"
     >
       <div className="flex h-screen min-h-0 flex-col overflow-hidden bg-muted/20">
-        <header className="border-b bg-background px-4 py-4 sm:px-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Bandeja de conversaciones
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
-            Conversaciones
-          </h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Gestiona los mensajes de tus clientes desde tus canales conectados.
+        <header className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b bg-background px-4 py-2.5 sm:px-5">
+          <p className="text-lg font-semibold tracking-tight">Conversaciones</p>
+          <p className="text-xs text-muted-foreground">
+            Bandeja de mensajes de tus canales conectados.
           </p>
         </header>
 
         {result.success ? (
-          <div className="min-h-0 flex-1 p-3 sm:p-4">
+          <div className="min-h-0 flex-1 p-2.5 sm:p-3">
             <ConversationInbox
               conversations={result.conversations}
               meta={result.meta}

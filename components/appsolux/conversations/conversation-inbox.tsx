@@ -28,9 +28,47 @@ type ConversationInboxProps = {
 
 type LoadState = "idle" | "loading" | "error";
 type SendState = "idle" | "sending" | "error";
+type ConversationFilter = "all" | "unassigned" | "assigned" | "mine";
 type Attachment = NonNullable<ChatwootMessage["attachments"]>[number];
 
 const SYSTEM_EVENT_MARKERS = ["connection successfully established"];
+const TECHNICAL_ATTRIBUTE_MARKERS = [
+  "avatar",
+  "hash",
+  "sync",
+  "identifier",
+  "source",
+  "thumbnail",
+  "external",
+  "provider",
+  "last_seen",
+  "created_at",
+  "updated_at",
+  "chatwoot",
+  "account",
+  "inbox",
+  "uuid",
+  "token",
+];
+const USEFUL_ATTRIBUTE_LABELS: Record<string, string> = {
+  city: "Ciudad",
+  ciudad: "Ciudad",
+  country: "Pais",
+  pais: "Pais",
+  company: "Empresa",
+  empresa: "Empresa",
+  birthday: "Cumpleanos",
+  birthdate: "Cumpleanos",
+  ruc: "RUC",
+  document: "Documento",
+  documento: "Documento",
+  address: "Direccion",
+  direccion: "Direccion",
+  notes: "Notas",
+  notas: "Notas",
+  website: "Web",
+  web: "Web",
+};
 
 function formatDate(timestamp?: number) {
   if (!timestamp) {
@@ -55,6 +93,16 @@ function getSenderPhone(conversation?: ChatwootConversation | null) {
 
 function getSenderEmail(conversation?: ChatwootConversation | null) {
   return conversation?.meta?.sender?.email ?? null;
+}
+
+function getSenderKey(conversation?: ChatwootConversation | null) {
+  const sender = conversation?.meta?.sender;
+
+  return (
+    sender?.email?.trim().toLowerCase() ||
+    sender?.phone_number?.trim().toLowerCase() ||
+    (sender?.id ? `sender:${sender.id}` : "")
+  );
 }
 
 function getSenderInitial(conversation?: ChatwootConversation | null) {
@@ -110,6 +158,36 @@ function getMessageContent(message: ChatwootMessage) {
     message.processed_message_content?.trim() ?? message.content?.trim() ?? "";
 
   return normalizeSystemContent(content);
+}
+
+function extractMessages(payload: unknown): ChatwootMessage[] {
+  if (Array.isArray(payload)) {
+    return payload as ChatwootMessage[];
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+
+  const record = payload as {
+    payload?: unknown;
+    data?: unknown;
+    messages?: unknown;
+  };
+
+  if (Array.isArray(record.payload)) {
+    return record.payload as ChatwootMessage[];
+  }
+
+  if (Array.isArray(record.data)) {
+    return record.data as ChatwootMessage[];
+  }
+
+  if (Array.isArray(record.messages)) {
+    return record.messages as ChatwootMessage[];
+  }
+
+  return [];
 }
 
 function isSystemMessage(message: ChatwootMessage) {
@@ -211,6 +289,87 @@ function statusLabel(status?: string) {
   return "Sin estado";
 }
 
+function getAssignmentSignal(conversation: ChatwootConversation) {
+  const assignable = conversation as ChatwootConversation & {
+    assignee?: unknown;
+    assignee_id?: unknown;
+  };
+
+  return Boolean(assignable.assignee || assignable.assignee_id);
+}
+
+function hasAssignmentData(conversations: ChatwootConversation[]) {
+  return conversations.some((conversation) =>
+    Object.prototype.hasOwnProperty.call(conversation, "assignee") ||
+    Object.prototype.hasOwnProperty.call(conversation, "assignee_id")
+  );
+}
+
+function filterConversationsByTab(
+  conversations: ChatwootConversation[],
+  filter: ConversationFilter,
+  canUseAssignmentFilters: boolean
+) {
+  if (filter === "all" || !canUseAssignmentFilters) {
+    return conversations;
+  }
+
+  if (filter === "assigned" || filter === "mine") {
+    return conversations.filter(getAssignmentSignal);
+  }
+
+  return conversations.filter((conversation) => !getAssignmentSignal(conversation));
+}
+
+function shouldShowAttribute(key: string, value: unknown) {
+  const cleanKey = key.trim().toLowerCase();
+
+  if (!cleanKey || value === null || value === undefined) {
+    return false;
+  }
+
+  if (typeof value === "object") {
+    return false;
+  }
+
+  const textValue = String(value).trim();
+
+  if (!textValue) {
+    return false;
+  }
+
+  if (USEFUL_ATTRIBUTE_LABELS[cleanKey]) {
+    return true;
+  }
+
+  if (
+    cleanKey === "id" ||
+    cleanKey.endsWith("_id") ||
+    cleanKey.endsWith(" id") ||
+    TECHNICAL_ATTRIBUTE_MARKERS.some((marker) => cleanKey.includes(marker))
+  ) {
+    return false;
+  }
+
+  if (cleanKey.includes("url")) {
+    return cleanKey.includes("web") || cleanKey.includes("site");
+  }
+
+  return true;
+}
+
+function formatAttributeLabel(key: string) {
+  const cleanKey = key.trim().toLowerCase();
+
+  if (USEFUL_ATTRIBUTE_LABELS[cleanKey]) {
+    return USEFUL_ATTRIBUTE_LABELS[cleanKey];
+  }
+
+  return key
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function getReadableAttributes(sender?: ChatwootSender) {
   const attributes = {
     ...(sender?.additional_attributes ?? {}),
@@ -218,30 +377,34 @@ function getReadableAttributes(sender?: ChatwootSender) {
   };
 
   return Object.entries(attributes)
-    .filter(([, value]) => {
-      if (value === null || value === undefined) {
-        return false;
-      }
-
-      if (typeof value === "object") {
-        return false;
-      }
-
-      return String(value).trim().length > 0;
-    })
+    .filter(([key, value]) => shouldShowAttribute(key, value))
     .slice(0, 6);
 }
 
 function ContactInfoPanel({
   conversation,
+  conversations,
+  onSelectConversation,
   onClose,
 }: {
   conversation: ChatwootConversation | null;
+  conversations: ChatwootConversation[];
+  onSelectConversation: (conversation: ChatwootConversation) => void;
   onClose: () => void;
 }) {
   const sender = conversation?.meta?.sender;
   const attributes = getReadableAttributes(sender);
   const labels = conversation?.labels ?? [];
+  const senderKey = getSenderKey(conversation);
+  const previousConversations = senderKey
+    ? conversations
+        .filter(
+          (item) =>
+            item.id !== conversation?.id && getSenderKey(item) === senderKey
+        )
+        .sort((a, b) => (b.last_activity_at ?? 0) - (a.last_activity_at ?? 0))
+        .slice(0, 5)
+    : [];
 
   return (
     <aside className="absolute inset-y-0 right-0 z-20 flex w-full max-w-sm flex-col border-l bg-background shadow-2xl xl:static xl:z-auto xl:w-[340px] xl:shrink-0 xl:shadow-none">
@@ -306,7 +469,13 @@ function ContactInfoPanel({
                   ))}
                 </div>
               ) : (
-                <EmptyPanelText />
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">Sin etiquetas.</p>
+                  {/* TODO: Implementar creación/asignación de etiquetas por tenant usando backend seguro. */}
+                  <Button type="button" variant="outline" size="sm" disabled>
+                    Agregar etiqueta proximamente
+                  </Button>
+                </div>
               )}
             </PanelSection>
 
@@ -316,13 +485,50 @@ function ContactInfoPanel({
                   {attributes.map(([key, value]) => (
                     <InfoRow
                       key={key}
-                      label={key.replaceAll("_", " ")}
+                      label={formatAttributeLabel(key)}
                       value={String(value)}
                     />
                   ))}
                 </div>
               ) : (
-                <EmptyPanelText />
+                <p className="text-sm text-muted-foreground">
+                  Sin información adicional registrada.
+                </p>
+              )}
+            </PanelSection>
+
+            <PanelSection title="Conversaciones anteriores">
+              {previousConversations.length > 0 ? (
+                <div className="space-y-2">
+                  {previousConversations.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="w-full rounded-lg border p-3 text-left text-sm hover:bg-muted/50"
+                      onClick={() => onSelectConversation(item)}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-medium">
+                          {statusLabel(item.status)}
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {formatDate(item.last_activity_at)}
+                        </span>
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-muted-foreground">
+                        {getLastMessage(item)}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {getChannel(item)}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Las conversaciones anteriores aparecerán aquí cuando estén
+                  disponibles.
+                </p>
               )}
             </PanelSection>
 
@@ -388,12 +594,6 @@ function PanelSection({
   );
 }
 
-function EmptyPanelText() {
-  return (
-    <p className="text-sm text-muted-foreground">Sin informacion registrada.</p>
-  );
-}
-
 export function ConversationInbox({
   conversations,
   meta,
@@ -418,28 +618,37 @@ export function ConversationInbox({
   const [sendState, setSendState] = useState<SendState>("idle");
   const [sendError, setSendError] = useState("");
   const [contactOpen, setContactOpen] = useState(Boolean(initialConversationId));
+  const [filter, setFilter] = useState<ConversationFilter>("all");
+  const [reloadToken, setReloadToken] = useState(0);
+  const canUseAssignmentFilters = hasAssignmentData(conversations);
 
   const filteredConversations = useMemo(() => {
     const cleanQuery = query.trim().toLowerCase();
+    const conversationsByFilter = filterConversationsByTab(
+      conversations,
+      filter,
+      canUseAssignmentFilters
+    );
 
     if (!cleanQuery) {
-      return conversations;
+      return conversationsByFilter;
     }
 
-    return conversations.filter((conversation) => {
+    return conversationsByFilter.filter((conversation) => {
       const haystack = [
         getSenderName(conversation),
         getSenderPhone(conversation),
         getSenderEmail(conversation),
         getLastMessage(conversation),
         getChannel(conversation),
+        ...(conversation.labels ?? []),
       ]
         .join(" ")
         .toLowerCase();
 
       return haystack.includes(cleanQuery);
     });
-  }, [conversations, query]);
+  }, [canUseAssignmentFilters, conversations, filter, query]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -470,7 +679,7 @@ export function ConversationInbox({
 
         if (!ignore) {
           setSelectedConversation(detailPayload.data.conversation);
-          setMessages(messagesPayload.data.messages.payload ?? []);
+          setMessages(extractMessages(messagesPayload.data?.messages));
           setLoadState("idle");
         }
       } catch (error) {
@@ -490,7 +699,7 @@ export function ConversationInbox({
     return () => {
       ignore = true;
     };
-  }, [selectedId]);
+  }, [reloadToken, selectedId]);
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ block: "end" });
@@ -583,7 +792,7 @@ export function ConversationInbox({
             : "flex min-h-0 flex-1 flex-col bg-background lg:w-[370px] lg:shrink-0 lg:border-r"
         }
       >
-        <div className="space-y-4 border-b p-4">
+        <div className="space-y-3 border-b p-3">
           <div>
             <p className="text-sm font-semibold">Bandeja</p>
             <p className="text-xs text-muted-foreground">
@@ -591,11 +800,49 @@ export function ConversationInbox({
             </p>
           </div>
 
-          <div className="grid grid-cols-4 gap-2 text-center text-xs">
-            <MetricPill label="Todas" value={meta.all_count} />
-            <MetricPill label="Sin asignar" value={meta.unassigned_count} />
-            <MetricPill label="Asignadas" value={meta.assigned_count} />
-            <MetricPill label="Mias" value={meta.mine_count} />
+          <div className="flex flex-wrap gap-1.5 text-xs">
+            <FilterChip
+              active={filter === "all"}
+              label="Todas"
+              value={meta.all_count}
+              onClick={() => setFilter("all")}
+            />
+            <FilterChip
+              active={filter === "unassigned"}
+              disabled={!canUseAssignmentFilters}
+              label="Sin asignar"
+              title={
+                canUseAssignmentFilters
+                  ? undefined
+                  : "Asignación de agentes próximamente"
+              }
+              value={meta.unassigned_count}
+              onClick={() => setFilter("unassigned")}
+            />
+            <FilterChip
+              active={filter === "assigned"}
+              disabled={!canUseAssignmentFilters}
+              label="Asignadas"
+              title={
+                canUseAssignmentFilters
+                  ? undefined
+                  : "Asignación de agentes próximamente"
+              }
+              value={meta.assigned_count}
+              onClick={() => setFilter("assigned")}
+            />
+            <FilterChip
+              active={filter === "mine"}
+              disabled={!canUseAssignmentFilters}
+              label="Mias"
+              title={
+                canUseAssignmentFilters
+                  ? undefined
+                  : "Asignación de agentes próximamente"
+              }
+              value={meta.mine_count}
+              onClick={() => setFilter("mine")}
+            />
           </div>
 
           <Input
@@ -646,7 +893,7 @@ export function ConversationInbox({
                             {getSenderName(conversation)}
                           </p>
                           <p className="truncate text-xs text-muted-foreground">
-                            {getChannel(conversation)} ·{" "}
+                            {getChannel(conversation)} -{" "}
                             {statusLabel(conversation.status)}
                           </p>
                         </div>
@@ -727,8 +974,8 @@ export function ConversationInbox({
                         {getSenderName(selectedConversation)}
                       </p>
                       <p className="truncate text-sm text-muted-foreground">
-                        {getSenderPhone(selectedConversation)} ·{" "}
-                        {getChannel(selectedConversation)} ·{" "}
+                        {getSenderPhone(selectedConversation)} -{" "}
+                        {getChannel(selectedConversation)} -{" "}
                         {statusLabel(selectedConversation?.status)}
                       </p>
                     </div>
@@ -756,11 +1003,22 @@ export function ConversationInbox({
                 {loadState !== "loading" && messages.length === 0 ? (
                   <div className="flex h-full items-center justify-center text-center">
                     <div className="max-w-sm rounded-2xl border bg-background p-6 shadow-sm">
-                      <p className="font-semibold">No hay mensajes para mostrar.</p>
+                      <p className="font-semibold">
+                        No pudimos cargar los mensajes de esta conversación.
+                      </p>
                       <p className="mt-2 text-sm text-muted-foreground">
                         Si la bandeja muestra actividad reciente, intenta
-                        recargar la conversacion.
+                        recargar la conversación.
                       </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-4"
+                        onClick={() => setReloadToken((current) => current + 1)}
+                      >
+                        Reintentar
+                      </Button>
                     </div>
                   </div>
                 ) : null}
@@ -780,7 +1038,7 @@ export function ConversationInbox({
                       return (
                         <div key={message.id} className="flex justify-center">
                           <div className="rounded-full border bg-background/80 px-3 py-1 text-xs text-muted-foreground shadow-sm">
-                            {messageContent || "Evento de sistema"} ·{" "}
+                            {messageContent || "Evento de sistema"} -{" "}
                             {formatDate(message.created_at)}
                           </div>
                         </div>
@@ -812,7 +1070,7 @@ export function ConversationInbox({
                                 : "mt-2 text-xs text-muted-foreground"
                             }
                           >
-                            {message.sender?.name ?? (outgoing ? "Equipo" : "Cliente")} ·{" "}
+                            {message.sender?.name ?? (outgoing ? "Equipo" : "Cliente")} -{" "}
                             {formatDate(message.created_at)}
                           </p>
                         </div>
@@ -875,6 +1133,8 @@ export function ConversationInbox({
         {contactOpen ? (
           <ContactInfoPanel
             conversation={selectedConversation}
+            conversations={conversations}
+            onSelectConversation={selectConversation}
             onClose={() => setContactOpen(false)}
           />
         ) : null}
@@ -883,11 +1143,34 @@ export function ConversationInbox({
   );
 }
 
-function MetricPill({ label, value }: { label: string; value: number }) {
+function FilterChip({
+  active,
+  disabled = false,
+  label,
+  onClick,
+  title,
+  value,
+}: {
+  active: boolean;
+  disabled?: boolean;
+  label: string;
+  onClick: () => void;
+  title?: string;
+  value: number;
+}) {
   return (
-    <div className="rounded-lg border bg-background p-2">
-      <p className="font-semibold">{value}</p>
-      <p className="truncate text-muted-foreground">{label}</p>
-    </div>
+    <button
+      type="button"
+      disabled={disabled}
+      title={title}
+      className={
+        active
+          ? "rounded-full bg-primary px-3 py-1 font-medium text-primary-foreground"
+          : "rounded-full border bg-background px-3 py-1 text-muted-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-55"
+      }
+      onClick={onClick}
+    >
+      {label} ({value})
+    </button>
   );
 }
