@@ -24,7 +24,7 @@ export function WarehousesSettingsCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>ERP y bodegas</CardTitle>
+        <CardTitle>Sucursales y bodegas</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-1 text-sm text-muted-foreground">
