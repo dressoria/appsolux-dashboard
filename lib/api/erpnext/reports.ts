@@ -4,12 +4,14 @@ import type {
   ErpnextBin,
   ErpnextListResponse,
   ErpnextPaymentEntry,
+  ErpnextPurchaseInvoice,
   ErpnextSalesInvoice,
 } from "@/types/erpnext";
 import type {
   LowStockReportItem,
   PaymentMethodReportItem,
   ProductSalesReportItem,
+  PurchaseReportSummary,
   ReportDateRange,
   ReportsDashboardData,
 } from "@/types/reports";
@@ -45,6 +47,18 @@ const binFields = [
   "actual_qty",
   "reserved_qty",
   "projected_qty",
+];
+
+const purchaseInvoiceFields = [
+  "name",
+  "supplier",
+  "supplier_name",
+  "posting_date",
+  "grand_total",
+  "outstanding_amount",
+  "status",
+  "docstatus",
+  "company",
 ];
 
 function getDateFilters(range?: ReportDateRange) {
@@ -119,6 +133,49 @@ export async function getInventoryForReports(): Promise<ErpnextBin[]> {
   );
 
   return response.data;
+}
+
+export async function getPurchaseInvoicesForReports(
+  range?: ReportDateRange
+): Promise<ErpnextPurchaseInvoice[]> {
+  const filters = getDateFilters(range);
+  const params = new URLSearchParams({
+    fields: JSON.stringify(purchaseInvoiceFields),
+    limit_page_length: "100",
+    order_by: "posting_date desc, modified desc",
+  });
+
+  if (filters.length > 0) {
+    params.set("filters", JSON.stringify(filters));
+  }
+
+  const response = await erpnextFetch<
+    ErpnextListResponse<ErpnextPurchaseInvoice>
+  >(`/api/resource/Purchase%20Invoice?${params.toString()}`);
+
+  return response.data;
+}
+
+function buildPurchaseSummary(
+  invoices: ErpnextPurchaseInvoice[]
+): PurchaseReportSummary {
+  const submitted = invoices.filter((inv) => inv.docstatus === 1);
+  const pending = submitted.filter(
+    (inv) => getNumber(inv.outstanding_amount) > 0
+  );
+
+  return {
+    total_purchases_amount: submitted.reduce(
+      (sum, inv) => sum + getNumber(inv.grand_total),
+      0
+    ),
+    total_purchase_invoices: invoices.length,
+    pending_payables: pending.length,
+    outstanding_payable: pending.reduce(
+      (sum, inv) => sum + getNumber(inv.outstanding_amount),
+      0
+    ),
+  };
 }
 
 async function getInvoiceItemsForReports(
@@ -200,11 +257,15 @@ function buildStockRows(inventory: ErpnextBin[], outOfStock: boolean) {
 export async function buildReportsDashboardData(
   range?: ReportDateRange
 ): Promise<ReportsDashboardData> {
-  const [salesInvoices, paymentEntries, inventory] = await Promise.all([
-    getSalesInvoicesForReports(range),
-    getPaymentEntriesForReports(range),
-    getInventoryForReports(),
-  ]);
+  const [salesInvoices, paymentEntries, inventory, purchaseInvoices] =
+    await Promise.all([
+      getSalesInvoicesForReports(range),
+      getPaymentEntriesForReports(range),
+      getInventoryForReports(),
+      getPurchaseInvoicesForReports(range).catch(
+        (): ErpnextPurchaseInvoice[] => []
+      ),
+    ]);
   const topProducts = await getInvoiceItemsForReports(salesInvoices);
   const activeInvoices = salesInvoices.filter(
     (invoice) => invoice.docstatus !== 2
@@ -225,6 +286,7 @@ export async function buildReportsDashboardData(
   const outOfStock = buildStockRows(inventory, true);
 
   return {
+    purchases: buildPurchaseSummary(purchaseInvoices),
     sales: {
       total_sales_amount: activeInvoices.reduce(
         (sum, invoice) => sum + getNumber(invoice.grand_total),

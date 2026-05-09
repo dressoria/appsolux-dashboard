@@ -46,9 +46,17 @@ export type LowStockReportItem = {
   projected_qty: number;
 };
 
+export type PurchaseReportSummary = {
+  total_purchases_amount: number;
+  total_purchase_invoices: number;
+  pending_payables: number;
+  outstanding_payable: number;
+};
+
 export type ReportsDashboardData = {
   sales: SalesReportSummary;
   payments: PaymentReportSummary;
+  purchases: PurchaseReportSummary;
   inventory: InventoryReportSummary;
   top_products: ProductSalesReportItem[];
   low_stock: LowStockReportItem[];
