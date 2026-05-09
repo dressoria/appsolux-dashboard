@@ -1112,7 +1112,6 @@ export function ConversationInbox({
 
   useEffect(() => {
     isAtBottomRef.current = true;
-    setShowNewMessage(false);
     messageEndRef.current?.scrollIntoView({ block: "end" });
   }, [selectedId, loadState]);
 
@@ -1130,6 +1129,7 @@ export function ConversationInbox({
     setSelectedConversation(conversation);
     setMessages([]);
     setLoadState("loading");
+    setShowNewMessage(false);
     setSendError("");
     setSendState("idle");
     setContactOpen(true);

@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 type NoteItem = {
@@ -34,34 +34,41 @@ export function NotesSection({ conversationId }: NotesSectionProps) {
     "idle"
   );
   const [saveError, setSaveError] = useState("");
-
-  const loadNotes = useCallback(async () => {
-    setLoadState("loading");
-    setNotes([]);
-
-    try {
-      const response = await fetch(
-        `/api/conversations/${conversationId}/notes`
-      );
-      const payload = (await response.json()) as {
-        success: boolean;
-        data?: { notes: NoteItem[] };
-      };
-
-      if (!response.ok || !payload.success) {
-        throw new Error();
-      }
-
-      setNotes(payload.data?.notes ?? []);
-      setLoadState("idle");
-    } catch {
-      setLoadState("error");
-    }
-  }, [conversationId]);
+  const [fetchTrigger, setFetchTrigger] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadNotes() {
+      setLoadState("loading");
+      setNotes([]);
+
+      try {
+        const response = await fetch(
+          `/api/conversations/${conversationId}/notes`
+        );
+        if (cancelled) return;
+        const payload = (await response.json()) as {
+          success: boolean;
+          data?: { notes: NoteItem[] };
+        };
+
+        if (!response.ok || !payload.success) {
+          throw new Error();
+        }
+
+        setNotes(payload.data?.notes ?? []);
+        setLoadState("idle");
+      } catch {
+        if (!cancelled) setLoadState("error");
+      }
+    }
+
     void loadNotes();
-  }, [loadNotes]);
+    return () => {
+      cancelled = true;
+    };
+  }, [conversationId, fetchTrigger]);
 
   async function saveNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -125,7 +132,7 @@ export function NotesSection({ conversationId }: NotesSectionProps) {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => void loadNotes()}
+            onClick={() => setFetchTrigger((n) => n + 1)}
           >
             Reintentar
           </Button>
