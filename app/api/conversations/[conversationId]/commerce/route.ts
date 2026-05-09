@@ -3,10 +3,18 @@ import { NextResponse } from "next/server";
 import { getConversationCommerceContext } from "@/lib/core/conversation-commerce";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 
 type RouteContext = {
   params: Promise<{ conversationId: string }>;
 };
+
+function resolveCommerceMode(modeState: Awaited<ReturnType<typeof getTenantModeState>>) {
+  if (modeState.shouldUseAdvancedMode) return "advanced_erp" as const;
+  const s = modeState.dedicatedErpStatus;
+  if (s === "queued" || s === "running") return "erp_pending" as const;
+  return "basic" as const;
+}
 
 export async function GET(request: Request, context: RouteContext) {
   try {
@@ -35,14 +43,28 @@ export async function GET(request: Request, context: RouteContext) {
     const contactPhone = searchParams.get("phone") ?? undefined;
     const contactEmail = searchParams.get("email") ?? undefined;
 
-    const data = await getConversationCommerceContext({
-      tenantId: tenant.id,
-      contactName,
-      contactPhone,
-      contactEmail,
-    });
+    const [commerceData, modeState] = await Promise.all([
+      getConversationCommerceContext({
+        tenantId: tenant.id,
+        contactName,
+        contactPhone,
+        contactEmail,
+      }),
+      getTenantModeState(tenant),
+    ]);
 
-    return NextResponse.json({ success: true, data });
+    const commerceMode = resolveCommerceMode(modeState);
+    const erpActions = {
+      customersUrl: "/erp",
+      posUrl: "/pos",
+      invoicesUrl: "/erp",
+      reportsUrl: "/reports",
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: { ...commerceData, commerceMode, erpActions },
+    });
   } catch {
     return NextResponse.json(
       {

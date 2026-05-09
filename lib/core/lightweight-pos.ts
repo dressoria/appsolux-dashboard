@@ -355,7 +355,7 @@ export async function updateCustomer(input: UpdateCustomerInput) {
 
 export async function listSales(
   tenantId: string,
-  input: { status?: "all" | "paid" | "pending" | "canceled" } = {}
+  input: { status?: "all" | "paid" | "pending" | "canceled"; customerId?: string } = {}
 ) {
   const prisma = getPrismaClient();
   const status = input.status ?? "all";
@@ -363,6 +363,7 @@ export async function listSales(
   return prisma.lightweightSale.findMany({
     where: {
       tenantId,
+      ...(input.customerId ? { customerId: input.customerId } : {}),
       ...(status === "paid" ? { paymentStatus: "paid" } : {}),
       ...(status === "pending"
         ? {

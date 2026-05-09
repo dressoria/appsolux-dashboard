@@ -28,11 +28,22 @@ type CommerceSummary = {
   lastSaleId: string | null;
 };
 
+type ErpActions = {
+  customersUrl: string;
+  posUrl: string;
+  invoicesUrl: string;
+  reportsUrl: string;
+};
+
+type CommerceMode = "basic" | "advanced_erp" | "erp_pending";
+
 type CommerceData = {
   matchedCustomer: CustomerSnap | null;
   candidateCustomers: CustomerSnap[];
   summary: CommerceSummary | null;
   recentSales: SaleSnap[];
+  commerceMode: CommerceMode;
+  erpActions: ErpActions;
 };
 
 type LoadState = "idle" | "loading" | "done" | "error";
@@ -72,6 +83,28 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium">{value}</span>
     </div>
+  );
+}
+
+function ModeBadge({ mode }: { mode: CommerceMode }) {
+  if (mode === "advanced_erp") {
+    return (
+      <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+        ERP avanzado
+      </span>
+    );
+  }
+  if (mode === "erp_pending") {
+    return (
+      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+        ERP en preparacion
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded-full border border-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+      Appsolux Basico
+    </span>
   );
 }
 
@@ -192,7 +225,9 @@ export function CommercePanel({
 
   if (!data) return null;
 
-  const { matchedCustomer, candidateCustomers, summary, recentSales } = data;
+  const { matchedCustomer, candidateCustomers, summary, recentSales, commerceMode, erpActions } = data;
+  const isAdvancedErp = commerceMode === "advanced_erp";
+  const isErpPending = commerceMode === "erp_pending";
 
   const createForm = showForm ? (
     <div className="space-y-2 rounded-lg border p-3">
@@ -206,7 +241,7 @@ export function CommercePanel({
       />
       <input
         className="w-full rounded border px-2 py-1 text-sm"
-        placeholder="Teléfono"
+        placeholder="Telefono"
         value={formPhone}
         onChange={(e) => setFormPhone(e.target.value)}
         maxLength={30}
@@ -241,18 +276,56 @@ export function CommercePanel({
     </div>
   ) : null;
 
+  // ERP advanced block to append below basic data
+  const erpBlock = isAdvancedErp ? (
+    <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 space-y-2">
+      <p className="text-xs font-semibold text-blue-700">ERP avanzado activo</p>
+      <p className="text-xs text-muted-foreground">
+        Las ventas, facturas, pagos e inventario principal viven en el ERP.
+      </p>
+      <div className="flex flex-wrap gap-2 pt-1">
+        <Button asChild size="sm" variant="outline">
+          <Link href={erpActions.customersUrl}>Ir a ERP</Link>
+        </Button>
+        <Button asChild size="sm" variant="outline">
+          <Link href={erpActions.posUrl}>Abrir POS avanzado</Link>
+        </Button>
+        <Button asChild size="sm" variant="outline">
+          <Link href={erpActions.reportsUrl}>Ver reportes</Link>
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Vinculacion directa con cliente ERP proximamente.
+      </p>
+    </div>
+  ) : isErpPending ? (
+    <div className="rounded-lg border border-amber-100 bg-amber-50/50 p-3 space-y-1">
+      <p className="text-xs font-semibold text-amber-700">ERP en preparacion</p>
+      <p className="text-xs text-muted-foreground">
+        Puedes seguir usando Appsolux Basico mientras se prepara el ERP.
+      </p>
+    </div>
+  ) : null;
+
   // Matched customer
   if (matchedCustomer) {
+    const customerSearchHref = `/basic/customers?q=${encodeURIComponent(matchedCustomer.name)}`;
+    const salesHref = `/basic/sales?customerId=${matchedCustomer.id}`;
+    const posHref = `/basic/pos?customerId=${matchedCustomer.id}`;
+
     return (
       <div className="space-y-3">
-        <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
-          <p className="font-semibold text-sm">{matchedCustomer.name}</p>
-          {matchedCustomer.phone && (
-            <p className="text-xs text-muted-foreground">{matchedCustomer.phone}</p>
-          )}
-          {matchedCustomer.email && (
-            <p className="text-xs text-muted-foreground">{matchedCustomer.email}</p>
-          )}
+        <div className="flex items-start justify-between gap-2">
+          <div className="rounded-lg border bg-muted/30 p-3 space-y-1 flex-1 min-w-0">
+            <p className="font-semibold text-sm truncate">{matchedCustomer.name}</p>
+            {matchedCustomer.phone && (
+              <p className="text-xs text-muted-foreground">{matchedCustomer.phone}</p>
+            )}
+            {matchedCustomer.email && (
+              <p className="text-xs text-muted-foreground truncate">{matchedCustomer.email}</p>
+            )}
+          </div>
+          <ModeBadge mode={commerceMode} />
         </div>
 
         {summary && (
@@ -261,7 +334,7 @@ export function CommercePanel({
             <SummaryRow label="Total comprado" value={formatMoney(summary.totalPurchased)} />
             <SummaryRow label="Saldo pendiente" value={formatMoney(summary.pendingBalance)} />
             {summary.lastSaleAt && (
-              <SummaryRow label="Última compra" value={formatDate(summary.lastSaleAt)} />
+              <SummaryRow label="Ultima compra" value={formatDate(summary.lastSaleAt)} />
             )}
           </div>
         )}
@@ -283,9 +356,7 @@ export function CommercePanel({
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span
-                    className={`text-xs font-medium ${paymentStatusColor(sale.paymentStatus)}`}
-                  >
+                  <span className={`text-xs font-medium ${paymentStatusColor(sale.paymentStatus)}`}>
                     {paymentStatusLabel(sale.paymentStatus)}
                   </span>
                   <Link
@@ -300,23 +371,23 @@ export function CommercePanel({
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Este cliente aún no tiene ventas registradas.
+            Este cliente aun no tiene ventas registradas.
           </p>
         )}
 
         <div className="flex flex-wrap gap-2 pt-1">
           <Button asChild size="sm" variant="outline">
-            <Link href="/basic/customers">Ver cliente</Link>
+            <Link href={customerSearchHref}>Ver cliente</Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <Link href="/basic/sales">Ver ventas</Link>
+            <Link href={salesHref}>Ver ventas</Link>
           </Button>
           <Button asChild size="sm" variant="default">
-            <Link href={`/basic/pos?customerId=${matchedCustomer.id}`}>
-              Crear venta
-            </Link>
+            <Link href={posHref}>Crear venta</Link>
           </Button>
         </div>
+
+        {erpBlock}
       </div>
     );
   }
@@ -325,7 +396,10 @@ export function CommercePanel({
   if (candidateCustomers.length > 0) {
     return (
       <div className="space-y-3">
-        <p className="text-sm font-medium">Posibles coincidencias</p>
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium">Posibles coincidencias</p>
+          <ModeBadge mode={commerceMode} />
+        </div>
         <div className="space-y-2">
           {candidateCustomers.map((c) => (
             <div
@@ -339,7 +413,9 @@ export function CommercePanel({
                 )}
               </div>
               <Button asChild size="sm" variant="outline">
-                <Link href="/basic/customers">Ver cliente</Link>
+                <Link href={`/basic/customers?q=${encodeURIComponent(c.name)}`}>
+                  Ver cliente
+                </Link>
               </Button>
             </div>
           ))}
@@ -353,6 +429,7 @@ export function CommercePanel({
           </Button>
         )}
         {createForm}
+        {erpBlock}
       </div>
     );
   }
@@ -360,15 +437,19 @@ export function CommercePanel({
   // No customer
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        Este contacto aún no está registrado como cliente.
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          Este contacto aun no esta registrado como cliente.
+        </p>
+        <ModeBadge mode={commerceMode} />
+      </div>
       {!showForm && (
         <Button size="sm" variant="outline" onClick={() => setShowForm(true)}>
           Crear cliente
         </Button>
       )}
       {createForm}
+      {erpBlock}
     </div>
   );
 }

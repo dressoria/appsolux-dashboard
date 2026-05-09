@@ -3,11 +3,16 @@ import { BasicPosClient } from "@/components/appsolux/basic/pos-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getPrismaClient } from "@/lib/db/prisma";
 import { listCustomers, listProducts } from "@/lib/core/lightweight-pos";
 import { getTenantPlanState } from "@/lib/core/plans";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
-export default async function BasicPosPage() {
+type BasicPosPageProps = {
+  searchParams: Promise<{ customerId?: string }>;
+};
+
+export default async function BasicPosPage({ searchParams }: BasicPosPageProps) {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -23,11 +28,25 @@ export default async function BasicPosPage() {
   }
 
   const tenant = await getCurrentTenant(user);
+  const resolvedParams = await searchParams;
   const plan = await getTenantPlanState(tenant.id);
+
   const [products, customers] = await Promise.all([
     listProducts(tenant.id),
     listCustomers(tenant.id),
   ]);
+
+  // Validate customerId belongs to this tenant
+  let initialCustomerId = "";
+  const rawCustomerId = resolvedParams.customerId ?? "";
+  if (rawCustomerId) {
+    const prisma = getPrismaClient();
+    const found = await prisma.lightweightCustomer.findFirst({
+      where: { id: rawCustomerId, tenantId: tenant.id },
+      select: { id: true },
+    });
+    if (found) initialCustomerId = found.id;
+  }
 
   if (!plan.canUseBasicPos) {
     return (
@@ -59,6 +78,7 @@ export default async function BasicPosPage() {
       <div className="space-y-6">
         <BasicPosClient
           tenantName={tenant.name}
+          initialCustomerId={initialCustomerId}
           products={products.map((product) => ({
             id: product.id,
             name: product.name,

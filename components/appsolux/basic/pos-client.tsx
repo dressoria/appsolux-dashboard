@@ -53,14 +53,16 @@ export function BasicPosClient({
   tenantName,
   products,
   customers,
+  initialCustomerId,
 }: {
   tenantName: string;
   products: Product[];
   customers: Customer[];
+  initialCustomerId?: string;
 }) {
   const router = useRouter();
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [customerId, setCustomerId] = useState("");
+  const [customerId, setCustomerId] = useState(initialCustomerId ?? "");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paidAmount, setPaidAmount] = useState("");
   const [search, setSearch] = useState("");
@@ -267,6 +269,11 @@ export function BasicPosClient({
 
           <div className="space-y-2">
             <Label htmlFor="customerId">Cliente</Label>
+            {initialCustomerId && customerId === initialCustomerId && (
+              <p className="text-xs text-muted-foreground">
+                Cliente seleccionado desde conversacion.
+              </p>
+            )}
             <select
               id="customerId"
               value={customerId}
