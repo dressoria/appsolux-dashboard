@@ -208,19 +208,47 @@ const MODULES: Module[] = [
   {
     id: "caja-bancos",
     label: "Caja y bancos",
-    description: "Movimientos, cierres y conciliación.",
+    description: "Cobros, pagos, caja, bancos y saldos pendientes.",
     icon: CreditCard,
     iconColor: "bg-emerald-50 text-emerald-600",
     items: [
-      { label: "Caja", status: "in-preparation" },
+      {
+        label: "Resumen financiero",
+        status: "available",
+        href: routes.erpFinance,
+      },
+      {
+        label: "Pagos recibidos",
+        status: "available",
+        href: routes.erpFinancePaymentsReceived,
+      },
+      {
+        label: "Cuentas por cobrar",
+        status: "available",
+        href: routes.erpFinanceReceivables,
+      },
+      {
+        label: "Cuentas por pagar",
+        status: "available",
+        href: routes.erpFinancePayables,
+      },
+      { label: "Pagos a proveedores", status: "in-preparation" },
       {
         label: "Métodos de pago",
-        status: "requires-config",
-        href: routes.settings,
+        status: "available",
+        href: routes.erpFinancePaymentMethods,
       },
-      { label: "Movimientos de caja", status: "in-preparation" },
-      { label: "Cierres de caja", status: "in-preparation" },
-      { label: "Bancos", status: "in-preparation" },
+      {
+        label: "Caja",
+        status: "available",
+        href: routes.erpFinanceCash,
+      },
+      { label: "Cierre de caja", status: "in-preparation" },
+      {
+        label: "Bancos",
+        status: "available",
+        href: routes.erpFinanceBanks,
+      },
       { label: "Conciliación bancaria", status: "coming-soon" },
     ],
   },
@@ -677,6 +705,52 @@ function InventorySectionCard() {
   );
 }
 
+// ─── Finance Section Card ─────────────────────────────────────────────────────
+
+function FinanceSectionCard() {
+  return (
+    <Card className="border-foreground/10">
+      <CardHeader>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle>Caja y bancos</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Controla cobros, pagos, cuentas por cobrar y pagar conectados al
+              ERP.
+            </p>
+          </div>
+          <span className="inline-flex h-6 items-center rounded-full border border-green-200 bg-green-50 px-2 text-xs font-medium text-green-700">
+            Disponible
+          </span>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild>
+            <Link href={routes.erpFinance}>Ver modulo financiero</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.erpFinancePaymentsReceived}>
+              Pagos recibidos
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.erpFinanceReceivables}>
+              Cuentas por cobrar
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.erpFinancePayables}>Cuentas por pagar</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.erpFinanceCash}>Caja</Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Fiscal Notice Card ───────────────────────────────────────────────────────
 
 function FiscalNoticeCard() {
@@ -992,6 +1066,8 @@ export function ErpTabs({
       <PurchasesSection />
 
       <InventorySectionCard />
+
+      <FinanceSectionCard />
 
       <FiscalNoticeCard />
     </div>
