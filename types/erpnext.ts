@@ -392,6 +392,87 @@ export type CompanySettingsSummary = {
   payment_accounts: PaymentAccountMapping[];
 };
 
+export type ErpnextSupplier = {
+  name: string;
+  supplier_name: string;
+  supplier_type?: string;
+  tax_id?: string;
+  email_id?: string;
+  mobile_no?: string;
+  disabled?: 0 | 1;
+};
+
+export type ErpnextPurchaseOrderItem = {
+  name?: string;
+  item_code: string;
+  item_name?: string;
+  qty: number;
+  rate: number;
+  amount?: number;
+  warehouse?: string;
+};
+
+export type ErpnextPurchaseOrder = {
+  name: string;
+  supplier: string;
+  supplier_name?: string;
+  transaction_date?: string;
+  schedule_date?: string;
+  status?: string;
+  docstatus?: 0 | 1 | 2;
+  grand_total?: number;
+  net_total?: number;
+  company?: string;
+  items?: ErpnextPurchaseOrderItem[];
+};
+
+export type ErpnextPurchaseInvoiceItem = {
+  name?: string;
+  item_code: string;
+  item_name?: string;
+  qty: number;
+  rate: number;
+  amount?: number;
+  warehouse?: string;
+};
+
+export type ErpnextPurchaseInvoice = {
+  name: string;
+  supplier: string;
+  supplier_name?: string;
+  posting_date?: string;
+  bill_date?: string;
+  bill_no?: string;
+  grand_total?: number;
+  outstanding_amount?: number;
+  status?: string;
+  docstatus?: 0 | 1 | 2;
+  company?: string;
+  items?: ErpnextPurchaseInvoiceItem[];
+};
+
+export type ErpnextPurchaseReceiptItem = {
+  name?: string;
+  item_code: string;
+  item_name?: string;
+  qty: number;
+  rate: number;
+  amount?: number;
+  warehouse?: string;
+};
+
+export type ErpnextPurchaseReceipt = {
+  name: string;
+  supplier: string;
+  supplier_name?: string;
+  posting_date?: string;
+  status?: string;
+  docstatus?: 0 | 1 | 2;
+  grand_total?: number;
+  company?: string;
+  items?: ErpnextPurchaseReceiptItem[];
+};
+
 export type CreatePaymentEntryInput = {
   sales_invoice_name: string;
   paid_amount: number;

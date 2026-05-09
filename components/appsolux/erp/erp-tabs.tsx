@@ -124,11 +124,32 @@ const MODULES: Module[] = [
     icon: ShoppingBag,
     iconColor: "bg-orange-50 text-orange-600",
     items: [
-      { label: "Proveedores", status: "in-preparation" },
-      { label: "Órdenes de compra", status: "in-preparation" },
-      { label: "Facturas recibidas", status: "in-preparation" },
-      { label: "Ingresos de mercadería", status: "in-preparation" },
-      { label: "Cuentas por pagar", status: "in-preparation" },
+      {
+        label: "Proveedores",
+        status: "available",
+        href: routes.erpPurchasesSuppliers,
+      },
+      {
+        label: "Ordenes de compra",
+        status: "available",
+        href: routes.erpPurchasesDocuments,
+      },
+      {
+        label: "Facturas recibidas",
+        status: "available",
+        href: routes.erpPurchasesDocuments,
+      },
+      {
+        label: "Ingresos de mercaderia",
+        status: "available",
+        href: routes.erpPurchasesReceipts,
+      },
+      {
+        label: "Cuentas por pagar",
+        status: "available",
+        href: routes.erpPurchasesPayables,
+      },
+      { label: "Pagos a proveedores", status: "coming-soon" },
     ],
   },
   {
@@ -186,7 +207,11 @@ const MODULES: Module[] = [
     iconColor: "bg-sky-50 text-sky-600",
     items: [
       { label: "Clientes", status: "available", sectionId: "customers" },
-      { label: "Proveedores", status: "in-preparation" },
+      {
+        label: "Proveedores",
+        status: "available",
+        href: routes.erpPurchasesSuppliers,
+      },
       { label: "Historial de transacciones", status: "coming-soon" },
       { label: "Saldos pendientes", status: "coming-soon" },
     ],
@@ -543,6 +568,45 @@ function PosSection() {
   );
 }
 
+// ─── Purchases Flow Card ─────────────────────────────────────────────────────
+
+function PurchasesSection() {
+  return (
+    <Card className="border-foreground/10">
+      <CardHeader>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle>Compras y proveedores</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Registra proveedores, gestiona compras, ingresos de mercaderia y
+              cuentas por pagar conectados al ERP.
+            </p>
+          </div>
+          <span className="inline-flex h-6 items-center rounded-full border border-green-200 bg-green-50 px-2 text-xs font-medium text-green-700">
+            Disponible
+          </span>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild>
+            <Link href={routes.erpPurchases}>Ver modulo de compras</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.erpPurchasesSuppliers}>Proveedores</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.erpPurchasesDocuments}>Compras</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.erpPurchasesPayables}>Cuentas por pagar</Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Fiscal Notice Card ───────────────────────────────────────────────────────
 
 function FiscalNoticeCard() {
@@ -854,6 +918,8 @@ export function ErpTabs({
       </div>
 
       <PosSection />
+
+      <PurchasesSection />
 
       <FiscalNoticeCard />
     </div>
