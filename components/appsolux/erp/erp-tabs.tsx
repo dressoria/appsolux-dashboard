@@ -155,29 +155,54 @@ const MODULES: Module[] = [
   {
     id: "inventario",
     label: "Inventario",
-    description: "Productos, bodegas, stock y movimientos.",
+    description: "Productos, bodegas, stock, movimientos y ajustes.",
     icon: Package,
     iconColor: "bg-violet-50 text-violet-600",
     items: [
-      { label: "Productos", status: "available", sectionId: "items" },
+      {
+        label: "Productos",
+        status: "available",
+        href: routes.erpInventoryProducts,
+      },
+      { label: "Categorias y unidades", status: "in-preparation" },
       {
         label: "Bodegas / ubicaciones",
         status: "available",
-        sectionId: "warehouses",
+        href: routes.erpInventoryWarehouses,
       },
-      { label: "Stock actual", status: "available", sectionId: "inventory" },
+      {
+        label: "Stock actual",
+        status: "available",
+        href: routes.erpInventoryStock,
+      },
       {
         label: "Ajustes de inventario",
         status: "available",
-        sectionId: "inventory",
+        href: routes.erpInventoryAdjustments,
       },
       {
-        label: "Movimientos de stock",
+        label: "Movimientos / historial",
         status: "available",
-        sectionId: "stock-ledger",
+        href: routes.erpInventoryMovements,
       },
-      { label: "Transferencias entre bodegas", status: "coming-soon" },
-      { label: "Toma física", status: "coming-soon" },
+      {
+        label: "Kardex por producto",
+        status: "available",
+        href: routes.erpInventoryKardex,
+      },
+      { label: "Transferencias entre bodegas", status: "in-preparation" },
+      { label: "Toma fisica", status: "coming-soon" },
+      {
+        label: "Ingresos de mercaderia",
+        status: "available",
+        href: routes.erpPurchasesReceipts,
+      },
+      {
+        label: "Stock bajo / sin stock",
+        status: "available",
+        href: routes.reports,
+      },
+      { label: "Inventario valorizado", status: "coming-soon" },
     ],
   },
   {
@@ -607,6 +632,51 @@ function PurchasesSection() {
   );
 }
 
+// ─── Inventory Section Card ───────────────────────────────────────────────────
+
+function InventorySectionCard() {
+  return (
+    <Card className="border-foreground/10">
+      <CardHeader>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle>Inventario</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Controla productos, stock, bodegas, movimientos y ajustes
+              conectados al ERP.
+            </p>
+          </div>
+          <span className="inline-flex h-6 items-center rounded-full border border-green-200 bg-green-50 px-2 text-xs font-medium text-green-700">
+            Disponible
+          </span>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild>
+            <Link href={routes.erpInventory}>Ver modulo de inventario</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.erpInventoryProducts}>Productos</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.erpInventoryStock}>Stock actual</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.erpInventoryMovements}>Movimientos</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.erpInventoryWarehouses}>Bodegas</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.erpInventoryAdjustments}>Ajustes</Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Fiscal Notice Card ───────────────────────────────────────────────────────
 
 function FiscalNoticeCard() {
@@ -920,6 +990,8 @@ export function ErpTabs({
       <PosSection />
 
       <PurchasesSection />
+
+      <InventorySectionCard />
 
       <FiscalNoticeCard />
     </div>
