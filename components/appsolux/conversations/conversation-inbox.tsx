@@ -901,6 +901,9 @@ export function ConversationInbox({
   const [priorityOverrides, setPriorityOverrides] = useState<Record<number, string | null>>({});
   const [conversationList, setConversationList] = useState<ChatwootConversation[]>(conversations);
   const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "live" | "reconnecting">("connecting");
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const isAtBottomRef = useRef(true);
+  const [showNewMessage, setShowNewMessage] = useState(false);
   const canUseAssignmentFilters = hasAssignmentData(conversationList);
   const statusOptions = useMemo(
     () => getStatusOptions(conversationList),
@@ -1108,13 +1111,25 @@ export function ConversationInbox({
   }, [reloadToken, selectedId]);
 
   useEffect(() => {
+    isAtBottomRef.current = true;
+    setShowNewMessage(false);
     messageEndRef.current?.scrollIntoView({ block: "end" });
-  }, [messages, selectedId, loadState]);
+  }, [selectedId, loadState]);
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+    if (isAtBottomRef.current) {
+      messageEndRef.current?.scrollIntoView({ block: "end" });
+    } else {
+      setShowNewMessage(true);
+    }
+  }, [messages]);
 
   function selectConversation(conversation: ChatwootConversation) {
     setSelectedId(conversation.id);
     setSelectedConversation(conversation);
     setMessages([]);
+    setLoadState("loading");
     setSendError("");
     setSendState("idle");
     setContactOpen(true);
@@ -1344,6 +1359,16 @@ export function ConversationInbox({
     setAttachment(null);
     setAttachmentPreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function handleMessagesScroll() {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 80;
+    if (isAtBottomRef.current) {
+      setShowNewMessage(false);
+    }
   }
 
   function handleInsertTemplate(text: string) {
@@ -1629,6 +1654,10 @@ export function ConversationInbox({
             filteredConversations.map((conversation) => {
               const active = selectedId === conversation.id;
               const labels = conversation.labels ?? [];
+              const effectivePriority =
+                conversation.id in priorityOverrides
+                  ? priorityOverrides[conversation.id]
+                  : conversation.priority;
 
               return (
                 <button
@@ -1675,18 +1704,9 @@ export function ConversationInbox({
                         >
                           {statusLabel(statusOverrides[conversation.id] ?? conversation.status)}
                         </span>
-                        {(priorityOverrides[conversation.id] !== undefined
-                          ? priorityOverrides[conversation.id]
-                          : conversation.priority) &&
-                        (priorityOverrides[conversation.id] !== undefined
-                          ? priorityOverrides[conversation.id]
-                          : conversation.priority) !== null ? (
+                        {effectivePriority ? (
                           <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
-                            {priorityLabel(
-                              priorityOverrides[conversation.id] !== undefined
-                                ? priorityOverrides[conversation.id]
-                                : conversation.priority
-                            )}
+                            {priorityLabel(effectivePriority)}
                           </span>
                         ) : null}
                         <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
@@ -1833,24 +1853,25 @@ export function ConversationInbox({
                 </p>
               ) : null}
 
-              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <div className="relative min-h-0 flex-1">
+                <div
+                  ref={messagesContainerRef}
+                  onScroll={handleMessagesScroll}
+                  className="absolute inset-0 overflow-y-auto p-4"
+                >
                 {loadState === "loading" ? (
                   <p className="text-sm text-muted-foreground">
                     Cargando mensajes...
                   </p>
                 ) : null}
                 {loadState === "error" ? (
-                  <p className="text-sm text-destructive">{loadError}</p>
-                ) : null}
-                {loadState !== "loading" && messages.length === 0 ? (
                   <div className="flex h-full items-center justify-center text-center">
                     <div className="max-w-sm rounded-2xl border bg-background p-6 shadow-sm">
                       <p className="font-semibold">
-                        No pudimos cargar los mensajes de esta conversación.
+                        Hubo un problema al cargar los mensajes.
                       </p>
                       <p className="mt-2 text-sm text-muted-foreground">
-                        Si la bandeja muestra actividad reciente, intenta
-                        recargar la conversación.
+                        {loadError || "Intenta nuevamente."}
                       </p>
                       <Button
                         type="button"
@@ -1861,6 +1882,17 @@ export function ConversationInbox({
                       >
                         Reintentar
                       </Button>
+                    </div>
+                  </div>
+                ) : loadState === "idle" && messages.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-center">
+                    <div className="max-w-sm rounded-2xl border bg-background p-6 shadow-sm">
+                      <p className="font-semibold">
+                        Esta conversación aún no tiene mensajes.
+                      </p>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Escribe el primer mensaje para iniciar la conversación.
+                      </p>
                     </div>
                   </div>
                 ) : null}
@@ -1921,6 +1953,25 @@ export function ConversationInbox({
                   })}
                   <div ref={messageEndRef} />
                 </div>
+                </div>
+                {showNewMessage ? (
+                  <div className="absolute inset-x-0 bottom-4 flex justify-center">
+                    <button
+                      type="button"
+                      className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground shadow-lg hover:bg-primary/90"
+                      onClick={() => {
+                        isAtBottomRef.current = true;
+                        setShowNewMessage(false);
+                        messageEndRef.current?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "end",
+                        });
+                      }}
+                    >
+                      Nuevo mensaje ↓
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               <form

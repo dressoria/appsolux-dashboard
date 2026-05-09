@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 type NoteItem = {
@@ -35,33 +35,33 @@ export function NotesSection({ conversationId }: NotesSectionProps) {
   );
   const [saveError, setSaveError] = useState("");
 
-  useEffect(() => {
-    async function loadNotes() {
-      setLoadState("loading");
-      setNotes([]);
+  const loadNotes = useCallback(async () => {
+    setLoadState("loading");
+    setNotes([]);
 
-      try {
-        const response = await fetch(
-          `/api/conversations/${conversationId}/notes`
-        );
-        const payload = (await response.json()) as {
-          success: boolean;
-          data?: { notes: NoteItem[] };
-        };
+    try {
+      const response = await fetch(
+        `/api/conversations/${conversationId}/notes`
+      );
+      const payload = (await response.json()) as {
+        success: boolean;
+        data?: { notes: NoteItem[] };
+      };
 
-        if (!response.ok || !payload.success) {
-          throw new Error();
-        }
-
-        setNotes(payload.data?.notes ?? []);
-        setLoadState("idle");
-      } catch {
-        setLoadState("error");
+      if (!response.ok || !payload.success) {
+        throw new Error();
       }
-    }
 
-    void loadNotes();
+      setNotes(payload.data?.notes ?? []);
+      setLoadState("idle");
+    } catch {
+      setLoadState("error");
+    }
   }, [conversationId]);
+
+  useEffect(() => {
+    void loadNotes();
+  }, [loadNotes]);
 
   async function saveNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -117,9 +117,19 @@ export function NotesSection({ conversationId }: NotesSectionProps) {
       {loadState === "loading" ? (
         <p className="text-sm text-muted-foreground">Cargando notas...</p>
       ) : loadState === "error" ? (
-        <p className="text-sm text-destructive">
-          No se pudieron cargar las notas.
-        </p>
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            No se pudieron cargar las notas.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void loadNotes()}
+          >
+            Reintentar
+          </Button>
+        </div>
       ) : notes.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Aún no hay notas internas.
