@@ -1,13 +1,18 @@
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { FileText, Users } from "lucide-react";
+import { routes } from "@/config/routes";
 
 const FISCAL_ITEMS = [
-  { label: "RUC / Identificacion tributaria", status: "Proximamente" },
-  { label: "Regimen fiscal", status: "Proximamente" },
-  { label: "Puntos de emision", status: "Proximamente" },
-  { label: "Facturacion electronica SRI", status: "Proximamente" },
-  { label: "ATS y retenciones", status: "Proximamente" },
-  { label: "Pais y moneda", status: "En preparacion" },
+  { label: "RUC / Identificacion tributaria", status: "En preparacion" },
+  { label: "Ambiente SRI: pruebas / produccion", status: "En preparacion" },
+  { label: "Certificado de firma electronica", status: "En preparacion" },
+  { label: "Secuenciales / puntos de emision", status: "En preparacion" },
+  { label: "Facturacion electronica SRI", status: "En preparacion" },
+  { label: "Retenciones y ATS", status: "En preparacion" },
+  { label: "Guias de remision", status: "Proximamente" },
+  { label: "Facturas recibidas electronicas", status: "Proximamente" },
 ] as const;
 
 const USER_ITEMS = [
@@ -57,25 +62,26 @@ export function FiscalSettingsPlaceholder() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <FileText className="h-5 w-5 text-muted-foreground" />
-          <CardTitle>Fiscal / SRI</CardTitle>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-muted-foreground" />
+            <CardTitle>Fiscal / SRI</CardTitle>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="inline-flex h-5 items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700">
+              En preparacion
+            </span>
+            <span className="inline-flex h-5 items-center rounded border border-slate-200 bg-slate-50 px-1.5 text-xs text-slate-500">
+              Ecuador
+            </span>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <span className="inline-flex h-5 items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700">
-            En preparacion
-          </span>
-          <span className="inline-flex h-5 items-center rounded border border-slate-200 bg-slate-50 px-1.5 text-xs text-slate-500">
-            Ecuador
-          </span>
-        </div>
         <div className="space-y-2 text-sm text-muted-foreground">
           <p>
-            La configuracion fiscal se activara por pais. Para Ecuador se
-            preparara integracion con SRI, ATS, retenciones y documentos
-            electronicos.
+            La configuracion fiscal se activa por pais. Para Ecuador se prepara
+            integracion con SRI, ATS, retenciones y documentos electronicos.
           </p>
           <p>
             No se tocan certificados, XML, firma electronica ni autorizacion de
@@ -83,6 +89,17 @@ export function FiscalSettingsPlaceholder() {
           </p>
         </div>
         <ItemGrid items={FISCAL_ITEMS} />
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button asChild size="sm">
+            <Link href={routes.erpFiscal}>Abrir modulo fiscal</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={routes.erpFiscalEcuador}>Ecuador / SRI</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={routes.erpFiscalSettings}>Configuracion fiscal</Link>
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

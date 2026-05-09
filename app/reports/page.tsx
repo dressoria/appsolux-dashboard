@@ -568,31 +568,35 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                 desc: "Top clientes, clientes con deuda, proveedores con saldo pendiente e historial comercial.",
                 badge: "En preparacion",
                 badgeClass: "border-amber-200 bg-amber-50 text-amber-700",
+                href: null as string | null,
               },
               {
                 title: "Exportaciones",
                 desc: "Exportar reportes en Excel o PDF. Enviar por WhatsApp o correo.",
                 badge: "En preparacion",
                 badgeClass: "border-amber-200 bg-amber-50 text-amber-700",
+                href: null as string | null,
               },
               {
                 title: "Fiscal / SRI",
                 desc: "ATS, retenciones y documentos electronicos para Ecuador.",
-                badge: "Proximamente",
-                badgeClass: "border-slate-200 bg-slate-50 text-slate-500",
+                badge: "En preparacion",
+                badgeClass: "border-amber-200 bg-amber-50 text-amber-700",
+                href: routes.erpFiscal as string | null,
               },
               {
                 title: "Asistente financiero IA",
                 desc: "Consulta ventas, stock, cobros y compras con inteligencia artificial.",
                 badge: "Proximamente",
                 badgeClass: "border-slate-200 bg-slate-50 text-slate-500",
+                href: null as string | null,
               },
             ].map((card) => (
               <div
                 key={card.title}
-                className="rounded-2xl border bg-card p-4"
+                className="rounded-2xl border bg-card p-4 space-y-2"
               >
-                <div className="mb-2 flex items-start justify-between gap-2">
+                <div className="flex items-start justify-between gap-2">
                   <p className="font-semibold">{card.title}</p>
                   <span
                     className={`inline-flex h-5 shrink-0 items-center rounded-full border px-2 text-xs font-medium ${card.badgeClass}`}
@@ -601,6 +605,14 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground">{card.desc}</p>
+                {card.href ? (
+                  <Link
+                    href={card.href}
+                    className="inline-flex h-7 items-center rounded-lg border bg-background px-3 text-xs transition-colors hover:bg-muted"
+                  >
+                    Ver modulo &rarr;
+                  </Link>
+                ) : null}
               </div>
             ))}
           </div>

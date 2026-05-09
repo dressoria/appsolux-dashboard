@@ -276,16 +276,49 @@ const MODULES: Module[] = [
     icon: Receipt,
     iconColor: "bg-rose-50 text-rose-600",
     items: [
-      { label: "Documentos electrónicos", status: "coming-soon" },
       {
-        label: "Facturación electrónica",
-        status: "coming-soon",
+        label: "Fiscalidad e impuestos",
+        status: "available",
+        href: routes.erpFiscal,
+      },
+      {
+        label: "Ecuador / SRI",
+        status: "available",
+        href: routes.erpFiscalEcuador,
         badge: "Ecuador",
       },
-      { label: "Retenciones", status: "coming-soon", badge: "Ecuador" },
-      { label: "ATS", status: "coming-soon", badge: "Ecuador" },
-      { label: "Configuración fiscal", status: "in-preparation" },
-      { label: "Impuestos por país", status: "coming-soon" },
+      {
+        label: "Documentos electrónicos",
+        status: "available",
+        href: routes.erpFiscalDocuments,
+      },
+      {
+        label: "Facturas recibidas",
+        status: "available",
+        href: routes.erpFiscalReceived,
+      },
+      {
+        label: "Retenciones",
+        status: "in-preparation",
+        href: routes.erpFiscalWithholdings,
+        badge: "Ecuador",
+      },
+      {
+        label: "ATS",
+        status: "in-preparation",
+        href: routes.erpFiscalAts,
+        badge: "Ecuador",
+      },
+      {
+        label: "Configuración fiscal",
+        status: "available",
+        href: routes.erpFiscalSettings,
+      },
+      { label: "Notas de crédito", status: "in-preparation" },
+      { label: "Notas de débito", status: "in-preparation" },
+      { label: "Guías de remisión", status: "coming-soon", badge: "Ecuador" },
+      { label: "Perú / SUNAT", status: "coming-soon", badge: "Perú" },
+      { label: "Colombia / DIAN", status: "coming-soon", badge: "Colombia" },
     ],
   },
   {
@@ -757,21 +790,36 @@ function FiscalNoticeCard() {
   return (
     <Card className="border-rose-100 bg-rose-50/40">
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <Receipt className="h-5 w-5 text-rose-500" />
-          <CardTitle className="text-base">Facturación e impuestos</CardTitle>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Receipt className="h-5 w-5 text-rose-500" />
+            <CardTitle className="text-base">Facturación e impuestos</CardTitle>
+          </div>
+          <span className="inline-flex h-5 items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700">
+            En preparación
+          </span>
         </div>
       </CardHeader>
-      <CardContent className="space-y-2 text-sm text-muted-foreground">
+      <CardContent className="space-y-3 text-sm text-muted-foreground">
         <p>
-          La facturación electrónica se activará por país. Para Ecuador se
-          preparará integración con SRI, ATS, retenciones y documentos
+          La facturación electrónica se activa por país. Para Ecuador se
+          prepara integración con SRI, ATS, retenciones y documentos
           electrónicos.
         </p>
-        <p>
-          Otros países vendrán con su localización fiscal. Si tu país no está
-          configurado, la facturación estará disponible como módulo genérico.
-        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm">
+            <Link href={routes.erpFiscal}>Ver módulo fiscal</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={routes.erpFiscalEcuador}>Ecuador / SRI</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={routes.erpFiscalDocuments}>Documentos</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={routes.erpFiscalSettings}>Configuración fiscal</Link>
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
