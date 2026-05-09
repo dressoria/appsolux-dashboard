@@ -22,6 +22,13 @@ import type {
 import { LabelEditor } from "./label-editor";
 import { NotesSection } from "./notes-section";
 import { CommercePanel } from "./commerce-panel";
+import { QuickRepliesButton } from "./quick-replies";
+import {
+  type QuickReply,
+  applyVariables,
+  findBySlash,
+  replaceSlash,
+} from "@/lib/conversations/quick-replies";
 
 type ConversationInboxProps = {
   conversations: ChatwootConversation[];
@@ -877,6 +884,7 @@ export function ConversationInbox({
   const [showFilters, setShowFilters] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+  const [slashSuggestions, setSlashSuggestions] = useState<QuickReply[]>([]);
   const canUseAssignmentFilters = hasAssignmentData(conversations);
   const statusOptions = useMemo(
     () => getStatusOptions(conversations),
@@ -1026,6 +1034,7 @@ export function ConversationInbox({
     setSendError("");
     setSendState("idle");
     setContactOpen(true);
+    setSlashSuggestions([]);
     router.replace(`/conversations?conversationId=${conversation.id}`, {
       scroll: false,
     });
@@ -1181,6 +1190,14 @@ export function ConversationInbox({
     setAttachment(null);
     setAttachmentPreviewUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function handleInsertTemplate(text: string) {
+    setContent((prev) => {
+      if (!prev.trim()) return text;
+      return prev.endsWith("\n") ? prev + text : prev + "\n" + text;
+    });
+    setSlashSuggestions([]);
   }
 
   const sharedFiles = useMemo(
@@ -1703,14 +1720,50 @@ export function ConversationInbox({
                     </button>
                   </div>
                 ) : null}
-                <textarea
-                  value={content}
-                  disabled={sendState === "sending" || recording}
-                  onKeyDown={handleKeyDown}
-                  onChange={(event) => setContent(event.target.value)}
-                  placeholder="Escribe un mensaje..."
-                  className="min-h-20 w-full resize-none rounded-xl border bg-background p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                />
+                <div className="relative">
+                  {slashSuggestions.length > 0 &&
+                  sendState !== "sending" &&
+                  !recording ? (
+                    <div className="absolute bottom-full left-0 right-0 z-30 mb-1 max-h-52 overflow-y-auto rounded-xl border bg-background shadow-xl">
+                      {slashSuggestions.map((reply) => (
+                        <button
+                          key={reply.id}
+                          type="button"
+                          className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-muted/60"
+                          onClick={() => {
+                            const text = applyVariables(
+                              reply.text,
+                              selectedConversation?.meta?.sender?.name
+                            );
+                            setContent(replaceSlash(content, text));
+                            setSlashSuggestions([]);
+                          }}
+                        >
+                          <span className="font-medium">{reply.title}</span>
+                          <span className="text-xs text-muted-foreground">
+                            /{reply.shortcut}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  <textarea
+                    value={content}
+                    disabled={sendState === "sending" || recording}
+                    onKeyDown={handleKeyDown}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setContent(value);
+                      setSlashSuggestions(
+                        sendState !== "sending" && !recording
+                          ? findBySlash(value)
+                          : []
+                      );
+                    }}
+                    placeholder="Escribe un mensaje..."
+                    className="min-h-20 w-full resize-none rounded-xl border bg-background p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                  />
+                </div>
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <input
@@ -1723,6 +1776,12 @@ export function ConversationInbox({
                         setAttachment(file);
                         setRecordError("");
                       }}
+                    />
+                    <QuickRepliesButton
+                      onSelect={handleInsertTemplate}
+                      contactName={
+                        selectedConversation?.meta?.sender?.name ?? undefined
+                      }
                     />
                     <Button
                       type="button"
