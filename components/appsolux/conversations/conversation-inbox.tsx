@@ -21,6 +21,7 @@ import type {
 } from "@/types/chatwoot";
 import { LabelEditor } from "./label-editor";
 import { NotesSection } from "./notes-section";
+import { CommercePanel } from "./commerce-panel";
 
 type ConversationInboxProps = {
   conversations: ChatwootConversation[];
@@ -760,6 +761,27 @@ function ContactInfoPanel({
               ) : (
                 <p className="text-sm text-muted-foreground">
                   Los archivos compartidos aparecerán aquí.
+                </p>
+              )}
+            </PanelSection>
+
+            <PanelSection title="Cliente y ventas">
+              {conversation ? (
+                <CommercePanel
+                  conversationId={conversation.id}
+                  contactName={
+                    conversation.meta?.sender?.name ?? undefined
+                  }
+                  contactPhone={
+                    conversation.meta?.sender?.phone_number ?? undefined
+                  }
+                  contactEmail={
+                    conversation.meta?.sender?.email ?? undefined
+                  }
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Selecciona una conversacion para ver informacion comercial.
                 </p>
               )}
             </PanelSection>
