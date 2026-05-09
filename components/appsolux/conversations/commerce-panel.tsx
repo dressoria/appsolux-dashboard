@@ -309,7 +309,7 @@ export function CommercePanel({
 
   // Matched customer
   if (matchedCustomer) {
-    const customerSearchHref = `/basic/customers?q=${encodeURIComponent(matchedCustomer.name)}`;
+    const customerSearchHref = `/basic/customers/${matchedCustomer.id}`;
     const salesHref = `/basic/sales?customerId=${matchedCustomer.id}`;
     const posHref = `/basic/pos?customerId=${matchedCustomer.id}`;
 
@@ -413,7 +413,7 @@ export function CommercePanel({
                 )}
               </div>
               <Button asChild size="sm" variant="outline">
-                <Link href={`/basic/customers?q=${encodeURIComponent(c.name)}`}>
+                <Link href={`/basic/customers/${c.id}`}>
                   Ver cliente
                 </Link>
               </Button>

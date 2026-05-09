@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
@@ -90,6 +91,9 @@ export function CustomerList({ customers }: { customers: Customer[] }) {
                 >
                   Saldo ${balance.toFixed(2)}
                 </span>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/basic/customers/${customer.id}`}>Ver detalle</Link>
+                </Button>
                 <Button type="button" variant="outline" onClick={() => setEditingId(isEditing ? "" : customer.id)}>
                   Editar
                 </Button>

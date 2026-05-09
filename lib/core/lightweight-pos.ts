@@ -731,6 +731,47 @@ export async function addSalePayment(input: AddSalePaymentInput) {
   });
 }
 
+export async function getCustomerDetail(tenantId: string, customerId: string) {
+  const prisma = getPrismaClient();
+
+  const customer = await prisma.lightweightCustomer.findFirst({
+    where: { id: customerId, tenantId },
+  });
+
+  if (!customer) return null;
+
+  const [aggregate, recentSales] = await Promise.all([
+    prisma.lightweightSale.aggregate({
+      where: { tenantId, customerId, status: { not: "canceled" } },
+      _sum: { total: true },
+      _count: { id: true },
+    }),
+    prisma.lightweightSale.findMany({
+      where: { tenantId, customerId },
+      include: {
+        items: { include: { product: true } },
+        payments: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    }),
+  ]);
+
+  const activeSales = recentSales.filter((s) => s.status !== "canceled");
+  const lastSaleAt = activeSales[0]?.createdAt ?? null;
+
+  return {
+    customer,
+    summary: {
+      totalSales: aggregate._count.id,
+      totalPurchased: aggregate._sum.total ?? new Prisma.Decimal(0),
+      pendingBalance: customer.balance,
+      lastSaleAt,
+    },
+    recentSales,
+  };
+}
+
 export async function getBasicReports(tenantId: string) {
   const prisma = getPrismaClient();
   const now = new Date();
