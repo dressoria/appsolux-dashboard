@@ -235,10 +235,6 @@ function isSystemMessage(message: ChatwootMessage) {
   );
 }
 
-function isImageAttachment(attachment: Attachment) {
-  return attachment.file_type === "image";
-}
-
 function getAttachmentUrl(attachment: Attachment) {
   return (
     attachment.data_url ??
@@ -247,6 +243,20 @@ function getAttachmentUrl(attachment: Attachment) {
     attachment.thumb_url ??
     ""
   );
+}
+
+function getAttachmentKind(
+  attachment: Attachment
+): "image" | "audio" | "video" | "pdf" | "file" {
+  const ft = (attachment.file_type ?? "").toLowerCase();
+  const name = (attachment.name ?? "").toLowerCase();
+  const ext = (attachment.extension ?? "").toLowerCase();
+
+  if (ft === "image") return "image";
+  if (ft === "audio") return "audio";
+  if (ft === "video") return "video";
+  if (ext === "pdf" || name.endsWith(".pdf")) return "pdf";
+  return "file";
 }
 
 function AttachmentList({ message }: { message: ChatwootMessage }) {
@@ -261,12 +271,13 @@ function AttachmentList({ message }: { message: ChatwootMessage }) {
       {attachments.map((attachment, index) => {
         const url = getAttachmentUrl(attachment);
         const name = attachment.name ?? `Archivo ${index + 1}`;
+        const kind = getAttachmentKind(attachment);
 
         if (!url) {
           return null;
         }
 
-        if (isImageAttachment(attachment)) {
+        if (kind === "image") {
           return (
             <a
               key={`${url}-${index}`}
@@ -285,15 +296,77 @@ function AttachmentList({ message }: { message: ChatwootMessage }) {
           );
         }
 
+        if (kind === "audio") {
+          return (
+            <div
+              key={`${url}-${index}`}
+              className="rounded-xl border bg-muted/30 p-3"
+            >
+              <p className="mb-2 truncate text-xs text-muted-foreground">
+                {name}
+              </p>
+              <audio controls src={url} className="w-full" preload="metadata">
+                <track kind="captions" />
+              </audio>
+            </div>
+          );
+        }
+
+        if (kind === "video") {
+          return (
+            <div
+              key={`${url}-${index}`}
+              className="overflow-hidden rounded-xl border"
+            >
+              <video
+                controls
+                src={url}
+                className="max-h-60 w-full"
+                preload="metadata"
+              >
+                <track kind="captions" />
+              </video>
+            </div>
+          );
+        }
+
+        if (kind === "pdf") {
+          return (
+            <a
+              key={`${url}-${index}`}
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-3 rounded-xl border bg-background p-3 shadow-sm hover:bg-muted/50"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-xs font-bold text-red-600">
+                PDF
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{name}</p>
+                <p className="text-xs text-muted-foreground">
+                  Documento — Abrir
+                </p>
+              </div>
+            </a>
+          );
+        }
+
         return (
           <a
             key={`${url}-${index}`}
             href={url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex rounded-lg border bg-background px-3 py-2 text-sm text-foreground shadow-sm hover:bg-muted"
+            className="flex items-center gap-3 rounded-xl border bg-background p-3 shadow-sm hover:bg-muted/50"
           >
-            {name}
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-bold uppercase text-muted-foreground">
+              {attachment.extension ?? "FILE"}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{name}</p>
+              <p className="text-xs text-muted-foreground">Abrir archivo</p>
+            </div>
           </a>
         );
       })}
@@ -505,12 +578,14 @@ function ContactInfoPanel({
   onSelectConversation,
   onClose,
   onLabelsChange,
+  sharedFiles,
 }: {
   conversation: ChatwootConversation | null;
   conversations: ChatwootConversation[];
   onSelectConversation: (conversation: ChatwootConversation) => void;
   onClose: () => void;
   onLabelsChange: (conversationId: number, newLabels: string[]) => void;
+  sharedFiles: Attachment[];
 }) {
   const sender = conversation?.meta?.sender;
   const attributes = getReadableAttributes(sender);
@@ -646,10 +721,47 @@ function ContactInfoPanel({
               ) : null}
             </PanelSection>
 
-            <PanelSection title="Archivos">
-              <p className="text-sm text-muted-foreground">
-                Archivos compartidos apareceran aqui.
-              </p>
+            <PanelSection title="Archivos compartidos">
+              {sharedFiles.length > 0 ? (
+                <div className="space-y-2">
+                  {sharedFiles.slice(0, 5).map((file, index) => {
+                    const url = getAttachmentUrl(file);
+                    const name = file.name ?? `Archivo ${index + 1}`;
+                    const kind = getAttachmentKind(file);
+
+                    if (!url) return null;
+
+                    return (
+                      <a
+                        key={`${url}-${index}`}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-3 rounded-xl border bg-background p-2 text-sm hover:bg-muted/50"
+                      >
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-bold uppercase text-muted-foreground">
+                          {kind === "image"
+                            ? "IMG"
+                            : kind === "audio"
+                              ? "AUD"
+                              : kind === "pdf"
+                                ? "PDF"
+                                : kind === "video"
+                                  ? "VID"
+                                  : (file.extension ?? "FILE")
+                                      .toUpperCase()
+                                      .slice(0, 4)}
+                        </span>
+                        <p className="min-w-0 truncate text-xs">{name}</p>
+                      </a>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Los archivos compartidos aparecerán aquí.
+                </p>
+              )}
             </PanelSection>
 
             <PanelSection title="Automatizaciones">
@@ -723,6 +835,13 @@ export function ConversationInbox({
   const [loadError, setLoadError] = useState("");
   const [content, setContent] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
+  const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<
+    string | null
+  >(null);
+  const previewUrlRef = useRef<string | null>(null);
+  const [recording, setRecording] = useState(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const [recordError, setRecordError] = useState("");
   const [sendState, setSendState] = useState<SendState>("idle");
   const [sendError, setSendError] = useState("");
   const [contactOpen, setContactOpen] = useState(Boolean(initialConversationId));
@@ -970,6 +1089,85 @@ export function ConversationInbox({
       prev?.id === conversationId ? { ...prev, labels: newLabels } : prev
     );
   }
+
+  useEffect(() => {
+    async function updatePreview() {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
+      if (attachment?.type.startsWith("image/")) {
+        const url = URL.createObjectURL(attachment);
+        previewUrlRef.current = url;
+        setAttachmentPreviewUrl(url);
+      } else {
+        setAttachmentPreviewUrl(null);
+      }
+    }
+    void updatePreview();
+  }, [attachment]);
+
+  async function startRecording() {
+    if (recording) return;
+    setRecordError("");
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setRecordError(
+          "La grabacion de audio no esta disponible en este navegador."
+        );
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const mimeType = recorder.mimeType || "audio/webm";
+        const ext = mimeType.split("/")[1]?.split(";")[0] ?? "webm";
+        const blob = new Blob(chunks, { type: mimeType });
+        const file = new File([blob], `nota-voz-${Date.now()}.${ext}`, {
+          type: mimeType,
+        });
+        setAttachment(file);
+        recorderRef.current = null;
+        setRecording(false);
+      };
+
+      recorder.start();
+      recorderRef.current = recorder;
+      setRecording(true);
+    } catch (err) {
+      const name = err instanceof Error ? err.name : "";
+      setRecordError(
+        name === "NotAllowedError"
+          ? "No se pudo acceder al microfono."
+          : "La grabacion de audio no esta disponible en este navegador."
+      );
+    }
+  }
+
+  function stopRecording() {
+    recorderRef.current?.stop();
+  }
+
+  function clearAttachment() {
+    setAttachment(null);
+    setAttachmentPreviewUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  const sharedFiles = useMemo(
+    () =>
+      messages
+        .flatMap((m) => m.attachments ?? [])
+        .filter((a) => Boolean(getAttachmentUrl(a))),
+    [messages]
+  );
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden rounded-2xl border bg-background shadow-sm">
@@ -1452,45 +1650,105 @@ export function ConversationInbox({
                 onSubmit={sendMessage}
                 className="border-t bg-background px-4 py-3"
               >
+                {attachment ? (
+                  <div className="mb-2 flex items-center gap-2 rounded-xl border bg-muted/30 p-2">
+                    {attachmentPreviewUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={attachmentPreviewUrl}
+                        alt={attachment.name}
+                        className="h-12 w-12 rounded-lg border object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-bold uppercase text-muted-foreground">
+                        {attachment.type.startsWith("audio/")
+                          ? "AUD"
+                          : attachment.type === "application/pdf"
+                            ? "PDF"
+                            : "FILE"}
+                      </span>
+                    )}
+                    <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                      {attachment.name}
+                    </p>
+                    <button
+                      type="button"
+                      aria-label="Quitar archivo"
+                      className="shrink-0 rounded-full px-1 text-xs text-muted-foreground hover:text-destructive"
+                      onClick={clearAttachment}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : null}
                 <textarea
                   value={content}
-                  disabled={sendState === "sending"}
+                  disabled={sendState === "sending" || recording}
                   onKeyDown={handleKeyDown}
                   onChange={(event) => setContent(event.target.value)}
                   placeholder="Escribe un mensaje..."
                   className="min-h-20 w-full resize-none rounded-xl border bg-background p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 />
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <input
                       ref={fileInputRef}
                       type="file"
                       className="hidden"
-                      accept="image/jpeg,image/png,image/webp,application/pdf"
-                      onChange={(event) =>
-                        setAttachment(event.target.files?.[0] ?? null)
-                      }
+                      accept="image/jpeg,image/png,image/webp,application/pdf,audio/mpeg,audio/mp3,audio/ogg,audio/wav,audio/webm,audio/mp4,audio/aac"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null;
+                        setAttachment(file);
+                        setRecordError("");
+                      }}
                     />
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={sendState === "sending"}
+                      size="sm"
+                      disabled={sendState === "sending" || recording}
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      Adjuntar
+                      Adjuntar archivo
                     </Button>
-                    {attachment ? (
-                      <span className="truncate text-xs text-muted-foreground">
-                        {attachment.name}
-                      </span>
+                    {recording ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={stopRecording}
+                        className="border-red-300 text-red-600 hover:bg-red-50"
+                      >
+                        Detener grabacion
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={sendState === "sending" || Boolean(attachment)}
+                        onClick={() => void startRecording()}
+                      >
+                        {recording ? "Grabando..." : "Nota de voz"}
+                      </Button>
+                    )}
+                    {recording ? (
+                      <span className="text-xs text-red-600">Grabando...</span>
                     ) : null}
                   </div>
-                  <Button type="submit" disabled={sendState === "sending"}>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={sendState === "sending" || recording}
+                  >
                     {sendState === "sending" ? "Enviando..." : "Enviar"}
                   </Button>
                 </div>
                 {sendError ? (
                   <p className="mt-2 text-xs text-destructive">{sendError}</p>
+                ) : null}
+                {recordError ? (
+                  <p className="mt-1 text-xs text-destructive">{recordError}</p>
                 ) : null}
               </form>
             </>
@@ -1504,6 +1762,7 @@ export function ConversationInbox({
             onSelectConversation={selectConversation}
             onClose={() => setContactOpen(false)}
             onLabelsChange={handleLabelsChange}
+            sharedFiles={sharedFiles}
           />
         ) : null}
       </div>

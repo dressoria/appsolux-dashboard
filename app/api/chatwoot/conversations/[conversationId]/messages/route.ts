@@ -39,8 +39,15 @@ const allowedAttachmentTypes = new Set([
   "image/png",
   "image/webp",
   "application/pdf",
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/ogg",
+  "audio/wav",
+  "audio/webm",
+  "audio/mp4",
+  "audio/aac",
 ]);
-const maxAttachmentSize = 8 * 1024 * 1024;
+const maxAttachmentSize = 10 * 1024 * 1024;
 
 function getCleanContent(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
