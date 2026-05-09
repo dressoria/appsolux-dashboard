@@ -38,6 +38,7 @@ type ConversationInboxProps = {
 
 type LoadState = "idle" | "loading" | "error";
 type SendState = "idle" | "sending" | "error";
+type ActionState = "idle" | "loading" | "error";
 type ConversationFilter = "all" | "unassigned" | "assigned" | "mine";
 type StatusFilter = "all" | "open" | "resolved" | "pending" | "snoozed";
 type SortOption =
@@ -420,6 +421,14 @@ function statusBadgeClass(status?: string) {
   }
 
   return "border-border bg-background text-muted-foreground";
+}
+
+function priorityLabel(priority?: string | null) {
+  if (priority === "urgent") return "Urgente";
+  if (priority === "high") return "Alta";
+  if (priority === "medium") return "Media";
+  if (priority === "low") return "Baja";
+  return "Sin prioridad";
 }
 
 function getAssignmentSignal(conversation: ChatwootConversation) {
@@ -885,6 +894,10 @@ export function ConversationInbox({
   const [showSort, setShowSort] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const [slashSuggestions, setSlashSuggestions] = useState<QuickReply[]>([]);
+  const [actionState, setActionState] = useState<ActionState>("idle");
+  const [actionError, setActionError] = useState("");
+  const [statusOverrides, setStatusOverrides] = useState<Record<number, string>>({});
+  const [priorityOverrides, setPriorityOverrides] = useState<Record<number, string | null>>({});
   const canUseAssignmentFilters = hasAssignmentData(conversations);
   const statusOptions = useMemo(
     () => getStatusOptions(conversations),
@@ -915,7 +928,8 @@ export function ConversationInbox({
     );
 
     const filtered = conversationsByFilter.filter((conversation) => {
-      if (statusFilter !== "all" && conversation.status !== statusFilter) {
+      const effectiveStatus = statusOverrides[conversation.id] ?? conversation.status;
+      if (statusFilter !== "all" && effectiveStatus !== statusFilter) {
         return false;
       }
 
@@ -969,6 +983,7 @@ export function ConversationInbox({
     query,
     sortOption,
     statusFilter,
+    statusOverrides,
     unreadOnly,
   ]);
 
@@ -1119,6 +1134,76 @@ export function ConversationInbox({
     setSelectedConversation((prev) =>
       prev?.id === conversationId ? { ...prev, labels: newLabels } : prev
     );
+  }
+
+  async function handleSetStatus(status: string) {
+    if (!selectedId || actionState === "loading") return;
+    setActionState("loading");
+    setActionError("");
+    try {
+      const res = await fetch(`/api/conversations/${selectedId}/actions`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "set_status", status }),
+      });
+      const json = (await res.json()) as {
+        success: boolean;
+        data?: { status: string };
+        error?: { message: string };
+      };
+      if (!json.success) throw new Error(json.error?.message ?? "Error");
+      const newStatus = json.data?.status ?? status;
+      setStatusOverrides((prev) => ({ ...prev, [selectedId]: newStatus }));
+      setSelectedConversation((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: newStatus as import("@/types/chatwoot").ChatwootConversationStatus,
+            }
+          : prev
+      );
+      setActionState("idle");
+    } catch (err) {
+      setActionState("error");
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : "No se pudo actualizar la conversacion."
+      );
+    }
+  }
+
+  async function handleSetPriority(rawPriority: string) {
+    if (!selectedId || actionState === "loading") return;
+    const priority = rawPriority === "none" ? null : rawPriority;
+    setActionState("loading");
+    setActionError("");
+    try {
+      const res = await fetch(`/api/conversations/${selectedId}/actions`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "set_priority", priority }),
+      });
+      const json = (await res.json()) as {
+        success: boolean;
+        data?: { priority: string | null };
+        error?: { message: string };
+      };
+      if (!json.success) throw new Error(json.error?.message ?? "Error");
+      const newPriority = json.data?.priority ?? priority;
+      setPriorityOverrides((prev) => ({ ...prev, [selectedId]: newPriority }));
+      setSelectedConversation((prev) =>
+        prev ? { ...prev, priority: newPriority } : prev
+      );
+      setActionState("idle");
+    } catch (err) {
+      setActionState("error");
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : "No se pudo actualizar la conversacion."
+      );
+    }
   }
 
   useEffect(() => {
@@ -1498,11 +1583,25 @@ export function ConversationInbox({
                       <div className="mt-3 flex flex-wrap gap-2">
                         <span
                           className={`rounded-full border px-2 py-0.5 text-xs ${statusBadgeClass(
-                            conversation.status
+                            statusOverrides[conversation.id] ?? conversation.status
                           )}`}
                         >
-                          {statusLabel(conversation.status)}
+                          {statusLabel(statusOverrides[conversation.id] ?? conversation.status)}
                         </span>
+                        {(priorityOverrides[conversation.id] !== undefined
+                          ? priorityOverrides[conversation.id]
+                          : conversation.priority) &&
+                        (priorityOverrides[conversation.id] !== undefined
+                          ? priorityOverrides[conversation.id]
+                          : conversation.priority) !== null ? (
+                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
+                            {priorityLabel(
+                              priorityOverrides[conversation.id] !== undefined
+                                ? priorityOverrides[conversation.id]
+                                : conversation.priority
+                            )}
+                          </span>
+                        ) : null}
                         <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
                           {getAssignmentSignal(conversation)
                             ? "Asignada"
@@ -1556,7 +1655,7 @@ export function ConversationInbox({
             </div>
           ) : (
             <>
-              <header className="flex items-center justify-between gap-3 border-b bg-background px-4 py-3">
+              <header className="flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3">
                 <div className="min-w-0">
                   <button
                     type="button"
@@ -1580,20 +1679,72 @@ export function ConversationInbox({
                       <p className="truncate text-sm text-muted-foreground">
                         {getSenderPhone(selectedConversation)} -{" "}
                         {getChannel(selectedConversation)} -{" "}
-                        {statusLabel(selectedConversation?.status)}
+                        {statusLabel(
+                          selectedId
+                            ? (statusOverrides[selectedId] ??
+                                selectedConversation?.status)
+                            : selectedConversation?.status
+                        )}
                       </p>
                     </div>
                   </div>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setContactOpen((current) => !current)}
-                >
-                  {contactOpen ? "Ocultar contacto" : "Ver contacto"}
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {(selectedId
+                    ? (statusOverrides[selectedId] ??
+                        selectedConversation?.status)
+                    : selectedConversation?.status) === "resolved" ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={actionState === "loading"}
+                      onClick={() => void handleSetStatus("open")}
+                    >
+                      {actionState === "loading" ? "..." : "Reabrir"}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={actionState === "loading"}
+                      onClick={() => void handleSetStatus("resolved")}
+                    >
+                      {actionState === "loading" ? "..." : "Resolver"}
+                    </Button>
+                  )}
+                  <select
+                    value={
+                      selectedId && selectedId in priorityOverrides
+                        ? (priorityOverrides[selectedId] ?? "none")
+                        : (selectedConversation?.priority ?? "none")
+                    }
+                    disabled={actionState === "loading"}
+                    onChange={(e) => void handleSetPriority(e.target.value)}
+                    className="rounded-lg border bg-background px-2 py-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                  >
+                    <option value="none">Sin prioridad</option>
+                    <option value="low">Baja</option>
+                    <option value="medium">Media</option>
+                    <option value="high">Alta</option>
+                    <option value="urgent">Urgente</option>
+                  </select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setContactOpen((current) => !current)}
+                  >
+                    {contactOpen ? "Ocultar contacto" : "Ver contacto"}
+                  </Button>
+                </div>
               </header>
+              {actionError ? (
+                <p className="border-b bg-destructive/5 px-4 py-2 text-xs text-destructive">
+                  {actionError}
+                </p>
+              ) : null}
 
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
                 {loadState === "loading" ? (
