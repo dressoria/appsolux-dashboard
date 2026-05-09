@@ -92,13 +92,26 @@ const MODULES: Module[] = [
   {
     id: "ventas",
     label: "Ventas",
-    description: "POS, facturas, pedidos y clientes.",
+    description: "POS, facturas, pedidos, pagos y clientes.",
     icon: ShoppingCart,
     iconColor: "bg-blue-50 text-blue-600",
     items: [
       { label: "Punto de venta (POS)", status: "available", href: routes.pos },
-      { label: "Facturas / comprobantes", status: "coming-soon" },
-      { label: "Pedidos / órdenes de venta", status: "coming-soon" },
+      {
+        label: "Facturas / comprobantes",
+        status: "available",
+        href: routes.posInvoices,
+      },
+      {
+        label: "Pedidos / ordenes de venta",
+        status: "available",
+        href: routes.posOrders,
+      },
+      {
+        label: "Pagos recibidos",
+        status: "available",
+        href: routes.posPayments,
+      },
       { label: "Proformas / cotizaciones", status: "coming-soon" },
       { label: "Clientes", status: "available", sectionId: "customers" },
       { label: "Cuentas por cobrar", status: "coming-soon" },
@@ -516,7 +529,10 @@ function PosSection() {
             <Link href={routes.posOrders}>Ver pedidos</Link>
           </Button>
           <Button asChild variant="outline">
-            <Link href={routes.posInvoices}>Ver facturas y cobros</Link>
+            <Link href={routes.posInvoices}>Ver facturas</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.posPayments}>Ver pagos</Link>
           </Button>
           <Button asChild variant="outline">
             <Link href={routes.reports}>Ver reportes</Link>

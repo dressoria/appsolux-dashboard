@@ -90,7 +90,7 @@ export default async function PosPage() {
               {getPosBlockedDescription(erpProvisioning)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Tenant: {tenant.name}
+              Empresa: {tenant.name}
             </p>
           </div>
 

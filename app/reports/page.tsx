@@ -137,7 +137,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               reales.
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Tenant: {tenant.name} ({tenant.slug})
+              Empresa: {tenant.name}
             </p>
           </div>
         </div>

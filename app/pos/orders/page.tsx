@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getErpnextSalesOrders } from "@/lib/api/erpnext/sales-orders";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { routes } from "@/config/routes";
 
 function formatMoney(value: number | undefined) {
   return new Intl.NumberFormat("es-EC", {
@@ -58,9 +59,14 @@ export default async function PosOrdersPage() {
               Consulta los pedidos creados desde el punto de venta.
             </p>
           </div>
-          <Button asChild variant="outline">
-            <Link href="/pos">Volver al POS</Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <Link href={routes.pos}>Volver al POS</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={routes.erp}>Volver al ERP</Link>
+            </Button>
+          </div>
         </div>
 
         <Card>

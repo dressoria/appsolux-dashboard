@@ -6,6 +6,7 @@ import { getErpnextModesOfPayment } from "@/lib/api/erpnext/modes-of-payment";
 import { getErpnextSalesInvoices } from "@/lib/api/erpnext/sales-invoices";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { routes } from "@/config/routes";
 
 function formatMoney(value: number | undefined) {
   return new Intl.NumberFormat("es-EC", {
@@ -82,12 +83,15 @@ export default async function PosInvoicesPage() {
               Consulta facturas preparadas y registra cobros basicos.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
-              <Link href="/pos/orders">Ver pedidos POS</Link>
+              <Link href={routes.posOrders}>Ver pedidos</Link>
             </Button>
-            <Button asChild>
-              <Link href="/pos">Ir al POS</Link>
+            <Button asChild variant="outline">
+              <Link href={routes.pos}>Ir al POS</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={routes.erp}>Volver al ERP</Link>
             </Button>
           </div>
         </div>

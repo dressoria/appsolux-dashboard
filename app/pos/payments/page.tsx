@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getErpnextPaymentEntries } from "@/lib/api/erpnext/payment-entries";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { routes } from "@/config/routes";
 import type { CashRegisterSummary, ErpnextPaymentEntry } from "@/types/erpnext";
 
 function formatMoney(value: number | undefined) {
@@ -110,10 +111,13 @@ export default async function PosPaymentsPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
-              <Link href="/pos/invoices">Ver facturas</Link>
+              <Link href={routes.posInvoices}>Ver facturas</Link>
             </Button>
-            <Button asChild>
-              <Link href="/pos">Ir al POS</Link>
+            <Button asChild variant="outline">
+              <Link href={routes.pos}>Ir al POS</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={routes.erp}>Volver al ERP</Link>
             </Button>
           </div>
         </div>
