@@ -864,6 +864,7 @@ export function ConversationInbox({
   const [selectedId, setSelectedId] = useState<number | null>(
     initialConversationId ?? null
   );
+  const selectedIdRef = useRef<number | null>(initialConversationId ?? null);
   const [selectedConversation, setSelectedConversation] =
     useState<ChatwootConversation | null>(
       conversations.find((item) => item.id === initialConversationId) ?? null
@@ -898,18 +899,20 @@ export function ConversationInbox({
   const [actionError, setActionError] = useState("");
   const [statusOverrides, setStatusOverrides] = useState<Record<number, string>>({});
   const [priorityOverrides, setPriorityOverrides] = useState<Record<number, string | null>>({});
-  const canUseAssignmentFilters = hasAssignmentData(conversations);
+  const [conversationList, setConversationList] = useState<ChatwootConversation[]>(conversations);
+  const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "live" | "reconnecting">("connecting");
+  const canUseAssignmentFilters = hasAssignmentData(conversationList);
   const statusOptions = useMemo(
-    () => getStatusOptions(conversations),
-    [conversations]
+    () => getStatusOptions(conversationList),
+    [conversationList]
   );
   const channelOptions = useMemo(
-    () => getChannelOptions(conversations),
-    [conversations]
+    () => getChannelOptions(conversationList),
+    [conversationList]
   );
   const labelOptions = useMemo(
-    () => getLabelOptions(conversations),
-    [conversations]
+    () => getLabelOptions(conversationList),
+    [conversationList]
   );
   const hasActiveFilters =
     filter !== "all" ||
@@ -922,7 +925,7 @@ export function ConversationInbox({
   const filteredConversations = useMemo(() => {
     const cleanQuery = normalizeText(query);
     const conversationsByFilter = filterConversationsByTab(
-      conversations,
+      conversationList,
       filter,
       canUseAssignmentFilters
     );
@@ -977,7 +980,7 @@ export function ConversationInbox({
   }, [
     canUseAssignmentFilters,
     channelFilter,
-    conversations,
+    conversationList,
     filter,
     labelFilter,
     query,
@@ -986,6 +989,72 @@ export function ConversationInbox({
     statusOverrides,
     unreadOnly,
   ]);
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
+
+  useEffect(() => {
+    const es = new EventSource("/api/conversations/events");
+
+    function onOpen() {
+      setRealtimeStatus("live");
+    }
+    function onError() {
+      setRealtimeStatus("reconnecting");
+    }
+    function onPing() {
+      setRealtimeStatus("live");
+    }
+    function onConversation(e: MessageEvent) {
+      try {
+        const event = JSON.parse(e.data as string) as {
+          conversationId: number;
+          type: string;
+        };
+
+        void (async () => {
+          try {
+            const res = await fetch("/api/chatwoot/conversations");
+            if (res.ok) {
+              const payload = (await res.json()) as {
+                success: boolean;
+                data?: {
+                  conversations?: {
+                    data?: { payload?: ChatwootConversation[] };
+                  };
+                };
+              };
+              const list = payload.data?.conversations?.data?.payload;
+              if (payload.success && Array.isArray(list)) {
+                setConversationList(list);
+              }
+            }
+          } catch {
+            // leave existing list intact
+          }
+        })();
+
+        if (
+          (event.type === "message_created" || event.type === "message_updated") &&
+          event.conversationId === selectedIdRef.current
+        ) {
+          setReloadToken((t) => t + 1);
+        }
+      } catch {
+        // ignore malformed
+      }
+    }
+
+    es.addEventListener("open", onOpen);
+    es.addEventListener("error", onError);
+    es.addEventListener("ping", onPing);
+    es.addEventListener("conversation", onConversation as EventListener);
+
+    return () => {
+      es.close();
+    };
+  }, []);
 
   useEffect(() => {
     if (!selectedId) {
@@ -1303,11 +1372,29 @@ export function ConversationInbox({
         }
       >
         <div className="space-y-3 border-b p-3">
-          <div>
-            <p className="text-sm font-semibold">Bandeja</p>
-            <p className="text-xs text-muted-foreground">
-              Conversaciones de tus canales conectados
-            </p>
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold">Bandeja</p>
+              <p className="text-xs text-muted-foreground">
+                Conversaciones de tus canales conectados
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <span
+                className={
+                  realtimeStatus === "live"
+                    ? "h-2 w-2 rounded-full bg-green-500"
+                    : "h-2 w-2 rounded-full bg-yellow-500 animate-pulse"
+                }
+              />
+              <span className="text-xs text-muted-foreground">
+                {realtimeStatus === "live"
+                  ? "En vivo"
+                  : realtimeStatus === "reconnecting"
+                    ? "Reconectando"
+                    : "Conectando"}
+              </span>
+            </div>
           </div>
 
           <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 text-xs">
@@ -1492,7 +1579,7 @@ export function ConversationInbox({
         <div className="min-h-0 flex-1 overflow-y-auto">
           {filteredConversations.length === 0 ? (
             <div className="p-6 text-sm text-muted-foreground">
-              {conversations.length === 0 ? (
+              {conversationList.length === 0 ? (
                 <>
                   <p className="font-medium text-foreground">
                     Aun no tienes conversaciones.
@@ -1990,7 +2077,7 @@ export function ConversationInbox({
         {contactOpen ? (
           <ContactInfoPanel
             conversation={selectedConversation}
-            conversations={conversations}
+            conversations={conversationList}
             onSelectConversation={selectConversation}
             onClose={() => setContactOpen(false)}
             onLabelsChange={handleLabelsChange}
