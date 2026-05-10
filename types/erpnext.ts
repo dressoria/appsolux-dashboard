@@ -60,6 +60,8 @@ export type ErpnextCustomer = {
   customer_name: string;
   customer_type?: string;
   territory?: string;
+  tax_id?: string;
+  mobile_no?: string;
   disabled?: 0 | 1;
 };
 
@@ -67,6 +69,8 @@ export type CreateErpnextCustomerInput = {
   customer_name: string;
   customer_type?: string;
   territory: string;
+  tax_id?: string;
+  mobile_no?: string;
 };
 
 export type ErpnextItemGroup = {
@@ -400,6 +404,14 @@ export type ErpnextSupplier = {
   email_id?: string;
   mobile_no?: string;
   disabled?: 0 | 1;
+};
+
+export type CreateErpnextSupplierInput = {
+  supplier_name: string;
+  supplier_type?: string;
+  tax_id?: string;
+  mobile_no?: string;
+  email_id?: string;
 };
 
 export type ErpnextPurchaseOrderItem = {

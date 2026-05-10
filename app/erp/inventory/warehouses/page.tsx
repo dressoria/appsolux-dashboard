@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { CreateWarehouseDialog } from "@/components/appsolux/erp/create-warehouse-dialog";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getErpnextCompanies } from "@/lib/api/erpnext/companies";
 import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
@@ -61,7 +63,10 @@ export default async function ErpInventoryWarehousesPage() {
     );
   }
 
-  const warehouses = await getErpnextWarehouses();
+  const [warehouses, companies] = await Promise.all([
+    getErpnextWarehouses().catch(() => []),
+    getErpnextCompanies().catch(() => []),
+  ]);
   const operative = warehouses.filter((w) => w.is_group !== 1);
   const groups = warehouses.filter((w) => w.is_group === 1);
 
@@ -112,20 +117,19 @@ export default async function ErpInventoryWarehousesPage() {
           </div>
         ) : null}
 
+        <div className="flex items-center gap-3">
+          <CreateWarehouseDialog companies={companies} />
+        </div>
+
         <Card>
           <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle>Bodegas operativas</CardTitle>
-              <span className="inline-flex h-5 items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700">
-                Nueva bodega: Ir al ERP principal
-              </span>
-            </div>
+            <CardTitle>Bodegas operativas</CardTitle>
           </CardHeader>
           <CardContent>
             {operative.length === 0 ? (
               <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                Aun no hay bodegas operativas configuradas. Crea una desde el
-                ERP principal.
+                Aun no hay bodegas operativas configuradas. Usa el boton
+                &ldquo;Nueva Bodega&rdquo; para crear la primera.
               </div>
             ) : (
               <div className="overflow-x-auto">

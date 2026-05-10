@@ -30,9 +30,6 @@ type DeleteCustomerResponse = ApiResponse<{
 const selectClassName =
   "h-8 w-full rounded-lg border border-input bg-background px-2.5 py-1 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
 
-function formatFlag(value: 0 | 1 | undefined) {
-  return value === 1 ? "Si" : "No";
-}
 
 export function CustomersTable({
   customers,
@@ -70,6 +67,8 @@ export function CustomersTable({
           customer_name: String(formData.get("customer_name") ?? "").trim(),
           customer_type: String(formData.get("customer_type") ?? "").trim(),
           territory: String(formData.get("territory") ?? "").trim(),
+          tax_id: String(formData.get("tax_id") ?? "").trim() || undefined,
+          mobile_no: String(formData.get("mobile_no") ?? "").trim() || undefined,
         }),
       });
       const result = (await response.json()) as UpdateCustomerResponse;
@@ -155,11 +154,10 @@ export function CustomersTable({
               <thead className="border-b text-xs text-muted-foreground">
                 <tr>
                   <th className="py-2 pr-4 font-medium">Cliente</th>
+                  <th className="py-2 pr-4 font-medium">Cedula / RUC</th>
+                  <th className="py-2 pr-4 font-medium">Telefono</th>
                   <th className="py-2 pr-4 font-medium">Tipo</th>
-                  <th className="py-2 pr-4 font-medium">
-                    Ubicacion / territorio
-                  </th>
-                  <th className="py-2 pr-4 font-medium">Deshabilitado</th>
+                  <th className="py-2 pr-4 font-medium">Estado</th>
                   <th className="py-2 font-medium">Acciones</th>
                 </tr>
               </thead>
@@ -169,12 +167,25 @@ export function CustomersTable({
                     <td className="py-2 pr-4 font-medium">
                       {customer.customer_name}
                     </td>
+                    <td className="py-2 pr-4 text-muted-foreground">
+                      {customer.tax_id ?? "-"}
+                    </td>
+                    <td className="py-2 pr-4 text-muted-foreground">
+                      {customer.mobile_no ?? "-"}
+                    </td>
                     <td className="py-2 pr-4">
                       {customer.customer_type ?? "-"}
                     </td>
-                    <td className="py-2 pr-4">{customer.territory ?? "-"}</td>
                     <td className="py-2 pr-4">
-                      {formatFlag(customer.disabled)}
+                      {customer.disabled === 1 ? (
+                        <span className="inline-flex h-5 items-center rounded-full border border-slate-200 bg-slate-50 px-2 text-xs font-medium text-slate-500">
+                          Inactivo
+                        </span>
+                      ) : (
+                        <span className="inline-flex h-5 items-center rounded-full border border-green-200 bg-green-50 px-2 text-xs font-medium text-green-700">
+                          Activo
+                        </span>
+                      )}
                     </td>
                     <td className="py-2">
                       <div className="flex gap-2">
@@ -209,26 +220,46 @@ export function CustomersTable({
           <div className="w-full max-w-md rounded-xl border bg-card p-4 shadow-lg">
             <h2 className="text-lg font-semibold">Editar cliente</h2>
             <form className="mt-4 space-y-3" onSubmit={handleEdit}>
-              <div className="space-y-2">
-                <Label htmlFor="edit_customer_name">Nombre</Label>
-                <Input
-                  id="edit_customer_name"
-                  name="customer_name"
-                  defaultValue={editingCustomer.customer_name}
-                  required
-                />
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="edit_customer_name">Nombre</Label>
+                  <Input
+                    id="edit_customer_name"
+                    name="customer_name"
+                    defaultValue={editingCustomer.customer_name}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit_tax_id">Cedula / RUC</Label>
+                  <Input
+                    id="edit_tax_id"
+                    name="tax_id"
+                    defaultValue={editingCustomer.tax_id ?? ""}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_customer_type">Tipo</Label>
-                <select
-                  id="edit_customer_type"
-                  name="customer_type"
-                  className={selectClassName}
-                  defaultValue={editingCustomer.customer_type ?? "Individual"}
-                >
-                  <option value="Individual">Individual</option>
-                  <option value="Company">Empresa</option>
-                </select>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="edit_mobile_no">Telefono</Label>
+                  <Input
+                    id="edit_mobile_no"
+                    name="mobile_no"
+                    defaultValue={editingCustomer.mobile_no ?? ""}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit_customer_type">Tipo</Label>
+                  <select
+                    id="edit_customer_type"
+                    name="customer_type"
+                    className={selectClassName}
+                    defaultValue={editingCustomer.customer_type ?? "Individual"}
+                  >
+                    <option value="Individual">Individual</option>
+                    <option value="Company">Empresa</option>
+                  </select>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit_territory">Ubicacion / territorio</Label>

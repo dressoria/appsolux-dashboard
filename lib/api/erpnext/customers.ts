@@ -13,6 +13,8 @@ const customerFields = [
   "customer_name",
   "customer_type",
   "territory",
+  "tax_id",
+  "mobile_no",
   "disabled",
 ];
 
@@ -42,6 +44,8 @@ export async function updateErpnextCustomer(
         customer_name: input.customer_name,
         customer_type: input.customer_type ?? "Individual",
         territory: input.territory,
+        tax_id: input.tax_id ?? undefined,
+        mobile_no: input.mobile_no ?? undefined,
       }),
     }
   );
@@ -85,9 +89,27 @@ export async function createErpnextCustomer(
         customer_name: input.customer_name,
         customer_type: input.customer_type ?? "Individual",
         territory: input.territory,
+        tax_id: input.tax_id ?? undefined,
+        mobile_no: input.mobile_no ?? undefined,
       }),
     }
   );
 
   return response.data;
+}
+
+export async function createErpnextCustomerAddress(
+  customerName: string,
+  addressLine1: string
+): Promise<void> {
+  await erpnextFetch("/api/resource/Address", {
+    method: "POST",
+    body: JSON.stringify({
+      address_title: customerName,
+      address_type: "Billing",
+      address_line1: addressLine1,
+      country: "Ecuador",
+      links: [{ link_doctype: "Customer", link_name: customerName }],
+    }),
+  });
 }

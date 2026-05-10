@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CreateSupplierForm } from "@/components/appsolux/erp/create-supplier-form";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,19 +96,17 @@ export default async function ErpPurchasesSuppliersPage() {
           </div>
         </div>
 
+        <CreateSupplierForm />
+
         <Card>
           <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle>Proveedores registrados</CardTitle>
-              <span className="inline-flex h-5 items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700">
-                Nuevo proveedor: Proximamente
-              </span>
-            </div>
+            <CardTitle>Proveedores registrados</CardTitle>
           </CardHeader>
           <CardContent>
             {suppliers.length === 0 ? (
               <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                Aun no hay proveedores registrados en el ERP.
+                Aun no hay proveedores registrados en el ERP. Usa el formulario
+                de arriba para crear el primero.
               </div>
             ) : (
               <div className="overflow-x-auto">

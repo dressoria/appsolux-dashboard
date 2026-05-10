@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { CreateItemForm } from "@/components/appsolux/erp/create-item-form";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getErpnextItems } from "@/lib/api/erpnext/items";
+import { getErpnextMasters } from "@/lib/api/erpnext/masters";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
@@ -61,7 +63,15 @@ export default async function ErpInventoryProductsPage() {
     );
   }
 
-  const items = await getErpnextItems();
+  const [items, masters] = await Promise.all([
+    getErpnextItems().catch(() => []),
+    getErpnextMasters().catch(() => ({
+      itemGroups: [],
+      uoms: [],
+      territories: [],
+      companies: [],
+    })),
+  ]);
 
   return (
     <DashboardShell>
@@ -101,19 +111,20 @@ export default async function ErpInventoryProductsPage() {
           </div>
         </div>
 
+        <CreateItemForm
+          itemGroups={masters.itemGroups}
+          uoms={masters.uoms}
+        />
+
         <Card>
           <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle>Productos registrados</CardTitle>
-              <span className="inline-flex h-5 items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700">
-                Nuevo producto: Ir al ERP principal
-              </span>
-            </div>
+            <CardTitle>Productos registrados</CardTitle>
           </CardHeader>
           <CardContent>
             {items.length === 0 ? (
               <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                Aun no hay productos registrados en el ERP.
+                Aun no hay productos registrados en el ERP. Usa el formulario de
+                arriba para crear el primero.
               </div>
             ) : (
               <div className="overflow-x-auto">

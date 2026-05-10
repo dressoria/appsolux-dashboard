@@ -57,6 +57,9 @@ export function CreateCustomerForm({ territories }: CreateCustomerFormProps) {
       customer_name: String(formData.get("customer_name") ?? "").trim(),
       customer_type: String(formData.get("customer_type") ?? "").trim(),
       territory: String(formData.get("territory") ?? "").trim(),
+      tax_id: String(formData.get("tax_id") ?? "").trim() || undefined,
+      mobile_no: String(formData.get("mobile_no") ?? "").trim() || undefined,
+      address_line1: String(formData.get("address_line1") ?? "").trim() || undefined,
     };
 
     try {
@@ -101,14 +104,46 @@ export function CreateCustomerForm({ territories }: CreateCustomerFormProps) {
         ) : null}
 
         <form className="space-y-3" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="customer_name">Nombre del cliente</Label>
-            <Input
-              id="customer_name"
-              name="customer_name"
-              disabled={!canCreateCustomer}
-              required
-            />
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="customer_name">Nombre del cliente</Label>
+              <Input
+                id="customer_name"
+                name="customer_name"
+                disabled={!canCreateCustomer}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tax_id">Cedula / RUC</Label>
+              <Input
+                id="tax_id"
+                name="tax_id"
+                placeholder="0000000000"
+                disabled={!canCreateCustomer}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="mobile_no">Telefono</Label>
+              <Input
+                id="mobile_no"
+                name="mobile_no"
+                placeholder="+593 99 000 0000"
+                disabled={!canCreateCustomer}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address_line1">Direccion</Label>
+              <Input
+                id="address_line1"
+                name="address_line1"
+                placeholder="Calle, numero, barrio"
+                disabled={!canCreateCustomer}
+              />
+            </div>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   createErpnextCustomer,
+  createErpnextCustomerAddress,
   deleteErpnextCustomer,
   disableErpnextCustomer,
   getErpnextCustomers,
@@ -53,6 +54,8 @@ export async function PUT(request: Request) {
       customer_name: customerName,
       customer_type: getStringField(body, "customer_type") || "Individual",
       territory,
+      tax_id: getStringField(body, "tax_id") || undefined,
+      mobile_no: getStringField(body, "mobile_no") || undefined,
     });
 
     return NextResponse.json({
@@ -221,8 +224,19 @@ export async function POST(request: Request) {
       customer_name: customerName,
       customer_type: getStringField(body, "customer_type") || "Individual",
       territory,
+      tax_id: getStringField(body, "tax_id") || undefined,
+      mobile_no: getStringField(body, "mobile_no") || undefined,
     };
     const customer = await createErpnextCustomer(input);
+
+    const addressLine1 = getStringField(body, "address_line1");
+    if (addressLine1) {
+      try {
+        await createErpnextCustomerAddress(customer.name, addressLine1);
+      } catch {
+        // address creation is best-effort; customer was already saved
+      }
+    }
 
     return NextResponse.json({
       success: true,

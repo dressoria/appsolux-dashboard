@@ -1,7 +1,9 @@
 import "@/lib/security/server-only";
 import { erpnextFetch } from "./client";
 import type {
+  CreateErpnextSupplierInput,
   ErpnextCreateResponse,
+  ErpnextDeleteResponse,
   ErpnextListResponse,
   ErpnextSupplier,
 } from "@/types/erpnext";
@@ -38,4 +40,45 @@ export async function getErpnextSupplierDetail(
   );
 
   return response.data;
+}
+
+export async function createErpnextSupplier(
+  input: CreateErpnextSupplierInput
+): Promise<ErpnextSupplier> {
+  const response = await erpnextFetch<ErpnextCreateResponse<ErpnextSupplier>>(
+    "/api/resource/Supplier",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        supplier_name: input.supplier_name,
+        supplier_type: input.supplier_type ?? "Company",
+        tax_id: input.tax_id ?? undefined,
+        mobile_no: input.mobile_no ?? undefined,
+        email_id: input.email_id ?? undefined,
+      }),
+    }
+  );
+
+  return response.data;
+}
+
+export async function disableErpnextSupplier(
+  name: string
+): Promise<ErpnextSupplier> {
+  const response = await erpnextFetch<ErpnextCreateResponse<ErpnextSupplier>>(
+    `/api/resource/Supplier/${encodeURIComponent(name)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ disabled: 1 }),
+    }
+  );
+
+  return response.data;
+}
+
+export async function deleteErpnextSupplier(name: string): Promise<void> {
+  await erpnextFetch<ErpnextDeleteResponse>(
+    `/api/resource/Supplier/${encodeURIComponent(name)}`,
+    { method: "DELETE" }
+  );
 }
