@@ -178,7 +178,8 @@ export default async function ErpFinanceReceivablesPage() {
                       <th className="py-2 pr-4 font-medium text-right">
                         Saldo
                       </th>
-                      <th className="py-2 font-medium">Estado</th>
+                      <th className="py-2 pr-4 font-medium">Estado</th>
+                      <th className="py-2 font-medium">Accion</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -204,12 +205,30 @@ export default async function ErpFinanceReceivablesPage() {
                           <td className="py-2 pr-4 text-right font-semibold text-amber-600">
                             {formatMoney(inv.outstanding_amount)}
                           </td>
-                          <td className="py-2">
+                          <td className="py-2 pr-4">
                             {status ? (
                               <span className="inline-flex h-5 items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700">
                                 {status}
                               </span>
                             ) : null}
+                          </td>
+                          <td className="py-2">
+                            <div className="flex gap-1">
+                              <Button asChild size="sm" variant="outline">
+                                <Link
+                                  href={`${routes.posInvoices}/${encodeURIComponent(inv.name)}`}
+                                >
+                                  Ver
+                                </Link>
+                              </Button>
+                              <Button asChild size="sm">
+                                <Link
+                                  href={`${routes.posInvoices}/${encodeURIComponent(inv.name)}`}
+                                >
+                                  Cobrar
+                                </Link>
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       );

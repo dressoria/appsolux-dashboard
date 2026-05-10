@@ -2,7 +2,9 @@ import Link from "next/link";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RegisterSupplierPaymentForm } from "@/components/appsolux/erp/register-supplier-payment-form";
 import { getErpnextPurchaseInvoices } from "@/lib/api/erpnext/purchase-invoices";
+import { getErpnextModesOfPayment } from "@/lib/api/erpnext/modes-of-payment";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
@@ -68,7 +70,10 @@ export default async function ErpFinancePayablesPage() {
     );
   }
 
-  const allInvoices = await getErpnextPurchaseInvoices();
+  const [allInvoices, modesOfPayment] = await Promise.all([
+    getErpnextPurchaseInvoices().catch(() => []),
+    getErpnextModesOfPayment().catch(() => []),
+  ]);
   const pending = allInvoices.filter(
     (inv) => inv.docstatus === 1 && (inv.outstanding_amount ?? 0) > 0
   );
@@ -140,12 +145,7 @@ export default async function ErpFinancePayablesPage() {
 
         <Card>
           <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle>Facturas pendientes de pago</CardTitle>
-              <span className="inline-flex h-5 items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700">
-                Pagos a proveedores: En preparacion
-              </span>
-            </div>
+            <CardTitle>Facturas pendientes de pago</CardTitle>
           </CardHeader>
           <CardContent>
             {pending.length === 0 ? (
@@ -199,6 +199,11 @@ export default async function ErpFinancePayablesPage() {
             )}
           </CardContent>
         </Card>
+
+        <RegisterSupplierPaymentForm
+          pendingInvoices={pending}
+          modesOfPayment={modesOfPayment}
+        />
       </div>
     </DashboardShell>
   );

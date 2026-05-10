@@ -2,7 +2,9 @@ import Link from "next/link";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RegisterSupplierPaymentForm } from "@/components/appsolux/erp/register-supplier-payment-form";
 import { getErpnextPurchaseInvoices } from "@/lib/api/erpnext/purchase-invoices";
+import { getErpnextModesOfPayment } from "@/lib/api/erpnext/modes-of-payment";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
@@ -68,7 +70,10 @@ export default async function ErpPurchasesPayablesPage() {
     );
   }
 
-  const allInvoices = await getErpnextPurchaseInvoices();
+  const [allInvoices, modesOfPayment] = await Promise.all([
+    getErpnextPurchaseInvoices().catch(() => []),
+    getErpnextModesOfPayment().catch(() => []),
+  ]);
   const pendingInvoices = allInvoices.filter(
     (inv) => inv.docstatus === 1 && (inv.outstanding_amount ?? 0) > 0
   );
@@ -196,6 +201,11 @@ export default async function ErpPurchasesPayablesPage() {
             )}
           </CardContent>
         </Card>
+
+        <RegisterSupplierPaymentForm
+          pendingInvoices={pendingInvoices}
+          modesOfPayment={modesOfPayment}
+        />
       </div>
     </DashboardShell>
   );

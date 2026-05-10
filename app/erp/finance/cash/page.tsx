@@ -19,7 +19,15 @@ function getTodayDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default async function ErpFinanceCashPage() {
+function isValidDate(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+type CashPageProps = {
+  searchParams: { date?: string };
+};
+
+export default async function ErpFinanceCashPage({ searchParams }: CashPageProps) {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -71,11 +79,14 @@ export default async function ErpFinanceCashPage() {
   }
 
   const today = getTodayDate();
+  const rawDate = searchParams.date ?? "";
+  const selectedDate = rawDate && isValidDate(rawDate) ? rawDate : today;
+
   const allPayments = await getErpnextPaymentEntries();
 
   const todayPayments = allPayments.filter(
     (p) =>
-      p.posting_date === today &&
+      p.posting_date === selectedDate &&
       p.docstatus === 1 &&
       p.payment_type === "Receive"
   );
@@ -134,14 +145,41 @@ export default async function ErpFinanceCashPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-2 text-sm text-muted-foreground">
-          Fecha: <span className="font-medium text-foreground">{today}</span>
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3">
+          <form method="GET" className="flex flex-wrap items-center gap-2">
+            <label htmlFor="cash-date" className="text-sm text-muted-foreground">
+              Fecha:
+            </label>
+            <input
+              type="date"
+              id="cash-date"
+              name="date"
+              defaultValue={selectedDate}
+              className="rounded-md border bg-background px-2 py-1 text-sm"
+            />
+            <button
+              type="submit"
+              className="rounded-md border bg-card px-3 py-1 text-sm font-medium hover:bg-muted"
+            >
+              Ver
+            </button>
+            {selectedDate !== today ? (
+              <a
+                href="?"
+                className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+              >
+                Volver a hoy
+              </a>
+            ) : null}
+          </form>
         </div>
 
         <div className="grid gap-3 md:grid-cols-3">
           <Card>
             <CardHeader>
-              <CardTitle>Cobrado hoy</CardTitle>
+              <CardTitle>
+                {selectedDate === today ? "Cobrado hoy" : `Cobrado (${selectedDate})`}
+              </CardTitle>
             </CardHeader>
             <CardContent className="text-2xl font-semibold text-green-700">
               {formatMoney(totalToday)}
@@ -149,7 +187,9 @@ export default async function ErpFinanceCashPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Pagos hoy</CardTitle>
+              <CardTitle>
+                {selectedDate === today ? "Pagos hoy" : "Pagos en fecha"}
+              </CardTitle>
             </CardHeader>
             <CardContent className="text-2xl font-semibold">
               {todayPayments.length}
@@ -168,7 +208,9 @@ export default async function ErpFinanceCashPage() {
         {Object.keys(byMode).length > 0 ? (
           <Card>
             <CardHeader>
-              <CardTitle>Cobros de hoy por metodo</CardTitle>
+              <CardTitle>
+              {selectedDate === today ? "Cobros de hoy por metodo" : `Cobros del ${selectedDate} por metodo`}
+            </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -207,12 +249,16 @@ export default async function ErpFinanceCashPage() {
         ) : (
           <Card>
             <CardHeader>
-              <CardTitle>Cobros de hoy</CardTitle>
+              <CardTitle>
+              {selectedDate === today ? "Cobros de hoy" : `Cobros del ${selectedDate}`}
+            </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                No hay cobros registrados para hoy. Los pagos se registran
-                automaticamente al completar ventas desde el POS.
+                {selectedDate === today
+                  ? "No hay cobros registrados para hoy."
+                  : `No hay cobros registrados para el ${selectedDate}.`}{" "}
+                Los pagos se registran automaticamente al completar ventas desde el POS.
               </div>
             </CardContent>
           </Card>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CancelPaymentButton } from "@/components/appsolux/erp/cancel-payment-button";
 import { getErpnextPaymentEntries } from "@/lib/api/erpnext/payment-entries";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
@@ -214,15 +215,21 @@ export default async function PosPaymentsPage() {
                           {paymentEntry.reference_no ?? "-"}
                         </td>
                         <td className="py-2">
-                          <Button asChild size="sm" variant="outline">
-                            <Link
-                              href={`/pos/payments/${encodeURIComponent(
-                                paymentEntry.name
-                              )}`}
-                            >
-                              Ver detalle
-                            </Link>
-                          </Button>
+                          <div className="flex flex-col gap-1">
+                            <Button asChild size="sm" variant="outline">
+                              <Link
+                                href={`/pos/payments/${encodeURIComponent(
+                                  paymentEntry.name
+                                )}`}
+                              >
+                                Ver detalle
+                              </Link>
+                            </Button>
+                            <CancelPaymentButton
+                              paymentEntryName={paymentEntry.name}
+                              docstatus={paymentEntry.docstatus}
+                            />
+                          </div>
                         </td>
                       </tr>
                     ))}

@@ -465,6 +465,9 @@ export type ErpnextPurchaseInvoice = {
   status?: string;
   docstatus?: 0 | 1 | 2;
   company?: string;
+  credit_to?: string;
+  currency?: string;
+  company_currency?: string;
   items?: ErpnextPurchaseInvoiceItem[];
 };
 
@@ -492,6 +495,15 @@ export type ErpnextPurchaseReceipt = {
 
 export type CreatePaymentEntryInput = {
   sales_invoice_name: string;
+  paid_amount: number;
+  mode_of_payment: string;
+  reference_no?: string;
+  reference_date?: string;
+  note?: string;
+};
+
+export type CreateSupplierPaymentEntryInput = {
+  purchase_invoice_name: string;
   paid_amount: number;
   mode_of_payment: string;
   reference_no?: string;

@@ -321,11 +321,11 @@ export default async function ErpFinancePage() {
             {
               title: "Pagos a proveedores",
               desc: "Registra pagos contra facturas de compra pendientes.",
-              badge: "En preparacion",
+              badge: "Disponible",
               badgeClass:
-                "border-amber-200 bg-amber-50 text-amber-700",
-              href: null,
-              linkLabel: null,
+                "border-green-200 bg-green-50 text-green-700",
+              href: routes.erpFinancePayables,
+              linkLabel: "Pagar facturas",
             },
             {
               title: "Cierre de caja",
