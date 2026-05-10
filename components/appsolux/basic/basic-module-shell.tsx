@@ -32,17 +32,22 @@ export function BasicModuleShell({
         <div className="rounded-md border bg-muted/30 p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Appsolux Basico
-              </p>
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span className="inline-flex h-6 items-center rounded-full border border-slate-200 bg-slate-50 px-2 text-xs font-medium text-slate-600">
+                  Modo Basico
+                </span>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Appsolux Basico
+                </p>
+              </div>
               <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
                 {description}
               </p>
               <p className="mt-1 max-w-3xl text-xs text-muted-foreground">
-                Este es tu modo basico incluido en el plan. Para inventario
-                avanzado, multiples bodegas, POS completo y reportes avanzados,
-                activa ERP dedicado desde Mi plan.
+                Ideal para ventas rapidas, stock simple y clientes. Basico y
+                ERP Avanzado son modos separados; la migracion o sincronizacion
+                se manejara desde un flujo dedicado.
               </p>
             </div>
             <Button asChild>

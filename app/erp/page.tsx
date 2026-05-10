@@ -101,6 +101,10 @@ export default async function ErpPage() {
             <p className="mt-2 max-w-3xl text-muted-foreground">
               {getErpBlockedDescription(erpProvisioning)}
             </p>
+            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+              ERP Avanzado requiere activacion. Mientras tanto, el modo Basico
+              sigue separado y disponible para ventas simples.
+            </p>
             <p className="mt-1 text-sm text-muted-foreground">
               Empresa: {tenant.name}
             </p>
@@ -214,12 +218,16 @@ export default async function ErpPage() {
                 Controla ventas, compras, inventario, caja, clientes y
                 facturación desde un solo lugar.
               </p>
+              <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+                Inventario, compras, caja, contabilidad y reportes avanzados.
+                No mueve ni sincroniza datos del modo Basico.
+              </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Empresa: {tenant.name}
               </p>
             </div>
             <span className="inline-flex h-7 items-center rounded-full border border-green-200 bg-green-50 px-3 text-sm font-medium text-green-700">
-              ERP activo
+              ERP Avanzado
             </span>
           </div>
         </div>

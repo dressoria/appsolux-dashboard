@@ -36,19 +36,19 @@ export const dashboardNavigation: NavigationItem[] = [
       "Centro interno de alertas, pagos, comprobantes, leads y eventos importantes.",
   },
   {
-    title: "ERP",
+    title: "ERP Comercial",
     href: routes.erp,
     description:
       "Clientes, inventario, productos, ventas, compras, facturas y contabilidad.",
   },
   {
-    title: "POS",
+    title: "POS avanzado",
     href: routes.pos,
     description:
       "Punto de venta para crear pedidos desde productos, clientes e inventario.",
   },
   {
-    title: "Basico",
+    title: "Appsolux Basico",
     href: routes.basic,
     description: "Centro de ventas, productos, clientes, caja y stock simple.",
   },
