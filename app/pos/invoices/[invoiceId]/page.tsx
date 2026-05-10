@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DocumentActions } from "@/components/appsolux/erp/document-actions";
 import { EditSalesInvoiceDraftForm } from "@/components/appsolux/pos/edit-sales-invoice-draft-form";
 import { RegisterPaymentForm } from "@/components/appsolux/pos/register-payment-form";
 import { SalesInvoiceActions } from "@/components/appsolux/pos/sales-invoice-actions";
@@ -184,6 +185,29 @@ export default async function PosInvoiceDetailPage({
                 </div>
               ) : null}
             </dl>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Documentos</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <DocumentActions
+              doctype="Sales Invoice"
+              name={salesInvoice.name}
+              showXml
+            />
+            <p>
+              Esta factura corresponde al documento comercial en ERP. La
+              emision fiscal/SRI se activara en una fase posterior.
+            </p>
+            {salesInvoice.docstatus === 2 ? (
+              <p>
+                Cuando facturacion electronica este activa, anulaciones y notas
+                de credito seguiran reglas fiscales.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 

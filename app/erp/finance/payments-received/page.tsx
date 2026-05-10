@@ -3,6 +3,7 @@ import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CancelPaymentButton } from "@/components/appsolux/erp/cancel-payment-button";
+import { DocumentActions } from "@/components/appsolux/erp/document-actions";
 import { getErpnextPaymentEntries } from "@/lib/api/erpnext/payment-entries";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
@@ -225,7 +226,7 @@ export default async function ErpFinancePaymentsReceivedPage() {
                       </th>
                       <th className="py-2 pr-4 font-medium">Estado</th>
                       <th className="py-2 pr-4 font-medium">Referencia</th>
-                      <th className="py-2 font-medium">Accion</th>
+                      <th className="py-2 font-medium">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -257,8 +258,13 @@ export default async function ErpFinancePaymentsReceivedPage() {
                           {p.reference_no ?? "-"}
                         </td>
                         <td className="py-2">
-                          <div className="flex flex-col gap-1">
-                            <Button asChild size="sm" variant="outline">
+                          <div className="flex flex-col gap-1.5">
+                            <DocumentActions
+                              doctype="Payment Entry"
+                              name={p.name}
+                              size="xs"
+                            />
+                            <Button asChild size="xs" variant="outline">
                               <Link href={`${routes.posPayments}/${encodeURIComponent(p.name)}`}>
                                 Ver
                               </Link>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DocumentActions } from "@/components/appsolux/erp/document-actions";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -179,7 +180,7 @@ export default async function ErpFinanceReceivablesPage() {
                         Saldo
                       </th>
                       <th className="py-2 pr-4 font-medium">Estado</th>
-                      <th className="py-2 font-medium">Accion</th>
+                      <th className="py-2 font-medium">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -213,15 +214,20 @@ export default async function ErpFinanceReceivablesPage() {
                             ) : null}
                           </td>
                           <td className="py-2">
-                            <div className="flex gap-1">
-                              <Button asChild size="sm" variant="outline">
+                            <div className="flex flex-wrap gap-1.5">
+                              <DocumentActions
+                                doctype="Sales Invoice"
+                                name={inv.name}
+                                size="xs"
+                              />
+                              <Button asChild size="xs" variant="outline">
                                 <Link
                                   href={`${routes.posInvoices}/${encodeURIComponent(inv.name)}`}
                                 >
                                   Ver
                                 </Link>
                               </Button>
-                              <Button asChild size="sm">
+                              <Button asChild size="xs">
                                 <Link
                                   href={`${routes.posInvoices}/${encodeURIComponent(inv.name)}`}
                                 >

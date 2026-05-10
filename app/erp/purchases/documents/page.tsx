@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DocumentActions } from "@/components/appsolux/erp/document-actions";
 import { CreatePurchaseInvoiceDialog } from "@/components/appsolux/erp/create-purchase-invoice-dialog";
 import { CreatePurchaseOrderDialog } from "@/components/appsolux/erp/create-purchase-order-dialog";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
@@ -195,9 +196,8 @@ export default async function ErpPurchasesDocumentsPage() {
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
             <p>
-              Importacion de facturas por PDF (OCR) y XML fiscal estara
-              disponible en una proxima actualizacion. Por ahora registra
-              facturas manualmente usando el formulario de arriba.
+              La carga de PDF/XML de proveedor se conectara luego con OCR/XML
+              fiscal. Por ahora registra la compra manualmente.
             </p>
           </CardContent>
         </Card>
@@ -223,7 +223,8 @@ export default async function ErpPurchasesDocumentsPage() {
                       <th className="py-2 pr-4 font-medium">Fecha</th>
                       <th className="py-2 pr-4 font-medium">Entrega</th>
                       <th className="py-2 pr-4 font-medium">Estado</th>
-                      <th className="py-2 font-medium">Total</th>
+                      <th className="py-2 pr-4 font-medium">Total</th>
+                      <th className="py-2 font-medium">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -244,8 +245,15 @@ export default async function ErpPurchasesDocumentsPage() {
                         <td className="py-2 pr-4">
                           {getPurchaseOrderStatus(order.status, order.docstatus)}
                         </td>
-                        <td className="py-2 font-medium">
+                        <td className="py-2 pr-4 font-medium">
                           {formatMoney(order.grand_total)}
+                        </td>
+                        <td className="py-2">
+                          <DocumentActions
+                            doctype="Purchase Order"
+                            name={order.name}
+                            size="xs"
+                          />
                         </td>
                       </tr>
                     ))}
@@ -280,7 +288,8 @@ export default async function ErpPurchasesDocumentsPage() {
                       </th>
                       <th className="py-2 pr-4 font-medium">Estado</th>
                       <th className="py-2 pr-4 font-medium">Total</th>
-                      <th className="py-2 font-medium">Pendiente</th>
+                      <th className="py-2 pr-4 font-medium">Pendiente</th>
+                      <th className="py-2 font-medium">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -308,7 +317,7 @@ export default async function ErpPurchasesDocumentsPage() {
                         <td className="py-2 pr-4 font-medium">
                           {formatMoney(invoice.grand_total)}
                         </td>
-                        <td className="py-2">
+                        <td className="py-2 pr-4">
                           {(invoice.outstanding_amount ?? 0) > 0 ? (
                             <span className="font-medium text-amber-600">
                               {formatMoney(invoice.outstanding_amount)}
@@ -316,6 +325,15 @@ export default async function ErpPurchasesDocumentsPage() {
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
+                        </td>
+                        <td className="py-2">
+                          <DocumentActions
+                            doctype="Purchase Invoice"
+                            name={invoice.name}
+                            size="xs"
+                            showXml
+                            xmlLabel="XML proveedor en preparacion"
+                          />
                         </td>
                       </tr>
                     ))}

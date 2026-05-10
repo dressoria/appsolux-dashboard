@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DocumentActions } from "@/components/appsolux/erp/document-actions";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -88,7 +89,7 @@ export default async function PosOrdersPage() {
                       <th className="py-2 pr-4 font-medium">Fecha</th>
                       <th className="py-2 pr-4 font-medium">Estado</th>
                       <th className="py-2 pr-4 font-medium">Total</th>
-                      <th className="py-2 font-medium">Accion</th>
+                      <th className="py-2 font-medium">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -110,15 +111,22 @@ export default async function PosOrdersPage() {
                           {formatMoney(salesOrder.grand_total)}
                         </td>
                         <td className="py-2">
-                          <Button asChild size="sm" variant="outline">
-                            <Link
-                              href={`/pos/orders/${encodeURIComponent(
-                                salesOrder.name
-                              )}`}
-                            >
-                              Ver detalle
-                            </Link>
-                          </Button>
+                          <div className="flex flex-wrap gap-1.5">
+                            <DocumentActions
+                              doctype="Sales Order"
+                              name={salesOrder.name}
+                              size="xs"
+                            />
+                            <Button asChild size="xs" variant="outline">
+                              <Link
+                                href={`/pos/orders/${encodeURIComponent(
+                                  salesOrder.name
+                                )}`}
+                              >
+                                Ver detalle
+                              </Link>
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}

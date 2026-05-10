@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DocumentActions } from "@/components/appsolux/erp/document-actions";
 import { CreatePurchaseReceiptDialog } from "@/components/appsolux/erp/create-purchase-receipt-dialog";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
@@ -230,7 +231,8 @@ export default async function ErpPurchasesReceiptsPage() {
                       <th className="py-2 pr-4 font-medium">Proveedor</th>
                       <th className="py-2 pr-4 font-medium">Fecha</th>
                       <th className="py-2 pr-4 font-medium">Estado</th>
-                      <th className="py-2 font-medium">Total</th>
+                      <th className="py-2 pr-4 font-medium">Total</th>
+                      <th className="py-2 font-medium">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -248,8 +250,15 @@ export default async function ErpPurchasesReceiptsPage() {
                         <td className="py-2 pr-4">
                           {getReceiptStatus(receipt.status, receipt.docstatus)}
                         </td>
-                        <td className="py-2 font-medium">
+                        <td className="py-2 pr-4 font-medium">
                           {formatMoney(receipt.grand_total)}
+                        </td>
+                        <td className="py-2">
+                          <DocumentActions
+                            doctype="Purchase Receipt"
+                            name={receipt.name}
+                            size="xs"
+                          />
                         </td>
                       </tr>
                     ))}

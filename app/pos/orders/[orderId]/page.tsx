@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DocumentActions } from "@/components/appsolux/erp/document-actions";
 import { CreateInvoiceFromOrderButton } from "@/components/appsolux/pos/create-invoice-from-order-button";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
@@ -116,6 +117,24 @@ export default async function PosOrderDetailPage({
                 </dd>
               </div>
             </dl>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Documentos</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <div className="flex flex-wrap gap-1.5">
+              <DocumentActions doctype="Sales Order" name={salesOrder.name} />
+              <Button type="button" variant="outline" disabled>
+                Editar pedido - En preparacion
+              </Button>
+            </div>
+            <p>
+              Un pedido es un documento comercial interno; no es comprobante
+              fiscal.
+            </p>
           </CardContent>
         </Card>
 

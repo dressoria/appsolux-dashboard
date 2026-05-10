@@ -2,6 +2,7 @@ import Link from "next/link";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DocumentActions } from "@/components/appsolux/erp/document-actions";
 import { RegisterSupplierPaymentForm } from "@/components/appsolux/erp/register-supplier-payment-form";
 import { getErpnextPurchaseInvoices } from "@/lib/api/erpnext/purchase-invoices";
 import { getErpnextModesOfPayment } from "@/lib/api/erpnext/modes-of-payment";
@@ -171,7 +172,8 @@ export default async function ErpPurchasesPayablesPage() {
                       <th className="py-2 pr-4 font-medium">Fecha</th>
                       <th className="py-2 pr-4 font-medium">Nro. factura proveedor</th>
                       <th className="py-2 pr-4 font-medium">Total</th>
-                      <th className="py-2 font-medium">Pendiente</th>
+                      <th className="py-2 pr-4 font-medium">Pendiente</th>
+                      <th className="py-2 font-medium">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -190,8 +192,15 @@ export default async function ErpPurchasesPayablesPage() {
                         <td className="py-2 pr-4">
                           {formatMoney(invoice.grand_total)}
                         </td>
-                        <td className="py-2 font-semibold text-amber-600">
+                        <td className="py-2 pr-4 font-semibold text-amber-600">
                           {formatMoney(invoice.outstanding_amount)}
+                        </td>
+                        <td className="py-2">
+                          <DocumentActions
+                            doctype="Purchase Invoice"
+                            name={invoice.name}
+                            size="xs"
+                          />
                         </td>
                       </tr>
                     ))}

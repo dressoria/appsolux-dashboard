@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DocumentActions } from "@/components/appsolux/erp/document-actions";
 import { PaymentEntryActions } from "@/components/appsolux/pos/payment-entry-actions";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
@@ -136,6 +137,16 @@ export default async function PosPaymentDetailPage({
                 </div>
               ) : null}
             </dl>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Documentos</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <DocumentActions doctype="Payment Entry" name={paymentEntry.name} />
+            <p>Este comprobante corresponde al registro de pago.</p>
           </CardContent>
         </Card>
 

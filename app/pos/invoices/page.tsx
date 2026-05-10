@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DocumentActions } from "@/components/appsolux/erp/document-actions";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -125,7 +126,7 @@ export default async function PosInvoicesPage() {
                       <th className="py-2 pr-4 font-medium">Total</th>
                       <th className="py-2 pr-4 font-medium">Pendiente</th>
                       <th className="py-2 pr-4 font-medium">Pagado</th>
-                      <th className="py-2 font-medium">Accion</th>
+                      <th className="py-2 font-medium">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -157,15 +158,22 @@ export default async function PosInvoicesPage() {
                           {formatMoney(salesInvoice.paid_amount)}
                         </td>
                         <td className="py-2">
-                          <Button asChild size="sm" variant="outline">
-                            <Link
-                              href={`/pos/invoices/${encodeURIComponent(
-                                salesInvoice.name
-                              )}`}
-                            >
-                              Ver / cobrar
-                            </Link>
-                          </Button>
+                          <div className="flex flex-wrap gap-1.5">
+                            <DocumentActions
+                              doctype="Sales Invoice"
+                              name={salesInvoice.name}
+                              size="xs"
+                            />
+                            <Button asChild size="xs" variant="outline">
+                              <Link
+                                href={`/pos/invoices/${encodeURIComponent(
+                                  salesInvoice.name
+                                )}`}
+                              >
+                                Ver / cobrar
+                              </Link>
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
