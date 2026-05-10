@@ -102,7 +102,14 @@ export default async function ErpPurchasesPayablesPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
-              <Link href={routes.erpPurchasesDocuments}>Ver todas las facturas</Link>
+              <Link href={routes.erpPurchasesDocuments}>
+                Registrar factura
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={routes.erpPurchasesDocuments}>
+                Ver todas las facturas
+              </Link>
             </Button>
             <Button asChild variant="outline">
               <Link href={routes.erpPurchases}>Volver a compras</Link>
@@ -139,8 +146,15 @@ export default async function ErpPurchasesPayablesPage() {
           <CardContent>
             {pendingInvoices.length === 0 ? (
               <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                No hay facturas pendientes de pago. Todos los saldos estan al
-                dia.
+                No hay facturas de compra pendientes de pago. Registra una
+                factura recibida desde{" "}
+                <Link
+                  href={routes.erpPurchasesDocuments}
+                  className="underline underline-offset-2"
+                >
+                  Compras y facturas
+                </Link>{" "}
+                para generar cuentas por pagar.
               </div>
             ) : (
               <div className="overflow-x-auto">

@@ -578,3 +578,48 @@ export type ErpnextCostCenter = {
   is_group?: 0 | 1;
   parent_cost_center?: string;
 };
+
+export type CreatePurchaseOrderItemInput = {
+  item_code: string;
+  qty: number;
+  rate: number;
+  warehouse?: string;
+};
+
+export type CreatePurchaseOrderInput = {
+  supplier: string;
+  company: string;
+  transaction_date: string;
+  schedule_date?: string;
+  items: CreatePurchaseOrderItemInput[];
+};
+
+export type CreatePurchaseInvoiceItemInput = {
+  item_code: string;
+  qty: number;
+  rate: number;
+  warehouse?: string;
+};
+
+export type CreatePurchaseInvoiceInput = {
+  supplier: string;
+  company: string;
+  posting_date: string;
+  bill_no?: string;
+  bill_date?: string;
+  items: CreatePurchaseInvoiceItemInput[];
+};
+
+export type CreatePurchaseReceiptItemInput = {
+  item_code: string;
+  qty: number;
+  rate?: number;
+  warehouse: string;
+};
+
+export type CreatePurchaseReceiptInput = {
+  supplier: string;
+  company: string;
+  posting_date: string;
+  items: CreatePurchaseReceiptItemInput[];
+};

@@ -1,8 +1,13 @@
 import Link from "next/link";
+import { CreatePurchaseReceiptDialog } from "@/components/appsolux/erp/create-purchase-receipt-dialog";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getErpnextCompanies } from "@/lib/api/erpnext/companies";
+import { getErpnextItems } from "@/lib/api/erpnext/items";
 import { getErpnextPurchaseReceipts } from "@/lib/api/erpnext/purchase-receipts";
+import { getErpnextSuppliers } from "@/lib/api/erpnext/suppliers";
+import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
@@ -85,7 +90,17 @@ export default async function ErpPurchasesReceiptsPage() {
     );
   }
 
-  const receipts = await getErpnextPurchaseReceipts();
+  const [receipts, suppliers, items, companies, warehouses] = await Promise.all(
+    [
+      getErpnextPurchaseReceipts().catch(() => []),
+      getErpnextSuppliers().catch(() => []),
+      getErpnextItems().catch(() => []),
+      getErpnextCompanies().catch(() => []),
+      getErpnextWarehouses().catch(() => []),
+    ]
+  );
+
+  const operativeWarehouses = warehouses.filter((w) => w.is_group !== 1);
 
   return (
     <DashboardShell>
@@ -111,6 +126,9 @@ export default async function ErpPurchasesReceiptsPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
+              <Link href={routes.erpInventoryStock}>Ver stock</Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link href={routes.erpPurchasesDocuments}>Ver compras</Link>
             </Button>
             <Button asChild variant="outline">
@@ -122,6 +140,74 @@ export default async function ErpPurchasesReceiptsPage() {
           </div>
         </div>
 
+        {suppliers.length === 0 ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm text-amber-700">
+            No hay proveedores registrados.{" "}
+            <Link
+              href={routes.erpPurchasesSuppliers}
+              className="underline underline-offset-2"
+            >
+              Crea un proveedor
+            </Link>{" "}
+            antes de registrar ingresos.
+          </div>
+        ) : null}
+
+        {operativeWarehouses.length === 0 ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm text-amber-700">
+            No hay bodegas operativas.{" "}
+            <Link
+              href={routes.erpInventoryWarehouses}
+              className="underline underline-offset-2"
+            >
+              Crea una bodega
+            </Link>{" "}
+            antes de registrar ingresos.
+          </div>
+        ) : null}
+
+        {items.length === 0 ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm text-amber-700">
+            No hay productos registrados.{" "}
+            <Link
+              href={routes.erpInventoryProducts}
+              className="underline underline-offset-2"
+            >
+              Crea productos
+            </Link>{" "}
+            antes de registrar ingresos.
+          </div>
+        ) : null}
+
+        <div className="flex items-center gap-3">
+          <CreatePurchaseReceiptDialog
+            suppliers={suppliers}
+            items={items}
+            companies={companies}
+            warehouses={warehouses}
+          />
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-sm text-muted-foreground">
+          Los ingresos se crean en borrador. El stock se actualiza cuando el
+          documento sea confirmado en el ERP. Despues de confirmar, el movimiento
+          aparece en{" "}
+          <Link
+            href={routes.erpInventoryStock}
+            className="underline underline-offset-2"
+          >
+            Ver stock
+          </Link>{" "}
+          y en{" "}
+          <Link
+            href={routes.erpInventoryMovements}
+            className="underline underline-offset-2"
+          >
+            Movimientos
+          </Link>
+          .
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle>Ingresos registrados</CardTitle>
@@ -129,7 +215,11 @@ export default async function ErpPurchasesReceiptsPage() {
           <CardContent>
             {receipts.length === 0 ? (
               <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                Aun no hay ingresos de mercaderia registrados.
+                Aun no hay ingresos de mercaderia registrados. Usa el boton{" "}
+                <span className="font-medium">
+                  Registrar ingreso de mercaderia
+                </span>{" "}
+                para crear el primero.
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -146,7 +236,9 @@ export default async function ErpPurchasesReceiptsPage() {
                   <tbody className="divide-y">
                     {receipts.map((receipt) => (
                       <tr key={receipt.name}>
-                        <td className="py-2 pr-4 font-medium">{receipt.name}</td>
+                        <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">
+                          {receipt.name}
+                        </td>
                         <td className="py-2 pr-4">
                           {receipt.supplier_name ?? receipt.supplier}
                         </td>

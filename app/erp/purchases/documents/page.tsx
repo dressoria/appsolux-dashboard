@@ -1,9 +1,14 @@
 import Link from "next/link";
+import { CreatePurchaseInvoiceDialog } from "@/components/appsolux/erp/create-purchase-invoice-dialog";
+import { CreatePurchaseOrderDialog } from "@/components/appsolux/erp/create-purchase-order-dialog";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getErpnextCompanies } from "@/lib/api/erpnext/companies";
+import { getErpnextItems } from "@/lib/api/erpnext/items";
 import { getErpnextPurchaseInvoices } from "@/lib/api/erpnext/purchase-invoices";
 import { getErpnextPurchaseOrders } from "@/lib/api/erpnext/purchase-orders";
+import { getErpnextSuppliers } from "@/lib/api/erpnext/suppliers";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
@@ -107,10 +112,14 @@ export default async function ErpPurchasesDocumentsPage() {
     );
   }
 
-  const [purchaseOrders, purchaseInvoices] = await Promise.all([
-    getErpnextPurchaseOrders(),
-    getErpnextPurchaseInvoices(),
-  ]);
+  const [purchaseOrders, purchaseInvoices, suppliers, items, companies] =
+    await Promise.all([
+      getErpnextPurchaseOrders().catch(() => []),
+      getErpnextPurchaseInvoices().catch(() => []),
+      getErpnextSuppliers().catch(() => []),
+      getErpnextItems().catch(() => []),
+      getErpnextCompanies().catch(() => []),
+    ]);
 
   return (
     <DashboardShell>
@@ -136,7 +145,9 @@ export default async function ErpPurchasesDocumentsPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
-              <Link href={routes.erpPurchasesPayables}>Ver cuentas por pagar</Link>
+              <Link href={routes.erpPurchasesPayables}>
+                Ver cuentas por pagar
+              </Link>
             </Button>
             <Button asChild variant="outline">
               <Link href={routes.erpPurchases}>Volver a compras</Link>
@@ -147,6 +158,50 @@ export default async function ErpPurchasesDocumentsPage() {
           </div>
         </div>
 
+        {suppliers.length === 0 ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm text-amber-700">
+            No hay proveedores registrados.{" "}
+            <Link
+              href={routes.erpPurchasesSuppliers}
+              className="underline underline-offset-2"
+            >
+              Crea un proveedor
+            </Link>{" "}
+            antes de registrar compras.
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap gap-2">
+          <CreatePurchaseOrderDialog
+            suppliers={suppliers}
+            items={items}
+            companies={companies}
+          />
+          <CreatePurchaseInvoiceDialog
+            suppliers={suppliers}
+            items={items}
+            companies={companies}
+          />
+        </div>
+
+        <Card className="border-dashed">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base text-muted-foreground">
+              Cargar PDF / XML
+              <span className="inline-flex h-5 items-center rounded-full border border-slate-200 bg-slate-50 px-2 text-xs font-medium text-slate-500">
+                En preparacion
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            <p>
+              Importacion de facturas por PDF (OCR) y XML fiscal estara
+              disponible en una proxima actualizacion. Por ahora registra
+              facturas manualmente usando el formulario de arriba.
+            </p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Ordenes de compra</CardTitle>
@@ -154,7 +209,9 @@ export default async function ErpPurchasesDocumentsPage() {
           <CardContent>
             {purchaseOrders.length === 0 ? (
               <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                Aun no hay ordenes de compra registradas.
+                Aun no hay ordenes de compra. Usa el boton{" "}
+                <span className="font-medium">Nueva orden de compra</span> para
+                crear la primera.
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -172,7 +229,9 @@ export default async function ErpPurchasesDocumentsPage() {
                   <tbody className="divide-y">
                     {purchaseOrders.map((order) => (
                       <tr key={order.name}>
-                        <td className="py-2 pr-4 font-medium">{order.name}</td>
+                        <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">
+                          {order.name}
+                        </td>
                         <td className="py-2 pr-4">
                           {order.supplier_name ?? order.supplier}
                         </td>
@@ -204,7 +263,9 @@ export default async function ErpPurchasesDocumentsPage() {
           <CardContent>
             {purchaseInvoices.length === 0 ? (
               <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                Aun no hay facturas recibidas registradas.
+                Aun no hay facturas recibidas. Usa el boton{" "}
+                <span className="font-medium">Registrar factura recibida</span>{" "}
+                para agregar la primera.
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -214,7 +275,9 @@ export default async function ErpPurchasesDocumentsPage() {
                       <th className="py-2 pr-4 font-medium">Factura</th>
                       <th className="py-2 pr-4 font-medium">Proveedor</th>
                       <th className="py-2 pr-4 font-medium">Fecha</th>
-                      <th className="py-2 pr-4 font-medium">Nro. factura proveedor</th>
+                      <th className="py-2 pr-4 font-medium">
+                        Nro. factura proveedor
+                      </th>
                       <th className="py-2 pr-4 font-medium">Estado</th>
                       <th className="py-2 pr-4 font-medium">Total</th>
                       <th className="py-2 font-medium">Pendiente</th>
@@ -223,7 +286,9 @@ export default async function ErpPurchasesDocumentsPage() {
                   <tbody className="divide-y">
                     {purchaseInvoices.map((invoice) => (
                       <tr key={invoice.name}>
-                        <td className="py-2 pr-4 font-medium">{invoice.name}</td>
+                        <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">
+                          {invoice.name}
+                        </td>
                         <td className="py-2 pr-4">
                           {invoice.supplier_name ?? invoice.supplier}
                         </td>
