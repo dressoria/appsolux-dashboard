@@ -893,6 +893,7 @@ export function ConversationInbox({
     useState<SortOption>("last_activity_desc");
   const [showFilters, setShowFilters] = useState(false);
   const [showSort, setShowSort] = useState(false);
+  const filterPanelRef = useRef<HTMLDivElement>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [slashSuggestions, setSlashSuggestions] = useState<QuickReply[]>([]);
   const [actionState, setActionState] = useState<ActionState>("idle");
@@ -996,6 +997,21 @@ export function ConversationInbox({
   useEffect(() => {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!showFilters && !showSort) return;
+    function handlePointerDown(event: PointerEvent) {
+      if (
+        filterPanelRef.current &&
+        !filterPanelRef.current.contains(event.target as Node)
+      ) {
+        setShowFilters(false);
+        setShowSort(false);
+      }
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [showFilters, showSort]);
 
   useEffect(() => {
     const es = new EventSource("/api/conversations/events");
@@ -1473,7 +1489,7 @@ export function ConversationInbox({
             onChange={(event) => setQuery(event.target.value)}
           />
 
-          <div className="relative flex flex-wrap gap-2">
+          <div ref={filterPanelRef} className="relative flex flex-wrap gap-2">
             <Button
               type="button"
               variant="outline"

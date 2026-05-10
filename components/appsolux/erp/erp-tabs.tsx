@@ -190,7 +190,11 @@ const MODULES: Module[] = [
         status: "available",
         href: routes.erpInventoryKardex,
       },
-      { label: "Transferencias entre bodegas", status: "in-preparation" },
+      {
+        label: "Transferencias entre bodegas",
+        status: "in-preparation",
+        href: routes.erpInventoryTransfers,
+      },
       { label: "Toma fisica", status: "coming-soon" },
       {
         label: "Ingresos de mercaderia",
@@ -490,6 +494,25 @@ function SubItemRow({
         <span className="leading-tight">{item.label}</span>
         <ArrowRight className="ml-2 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       </button>
+    );
+  }
+
+  if (item.href && item.status === "in-preparation") {
+    return (
+      <Link
+        href={item.href}
+        className="flex items-start justify-between gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-muted"
+      >
+        <span className="leading-tight text-muted-foreground">{item.label}</span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {item.badge ? (
+            <span className="inline-flex h-4 items-center rounded border border-slate-200 bg-slate-50 px-1.5 text-xs text-slate-500">
+              {item.badge}
+            </span>
+          ) : null}
+          <StatusBadge status={item.status} />
+        </div>
+      </Link>
     );
   }
 

@@ -70,20 +70,23 @@ export async function getErpnextPaymentEntryDetail(
 export async function getPaymentEntriesForSalesInvoice(
   salesInvoiceName: string
 ): Promise<ErpnextPaymentEntry[]> {
-  const paymentEntries = await getErpnextPaymentEntries();
-  const detailedPaymentEntries = await Promise.all(
-    paymentEntries.map((paymentEntry) =>
-      getErpnextPaymentEntryDetail(paymentEntry.name)
-    )
+  // Filter directly on the child table to avoid N+1: only fetch Payment Entries
+  // that actually reference this sales invoice (typically 1-3 results).
+  const filters = JSON.stringify([
+    ["Payment Entry Reference", "reference_name", "=", salesInvoiceName],
+    ["Payment Entry Reference", "reference_doctype", "=", "Sales Invoice"],
+  ]);
+  const params = new URLSearchParams({
+    fields: JSON.stringify(["name"]),
+    filters,
+    limit_page_length: "20",
+  });
+  const listResponse = await erpnextFetch<ErpnextListResponse<{ name: string }>>(
+    `/api/resource/Payment%20Entry?${params.toString()}`
   );
-
-  return detailedPaymentEntries.filter((paymentEntry) =>
-    (paymentEntry.references ?? []).some(
-      (reference) =>
-        reference.reference_doctype === "Sales Invoice" &&
-        reference.reference_name === salesInvoiceName
-    )
-  );
+  const names = listResponse.data.map((r) => r.name);
+  if (names.length === 0) return [];
+  return Promise.all(names.map((name) => getErpnextPaymentEntryDetail(name)));
 }
 
 export async function cancelErpnextPaymentEntry(

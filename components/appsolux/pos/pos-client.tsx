@@ -766,7 +766,7 @@ export function PosClient({
                 disabled={!canCreateOrder || isSubmitting}
                 onClick={handleCreateOrder}
               >
-                {isSubmitting ? "Guardando..." : "Guardar como pedido pendiente"}
+                {isSubmitting ? "Guardando..." : "Guardar pedido"}
               </Button>
             </div>
           </CardContent>

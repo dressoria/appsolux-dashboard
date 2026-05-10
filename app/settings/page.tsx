@@ -1,5 +1,6 @@
 import { SettingsTabs } from "@/components/appsolux/settings/settings-tabs";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
+import { Card, CardContent } from "@/components/ui/card";
 import { getCashAndBankAccounts } from "@/lib/api/erpnext/accounts";
 import {
   getErpnextCompanies,
@@ -16,22 +17,32 @@ import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 async function loadErpSettings(erpnextCompanyId: string | null | undefined) {
   const [companies, warehouses, modesOfPayment] = await Promise.all([
-    getErpnextCompanies(),
-    getErpnextWarehouses(),
-    getErpnextModesOfPayment(),
+    getErpnextCompanies().catch(() => []),
+    getErpnextWarehouses().catch(() => []),
+    getErpnextModesOfPayment().catch(() => []),
   ]);
-  const companyName =
-    erpnextCompanyId ?? companies.find((c) => c.name)?.name ?? undefined;
+
+  const configuredExists =
+    Boolean(erpnextCompanyId) &&
+    companies.some((c) => c.name === erpnextCompanyId);
+  const companyMismatch = Boolean(erpnextCompanyId) && !configuredExists;
+  const effectiveName = configuredExists
+    ? erpnextCompanyId!
+    : (companies[0]?.name ?? undefined);
+
   const [company, paymentModeDetails, accounts] = await Promise.all([
-    companyName
-      ? getErpnextCompanyDetail(companyName)
+    effectiveName
+      ? getErpnextCompanyDetail(effectiveName).catch(() => undefined)
       : Promise.resolve(undefined),
     Promise.all(
       modesOfPayment.map((m) => getErpnextModeOfPaymentDetail(m.name))
-    ),
-    companyName ? getCashAndBankAccounts(companyName) : Promise.resolve([]),
+    ).catch(() => []),
+    effectiveName
+      ? getCashAndBankAccounts(effectiveName).catch(() => [])
+      : Promise.resolve([]),
   ]);
-  return { companies, warehouses, company, paymentModeDetails, accounts };
+
+  return { companies, warehouses, company, paymentModeDetails, accounts, companyMismatch };
 }
 
 function getErpBadge(erp: {
@@ -113,6 +124,18 @@ export default async function SettingsPage() {
             {badge.label}
           </span>
         </div>
+
+        {erpData?.companyMismatch ? (
+          <Card className="border-amber-200 bg-amber-50/60">
+            <CardContent className="p-4 text-sm text-amber-800">
+              <span className="font-medium">
+                La empresa configurada no coincide con el ERP.
+              </span>{" "}
+              Se muestra la empresa disponible. Revisa la configuracion del
+              tenant.
+            </CardContent>
+          </Card>
+        ) : null}
 
         <SettingsTabs
           company={erpData?.company}

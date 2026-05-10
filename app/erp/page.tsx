@@ -1,4 +1,5 @@
-﻿import { ErpTabs } from "@/components/appsolux/erp/erp-tabs";
+﻿import Link from "next/link";
+import { ErpTabs } from "@/components/appsolux/erp/erp-tabs";
 import { ErpDedicatedProvisionCard } from "@/components/appsolux/dashboard/erp-dedicated-provision-card";
 import { AdvancedModeBlockedCard } from "@/components/appsolux/dashboard/advanced-mode-blocked-card";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
@@ -14,6 +15,7 @@ import { canManageSettings } from "@/lib/auth/permissions";
 import { getErpProvisioningState } from "@/lib/core/erp-provisioning-status";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { routes } from "@/config/routes";
 import type { ErpnextMasters } from "@/types/erpnext";
 
 type LoadResult<T> = {
@@ -87,7 +89,12 @@ export default async function ErpPage() {
       <DashboardShell>
         <div className="space-y-6">
           <div>
-            <p className="text-sm text-muted-foreground">ERP Comercial</p>
+            <p className="text-sm text-muted-foreground">
+              <Link href={routes.dashboard} className="hover:underline">
+                Dashboard
+              </Link>{" "}
+              / ERP Comercial
+            </p>
             <h1 className="text-3xl font-semibold tracking-tight">
               ERP Comercial
             </h1>
@@ -194,7 +201,12 @@ export default async function ErpPage() {
         <div>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-sm text-muted-foreground">ERP Comercial</p>
+              <p className="text-sm text-muted-foreground">
+                <Link href={routes.dashboard} className="hover:underline">
+                  Dashboard
+                </Link>{" "}
+                / ERP Comercial
+              </p>
               <h1 className="text-3xl font-semibold tracking-tight">
                 ERP Comercial
               </h1>
