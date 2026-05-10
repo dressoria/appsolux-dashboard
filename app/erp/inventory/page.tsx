@@ -156,6 +156,20 @@ export default async function ErpInventoryPage() {
               <Link href={routes.erpInventoryStock}>Ver stock actual</Link>
             </Button>
             <Button asChild variant="outline">
+              <Link href={`${routes.erpInventoryStock}?filter=low`}>
+                Stock bajo
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={routes.erpInventoryTransfers}>Transferencias</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={routes.erpInventoryPhysicalCount}>Toma fisica</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={routes.erpInventoryValuation}>Inventario valorizado</Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link href={routes.erpInventoryAdjustments}>
                 Ajustar inventario
               </Link>
@@ -273,7 +287,19 @@ export default async function ErpInventoryPage() {
               title: "Transferencias",
               desc: "Mueve productos entre sucursales o bodegas.",
               href: routes.erpInventoryTransfers,
-              status: "En preparacion",
+              status: "Disponible",
+            },
+            {
+              title: "Toma fisica",
+              desc: "Compara conteo real con stock del sistema y aplica ajustes.",
+              href: routes.erpInventoryPhysicalCount,
+              status: "Disponible",
+            },
+            {
+              title: "Inventario valorizado",
+              desc: "Valor total del inventario calculado por costo promedio.",
+              href: routes.erpInventoryValuation,
+              status: "Disponible",
             },
             {
               title: "Ingresos de mercaderia",

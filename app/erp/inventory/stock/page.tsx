@@ -15,7 +15,12 @@ function formatQty(value: number | undefined) {
   }).format(value);
 }
 
-export default async function ErpInventoryStockPage() {
+type StockPageProps = {
+  searchParams: { filter?: string };
+};
+
+export default async function ErpInventoryStockPage({ searchParams }: StockPageProps) {
+  const filter = searchParams.filter ?? "all";
   const user = await getCurrentUser();
 
   if (!user) {
@@ -68,9 +73,26 @@ export default async function ErpInventoryStockPage() {
     );
   }
 
+  const LOW_STOCK_THRESHOLD = 5;
+
   const inventory = await getErpnextInventory();
   const noStockRows = inventory.filter((b) => (b.actual_qty ?? 0) <= 0);
   const withStockRows = inventory.filter((b) => (b.actual_qty ?? 0) > 0);
+  const lowStockRows = withStockRows.filter((b) => (b.actual_qty ?? 0) <= LOW_STOCK_THRESHOLD);
+
+  const displayRows =
+    filter === "out"
+      ? noStockRows
+      : filter === "low"
+        ? lowStockRows
+        : inventory;
+
+  const pageTitle =
+    filter === "out"
+      ? "Stock actual — Sin stock"
+      : filter === "low"
+        ? "Stock actual — Stock bajo"
+        : "Stock actual";
 
   return (
     <DashboardShell>
@@ -87,19 +109,14 @@ export default async function ErpInventoryStockPage() {
               </Link>{" "}
               / Stock actual
             </p>
-            <h1 className="text-3xl font-semibold tracking-tight">
-              Stock actual
-            </h1>
+            <h1 className="text-3xl font-semibold tracking-tight">{pageTitle}</h1>
             <p className="mt-2 text-muted-foreground">
-              Cantidades disponibles, proyectadas y reservadas por producto y
-              bodega.
+              Cantidades disponibles, proyectadas y reservadas por producto y bodega.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
-              <Link href={routes.erpInventoryAdjustments}>
-                Ajustar inventario
-              </Link>
+              <Link href={routes.erpInventoryAdjustments}>Ajustar inventario</Link>
             </Button>
             <Button asChild variant="outline">
               <Link href={routes.erpInventoryMovements}>Ver movimientos</Link>
@@ -113,18 +130,48 @@ export default async function ErpInventoryStockPage() {
           </div>
         </div>
 
-        {noStockRows.length > 0 ? (
-          <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm text-amber-800">
-            <span className="font-medium">
-              {noStockRows.length}{" "}
-              {noStockRows.length === 1
-                ? "producto sin stock"
-                : "productos sin stock"}
-            </span>
-            <span className="text-amber-600">
-              — Revisa ajustes o ingresos de mercaderia
-            </span>
-          </div>
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-sm text-muted-foreground">
+          Los ingresos o transferencias en borrador no afectan el stock hasta ser confirmados en el
+          ERP.
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`${routes.erpInventoryStock}`}
+            className={`inline-flex h-8 items-center rounded-lg border px-3 text-sm font-medium transition-colors ${
+              filter === "all" || filter === undefined || filter === ""
+                ? "border-slate-900 bg-slate-900 text-white"
+                : "border-input bg-background hover:bg-muted"
+            }`}
+          >
+            Todos ({inventory.length})
+          </Link>
+          <Link
+            href={`${routes.erpInventoryStock}?filter=out`}
+            className={`inline-flex h-8 items-center rounded-lg border px-3 text-sm font-medium transition-colors ${
+              filter === "out"
+                ? "border-amber-600 bg-amber-600 text-white"
+                : "border-input bg-background hover:bg-muted"
+            }`}
+          >
+            Sin stock ({noStockRows.length})
+          </Link>
+          <Link
+            href={`${routes.erpInventoryStock}?filter=low`}
+            className={`inline-flex h-8 items-center rounded-lg border px-3 text-sm font-medium transition-colors ${
+              filter === "low"
+                ? "border-amber-500 bg-amber-500 text-white"
+                : "border-input bg-background hover:bg-muted"
+            }`}
+          >
+            Stock bajo ({lowStockRows.length})
+          </Link>
+        </div>
+
+        {filter === "low" ? (
+          <p className="text-xs text-muted-foreground">
+            Stock bajo: productos con cantidad disponible entre 1 y {LOW_STOCK_THRESHOLD} unidades (estimado). Para umbrales exactos configura nivel de reorden en el ERP.
+          </p>
         ) : null}
 
         <div className="grid gap-3 md:grid-cols-3">
@@ -132,9 +179,7 @@ export default async function ErpInventoryStockPage() {
             <CardHeader>
               <CardTitle>Filas de stock</CardTitle>
             </CardHeader>
-            <CardContent className="text-2xl font-semibold">
-              {inventory.length}
-            </CardContent>
+            <CardContent className="text-2xl font-semibold">{inventory.length}</CardContent>
           </Card>
           <Card>
             <CardHeader>
@@ -158,13 +203,22 @@ export default async function ErpInventoryStockPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Stock por producto y bodega</CardTitle>
+            <CardTitle>
+              {filter === "out"
+                ? "Productos sin stock"
+                : filter === "low"
+                  ? "Productos con stock bajo"
+                  : "Stock por producto y bodega"}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {inventory.length === 0 ? (
+            {displayRows.length === 0 ? (
               <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                Aun no hay stock registrado. Agrega stock desde la seccion de
-                ajustes o mediante ingresos de mercaderia.
+                {filter === "out"
+                  ? "No hay productos sin stock en este momento."
+                  : filter === "low"
+                    ? "No hay productos con stock bajo en este momento."
+                    : "Aun no hay stock registrado. Agrega stock desde ajustes o ingresos de mercaderia."}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -173,22 +227,17 @@ export default async function ErpInventoryStockPage() {
                     <tr>
                       <th className="py-2 pr-4 font-medium">Producto</th>
                       <th className="py-2 pr-4 font-medium">Bodega</th>
-                      <th className="py-2 pr-4 font-medium text-right">
-                        Disponible
-                      </th>
-                      <th className="py-2 pr-4 font-medium text-right">
-                        Proyectado
-                      </th>
-                      <th className="py-2 pr-4 font-medium text-right">
-                        Reservado
-                      </th>
+                      <th className="py-2 pr-4 font-medium text-right">Disponible</th>
+                      <th className="py-2 pr-4 font-medium text-right">Proyectado</th>
+                      <th className="py-2 pr-4 font-medium text-right">Reservado</th>
                       <th className="py-2 font-medium">Estado</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {inventory.map((bin) => {
+                    {displayRows.map((bin) => {
                       const qty = bin.actual_qty ?? 0;
                       const isNoStock = qty <= 0;
+                      const isLow = qty > 0 && qty <= LOW_STOCK_THRESHOLD;
                       return (
                         <tr key={bin.name}>
                           <td className="py-2 pr-4 font-medium">
@@ -199,11 +248,11 @@ export default async function ErpInventoryStockPage() {
                               {bin.item_code}
                             </Link>
                           </td>
-                          <td className="py-2 pr-4 text-muted-foreground">
-                            {bin.warehouse}
-                          </td>
+                          <td className="py-2 pr-4 text-muted-foreground">{bin.warehouse}</td>
                           <td
-                            className={`py-2 pr-4 text-right font-semibold ${isNoStock ? "text-amber-600" : ""}`}
+                            className={`py-2 pr-4 text-right font-semibold ${
+                              isNoStock ? "text-amber-600" : isLow ? "text-orange-600" : ""
+                            }`}
                           >
                             {formatQty(bin.actual_qty)}
                           </td>
@@ -217,6 +266,10 @@ export default async function ErpInventoryStockPage() {
                             {isNoStock ? (
                               <span className="inline-flex h-5 items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700">
                                 Sin stock
+                              </span>
+                            ) : isLow ? (
+                              <span className="inline-flex h-5 items-center rounded-full border border-orange-200 bg-orange-50 px-2 text-xs font-medium text-orange-700">
+                                Stock bajo
                               </span>
                             ) : (
                               <span className="inline-flex h-5 items-center rounded-full border border-green-200 bg-green-50 px-2 text-xs font-medium text-green-700">

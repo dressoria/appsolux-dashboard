@@ -3,6 +3,7 @@ import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AdjustStockForm } from "@/components/appsolux/erp/adjust-stock-form";
+import { BulkStockAdjustment } from "@/components/appsolux/erp/bulk-stock-adjustment";
 import { CreateStockEntryForm } from "@/components/appsolux/erp/create-stock-entry-form";
 import { getErpnextItems } from "@/lib/api/erpnext/items";
 import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
@@ -129,6 +130,19 @@ export default async function ErpInventoryAdjustmentsPage() {
         <CreateStockEntryForm items={items} warehouses={warehouses} />
 
         <AdjustStockForm items={items} warehouses={warehouses} />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Ajuste masivo desde CSV</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Carga un archivo CSV para ajustar multiples productos a la vez. Descarga la plantilla,
+              completa las cantidades objetivo y sube el archivo para validar y aplicar.
+            </p>
+            <BulkStockAdjustment items={items} warehouses={warehouses} />
+          </CardContent>
+        </Card>
       </div>
     </DashboardShell>
   );

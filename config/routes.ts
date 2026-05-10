@@ -23,6 +23,8 @@ export const routes = {
   erpInventoryTransfers: "/erp/inventory/transfers",
   erpInventoryKardex: "/erp/inventory/kardex",
   erpInventoryWarehouses: "/erp/inventory/warehouses",
+  erpInventoryPhysicalCount: "/erp/inventory/physical-count",
+  erpInventoryValuation: "/erp/inventory/valuation",
   erpFinance: "/erp/finance",
   erpFinancePaymentsReceived: "/erp/finance/payments-received",
   erpFinanceReceivables: "/erp/finance/receivables",

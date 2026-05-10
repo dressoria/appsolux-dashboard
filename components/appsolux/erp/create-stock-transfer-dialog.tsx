@@ -1,0 +1,277 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import type { ApiResponse } from "@/types/api";
+import type { ErpnextStockEntry, ErpnextWarehouse, ErpnextItem } from "@/types/erpnext";
+
+type Props = {
+  warehouses: ErpnextWarehouse[];
+  items: ErpnextItem[];
+};
+
+type DraftRow = {
+  id: number;
+  item_code: string;
+  qty: string;
+};
+
+type TransferResponse = ApiResponse<{ transfer: ErpnextStockEntry }>;
+
+const selectClassName =
+  "h-8 w-full rounded-lg border border-input bg-background px-2.5 py-1 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50";
+
+function today() {
+  return new Date().toISOString().split("T")[0];
+}
+
+export function CreateStockTransferDialog({ warehouses, items }: Props) {
+  const router = useRouter();
+  const operativeWarehouses = warehouses.filter(
+    (w) => w.is_group !== 1 && w.disabled !== 1
+  );
+  const stockItems = items.filter((i) => i.disabled !== 1 && i.is_stock_item !== 0);
+
+  const [open, setOpen] = useState(false);
+  const [fromWarehouse, setFromWarehouse] = useState("");
+  const [toWarehouse, setToWarehouse] = useState("");
+  const [date, setDate] = useState(today);
+  const [rows, setRows] = useState<DraftRow[]>([{ id: 1, item_code: "", qty: "1" }]);
+  const [message, setMessage] = useState<string | null>(null);
+  const [isError, setIsError] = useState(false);
+  const [isPending, setIsPending] = useState(false);
+
+  function addRow() {
+    setRows((prev) => [...prev, { id: Date.now(), item_code: "", qty: "1" }]);
+  }
+
+  function removeRow(id: number) {
+    if (rows.length === 1) return;
+    setRows((prev) => prev.filter((r) => r.id !== id));
+  }
+
+  function updateRow(id: number, field: "item_code" | "qty", value: string) {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+  }
+
+  function resetForm() {
+    setFromWarehouse("");
+    setToWarehouse("");
+    setDate(today());
+    setRows([{ id: 1, item_code: "", qty: "1" }]);
+    setMessage(null);
+    setIsError(false);
+  }
+
+  function handleClose() {
+    resetForm();
+    setOpen(false);
+  }
+
+  async function handleSubmit() {
+    setMessage(null);
+    setIsError(false);
+
+    if (!fromWarehouse) {
+      setIsError(true);
+      setMessage("Selecciona bodega origen.");
+      return;
+    }
+    if (!toWarehouse) {
+      setIsError(true);
+      setMessage("Selecciona bodega destino.");
+      return;
+    }
+    if (fromWarehouse === toWarehouse) {
+      setIsError(true);
+      setMessage("Bodega origen y destino no pueden ser la misma.");
+      return;
+    }
+
+    const validRows = rows.filter((r) => r.item_code && Number(r.qty) > 0);
+    if (validRows.length === 0) {
+      setIsError(true);
+      setMessage("Agrega al menos un producto con cantidad mayor a 0.");
+      return;
+    }
+
+    setIsPending(true);
+    try {
+      const response = await fetch("/api/erpnext/inventory/transfers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from_warehouse: fromWarehouse,
+          to_warehouse: toWarehouse,
+          posting_date: date,
+          items: validRows.map((r) => ({ item_code: r.item_code, qty: Number(r.qty) })),
+        }),
+      });
+      const result = (await response.json()) as TransferResponse;
+
+      if (!result.success) {
+        setIsError(true);
+        setMessage(result.error.message);
+        return;
+      }
+
+      setMessage(`Transferencia ${result.data.transfer.name} aplicada.`);
+      router.refresh();
+      window.setTimeout(() => {
+        handleClose();
+      }, 1800);
+    } catch (error) {
+      setIsError(true);
+      setMessage(error instanceof Error ? error.message : "No se pudo registrar la transferencia.");
+    } finally {
+      setIsPending(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <Button
+        onClick={() => setOpen(true)}
+        disabled={operativeWarehouses.length < 2 || stockItems.length === 0}
+      >
+        Nueva transferencia
+      </Button>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-background/80 p-4 backdrop-blur-sm">
+      <div className="my-8 w-full max-w-2xl rounded-xl border bg-card p-5 shadow-lg">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Nueva transferencia entre bodegas</h2>
+          <Button type="button" variant="ghost" size="sm" onClick={handleClose} disabled={isPending}>
+            Cerrar
+          </Button>
+        </div>
+
+        <div className="mt-4 space-y-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Bodega origen</Label>
+              <select
+                className={selectClassName}
+                value={fromWarehouse}
+                onChange={(e) => setFromWarehouse(e.target.value)}
+              >
+                <option value="">Selecciona bodega origen</option>
+                {operativeWarehouses.map((w) => (
+                  <option key={w.name} value={w.name}>
+                    {w.warehouse_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Bodega destino</Label>
+              <select
+                className={selectClassName}
+                value={toWarehouse}
+                onChange={(e) => setToWarehouse(e.target.value)}
+              >
+                <option value="">Selecciona bodega destino</option>
+                {operativeWarehouses
+                  .filter((w) => w.name !== fromWarehouse)
+                  .map((w) => (
+                    <option key={w.name} value={w.name}>
+                      {w.warehouse_name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Fecha</Label>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="max-w-xs" />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Productos a transferir</Label>
+              <Button type="button" variant="outline" size="sm" onClick={addRow}>
+                + Agregar fila
+              </Button>
+            </div>
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="w-full text-sm">
+                <thead className="border-b bg-muted/30 text-xs text-muted-foreground">
+                  <tr>
+                    <th className="py-2 pl-3 pr-2 text-left font-medium">Producto</th>
+                    <th className="py-2 pr-2 text-left font-medium">Cantidad</th>
+                    <th className="w-8" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {rows.map((row) => (
+                    <tr key={row.id}>
+                      <td className="py-1.5 pl-3 pr-2">
+                        <select
+                          className={selectClassName}
+                          value={row.item_code}
+                          onChange={(e) => updateRow(row.id, "item_code", e.target.value)}
+                        >
+                          <option value="">Selecciona producto</option>
+                          {stockItems.map((i) => (
+                            <option key={i.name} value={i.item_code}>
+                              {i.item_name} ({i.item_code})
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="py-1.5 pr-2">
+                        <Input
+                          type="number"
+                          min="0.001"
+                          step="0.001"
+                          value={row.qty}
+                          onChange={(e) => updateRow(row.id, "qty", e.target.value)}
+                          className="h-8 w-24"
+                        />
+                      </td>
+                      <td className="py-1.5 pr-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => removeRow(row.id)}
+                          disabled={rows.length === 1}
+                          className="text-muted-foreground hover:text-destructive disabled:opacity-30"
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              La transferencia se aplica de inmediato. El stock se ajusta en ambas bodegas al confirmar.
+            </p>
+          </div>
+
+          {message ? (
+            <p className={isError ? "text-sm text-destructive" : "text-sm text-green-700"}>
+              {message}
+            </p>
+          ) : null}
+
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={handleClose} disabled={isPending}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={handleSubmit} disabled={isPending}>
+              {isPending ? "Transfiriendo..." : "Aplicar transferencia"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

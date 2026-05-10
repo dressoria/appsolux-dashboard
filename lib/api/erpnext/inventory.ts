@@ -13,6 +13,8 @@ const binFields = [
   "actual_qty",
   "reserved_qty",
   "projected_qty",
+  "stock_value",
+  "valuation_rate",
 ];
 
 export async function getErpnextInventory(): Promise<ErpnextBin[]> {

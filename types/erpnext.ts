@@ -53,6 +53,8 @@ export type ErpnextBin = {
   actual_qty?: number;
   reserved_qty?: number;
   projected_qty?: number;
+  stock_value?: number;
+  valuation_rate?: number;
 };
 
 export type ErpnextCustomer = {
@@ -134,6 +136,9 @@ export type ErpnextStockEntry = {
   doctype?: "Stock Entry";
   stock_entry_type?: string;
   purpose?: string;
+  posting_date?: string;
+  from_warehouse?: string;
+  to_warehouse?: string;
   docstatus?: 0 | 1 | 2;
   items?: ErpnextStockEntryItem[];
 };
@@ -622,4 +627,16 @@ export type CreatePurchaseReceiptInput = {
   company: string;
   posting_date: string;
   items: CreatePurchaseReceiptItemInput[];
+};
+
+export type CreateStockTransferItemInput = {
+  item_code: string;
+  qty: number;
+};
+
+export type CreateStockTransferInput = {
+  posting_date: string;
+  from_warehouse: string;
+  to_warehouse: string;
+  items: CreateStockTransferItemInput[];
 };

@@ -124,6 +124,11 @@ export default async function ErpInventoryMovementsPage() {
           </div>
         </div>
 
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-sm text-muted-foreground">
+          Los ingresos o transferencias en borrador no aparecen aqui hasta ser confirmados en el
+          ERP.
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle>Ultimos movimientos</CardTitle>
