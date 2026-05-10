@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { ErpDedicatedProvisionCard } from "@/components/appsolux/dashboard/erp-dedicated-provision-card";
-import { PaymentMethodsTable } from "@/components/appsolux/reports/payment-methods-table";
 import { AdvancedModeBlockedCard } from "@/components/appsolux/dashboard/advanced-mode-blocked-card";
-import { ReportsSummary } from "@/components/appsolux/reports/reports-summary";
-import { TopProductsTable } from "@/components/appsolux/reports/top-products-table";
+import { ExportCsvButton } from "@/components/appsolux/reports/export-csv-button";
 import { LowStockTable } from "@/components/appsolux/reports/low-stock-table";
+import { PaymentMethodsTable } from "@/components/appsolux/reports/payment-methods-table";
+import { ReportsEmptyState } from "@/components/appsolux/reports/reports-empty-state";
+import { ReportsSummary } from "@/components/appsolux/reports/reports-summary";
+import { SimpleBarChart } from "@/components/appsolux/reports/simple-bar-chart";
+import { TopProductsTable } from "@/components/appsolux/reports/top-products-table";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +20,12 @@ import { getErpProvisioningState } from "@/lib/core/erp-provisioning-status";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { routes } from "@/config/routes";
-import type { ReportDateRange } from "@/types/reports";
+import type {
+  CustomerDebtReportItem,
+  CustomerPurchaseReportItem,
+  ProductMovementReportItem,
+  SupplierPayableReportItem,
+} from "@/types/reports";
 
 type ReportsPageProps = {
   searchParams: Promise<{
@@ -26,14 +34,78 @@ type ReportsPageProps = {
   }>;
 };
 
-function normalizeDate(value: string | undefined) {
-  return value?.trim() || undefined;
+function formatDateInput(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function isValidDateInput(value: string | undefined) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  return !Number.isNaN(new Date(`${value}T00:00:00`).getTime());
+}
+
+function resolveReportDateRange(params: { from?: string; to?: string }) {
+  const today = new Date();
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  let from: string = isValidDateInput(params.from)
+    ? params.from!
+    : formatDateInput(monthStart);
+  let to: string = isValidDateInput(params.to) ? params.to! : formatDateInput(today);
+
+  if (from > to) {
+    [from, to] = [to, from];
+  }
+
+  return { from, to };
+}
+
+function buildReportsHref(from: string, to: string) {
+  const params = new URLSearchParams({ from, to });
+  return `/reports?${params.toString()}`;
+}
+
+function buildQuickRanges() {
+  const today = new Date();
+  const todayValue = formatDateInput(today);
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - today.getDay());
+
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const last30 = new Date(today);
+  last30.setDate(today.getDate() - 29);
+
+  return [
+    { label: "Hoy", from: todayValue, to: todayValue },
+    {
+      label: "Esta semana",
+      from: formatDateInput(weekStart),
+      to: todayValue,
+    },
+    {
+      label: "Este mes",
+      from: formatDateInput(monthStart),
+      to: todayValue,
+    },
+    {
+      label: "Ultimos 30 dias",
+      from: formatDateInput(last30),
+      to: todayValue,
+    },
+  ];
 }
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat("es-EC", {
     style: "currency",
     currency: "USD",
+  }).format(value);
+}
+
+function formatQuantity(value: number) {
+  return new Intl.NumberFormat("es-EC", {
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -51,6 +123,144 @@ function getReportsBlockedDescription(
   }
 
   return erpProvisioning.displayStatus;
+}
+
+function MovementTable({
+  products,
+  emptyMessage,
+}: {
+  products: ProductMovementReportItem[];
+  emptyMessage: string;
+}) {
+  if (products.length === 0) {
+    return <ReportsEmptyState message={emptyMessage} />;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b text-xs text-muted-foreground">
+          <tr>
+            <th className="py-2 pr-4 font-medium">Producto</th>
+            <th className="py-2 pr-4 font-medium">Cantidad</th>
+            <th className="py-2 font-medium">Total</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {products.map((product) => (
+            <tr key={product.item_code}>
+              <td className="py-2 pr-4">
+                <p className="font-medium">
+                  {product.item_name ?? product.item_code}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {product.item_code}
+                </p>
+              </td>
+              <td className="py-2 pr-4">{formatQuantity(product.qty_sold)}</td>
+              <td className="py-2">{formatMoney(product.total_amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function CustomersTable({
+  customers,
+  mode,
+}: {
+  customers: Array<CustomerPurchaseReportItem | CustomerDebtReportItem>;
+  mode: "sales" | "debt";
+}) {
+  if (customers.length === 0) {
+    return (
+      <ReportsEmptyState
+        message={
+          mode === "sales"
+            ? "Aun no hay compras de clientes en el rango."
+            : "No hay clientes con deuda en el rango."
+        }
+      />
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b text-xs text-muted-foreground">
+          <tr>
+            <th className="py-2 pr-4 font-medium">Cliente</th>
+            <th className="py-2 pr-4 font-medium">Facturas</th>
+            <th className="py-2 font-medium">
+              {mode === "sales" ? "Compra total" : "Saldo"}
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {customers.map((customer) => (
+            <tr key={customer.customer}>
+              <td className="py-2 pr-4">
+                <p className="font-medium">
+                  {customer.customer_name ?? customer.customer}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {customer.customer}
+                </p>
+              </td>
+              <td className="py-2 pr-4">{customer.invoice_count}</td>
+              <td className="py-2 font-medium">
+                {formatMoney(
+                  mode === "sales"
+                    ? (customer as CustomerPurchaseReportItem).total_amount
+                    : (customer as CustomerDebtReportItem).outstanding_amount
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SuppliersTable({ suppliers }: { suppliers: SupplierPayableReportItem[] }) {
+  if (suppliers.length === 0) {
+    return <ReportsEmptyState message="No hay proveedores con saldo pendiente." />;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b text-xs text-muted-foreground">
+          <tr>
+            <th className="py-2 pr-4 font-medium">Proveedor</th>
+            <th className="py-2 pr-4 font-medium">Facturas</th>
+            <th className="py-2 font-medium">Saldo</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {suppliers.map((supplier) => (
+            <tr key={supplier.supplier}>
+              <td className="py-2 pr-4">
+                <p className="font-medium">
+                  {supplier.supplier_name ?? supplier.supplier}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {supplier.supplier}
+                </p>
+              </td>
+              <td className="py-2 pr-4">{supplier.invoice_count}</td>
+              <td className="py-2 font-medium">
+                {formatMoney(supplier.outstanding_amount)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 export default async function ReportsPage({ searchParams }: ReportsPageProps) {
@@ -98,28 +308,6 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             canRequestDedicatedErp={tenantMode.canRequestDedicatedErp}
           />
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Reportes protegidos</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm text-muted-foreground">
-              {erpProvisioning.isSimulated ? (
-                <p>
-                  El worker ejecuto el dry-run correctamente. Appsolux no
-                  calculara reportes reales hasta que el sitio ERPNext este
-                  aprovisionado en produccion.
-                </p>
-              ) : erpProvisioning.isPending || erpProvisioning.isFailed ? (
-                <p>{erpProvisioning.displayStatus}</p>
-              ) : (
-                <p>
-                  Appsolux no calculara reportes reales hasta que el ERP este
-                  activo. Asi evitamos errores cuando el tenant esta en onboarding.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
           <AdvancedModeBlockedCard
             title="Reportes basicos disponibles"
             erpProvisioning={erpProvisioning}
@@ -131,17 +319,40 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   }
 
   const resolvedSearchParams = await searchParams;
-  const range: ReportDateRange = {
-    from: normalizeDate(resolvedSearchParams.from),
-    to: normalizeDate(resolvedSearchParams.to),
-  };
+  const range = resolveReportDateRange(resolvedSearchParams);
   const reports = await buildReportsDashboardData(range);
+  const quickRanges = buildQuickRanges();
+
+  const topProductsCsv = reports.top_products.map((product) => ({
+    item_code: product.item_code,
+    item_name: product.item_name ?? "",
+    qty_sold: product.qty_sold,
+    total_amount: product.total_amount,
+  }));
+  const customersDebtCsv = reports.customers_with_debt.map((customer) => ({
+    customer: customer.customer,
+    customer_name: customer.customer_name ?? "",
+    invoice_count: customer.invoice_count,
+    outstanding_amount: customer.outstanding_amount,
+  }));
+  const suppliersCsv = reports.suppliers_with_payables.map((supplier) => ({
+    supplier: supplier.supplier,
+    supplier_name: supplier.supplier_name ?? "",
+    invoice_count: supplier.invoice_count,
+    outstanding_amount: supplier.outstanding_amount,
+  }));
+  const lowStockCsv = [...reports.low_stock, ...reports.out_of_stock].map(
+    (item) => ({
+      item_code: item.item_code,
+      warehouse: item.warehouse,
+      actual_qty: item.actual_qty,
+      projected_qty: item.projected_qty,
+    })
+  );
 
   return (
     <DashboardShell>
       <div className="space-y-8">
-
-        {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm text-muted-foreground">Reportes gerenciales</p>
@@ -149,11 +360,11 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               Reportes gerenciales
             </h1>
             <p className="mt-2 text-muted-foreground">
-              Analiza ventas, compras, caja, inventario y saldos pendientes en
-              tiempo real.
+              Ventas, compras, caja, clientes, proveedores e inventario para el
+              rango activo.
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Empresa: {tenant.name}
+              Empresa: {tenant.name}. Rango: {range.from} a {range.to}.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -166,16 +377,13 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           </div>
         </div>
 
-        {/* Date filter */}
         <Card>
           <CardContent className="space-y-4 p-4">
-            <div className="space-y-1">
-              <p className="text-sm font-medium">
-                Filtro por periodo
-              </p>
+            <div>
+              <p className="text-sm font-medium">Filtro por periodo</p>
               <p className="text-sm text-muted-foreground">
-                Ajusta el rango de fechas para ventas, cobros y compras.
-                Inventario y stock se calculan siempre sobre el total actual.
+                Ventas, cobros, compras y rankings usan este rango. Inventario
+                muestra el estado actual.
               </p>
             </div>
             <form
@@ -188,7 +396,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                   id="reports_from"
                   name="from"
                   type="date"
-                  defaultValue={range.from ?? ""}
+                  defaultValue={range.from}
                 />
               </div>
               <div className="space-y-2">
@@ -197,434 +405,365 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                   id="reports_to"
                   name="to"
                   type="date"
-                  defaultValue={range.to ?? ""}
+                  defaultValue={range.to}
                 />
               </div>
               <div className="flex items-end gap-2">
                 <Button type="submit">Filtrar</Button>
                 <Button asChild type="button" variant="outline">
-                  <a href="/reports">Limpiar</a>
+                  <Link href={buildReportsHref(quickRanges[2].from, quickRanges[2].to)}>
+                    Mes actual
+                  </Link>
                 </Button>
               </div>
             </form>
+            <div className="flex flex-wrap gap-2">
+              {quickRanges.map((quickRange) => (
+                <Button
+                  key={quickRange.label}
+                  asChild
+                  size="sm"
+                  variant="outline"
+                >
+                  <Link href={buildReportsHref(quickRange.from, quickRange.to)}>
+                    {quickRange.label}
+                  </Link>
+                </Button>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
-        {/* Resumen ejecutivo */}
         <section className="space-y-4">
           <h2 className="text-lg font-semibold">Resumen ejecutivo</h2>
           <ReportsSummary reports={reports} />
         </section>
 
-        {/* Seccion A: Ventas */}
+        <section className="grid gap-6 xl:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle>Ventas por dia</CardTitle>
+                <ExportCsvButton
+                  filename={`ventas-por-dia-${range.from}-${range.to}`}
+                  rows={reports.sales_by_day}
+                  columns={[
+                    { key: "date", header: "Fecha" },
+                    { key: "count", header: "Facturas" },
+                    { key: "total_amount", header: "Total" },
+                  ]}
+                />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <SimpleBarChart
+                items={reports.sales_by_day.map((day) => ({
+                  label: day.date,
+                  value: day.total_amount,
+                  description: `${day.count} facturas`,
+                }))}
+                valueFormatter={formatMoney}
+                emptyMessage="No hay ventas en el rango seleccionado."
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle>Cobros por metodo</CardTitle>
+                <ExportCsvButton
+                  filename={`cobros-por-metodo-${range.from}-${range.to}`}
+                  rows={reports.payments.by_method}
+                  columns={[
+                    { key: "mode_of_payment", header: "Metodo" },
+                    { key: "count", header: "Cobros" },
+                    { key: "total_amount", header: "Total" },
+                  ]}
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <SimpleBarChart
+                items={reports.payments.by_method.map((method) => ({
+                  label: method.mode_of_payment,
+                  value: method.total_amount,
+                  description: `${method.count} cobros`,
+                }))}
+                valueFormatter={formatMoney}
+                emptyMessage="No hay cobros confirmados en el rango."
+              />
+              <PaymentMethodsTable methods={reports.payments.by_method} />
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle>Compras por dia</CardTitle>
+                <ExportCsvButton
+                  filename={`compras-por-dia-${range.from}-${range.to}`}
+                  rows={reports.purchases_by_day}
+                  columns={[
+                    { key: "date", header: "Fecha" },
+                    { key: "count", header: "Facturas" },
+                    { key: "total_amount", header: "Total" },
+                  ]}
+                />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <SimpleBarChart
+                items={reports.purchases_by_day.map((day) => ({
+                  label: day.date,
+                  value: day.total_amount,
+                  description: `${day.count} facturas`,
+                }))}
+                valueFormatter={formatMoney}
+                emptyMessage="No hay compras en el rango seleccionado."
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Stock bajo / sin stock</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SimpleBarChart
+                items={[
+                  {
+                    label: "Stock bajo",
+                    value: reports.inventory.low_stock_items,
+                    description: "Productos con 5 unidades o menos",
+                  },
+                  {
+                    label: "Sin stock",
+                    value: reports.inventory.out_of_stock_items,
+                    description: "Registros sin unidades disponibles",
+                  },
+                ]}
+                emptyMessage="No hay alertas de stock."
+              />
+            </CardContent>
+          </Card>
+        </section>
+
         <section className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold">Ventas</h2>
-            <div className="flex flex-wrap gap-2">
-              <Button asChild size="sm" variant="outline">
-                <Link href={routes.posInvoices}>Ver facturas</Link>
-              </Button>
-              <Button asChild size="sm" variant="outline">
-                <Link href={routes.posPayments}>Ver cobros</Link>
-              </Button>
-            </div>
+            <h2 className="text-lg font-semibold">Productos</h2>
+            <Button asChild size="sm" variant="outline">
+              <Link href={routes.erpInventoryProducts}>Ver catalogo</Link>
+            </Button>
           </div>
-          <div className="grid gap-6 xl:grid-cols-2">
+          <div className="grid gap-6 xl:grid-cols-3">
             <Card>
               <CardHeader>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <CardTitle>Ventas y facturas</CardTitle>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.posInvoices}>Ver todas</Link>
-                  </Button>
+                  <CardTitle>Mas vendidos</CardTitle>
+                  <ExportCsvButton
+                    filename={`top-productos-${range.from}-${range.to}`}
+                    rows={topProductsCsv}
+                    columns={[
+                      { key: "item_code", header: "Codigo" },
+                      { key: "item_name", header: "Producto" },
+                      { key: "qty_sold", header: "Cantidad" },
+                      { key: "total_amount", header: "Total" },
+                    ]}
+                    size="xs"
+                  />
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-muted-foreground">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Total vendido
-                    </p>
-                    <p className="mt-0.5 text-xl font-semibold text-green-700">
-                      {formatMoney(reports.sales.total_sales_amount)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Por cobrar
-                    </p>
-                    <p
-                      className={`mt-0.5 text-xl font-semibold ${reports.sales.outstanding_amount > 0 ? "text-amber-600" : ""}`}
-                    >
-                      {formatMoney(reports.sales.outstanding_amount)}
-                    </p>
-                  </div>
-                </div>
-                <p>
-                  Facturas pagadas: {reports.sales.paid_invoices}. Pendientes:{" "}
-                  {reports.sales.unpaid_invoices}. Borradores:{" "}
-                  {reports.sales.draft_invoices}. Anuladas:{" "}
-                  {reports.sales.cancelled_invoices}.
-                </p>
-                <Button asChild size="sm" variant="outline">
-                  <Link href={routes.erpFinanceReceivables}>
-                    Ver cuentas por cobrar
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Productos mas vendidos</CardTitle>
               </CardHeader>
               <CardContent>
                 <TopProductsTable products={reports.top_products} />
-                <div className="mt-3">
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.erpInventoryProducts}>
-                      Ver catalogo de productos
-                    </Link>
-                  </Button>
-                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Menos vendidos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MovementTable
+                  products={reports.least_sold_products}
+                  emptyMessage="Aun no hay suficientes ventas para comparar productos."
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Sin ventas en el rango</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MovementTable
+                  products={reports.products_without_sales}
+                  emptyMessage="Todos los productos revisados tuvieron ventas en el rango."
+                />
               </CardContent>
             </Card>
           </div>
         </section>
 
-        {/* Seccion B: Caja y bancos */}
         <section className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold">Caja y bancos</h2>
-            <Button asChild size="sm" variant="outline">
-              <Link href={routes.erpFinance}>Ver modulo financiero</Link>
-            </Button>
+            <h2 className="text-lg font-semibold">Clientes y proveedores</h2>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link href={routes.erpFinanceReceivables}>CxC</Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href={routes.erpFinancePayables}>CxP</Link>
+              </Button>
+            </div>
           </div>
-          <div className="grid gap-6 xl:grid-cols-2">
+          <div className="grid gap-6 xl:grid-cols-3">
+            <Card>
+              <CardHeader>
+                <CardTitle>Clientes con mayor compra</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CustomersTable customers={reports.top_customers} mode="sales" />
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <CardTitle>Cobros por metodo de pago</CardTitle>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.erpFinancePaymentsReceived}>
-                      Ver pagos
-                    </Link>
-                  </Button>
+                  <CardTitle>Clientes con deuda</CardTitle>
+                  <ExportCsvButton
+                    filename={`clientes-con-deuda-${range.from}-${range.to}`}
+                    rows={customersDebtCsv}
+                    columns={[
+                      { key: "customer", header: "Cliente" },
+                      { key: "customer_name", header: "Nombre" },
+                      { key: "invoice_count", header: "Facturas" },
+                      { key: "outstanding_amount", header: "Saldo" },
+                    ]}
+                    size="xs"
+                  />
                 </div>
               </CardHeader>
               <CardContent>
-                <PaymentMethodsTable methods={reports.payments.by_method} />
+                <CustomersTable
+                  customers={reports.customers_with_debt}
+                  mode="debt"
+                />
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Cuentas por cobrar y por pagar</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Por cobrar
-                    </p>
-                    <p
-                      className={`mt-0.5 text-xl font-semibold ${reports.sales.outstanding_amount > 0 ? "text-amber-600" : "text-green-700"}`}
-                    >
-                      {formatMoney(reports.sales.outstanding_amount)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {reports.sales.unpaid_invoices} facturas pendientes
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Por pagar
-                    </p>
-                    <p
-                      className={`mt-0.5 text-xl font-semibold ${reports.purchases.outstanding_payable > 0 ? "text-rose-600" : "text-green-700"}`}
-                    >
-                      {formatMoney(reports.purchases.outstanding_payable)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {reports.purchases.pending_payables} facturas pendientes
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.erpFinanceReceivables}>
-                      Ver por cobrar
-                    </Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.erpFinancePayables}>Ver por pagar</Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.erpFinanceCash}>Caja</Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-
-        {/* Seccion C: Compras */}
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold">Compras</h2>
-            <Button asChild size="sm" variant="outline">
-              <Link href={routes.erpPurchases}>Ver modulo compras</Link>
-            </Button>
-          </div>
-          <div className="grid gap-6 xl:grid-cols-2">
             <Card>
               <CardHeader>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <CardTitle>Resumen de compras</CardTitle>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.erpPurchasesDocuments}>
-                      Ver facturas
-                    </Link>
-                  </Button>
+                  <CardTitle>Proveedores con saldo</CardTitle>
+                  <ExportCsvButton
+                    filename={`proveedores-con-saldo-${range.from}-${range.to}`}
+                    rows={suppliersCsv}
+                    columns={[
+                      { key: "supplier", header: "Proveedor" },
+                      { key: "supplier_name", header: "Nombre" },
+                      { key: "invoice_count", header: "Facturas" },
+                      { key: "outstanding_amount", header: "Saldo" },
+                    ]}
+                    size="xs"
+                  />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Total comprado
-                    </p>
-                    <p className="mt-0.5 text-xl font-semibold">
-                      {formatMoney(reports.purchases.total_purchases_amount)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Facturas de compra
-                    </p>
-                    <p className="mt-0.5 text-xl font-semibold">
-                      {reports.purchases.total_purchase_invoices}
-                    </p>
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Facturas con saldo pendiente: {reports.purchases.pending_payables}.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Cuentas por pagar</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Saldo pendiente
-                  </p>
-                  <p
-                    className={`mt-0.5 text-2xl font-semibold ${reports.purchases.outstanding_payable > 0 ? "text-rose-600" : "text-green-700"}`}
-                  >
-                    {formatMoney(reports.purchases.outstanding_payable)}
-                  </p>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {reports.purchases.pending_payables > 0
-                    ? `${reports.purchases.pending_payables} facturas de proveedor pendientes de pago.`
-                    : "Todos los saldos con proveedores estan al dia."}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.erpFinancePayables}>
-                      Ver cuentas por pagar
-                    </Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.erpPurchasesSuppliers}>
-                      Ver proveedores
-                    </Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.erpPurchasesReceipts}>
-                      Ingresos de mercaderia
-                    </Link>
-                  </Button>
-                </div>
+              <CardContent>
+                <SuppliersTable suppliers={reports.suppliers_with_payables} />
               </CardContent>
             </Card>
           </div>
         </section>
 
-        {/* Seccion D: Inventario */}
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold">Inventario</h2>
-            <div className="flex flex-wrap gap-2">
-              <Button asChild size="sm" variant="outline">
-                <Link href={routes.erpInventoryStock}>Ver stock</Link>
-              </Button>
-              <Button asChild size="sm" variant="outline">
-                <Link href={routes.erpInventoryMovements}>
-                  Ver movimientos
-                </Link>
-              </Button>
-            </div>
-          </div>
-          <div className="grid gap-6 xl:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <CardTitle>Stock bajo / sin stock</CardTitle>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.erpInventoryKardex}>Kardex</Link>
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-3">
-                  <div>
-                    <h3 className="text-sm font-semibold">Stock bajo</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Productos con existencias mayores a 0 y hasta 5 unidades.
-                    </p>
-                  </div>
-                  <LowStockTable
-                    items={reports.low_stock}
-                    emptyMessage="No hay productos con bajo stock."
-                  />
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <h3 className="text-sm font-semibold">Sin stock</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Registros de inventario sin unidades disponibles.
-                    </p>
-                  </div>
-                  <LowStockTable
-                    items={reports.out_of_stock}
-                    emptyMessage="No hay productos sin stock."
-                  />
-                </div>
-              </CardContent>
-            </Card>
+        <section className="grid gap-6 xl:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle>Inventario operativo</CardTitle>
+                <ExportCsvButton
+                  filename={`stock-alertas-${range.from}-${range.to}`}
+                  rows={lowStockCsv}
+                  columns={[
+                    { key: "item_code", header: "Producto" },
+                    { key: "warehouse", header: "Bodega" },
+                    { key: "actual_qty", header: "Stock actual" },
+                    { key: "projected_qty", header: "Proyectado" },
+                  ]}
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <LowStockTable
+                items={reports.low_stock}
+                emptyMessage="No hay productos con bajo stock."
+              />
+              <LowStockTable
+                items={reports.out_of_stock}
+                emptyMessage="No hay productos sin stock."
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button asChild size="sm" variant="outline">
+                  <Link href={routes.erpInventoryStock}>Stock actual</Link>
+                </Button>
+                <Button asChild size="sm" variant="outline">
+                  <Link href={routes.erpInventoryValuation}>
+                    Inventario valorizado
+                  </Link>
+                </Button>
+                <Button asChild size="sm" variant="outline">
+                  <Link href={routes.erpInventoryKardex}>Kardex</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-            <div className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Acceso rapido al inventario</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-wrap gap-2">
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.erpInventory}>Hub inventario</Link>
+          <Card>
+            <CardHeader>
+              <CardTitle>Exportaciones y proximas fases</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm text-muted-foreground">
+              <div className="rounded-lg border p-3">
+                <p className="font-medium text-foreground">CSV disponible</p>
+                <p>
+                  Los reportes clave ya pueden descargarse como CSV desde los
+                  datos cargados en esta pantalla.
+                </p>
+              </div>
+              <div className="rounded-lg border border-dashed p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" size="sm" variant="outline" disabled>
+                    Exportar PDF - En preparacion
                   </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.erpInventoryProducts}>Productos</Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.erpInventoryStock}>Stock actual</Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.erpInventoryMovements}>
-                      Movimientos
-                    </Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.erpInventoryKardex}>Kardex</Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.erpInventoryWarehouses}>Bodegas</Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={routes.erpInventoryAdjustments}>Ajustes</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <CardTitle>Inventario valorizado</CardTitle>
-                    <span className="inline-flex h-5 items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700">
-                      En preparacion
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  Reporte de valoracion de inventario por costo promedio o FIFO.
-                  Disponible proximamente.
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </section>
-
-        {/* Placeholders: Clientes/Proveedores, Exportaciones, Fiscal, Contabilidad, IA */}
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold">Proximos reportes</h2>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {[
-              {
-                title: "Clientes y proveedores",
-                desc: "Top clientes, clientes con deuda, proveedores con saldo pendiente e historial comercial.",
-                badge: "En preparacion",
-                badgeClass: "border-amber-200 bg-amber-50 text-amber-700",
-                href: null as string | null,
-              },
-              {
-                title: "Exportaciones",
-                desc: "Exportar reportes en Excel o PDF. Enviar por WhatsApp o correo.",
-                badge: "En preparacion",
-                badgeClass: "border-amber-200 bg-amber-50 text-amber-700",
-                href: null as string | null,
-              },
-              {
-                title: "Fiscal / SRI",
-                desc: "ATS, retenciones y documentos electronicos para Ecuador.",
-                badge: "En preparacion",
-                badgeClass: "border-amber-200 bg-amber-50 text-amber-700",
-                href: routes.erpFiscal as string | null,
-              },
-              {
-                title: "Contabilidad",
-                desc: "Plan de cuentas, libro mayor, estado de resultados y balance general.",
-                badge: "Disponible",
-                badgeClass: "border-green-200 bg-green-50 text-green-700",
-                href: routes.erpAccounting as string | null,
-              },
-              {
-                title: "Asistente financiero IA",
-                desc: "Consulta ventas, stock, cobros y compras con inteligencia artificial.",
-                badge: "Proximamente",
-                badgeClass: "border-slate-200 bg-slate-50 text-slate-500",
-                href: null as string | null,
-              },
-            ].map((card) => (
-              <div
-                key={card.title}
-                className="rounded-2xl border bg-card p-4 space-y-2"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <p className="font-semibold">{card.title}</p>
-                  <span
-                    className={`inline-flex h-5 shrink-0 items-center rounded-full border px-2 text-xs font-medium ${card.badgeClass}`}
-                  >
-                    {card.badge}
+                  <span className="text-xs">
+                    El PDF gerencial estara disponible en una siguiente fase.
+                    Por ahora puedes exportar CSV.
                   </span>
                 </div>
-                <p className="text-sm text-muted-foreground">{card.desc}</p>
-                {card.href ? (
-                  <Link
-                    href={card.href}
-                    className="inline-flex h-7 items-center rounded-lg border bg-background px-3 text-xs transition-colors hover:bg-muted"
-                  >
-                    Ver modulo &rarr;
-                  </Link>
-                ) : null}
               </div>
-            ))}
-          </div>
+              <div className="rounded-lg border border-dashed p-3">
+                <p className="font-medium text-foreground">
+                  Fiscal/SRI - En preparacion
+                </p>
+                <p>
+                  No se genera XML fiscal, no se firma y no se conecta a
+                  servicios SRI en esta fase.
+                </p>
+              </div>
+              <div className="rounded-lg border border-dashed p-3">
+                <p className="font-medium text-foreground">
+                  Asistente financiero IA - Proximamente
+                </p>
+                <p>
+                  El analisis asistido queda preparado visualmente, sin IA
+                  financiera real todavia.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </section>
-
       </div>
     </DashboardShell>
   );

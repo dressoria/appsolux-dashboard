@@ -2,18 +2,25 @@ import "@/lib/security/server-only";
 import { erpnextFetch } from "./client";
 import type {
   ErpnextBin,
+  ErpnextItem,
   ErpnextListResponse,
   ErpnextPaymentEntry,
   ErpnextPurchaseInvoice,
+  ErpnextSalesInvoiceItem,
   ErpnextSalesInvoice,
 } from "@/types/erpnext";
 import type {
+  CustomerDebtReportItem,
+  CustomerPurchaseReportItem,
+  DailyAmountReportItem,
   LowStockReportItem,
   PaymentMethodReportItem,
+  ProductMovementReportItem,
   ProductSalesReportItem,
   PurchaseReportSummary,
   ReportDateRange,
   ReportsDashboardData,
+  SupplierPayableReportItem,
 } from "@/types/reports";
 
 const salesInvoiceFields = [
@@ -60,6 +67,20 @@ const purchaseInvoiceFields = [
   "docstatus",
   "company",
 ];
+
+const salesInvoiceItemFields = [
+  "parent",
+  "item_code",
+  "item_name",
+  "qty",
+  "amount",
+];
+
+const itemFields = ["name", "item_code", "item_name", "disabled"];
+
+type SalesInvoiceItemReportRow = ErpnextSalesInvoiceItem & {
+  parent: string;
+};
 
 function getDateFilters(range?: ReportDateRange) {
   const filters: unknown[] = [];
@@ -156,6 +177,21 @@ export async function getPurchaseInvoicesForReports(
   return response.data;
 }
 
+export async function getItemsForReports(): Promise<ErpnextItem[]> {
+  const params = new URLSearchParams({
+    fields: JSON.stringify(itemFields),
+    filters: JSON.stringify([["disabled", "=", 0]]),
+    limit_page_length: "200",
+    order_by: "modified desc",
+  });
+
+  const response = await erpnextFetch<ErpnextListResponse<ErpnextItem>>(
+    `/api/resource/Item?${params.toString()}`
+  );
+
+  return response.data;
+}
+
 function buildPurchaseSummary(
   invoices: ErpnextPurchaseInvoice[]
 ): PurchaseReportSummary {
@@ -180,34 +216,182 @@ function buildPurchaseSummary(
 
 async function getInvoiceItemsForReports(
   invoices: ErpnextSalesInvoice[]
-): Promise<ProductSalesReportItem[]> {
+): Promise<SalesInvoiceItemReportRow[]> {
   const activeInvoices = invoices.filter((invoice) => invoice.docstatus !== 2);
-  const invoiceDetails = await Promise.all(
-    activeInvoices.map((invoice) =>
-      erpnextFetch<{ data: ErpnextSalesInvoice }>(
-        `/api/resource/Sales%20Invoice/${encodeURIComponent(invoice.name)}`
-      )
-    )
-  );
+  const invoiceNames = activeInvoices.map((invoice) => invoice.name).slice(0, 100);
+
+  if (invoiceNames.length === 0) {
+    return [];
+  }
+
+  const params = new URLSearchParams({
+    fields: JSON.stringify(salesInvoiceItemFields),
+    filters: JSON.stringify([["parent", "in", invoiceNames]]),
+    limit_page_length: "500",
+  });
+
+  const response = await erpnextFetch<
+    ErpnextListResponse<SalesInvoiceItemReportRow>
+  >(`/api/resource/Sales%20Invoice%20Item?${params.toString()}`);
+
+  return response.data;
+}
+
+function buildProductSalesRows(
+  items: SalesInvoiceItemReportRow[]
+): ProductSalesReportItem[] {
   const productMap = new Map<string, ProductSalesReportItem>();
 
-  invoiceDetails.forEach((response) => {
-    (response.data.items ?? []).forEach((item) => {
-      const current = productMap.get(item.item_code) ?? {
-        item_code: item.item_code,
-        item_name: item.item_name,
-        qty_sold: 0,
-        total_amount: 0,
-      };
+  items.forEach((item) => {
+    const current = productMap.get(item.item_code) ?? {
+      item_code: item.item_code,
+      item_name: item.item_name,
+      qty_sold: 0,
+      total_amount: 0,
+    };
 
-      current.qty_sold += getNumber(item.qty);
-      current.total_amount += getNumber(item.amount);
-      productMap.set(item.item_code, current);
-    });
+    current.qty_sold += getNumber(item.qty);
+    current.total_amount += getNumber(item.amount);
+    productMap.set(item.item_code, current);
   });
 
   return Array.from(productMap.values())
+    .sort((left, right) => right.total_amount - left.total_amount);
+}
+
+function buildLeastSoldProducts(
+  productRows: ProductSalesReportItem[]
+): ProductMovementReportItem[] {
+  return [...productRows]
+    .filter((product) => product.qty_sold > 0)
+    .sort((left, right) => left.qty_sold - right.qty_sold)
+    .slice(0, 10);
+}
+
+function buildProductsWithoutSales(
+  items: ErpnextItem[],
+  productRows: ProductSalesReportItem[]
+): ProductMovementReportItem[] {
+  const soldCodes = new Set(productRows.map((product) => product.item_code));
+
+  return items
+    .filter((item) => !soldCodes.has(item.item_code))
+    .slice(0, 20)
+    .map((item) => ({
+      item_code: item.item_code,
+      item_name: item.item_name,
+      qty_sold: 0,
+      total_amount: 0,
+    }));
+}
+
+function buildDailyAmounts<T extends { posting_date?: string; grand_total?: number }>(
+  rows: T[]
+): DailyAmountReportItem[] {
+  const dayMap = new Map<string, DailyAmountReportItem>();
+
+  rows.forEach((row) => {
+    if (!row.posting_date) {
+      return;
+    }
+
+    const current = dayMap.get(row.posting_date) ?? {
+      date: row.posting_date,
+      total_amount: 0,
+      count: 0,
+    };
+
+    current.total_amount += getNumber(row.grand_total);
+    current.count += 1;
+    dayMap.set(row.posting_date, current);
+  });
+
+  return Array.from(dayMap.values()).sort((left, right) =>
+    left.date.localeCompare(right.date)
+  );
+}
+
+function buildTopCustomers(
+  invoices: ErpnextSalesInvoice[]
+): CustomerPurchaseReportItem[] {
+  const customerMap = new Map<string, CustomerPurchaseReportItem>();
+
+  invoices
+    .filter((invoice) => invoice.docstatus === 1)
+    .forEach((invoice) => {
+      const customer = invoice.customer;
+      const current = customerMap.get(customer) ?? {
+        customer,
+        customer_name: invoice.customer_name,
+        total_amount: 0,
+        invoice_count: 0,
+      };
+
+      current.total_amount += getNumber(invoice.grand_total);
+      current.invoice_count += 1;
+      customerMap.set(customer, current);
+    });
+
+  return Array.from(customerMap.values())
     .sort((left, right) => right.total_amount - left.total_amount)
+    .slice(0, 10);
+}
+
+function buildCustomerDebts(
+  invoices: ErpnextSalesInvoice[]
+): CustomerDebtReportItem[] {
+  const customerMap = new Map<string, CustomerDebtReportItem>();
+
+  invoices
+    .filter(
+      (invoice) =>
+        invoice.docstatus === 1 && getNumber(invoice.outstanding_amount) > 0
+    )
+    .forEach((invoice) => {
+      const customer = invoice.customer;
+      const current = customerMap.get(customer) ?? {
+        customer,
+        customer_name: invoice.customer_name,
+        outstanding_amount: 0,
+        invoice_count: 0,
+      };
+
+      current.outstanding_amount += getNumber(invoice.outstanding_amount);
+      current.invoice_count += 1;
+      customerMap.set(customer, current);
+    });
+
+  return Array.from(customerMap.values())
+    .sort((left, right) => right.outstanding_amount - left.outstanding_amount)
+    .slice(0, 10);
+}
+
+function buildSupplierPayables(
+  invoices: ErpnextPurchaseInvoice[]
+): SupplierPayableReportItem[] {
+  const supplierMap = new Map<string, SupplierPayableReportItem>();
+
+  invoices
+    .filter(
+      (invoice) =>
+        invoice.docstatus === 1 && getNumber(invoice.outstanding_amount) > 0
+    )
+    .forEach((invoice) => {
+      const supplier = invoice.supplier;
+      const current = supplierMap.get(supplier) ?? {
+        supplier,
+        supplier_name: invoice.supplier_name,
+        outstanding_amount: 0,
+        invoice_count: 0,
+      };
+
+      current.outstanding_amount += getNumber(invoice.outstanding_amount);
+      current.invoice_count += 1;
+      supplierMap.set(supplier, current);
+    });
+
+  return Array.from(supplierMap.values())
+    .sort((left, right) => right.outstanding_amount - left.outstanding_amount)
     .slice(0, 10);
 }
 
@@ -266,7 +450,13 @@ export async function buildReportsDashboardData(
         (): ErpnextPurchaseInvoice[] => []
       ),
     ]);
-  const topProducts = await getInvoiceItemsForReports(salesInvoices);
+  const [invoiceItems, items] = await Promise.all([
+    getInvoiceItemsForReports(salesInvoices).catch(
+      (): SalesInvoiceItemReportRow[] => []
+    ),
+    getItemsForReports().catch((): ErpnextItem[] => []),
+  ]);
+  const productRows = buildProductSalesRows(invoiceItems);
   const activeInvoices = salesInvoices.filter(
     (invoice) => invoice.docstatus !== 2
   );
@@ -286,6 +476,10 @@ export async function buildReportsDashboardData(
   const outOfStock = buildStockRows(inventory, true);
 
   return {
+    range: {
+      from: range?.from ?? "",
+      to: range?.to ?? "",
+    },
     purchases: buildPurchaseSummary(purchaseInvoices),
     sales: {
       total_sales_amount: activeInvoices.reduce(
@@ -322,7 +516,18 @@ export async function buildReportsDashboardData(
       low_stock_items: lowStock.length,
       out_of_stock_items: outOfStock.length,
     },
-    top_products: topProducts,
+    sales_by_day: buildDailyAmounts(
+      salesInvoices.filter((invoice) => invoice.docstatus !== 2)
+    ),
+    purchases_by_day: buildDailyAmounts(
+      purchaseInvoices.filter((invoice) => invoice.docstatus !== 2)
+    ),
+    top_products: productRows.slice(0, 10),
+    least_sold_products: buildLeastSoldProducts(productRows),
+    products_without_sales: buildProductsWithoutSales(items, productRows),
+    top_customers: buildTopCustomers(salesInvoices),
+    customers_with_debt: buildCustomerDebts(salesInvoices),
+    suppliers_with_payables: buildSupplierPayables(purchaseInvoices),
     low_stock: lowStock,
     out_of_stock: outOfStock,
   };
