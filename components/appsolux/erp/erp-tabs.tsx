@@ -328,12 +328,46 @@ const MODULES: Module[] = [
     icon: BookOpen,
     iconColor: "bg-indigo-50 text-indigo-600",
     items: [
-      { label: "Plan de cuentas", status: "in-preparation" },
-      { label: "Libro diario", status: "in-preparation" },
-      { label: "Libro mayor", status: "in-preparation" },
-      { label: "Estado de resultados", status: "in-preparation" },
-      { label: "Balance general", status: "in-preparation" },
-      { label: "Balance de comprobación", status: "in-preparation" },
+      {
+        label: "Resumen contable",
+        status: "available",
+        href: routes.erpAccounting,
+      },
+      {
+        label: "Plan de cuentas",
+        status: "available",
+        href: routes.erpAccountingAccounts,
+      },
+      {
+        label: "Libro diario",
+        status: "available",
+        href: routes.erpAccountingJournal,
+      },
+      {
+        label: "Libro mayor",
+        status: "available",
+        href: routes.erpAccountingGeneralLedger,
+      },
+      {
+        label: "Estado de resultados",
+        status: "in-preparation",
+        href: routes.erpAccountingProfitAndLoss,
+      },
+      {
+        label: "Balance general",
+        status: "in-preparation",
+        href: routes.erpAccountingBalanceSheet,
+      },
+      {
+        label: "Balance de comprobación",
+        status: "in-preparation",
+        href: routes.erpAccountingTrialBalance,
+      },
+      {
+        label: "Centros de costo",
+        status: "available",
+        href: routes.erpAccountingCostCenters,
+      },
     ],
   },
   {
@@ -825,6 +859,53 @@ function FiscalNoticeCard() {
   );
 }
 
+// ─── Accounting Notice Card ───────────────────────────────────────────────────
+
+function AccountingNoticeCard() {
+  return (
+    <Card className="border-indigo-100 bg-indigo-50/40">
+      <CardHeader>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-indigo-500" />
+            <CardTitle className="text-base">Contabilidad</CardTitle>
+          </div>
+          <span className="inline-flex h-5 items-center rounded-full border border-green-200 bg-green-50 px-2 text-xs font-medium text-green-700">
+            Disponible
+          </span>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm text-muted-foreground">
+        <p>
+          Consulta el plan de cuentas, movimientos contables, libro diario y
+          libro mayor. Los estados financieros oficiales se preparan
+          progresivamente.
+        </p>
+        <p className="text-xs">
+          <span className="font-medium text-foreground">Contabilidad</span> =
+          cuentas, asientos y reportes contables.{" "}
+          <span className="font-medium text-foreground">Finanzas</span> = caja,
+          cobros, pagos y bancos operativos.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm">
+            <Link href={routes.erpAccounting}>Ver contabilidad</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={routes.erpAccountingAccounts}>Plan de cuentas</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={routes.erpAccountingGeneralLedger}>Libro mayor</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={routes.erpAccountingJournal}>Libro diario</Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Connection Warnings ──────────────────────────────────────────────────────
 
 function ConnectionWarnings({ masterWarnings }: { masterWarnings: string[] }) {
@@ -1118,6 +1199,8 @@ export function ErpTabs({
       <FinanceSectionCard />
 
       <FiscalNoticeCard />
+
+      <AccountingNoticeCard />
     </div>
   );
 }

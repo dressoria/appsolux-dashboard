@@ -531,3 +531,38 @@ export type ErpnextInvoice = {
   outstanding_amount?: number;
   status?: string;
 };
+
+export type ErpnextGlEntry = {
+  name: string;
+  posting_date?: string;
+  account?: string;
+  debit?: number;
+  credit?: number;
+  voucher_type?: string;
+  voucher_no?: string;
+  party_type?: string;
+  party?: string;
+  remarks?: string;
+  company?: string;
+};
+
+export type ErpnextJournalEntry = {
+  name: string;
+  title?: string;
+  posting_date?: string;
+  voucher_type?: string;
+  total_debit?: number;
+  total_credit?: number;
+  docstatus?: 0 | 1 | 2;
+  company?: string;
+  user_remark?: string;
+};
+
+export type ErpnextCostCenter = {
+  name: string;
+  cost_center_name?: string;
+  company?: string;
+  disabled?: 0 | 1;
+  is_group?: 0 | 1;
+  parent_cost_center?: string;
+};

@@ -558,10 +558,10 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           </div>
         </section>
 
-        {/* Placeholders: Clientes/Proveedores, Exportaciones, Fiscal, IA */}
+        {/* Placeholders: Clientes/Proveedores, Exportaciones, Fiscal, Contabilidad, IA */}
         <section className="space-y-4">
           <h2 className="text-lg font-semibold">Proximos reportes</h2>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {[
               {
                 title: "Clientes y proveedores",
@@ -583,6 +583,13 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                 badge: "En preparacion",
                 badgeClass: "border-amber-200 bg-amber-50 text-amber-700",
                 href: routes.erpFiscal as string | null,
+              },
+              {
+                title: "Contabilidad",
+                desc: "Plan de cuentas, libro mayor, estado de resultados y balance general.",
+                badge: "Disponible",
+                badgeClass: "border-green-200 bg-green-50 text-green-700",
+                href: routes.erpAccounting as string | null,
               },
               {
                 title: "Asistente financiero IA",
