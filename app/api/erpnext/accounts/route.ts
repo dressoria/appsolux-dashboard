@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import {
+  createErpnextAccount,
   createErpnextCashOrBankAccount,
+  disableErpnextAccount,
   getCashAndBankAccounts,
   getErpnextAccounts,
+  updateErpnextAccount,
 } from "@/lib/api/erpnext/accounts";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 export async function GET(request: Request) {
@@ -24,7 +28,14 @@ export async function GET(request: Request) {
       );
     }
 
-    await getCurrentTenant(user);
+    const tenant = await getCurrentTenant(user);
+    const tenantMode = await getTenantModeState(tenant);
+    if (!tenantMode.erpProvisioning.isRealActive) {
+      return NextResponse.json(
+        { success: false, error: { code: "ERP_NOT_ACTIVE", message: "ERP dedicado no esta activo." } },
+        { status: 400 }
+      );
+    }
 
     const url = new URL(request.url);
     const company = url.searchParams.get("company")?.trim() || undefined;
@@ -77,14 +88,23 @@ export async function POST(request: Request) {
       );
     }
 
-    await getCurrentTenant(user);
+    const tenant = await getCurrentTenant(user);
+    const tenantMode = await getTenantModeState(tenant);
+    if (!tenantMode.erpProvisioning.isRealActive) {
+      return NextResponse.json(
+        { success: false, error: { code: "ERP_NOT_ACTIVE", message: "ERP dedicado no esta activo." } },
+        { status: 400 }
+      );
+    }
 
     const body = (await request.json()) as Record<string, unknown>;
     const accountName = getStringField(body, "account_name");
     const company = getStringField(body, "company");
     const accountType = getStringField(body, "account_type");
+    const rootType = getStringField(body, "root_type");
     const accountCurrency = getStringField(body, "account_currency");
     const parentAccount = getStringField(body, "parent_account");
+    const mode = getStringField(body, "mode");
 
     if (!accountName || !company) {
       return NextResponse.json(
@@ -99,7 +119,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (accountType !== "Cash" && accountType !== "Bank") {
+    if (mode !== "general" && accountType !== "Cash" && accountType !== "Bank") {
       return NextResponse.json(
         {
           success: false,
@@ -112,13 +132,23 @@ export async function POST(request: Request) {
       );
     }
 
-    const account = await createErpnextCashOrBankAccount({
-      account_name: accountName,
-      company,
-      account_type: accountType,
-      account_currency: accountCurrency || undefined,
-      parent_account: parentAccount || undefined,
-    });
+    const account =
+      mode === "general"
+        ? await createErpnextAccount({
+            account_name: accountName,
+            company,
+            root_type: rootType || undefined,
+            account_type: accountType || undefined,
+            account_currency: accountCurrency || undefined,
+            parent_account: parentAccount || undefined,
+          })
+        : await createErpnextCashOrBankAccount({
+            account_name: accountName,
+            company,
+            account_type: accountType as "Cash" | "Bank",
+            account_currency: accountCurrency || undefined,
+            parent_account: parentAccount || undefined,
+          });
 
     return NextResponse.json({
       success: true,
@@ -136,6 +166,56 @@ export async function POST(request: Request) {
           message,
         },
       },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: { code: "UNAUTHORIZED", message: "User session is required" } },
+        { status: 401 }
+      );
+    }
+    const tenant = await getCurrentTenant(user);
+    const tenantMode = await getTenantModeState(tenant);
+    if (!tenantMode.erpProvisioning.isRealActive) {
+      return NextResponse.json(
+        { success: false, error: { code: "ERP_NOT_ACTIVE", message: "ERP dedicado no esta activo." } },
+        { status: 400 }
+      );
+    }
+
+    const body = (await request.json()) as Record<string, unknown>;
+    const name = getStringField(body, "name");
+    const action = getStringField(body, "action");
+
+    if (!name) {
+      return NextResponse.json(
+        { success: false, error: { code: "INVALID_ACCOUNT", message: "Cuenta requerida." } },
+        { status: 400 }
+      );
+    }
+
+    const account =
+      action === "disable"
+        ? await disableErpnextAccount(name)
+        : await updateErpnextAccount(name, {
+            account_name: getStringField(body, "account_name") || undefined,
+            account_type: getStringField(body, "account_type") || undefined,
+            account_currency: getStringField(body, "account_currency") || undefined,
+            parent_account: getStringField(body, "parent_account") || undefined,
+          });
+
+    return NextResponse.json({ success: true, data: { account } });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "No se pudo actualizar la cuenta";
+    return NextResponse.json(
+      { success: false, error: { code: "ERPNEXT_UPDATE_ACCOUNT_ERROR", message } },
       { status: 500 }
     );
   }

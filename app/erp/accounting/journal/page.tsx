@@ -94,8 +94,8 @@ export default async function ErpAccountingJournalPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <span className="inline-flex h-8 items-center rounded-lg border border-amber-200 bg-amber-50 px-3 text-xs font-medium text-amber-700">
-              Nuevo asiento — En preparacion
+            <span className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-600">
+              Asientos manuales se registran en ERPNext
             </span>
             <Button asChild variant="outline">
               <Link href={routes.erpAccounting}>Volver a contabilidad</Link>

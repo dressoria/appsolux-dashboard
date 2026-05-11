@@ -439,6 +439,7 @@ export type CreateErpnextModeOfPaymentInput = {
 export type ErpnextAccount = {
   name: string;
   account_name?: string;
+  account_number?: string;
   account_type?: string;
   root_type?: string;
   account_currency?: string;
@@ -446,14 +447,21 @@ export type ErpnextAccount = {
   parent_account?: string;
   is_group?: 0 | 1;
   disabled?: 0 | 1;
+  balance?: number;
 };
 
-export type CreateErpnextCashOrBankAccountInput = {
+export type CreateErpnextAccountInput = {
   account_name: string;
   company: string;
-  account_type: "Cash" | "Bank";
+  root_type?: string;
+  account_type?: string;
   account_currency?: string;
   parent_account?: string;
+  is_group?: 0 | 1;
+};
+
+export type CreateErpnextCashOrBankAccountInput = CreateErpnextAccountInput & {
+  account_type: "Cash" | "Bank";
 };
 
 export type PaymentAccountMapping = {
@@ -654,6 +662,7 @@ export type ErpnextGlEntry = {
   party?: string;
   remarks?: string;
   company?: string;
+  is_cancelled?: 0 | 1;
 };
 
 export type ErpnextJournalEntry = {
@@ -675,6 +684,13 @@ export type ErpnextCostCenter = {
   disabled?: 0 | 1;
   is_group?: 0 | 1;
   parent_cost_center?: string;
+};
+
+export type CreateErpnextCostCenterInput = {
+  cost_center_name: string;
+  company: string;
+  parent_cost_center?: string;
+  is_group?: 0 | 1;
 };
 
 export type CreatePurchaseOrderItemInput = {

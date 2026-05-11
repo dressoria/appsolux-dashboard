@@ -5,8 +5,8 @@ import { useState } from "react";
 import { CompanySettingsCard } from "./company-settings-card";
 import {
   FiscalSettingsPlaceholder,
-  UsersSettingsPlaceholder,
 } from "./fiscal-settings-placeholder";
+import { UsersPermissionsSettings } from "./users-permissions-settings";
 import { CreatePaymentAccountForm } from "./create-payment-account-form";
 import { CreatePaymentMethodForm } from "./create-payment-method-form";
 import { PaymentMethodAccountForm } from "./payment-method-account-form";
@@ -20,6 +20,21 @@ import type {
   ErpnextModeOfPaymentDetail,
   ErpnextWarehouse,
 } from "@/types/erpnext";
+import type { MembershipRole, MembershipStatus, UserStatus } from "@prisma/client";
+
+type MembershipRow = {
+  id: string;
+  role: MembershipRole;
+  status: MembershipStatus;
+  createdAt: Date | string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    status: UserStatus;
+    createdAt: Date | string;
+  };
+};
 
 type SettingsTabId =
   | "empresa"
@@ -37,6 +52,7 @@ type SettingsTabsProps = {
   accounts: ErpnextAccount[];
   erpActive: boolean;
   erpDisplayStatus: string;
+  memberships: MembershipRow[];
 };
 
 const TABS: Array<{ id: SettingsTabId; label: string }> = [
@@ -196,6 +212,7 @@ export function SettingsTabs({
   accounts,
   erpActive,
   erpDisplayStatus,
+  memberships,
 }: SettingsTabsProps) {
   const [activeTab, setActiveTab] = useState<SettingsTabId>("empresa");
 
@@ -264,7 +281,9 @@ export function SettingsTabs({
 
       {activeTab === "fiscal" ? <FiscalSettingsPlaceholder /> : null}
 
-      {activeTab === "usuarios" ? <UsersSettingsPlaceholder /> : null}
+      {activeTab === "usuarios" ? (
+        <UsersPermissionsSettings memberships={memberships} />
+      ) : null}
 
       {activeTab === "integraciones" ? (
         <IntegrationsSection

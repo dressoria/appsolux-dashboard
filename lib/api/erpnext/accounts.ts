@@ -2,15 +2,18 @@ import "@/lib/security/server-only";
 import { erpnextFetch } from "./client";
 import { getErpnextCompanies } from "./companies";
 import type {
+  CreateErpnextAccountInput,
   CreateErpnextCashOrBankAccountInput,
   ErpnextAccount,
   ErpnextCreateResponse,
+  ErpnextDeleteResponse,
   ErpnextListResponse,
 } from "@/types/erpnext";
 
 const accountFields = [
   "name",
   "account_name",
+  "account_number",
   "account_type",
   "root_type",
   "account_currency",
@@ -18,6 +21,7 @@ const accountFields = [
   "parent_account",
   "is_group",
   "disabled",
+  "balance",
 ];
 
 export async function getErpnextAccounts(
@@ -117,6 +121,60 @@ export async function createErpnextCashOrBankAccount(
   );
 
   return response.data;
+}
+
+export async function createErpnextAccount(
+  input: CreateErpnextAccountInput
+): Promise<ErpnextAccount> {
+  const response = await erpnextFetch<ErpnextCreateResponse<ErpnextAccount>>(
+    "/api/resource/Account",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        account_name: input.account_name,
+        company: input.company,
+        root_type: input.root_type || undefined,
+        account_type: input.account_type || undefined,
+        account_currency: input.account_currency || undefined,
+        parent_account: input.parent_account || undefined,
+        is_group: input.is_group ?? 0,
+      }),
+    }
+  );
+
+  return response.data;
+}
+
+export async function updateErpnextAccount(
+  name: string,
+  input: Partial<CreateErpnextAccountInput> & { disabled?: 0 | 1 }
+): Promise<ErpnextAccount> {
+  const response = await erpnextFetch<ErpnextCreateResponse<ErpnextAccount>>(
+    `/api/resource/Account/${encodeURIComponent(name)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        account_name: input.account_name || undefined,
+        account_type: input.account_type || undefined,
+        account_currency: input.account_currency || undefined,
+        parent_account: input.parent_account || undefined,
+        disabled: input.disabled,
+      }),
+    }
+  );
+
+  return response.data;
+}
+
+export async function disableErpnextAccount(name: string): Promise<ErpnextAccount> {
+  return updateErpnextAccount(name, { disabled: 1 });
+}
+
+export async function deleteErpnextAccount(name: string): Promise<void> {
+  await erpnextFetch<ErpnextDeleteResponse>(
+    `/api/resource/Account/${encodeURIComponent(name)}`,
+    { method: "DELETE" }
+  );
 }
 
 export async function getErpnextAccountCurrency(

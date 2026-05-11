@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Users } from "lucide-react";
+import { FileText } from "lucide-react";
 import { routes } from "@/config/routes";
 
 const FISCAL_ITEMS = [
@@ -13,15 +13,6 @@ const FISCAL_ITEMS = [
   { label: "Retenciones y ATS", status: "En preparacion" },
   { label: "Guias de remision", status: "Proximamente" },
   { label: "Facturas recibidas electronicas", status: "Proximamente" },
-] as const;
-
-const USER_ITEMS = [
-  { label: "Usuarios del negocio", status: "En preparacion" },
-  { label: "Roles y grupos", status: "En preparacion" },
-  { label: "Permisos por modulo", status: "En preparacion" },
-  { label: "Acceso por dispositivo", status: "Proximamente" },
-  { label: "Sesiones activas", status: "Proximamente" },
-  { label: "Historial de accesos", status: "Proximamente" },
 ] as const;
 
 function StatusBadge({ status }: { status: "En preparacion" | "Proximamente" }) {
@@ -104,30 +95,3 @@ export function FiscalSettingsPlaceholder() {
     </Card>
   );
 }
-
-export function UsersSettingsPlaceholder() {
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Users className="h-5 w-5 text-muted-foreground" />
-          <CardTitle>Usuarios y permisos</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <span className="inline-flex h-5 items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700">
-            En preparacion
-          </span>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Administra quien puede acceder al dashboard, que modulos puede usar y
-          que acciones puede ejecutar.
-        </p>
-        <ItemGrid items={USER_ITEMS} />
-      </CardContent>
-    </Card>
-  );
-}
-
-export { UsersSettingsPlaceholder as SecuritySettingsPlaceholder };

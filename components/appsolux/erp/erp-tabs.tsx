@@ -408,17 +408,17 @@ const MODULES: Module[] = [
       },
       {
         label: "Estado de resultados",
-        status: "in-preparation",
+        status: "available",
         href: routes.erpAccountingProfitAndLoss,
       },
       {
         label: "Balance general",
-        status: "in-preparation",
+        status: "available",
         href: routes.erpAccountingBalanceSheet,
       },
       {
         label: "Balance de comprobación",
-        status: "in-preparation",
+        status: "available",
         href: routes.erpAccountingTrialBalance,
       },
       {

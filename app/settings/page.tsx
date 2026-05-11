@@ -12,6 +12,7 @@ import {
 } from "@/lib/api/erpnext/modes-of-payment";
 import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getTenantMemberships } from "@/lib/core/memberships";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
@@ -97,9 +98,20 @@ export default async function SettingsPage() {
   const tenantMode = await getTenantModeState(tenant);
   const erpActive = tenantMode.erpProvisioning.isRealActive;
   const badge = getErpBadge(tenantMode.erpProvisioning);
-  const erpData = erpActive
-    ? await loadErpSettings(tenant.erpnext_company_id)
-    : null;
+  const [erpData, memberships] = await Promise.all([
+    erpActive ? loadErpSettings(tenant.erpnext_company_id) : Promise.resolve(null),
+    getTenantMemberships(tenant.id).catch(() => []),
+  ]);
+  const membershipRows = memberships.map((membership) => ({
+    id: membership.id,
+    role: membership.role,
+    status: membership.status,
+    createdAt: membership.createdAt.toISOString(),
+    user: {
+      ...membership.user,
+      createdAt: membership.user.createdAt.toISOString(),
+    },
+  }));
 
   return (
     <DashboardShell>
@@ -145,6 +157,7 @@ export default async function SettingsPage() {
           accounts={erpData?.accounts ?? []}
           erpActive={erpActive}
           erpDisplayStatus={tenantMode.erpProvisioning.displayStatus}
+          memberships={membershipRows}
         />
       </div>
     </DashboardShell>

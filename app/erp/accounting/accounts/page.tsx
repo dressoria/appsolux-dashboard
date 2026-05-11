@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { AccountActions } from "@/components/appsolux/erp/account-actions";
+import { CreateAccountForm } from "@/components/appsolux/erp/create-account-form";
+import { ExportCsvButton } from "@/components/appsolux/reports/export-csv-button";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,60 +21,33 @@ const ROOT_TYPE_LABELS: Record<string, string> = {
   Expense: "Gasto",
 };
 
-const ACCOUNT_TYPE_LABELS: Record<string, string> = {
-  Cash: "Caja",
-  Bank: "Banco",
-  Receivable: "Por cobrar",
-  Payable: "Por pagar",
-  "Tax": "Impuesto",
-  "Cost of Goods Sold": "Costo de ventas",
-  "Stock": "Inventario",
-  "Fixed Asset": "Activo fijo",
-  "Depreciation": "Depreciacion",
-  "Accumulated Depreciation": "Depreciacion acumulada",
-  "Capital Work in Progress": "Obra en curso",
-  "Chargeable": "Imputable",
-  "Round Off": "Redondeo",
-  "Income Account": "Ingreso",
-  "Expense Account": "Gasto",
-};
+const ROOT_ORDER = ["Asset", "Liability", "Equity", "Income", "Expense"];
 
-function accountTypeLabel(type?: string) {
-  if (!type) return null;
-  return ACCOUNT_TYPE_LABELS[type] ?? type;
+function formatMoney(value: number) {
+  return new Intl.NumberFormat("es-EC", {
+    style: "currency",
+    currency: "USD",
+  }).format(value);
 }
 
 function rootTypeLabel(type?: string) {
-  if (!type) return null;
+  if (!type) return "Otro";
   return ROOT_TYPE_LABELS[type] ?? type;
 }
 
-function isCashOrBank(account: ErpnextAccount) {
-  return account.account_type === "Cash" || account.account_type === "Bank";
-}
-
-const ROOT_ORDER = ["Asset", "Liability", "Equity", "Income", "Expense"];
-
 function groupByRootType(accounts: ErpnextAccount[]) {
   const groups: Record<string, ErpnextAccount[]> = {};
-
   for (const account of accounts) {
     const root = account.root_type ?? "Otro";
-    if (!groups[root]) groups[root] = [];
-    groups[root].push(account);
+    groups[root] = [...(groups[root] ?? []), account];
   }
 
-  const ordered: Array<[string, ErpnextAccount[]]> = [];
-
-  for (const root of ROOT_ORDER) {
-    if (groups[root]) ordered.push([root, groups[root]]);
-  }
-
-  for (const [root, items] of Object.entries(groups)) {
-    if (!ROOT_ORDER.includes(root)) ordered.push([root, items]);
-  }
-
-  return ordered;
+  return [
+    ...ROOT_ORDER.filter((root) => groups[root]).map(
+      (root) => [root, groups[root]] as [string, ErpnextAccount[]]
+    ),
+    ...Object.entries(groups).filter(([root]) => !ROOT_ORDER.includes(root)),
+  ];
 }
 
 export default async function ErpAccountingAccountsPage() {
@@ -98,25 +74,11 @@ export default async function ErpAccountingAccountsPage() {
   if (!tenantMode.erpProvisioning.isRealActive) {
     return (
       <DashboardShell>
-        <div className="space-y-6">
-          <div>
-            <p className="text-sm text-muted-foreground">
-              <Link href={routes.erp} className="hover:underline">ERP Comercial</Link>{" "}
-              /{" "}
-              <Link href={routes.erpAccounting} className="hover:underline">Contabilidad</Link>{" "}
-              / Plan de cuentas
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight">Plan de cuentas</h1>
-          </div>
-          <Card>
-            <CardContent className="p-6 text-sm text-muted-foreground">
-              <p>El ERP dedicado es necesario para ver el plan de cuentas.</p>
-              <Button asChild variant="outline" size="sm" className="mt-3">
-                <Link href={routes.erp}>Ir al ERP</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+        <Card>
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            <p>El ERP dedicado es necesario para ver el plan de cuentas.</p>
+          </CardContent>
+        </Card>
       </DashboardShell>
     );
   }
@@ -124,10 +86,20 @@ export default async function ErpAccountingAccountsPage() {
   const companies = await getErpnextCompanies().catch(() => []);
   const firstCompany = companies[0];
   const accounts = await getErpnextAccounts(firstCompany?.name).catch(() => []);
-
   const activeAccounts = accounts.filter((a) => a.disabled !== 1 && a.is_group !== 1);
   const groupAccounts = accounts.filter((a) => a.is_group === 1);
   const grouped = groupByRootType(activeAccounts);
+  const accountsCsv = accounts.map((account) => ({
+    name: account.name,
+    account_number: account.account_number ?? "",
+    account_name: account.account_name ?? "",
+    parent_account: account.parent_account ?? "",
+    root_type: account.root_type ?? "",
+    account_type: account.account_type ?? "",
+    is_group: account.is_group ?? 0,
+    disabled: account.disabled ?? 0,
+    balance: account.balance ?? 0,
+  }));
 
   return (
     <DashboardShell>
@@ -135,20 +107,50 @@ export default async function ErpAccountingAccountsPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm text-muted-foreground">
-              <Link href={routes.erp} className="hover:underline">ERP Comercial</Link>{" "}
+              <Link href={routes.erp} className="hover:underline">
+                ERP Comercial
+              </Link>{" "}
               /{" "}
-              <Link href={routes.erpAccounting} className="hover:underline">Contabilidad</Link>{" "}
+              <Link href={routes.erpAccounting} className="hover:underline">
+                Contabilidad
+              </Link>{" "}
               / Plan de cuentas
             </p>
-            <h1 className="text-3xl font-semibold tracking-tight">Plan de cuentas</h1>
+            <h1 className="text-3xl font-semibold tracking-tight">
+              Plan de cuentas
+            </h1>
             <p className="mt-1 text-muted-foreground">
               {activeAccounts.length} cuentas activas · {groupAccounts.length} grupos
             </p>
           </div>
-          <Button asChild variant="outline">
-            <Link href={routes.erpAccounting}>Volver a contabilidad</Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <ExportCsvButton
+              filename="plan-de-cuentas"
+              rows={accountsCsv}
+              columns={[
+                { key: "name", header: "ID" },
+                { key: "account_number", header: "Numero" },
+                { key: "account_name", header: "Cuenta" },
+                { key: "parent_account", header: "Padre" },
+                { key: "root_type", header: "Root type" },
+                { key: "account_type", header: "Tipo" },
+                { key: "is_group", header: "Grupo" },
+                { key: "disabled", header: "Inactivo" },
+                { key: "balance", header: "Balance" },
+              ]}
+            />
+            <Button asChild variant="outline">
+              <Link href={routes.erpAccounting}>Volver a contabilidad</Link>
+            </Button>
+          </div>
         </div>
+
+        <CreateAccountForm
+          companies={companies}
+          parentAccounts={groupAccounts}
+          defaultCompany={firstCompany?.name}
+          defaultCurrency={firstCompany?.default_currency}
+        />
 
         {accounts.length === 0 ? (
           <Card>
@@ -175,10 +177,14 @@ export default async function ErpAccountingAccountsPage() {
                       <thead>
                         <tr className="border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                           <th className="px-4 py-2 text-left">Cuenta</th>
+                          <th className="px-4 py-2 text-left">ID</th>
+                          <th className="px-4 py-2 text-left">Padre</th>
                           <th className="px-4 py-2 text-left">Tipo</th>
                           <th className="px-4 py-2 text-left">Moneda</th>
                           <th className="px-4 py-2 text-left">Empresa</th>
-                          <th className="px-4 py-2 text-left">Etiqueta</th>
+                          <th className="px-4 py-2 text-right">Balance</th>
+                          <th className="px-4 py-2 text-left">Estado</th>
+                          <th className="px-4 py-2 text-left">Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -189,22 +195,40 @@ export default async function ErpAccountingAccountsPage() {
                           >
                             <td className="px-4 py-2 font-medium">
                               {account.account_name ?? account.name}
-                            </td>
-                            <td className="px-4 py-2 text-muted-foreground">
-                              {accountTypeLabel(account.account_type) ?? "—"}
-                            </td>
-                            <td className="px-4 py-2 text-muted-foreground">
-                              {account.account_currency ?? "—"}
-                            </td>
-                            <td className="px-4 py-2 text-muted-foreground">
-                              {account.company ?? "—"}
-                            </td>
-                            <td className="px-4 py-2">
-                              {isCashOrBank(account) ? (
-                                <span className="inline-flex h-5 items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 text-xs font-medium text-emerald-700">
-                                  Caja/Banco
+                              {account.account_number ? (
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  {account.account_number}
                                 </span>
                               ) : null}
+                            </td>
+                            <td className="px-4 py-2 font-mono text-xs text-muted-foreground">
+                              {account.name}
+                            </td>
+                            <td className="px-4 py-2 text-muted-foreground">
+                              {account.parent_account ?? "-"}
+                            </td>
+                            <td className="px-4 py-2 text-muted-foreground">
+                              {account.account_type ?? "-"}
+                            </td>
+                            <td className="px-4 py-2 text-muted-foreground">
+                              {account.account_currency ?? "-"}
+                            </td>
+                            <td className="px-4 py-2 text-muted-foreground">
+                              {account.company ?? "-"}
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                              {formatMoney(account.balance ?? 0)}
+                            </td>
+                            <td className="px-4 py-2">
+                              <span className="inline-flex h-5 items-center rounded-full border border-green-200 bg-green-50 px-2 text-xs font-medium text-green-700">
+                                Activa
+                              </span>
+                            </td>
+                            <td className="px-4 py-2">
+                              <AccountActions
+                                account={account}
+                                parentAccounts={groupAccounts}
+                              />
                             </td>
                           </tr>
                         ))}
@@ -219,13 +243,12 @@ export default async function ErpAccountingAccountsPage() {
 
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link href={routes.erpFinanceCash}>Cuentas de caja</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href={routes.erpFinanceBanks}>Cuentas de banco</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
             <Link href={routes.erpAccountingGeneralLedger}>Libro mayor</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href={routes.erpAccountingTrialBalance}>
+              Balance de comprobacion
+            </Link>
           </Button>
         </div>
       </div>
