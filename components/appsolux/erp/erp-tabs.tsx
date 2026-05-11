@@ -117,7 +117,7 @@ const MODULES: Module[] = [
         status: "available",
         href: routes.erpSalesQuotations,
       },
-      { label: "Clientes", status: "available", sectionId: "customers" },
+      { label: "Clientes", status: "available", href: routes.erpCustomers },
       {
         label: "Cuentas por cobrar",
         status: "available",
@@ -310,8 +310,21 @@ const MODULES: Module[] = [
         status: "available",
         href: routes.erpPurchasesSuppliers,
       },
-      { label: "Historial de transacciones", status: "coming-soon" },
-      { label: "Saldos pendientes", status: "coming-soon" },
+      {
+        label: "Historial de clientes",
+        status: "available",
+        href: routes.erpCustomers,
+      },
+      {
+        label: "Clientes con saldo",
+        status: "available",
+        href: routes.erpCustomerBalances,
+      },
+      {
+        label: "Proveedores con saldo",
+        status: "available",
+        href: routes.erpPurchasesSupplierBalances,
+      },
     ],
   },
   {

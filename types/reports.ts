@@ -63,14 +63,18 @@ export type CustomerDebtReportItem = {
   customer: string;
   customer_name?: string;
   outstanding_amount: number;
+  overdue_amount: number;
   invoice_count: number;
+  last_invoice?: string;
 };
 
 export type SupplierPayableReportItem = {
   supplier: string;
   supplier_name?: string;
   outstanding_amount: number;
+  overdue_amount: number;
   invoice_count: number;
+  last_invoice?: string;
 };
 
 export type LowStockReportItem = {

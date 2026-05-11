@@ -112,6 +112,11 @@ export default async function ErpFinancePayablesPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
+              <Link href={routes.erpPurchasesSupplierBalances}>
+                Proveedores con saldo
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link href={routes.erpPurchasesPayables}>
                 Ver en modulo compras
               </Link>
@@ -220,6 +225,13 @@ export default async function ErpFinancePayablesPage() {
                         </td>
                         <td className="py-2">
                           <div className="flex flex-wrap gap-1.5">
+                            <Button asChild size="xs" variant="outline">
+                              <Link
+                                href={`${routes.erpPurchasesSuppliers}/${encodeURIComponent(inv.supplier)}`}
+                              >
+                                Historial
+                              </Link>
+                            </Button>
                             <DocumentActions
                               doctype="Purchase Invoice"
                               name={inv.name}

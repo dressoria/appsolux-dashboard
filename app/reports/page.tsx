@@ -193,32 +193,65 @@ function CustomersTable({
           <tr>
             <th className="py-2 pr-4 font-medium">Cliente</th>
             <th className="py-2 pr-4 font-medium">Facturas</th>
+            {mode === "debt" ? (
+              <>
+                <th className="py-2 pr-4 font-medium">Ultima factura</th>
+                <th className="py-2 pr-4 font-medium">Vencido</th>
+              </>
+            ) : null}
             <th className="py-2 font-medium">
               {mode === "sales" ? "Compra total" : "Saldo"}
             </th>
+            {mode === "debt" ? (
+              <th className="py-2 pl-4 font-medium">Acciones</th>
+            ) : null}
           </tr>
         </thead>
         <tbody className="divide-y">
-          {customers.map((customer) => (
-            <tr key={customer.customer}>
-              <td className="py-2 pr-4">
-                <p className="font-medium">
-                  {customer.customer_name ?? customer.customer}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {customer.customer}
-                </p>
-              </td>
-              <td className="py-2 pr-4">{customer.invoice_count}</td>
-              <td className="py-2 font-medium">
-                {formatMoney(
-                  mode === "sales"
-                    ? (customer as CustomerPurchaseReportItem).total_amount
-                    : (customer as CustomerDebtReportItem).outstanding_amount
-                )}
-              </td>
-            </tr>
-          ))}
+          {customers.map((customer) => {
+            const debtCustomer = customer as CustomerDebtReportItem;
+            return (
+              <tr key={customer.customer}>
+                <td className="py-2 pr-4">
+                  <p className="font-medium">
+                    {customer.customer_name ?? customer.customer}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {customer.customer}
+                  </p>
+                </td>
+                <td className="py-2 pr-4">{customer.invoice_count}</td>
+                {mode === "debt" ? (
+                  <>
+                    <td className="py-2 pr-4 text-muted-foreground">
+                      {debtCustomer.last_invoice ?? "-"}
+                    </td>
+                    <td className="py-2 pr-4 text-rose-600">
+                      {formatMoney(debtCustomer.overdue_amount)}
+                    </td>
+                  </>
+                ) : null}
+                <td className="py-2 font-medium">
+                  {formatMoney(
+                    mode === "sales"
+                      ? (customer as CustomerPurchaseReportItem).total_amount
+                      : debtCustomer.outstanding_amount
+                  )}
+                </td>
+                {mode === "debt" ? (
+                  <td className="py-2 pl-4">
+                    <Button asChild size="xs" variant="outline">
+                      <Link
+                        href={`${routes.erpCustomers}/${encodeURIComponent(customer.customer)}`}
+                      >
+                        Historial
+                      </Link>
+                    </Button>
+                  </td>
+                ) : null}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -237,7 +270,10 @@ function SuppliersTable({ suppliers }: { suppliers: SupplierPayableReportItem[] 
           <tr>
             <th className="py-2 pr-4 font-medium">Proveedor</th>
             <th className="py-2 pr-4 font-medium">Facturas</th>
-            <th className="py-2 font-medium">Saldo</th>
+            <th className="py-2 pr-4 font-medium">Ultima factura</th>
+            <th className="py-2 pr-4 font-medium">Vencido</th>
+            <th className="py-2 pr-4 font-medium">Saldo</th>
+            <th className="py-2 font-medium">Acciones</th>
           </tr>
         </thead>
         <tbody className="divide-y">
@@ -252,8 +288,23 @@ function SuppliersTable({ suppliers }: { suppliers: SupplierPayableReportItem[] 
                 </p>
               </td>
               <td className="py-2 pr-4">{supplier.invoice_count}</td>
-              <td className="py-2 font-medium">
+              <td className="py-2 pr-4 text-muted-foreground">
+                {supplier.last_invoice ?? "-"}
+              </td>
+              <td className="py-2 pr-4 text-rose-600">
+                {formatMoney(supplier.overdue_amount)}
+              </td>
+              <td className="py-2 pr-4 font-medium">
                 {formatMoney(supplier.outstanding_amount)}
+              </td>
+              <td className="py-2">
+                <Button asChild size="xs" variant="outline">
+                  <Link
+                    href={`${routes.erpPurchasesSuppliers}/${encodeURIComponent(supplier.supplier)}`}
+                  >
+                    Historial
+                  </Link>
+                </Button>
               </td>
             </tr>
           ))}
@@ -334,12 +385,16 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     customer_name: customer.customer_name ?? "",
     invoice_count: customer.invoice_count,
     outstanding_amount: customer.outstanding_amount,
+    overdue_amount: customer.overdue_amount,
+    last_invoice: customer.last_invoice ?? "",
   }));
   const suppliersCsv = reports.suppliers_with_payables.map((supplier) => ({
     supplier: supplier.supplier,
     supplier_name: supplier.supplier_name ?? "",
     invoice_count: supplier.invoice_count,
     outstanding_amount: supplier.outstanding_amount,
+    overdue_amount: supplier.overdue_amount,
+    last_invoice: supplier.last_invoice ?? "",
   }));
   const lowStockCsv = [...reports.low_stock, ...reports.out_of_stock].map(
     (item) => ({
@@ -349,6 +404,36 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       projected_qty: item.projected_qty,
     })
   );
+  const receivablesSummary = {
+    total: reports.customers_with_debt.reduce(
+      (sum, customer) => sum + customer.outstanding_amount,
+      0
+    ),
+    overdue: reports.customers_with_debt.reduce(
+      (sum, customer) => sum + customer.overdue_amount,
+      0
+    ),
+    parties: reports.customers_with_debt.length,
+    invoices: reports.customers_with_debt.reduce(
+      (sum, customer) => sum + customer.invoice_count,
+      0
+    ),
+  };
+  const payablesSummary = {
+    total: reports.suppliers_with_payables.reduce(
+      (sum, supplier) => sum + supplier.outstanding_amount,
+      0
+    ),
+    overdue: reports.suppliers_with_payables.reduce(
+      (sum, supplier) => sum + supplier.overdue_amount,
+      0
+    ),
+    parties: reports.suppliers_with_payables.length,
+    invoices: reports.suppliers_with_payables.reduce(
+      (sum, supplier) => sum + supplier.invoice_count,
+      0
+    ),
+  };
 
   return (
     <DashboardShell>
@@ -437,6 +522,116 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         <section className="space-y-4">
           <h2 className="text-lg font-semibold">Resumen ejecutivo</h2>
           <ReportsSummary reports={reports} />
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Cuentas por cobrar y pagar</h2>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link href={routes.erpFinanceReceivables}>CxC por factura</Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href={routes.erpFinancePayables}>CxP por factura</Link>
+              </Button>
+            </div>
+          </div>
+          <div className="grid gap-6 xl:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle>Cuentas por cobrar</CardTitle>
+                  <ExportCsvButton
+                    filename={`cuentas-por-cobrar-${range.from}-${range.to}`}
+                    rows={customersDebtCsv}
+                    columns={[
+                      { key: "customer", header: "Cliente" },
+                      { key: "customer_name", header: "Nombre" },
+                      { key: "invoice_count", header: "Facturas pendientes" },
+                      { key: "last_invoice", header: "Ultima factura" },
+                      { key: "overdue_amount", header: "Vencido" },
+                      { key: "outstanding_amount", header: "Saldo" },
+                    ]}
+                    size="xs"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-4">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">Total</p>
+                    <p className="font-semibold">
+                      {formatMoney(receivablesSummary.total)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">Vencido</p>
+                    <p className="font-semibold text-rose-600">
+                      {formatMoney(receivablesSummary.overdue)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">Clientes</p>
+                    <p className="font-semibold">{receivablesSummary.parties}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">Facturas</p>
+                    <p className="font-semibold">{receivablesSummary.invoices}</p>
+                  </div>
+                </div>
+                <CustomersTable
+                  customers={reports.customers_with_debt}
+                  mode="debt"
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle>Cuentas por pagar</CardTitle>
+                  <ExportCsvButton
+                    filename={`cuentas-por-pagar-${range.from}-${range.to}`}
+                    rows={suppliersCsv}
+                    columns={[
+                      { key: "supplier", header: "Proveedor" },
+                      { key: "supplier_name", header: "Nombre" },
+                      { key: "invoice_count", header: "Facturas pendientes" },
+                      { key: "last_invoice", header: "Ultima factura" },
+                      { key: "overdue_amount", header: "Vencido" },
+                      { key: "outstanding_amount", header: "Saldo" },
+                    ]}
+                    size="xs"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-4">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">Total</p>
+                    <p className="font-semibold">
+                      {formatMoney(payablesSummary.total)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">Vencido</p>
+                    <p className="font-semibold text-rose-600">
+                      {formatMoney(payablesSummary.overdue)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">Proveedores</p>
+                    <p className="font-semibold">{payablesSummary.parties}</p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">Facturas</p>
+                    <p className="font-semibold">{payablesSummary.invoices}</p>
+                  </div>
+                </div>
+                <SuppliersTable suppliers={reports.suppliers_with_payables} />
+              </CardContent>
+            </Card>
+          </div>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-2">

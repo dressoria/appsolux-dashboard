@@ -89,6 +89,11 @@ export default async function ErpPurchasesSuppliersPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
+              <Link href={routes.erpPurchasesSupplierBalances}>
+                Proveedores con saldo
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link href={routes.erpPurchases}>Volver a compras</Link>
             </Button>
             <Button asChild variant="outline">
@@ -157,7 +162,16 @@ export default async function ErpPurchasesSuppliersPage() {
                           )}
                         </td>
                         <td className="py-2">
-                          <SupplierActions supplier={supplier} />
+                          <div className="flex flex-wrap gap-1.5">
+                            <Button asChild size="xs" variant="outline">
+                              <Link
+                                href={`${routes.erpPurchasesSuppliers}/${encodeURIComponent(supplier.name)}`}
+                              >
+                                Historial
+                              </Link>
+                            </Button>
+                            <SupplierActions supplier={supplier} />
+                          </div>
                         </td>
                       </tr>
                     ))}

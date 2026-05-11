@@ -28,6 +28,7 @@ const salesInvoiceFields = [
   "customer",
   "customer_name",
   "posting_date",
+  "due_date",
   "status",
   "docstatus",
   "grand_total",
@@ -61,6 +62,7 @@ const purchaseInvoiceFields = [
   "supplier",
   "supplier_name",
   "posting_date",
+  "due_date",
   "grand_total",
   "outstanding_amount",
   "status",
@@ -98,6 +100,14 @@ function getDateFilters(range?: ReportDateRange) {
 
 function getNumber(value: number | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function getTodayDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function isOverdue(dueDate: string | undefined, today: string) {
+  return Boolean(dueDate && dueDate < today);
 }
 
 export async function getSalesInvoicesForReports(
@@ -341,6 +351,7 @@ function buildCustomerDebts(
   invoices: ErpnextSalesInvoice[]
 ): CustomerDebtReportItem[] {
   const customerMap = new Map<string, CustomerDebtReportItem>();
+  const today = getTodayDate();
 
   invoices
     .filter(
@@ -353,11 +364,23 @@ function buildCustomerDebts(
         customer,
         customer_name: invoice.customer_name,
         outstanding_amount: 0,
+        overdue_amount: 0,
         invoice_count: 0,
+        last_invoice: undefined,
       };
 
       current.outstanding_amount += getNumber(invoice.outstanding_amount);
+      current.overdue_amount += isOverdue(invoice.due_date, today)
+        ? getNumber(invoice.outstanding_amount)
+        : 0;
       current.invoice_count += 1;
+      if (
+        !current.last_invoice ||
+        (invoice.posting_date ?? "") >
+          (invoices.find((row) => row.name === current.last_invoice)?.posting_date ?? "")
+      ) {
+        current.last_invoice = invoice.name;
+      }
       customerMap.set(customer, current);
     });
 
@@ -370,6 +393,7 @@ function buildSupplierPayables(
   invoices: ErpnextPurchaseInvoice[]
 ): SupplierPayableReportItem[] {
   const supplierMap = new Map<string, SupplierPayableReportItem>();
+  const today = getTodayDate();
 
   invoices
     .filter(
@@ -382,11 +406,23 @@ function buildSupplierPayables(
         supplier,
         supplier_name: invoice.supplier_name,
         outstanding_amount: 0,
+        overdue_amount: 0,
         invoice_count: 0,
+        last_invoice: undefined,
       };
 
       current.outstanding_amount += getNumber(invoice.outstanding_amount);
+      current.overdue_amount += isOverdue(invoice.due_date, today)
+        ? getNumber(invoice.outstanding_amount)
+        : 0;
       current.invoice_count += 1;
+      if (
+        !current.last_invoice ||
+        (invoice.posting_date ?? "") >
+          (invoices.find((row) => row.name === current.last_invoice)?.posting_date ?? "")
+      ) {
+        current.last_invoice = invoice.name;
+      }
       supplierMap.set(supplier, current);
     });
 

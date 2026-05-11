@@ -202,6 +202,11 @@ export default async function ErpPurchasesPage() {
                 </Link>
               </Button>
               <Button asChild variant="outline">
+                <Link href={routes.erpPurchasesSupplierBalances}>
+                  Proveedores con saldo
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
                 <Link href={routes.reports}>Reportes</Link>
               </Button>
             </div>

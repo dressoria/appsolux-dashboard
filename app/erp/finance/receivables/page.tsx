@@ -112,6 +112,9 @@ export default async function ErpFinanceReceivablesPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
+              <Link href={routes.erpCustomerBalances}>Clientes con saldo</Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link href={routes.erpFinancePaymentsReceived}>
                 Ver pagos recibidos
               </Link>
@@ -226,6 +229,13 @@ export default async function ErpFinanceReceivablesPage() {
                                 name={inv.name}
                                 size="xs"
                               />
+                              <Button asChild size="xs" variant="outline">
+                                <Link
+                                  href={`${routes.erpCustomers}/${encodeURIComponent(inv.customer)}`}
+                                >
+                                  Historial
+                                </Link>
+                              </Button>
                               <Button asChild size="xs" variant="outline">
                                 <Link
                                   href={`${routes.posInvoices}/${encodeURIComponent(inv.name)}`}

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ApiResponse } from "@/types/api";
 import type { ErpnextCustomer, ErpnextTerritory } from "@/types/erpnext";
+import { routes } from "@/config/routes";
 import {
   ConfirmModal,
   ErpToast,
@@ -188,7 +190,14 @@ export function CustomersTable({
                       )}
                     </td>
                     <td className="py-2">
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <Button asChild variant="outline" size="sm">
+                          <Link
+                            href={`${routes.erpCustomers}/${encodeURIComponent(customer.name)}`}
+                          >
+                            Historial
+                          </Link>
+                        </Button>
                         <Button
                           type="button"
                           variant="outline"
