@@ -153,11 +153,22 @@ export default async function ErpInventoryPage() {
               <Link href={routes.erpInventoryProducts}>Ver productos</Link>
             </Button>
             <Button asChild variant="outline">
+              <Link href={routes.erpInventoryCategories}>Categorias</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={routes.erpInventoryUnits}>Unidades</Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link href={routes.erpInventoryStock}>Ver stock actual</Link>
             </Button>
             <Button asChild variant="outline">
               <Link href={`${routes.erpInventoryStock}?filter=low`}>
                 Stock bajo
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={`${routes.erpInventoryStock}?filter=out`}>
+                Sin stock
               </Link>
             </Button>
             <Button asChild variant="outline">
@@ -254,6 +265,18 @@ export default async function ErpInventoryPage() {
               status: "Disponible",
             },
             {
+              title: "Categorias",
+              desc: "Grupos de items reales de ERPNext para organizar el catalogo.",
+              href: routes.erpInventoryCategories,
+              status: "Disponible",
+            },
+            {
+              title: "Unidades",
+              desc: "Unidades de medida usadas por productos, compras y stock.",
+              href: routes.erpInventoryUnits,
+              status: "Disponible",
+            },
+            {
               title: "Stock actual",
               desc: "Cantidades disponibles, proyectadas y reservadas por bodega.",
               href: routes.erpInventoryStock,
@@ -309,7 +332,7 @@ export default async function ErpInventoryPage() {
             },
             {
               title: "Reportes de inventario",
-              desc: "Stock bajo, productos mas vendidos e inventario valorizado.",
+              desc: "Indicadores gerenciales y rankings de inventario.",
               href: routes.reports,
               status: "Disponible",
             },

@@ -79,11 +79,32 @@ export type ErpnextItemGroup = {
   name: string;
   item_group_name?: string;
   is_group?: 0 | 1;
+  parent_item_group?: string;
+  disabled?: 0 | 1;
 };
 
 export type ErpnextUom = {
   name: string;
   uom_name?: string;
+  enabled?: 0 | 1;
+};
+
+export type CreateErpnextItemGroupInput = {
+  item_group_name: string;
+  parent_item_group?: string;
+  is_group?: boolean;
+};
+
+export type UpdateErpnextItemGroupInput = CreateErpnextItemGroupInput & {
+  disabled?: boolean;
+};
+
+export type CreateErpnextUomInput = {
+  uom_name: string;
+};
+
+export type UpdateErpnextUomInput = CreateErpnextUomInput & {
+  enabled?: boolean;
 };
 
 export type ErpnextTerritory = {
@@ -175,6 +196,8 @@ export type ErpnextStockLedgerEntry = {
   warehouse: string;
   actual_qty?: number;
   qty_after_transaction?: number;
+  valuation_rate?: number;
+  stock_value_difference?: number;
   voucher_type?: string;
   voucher_no?: string;
 };

@@ -176,7 +176,16 @@ const MODULES: Module[] = [
         status: "available",
         href: routes.erpInventoryProducts,
       },
-      { label: "Categorias y unidades", status: "in-preparation" },
+      {
+        label: "Categorias",
+        status: "available",
+        href: routes.erpInventoryCategories,
+      },
+      {
+        label: "Unidades",
+        status: "available",
+        href: routes.erpInventoryUnits,
+      },
       {
         label: "Bodegas / ubicaciones",
         status: "available",
@@ -204,10 +213,14 @@ const MODULES: Module[] = [
       },
       {
         label: "Transferencias entre bodegas",
-        status: "in-preparation",
+        status: "available",
         href: routes.erpInventoryTransfers,
       },
-      { label: "Toma fisica", status: "coming-soon" },
+      {
+        label: "Toma fisica",
+        status: "available",
+        href: routes.erpInventoryPhysicalCount,
+      },
       {
         label: "Ingresos de mercaderia",
         status: "available",
@@ -216,9 +229,13 @@ const MODULES: Module[] = [
       {
         label: "Stock bajo / sin stock",
         status: "available",
-        href: routes.reports,
+        href: `${routes.erpInventoryStock}?filter=low`,
       },
-      { label: "Inventario valorizado", status: "coming-soon" },
+      {
+        label: "Inventario valorizado",
+        status: "available",
+        href: routes.erpInventoryValuation,
+      },
     ],
   },
   {

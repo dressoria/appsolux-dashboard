@@ -1,12 +1,12 @@
 import "@/lib/security/server-only";
 import { erpnextFetch } from "./client";
 import { getErpnextCompanies } from "./companies";
+import { getErpnextItemGroups } from "./item-groups";
+import { getErpnextUoms } from "./uoms";
 import type {
-  ErpnextItemGroup,
   ErpnextListResponse,
   ErpnextMasters,
   ErpnextTerritory,
-  ErpnextUom,
 } from "@/types/erpnext";
 
 function getListPath(doctype: string, fields: string[]) {
@@ -17,26 +17,6 @@ function getListPath(doctype: string, fields: string[]) {
   });
 
   return `/api/resource/${encodeURIComponent(doctype)}?${params.toString()}`;
-}
-
-export async function getErpnextItemGroups(): Promise<ErpnextItemGroup[]> {
-  const response = await erpnextFetch<ErpnextListResponse<ErpnextItemGroup>>(
-    getListPath("Item Group", ["name", "item_group_name", "is_group"])
-  );
-
-  const usableItemGroups = response.data.filter(
-    (itemGroup) => itemGroup.is_group !== 1
-  );
-
-  return usableItemGroups.length > 0 ? usableItemGroups : response.data;
-}
-
-export async function getErpnextUoms(): Promise<ErpnextUom[]> {
-  const response = await erpnextFetch<ErpnextListResponse<ErpnextUom>>(
-    getListPath("UOM", ["name", "uom_name"])
-  );
-
-  return response.data;
 }
 
 export async function getErpnextTerritories(): Promise<ErpnextTerritory[]> {
@@ -53,7 +33,7 @@ export async function getErpnextTerritories(): Promise<ErpnextTerritory[]> {
 
 export async function getErpnextMasters(): Promise<ErpnextMasters> {
   const [itemGroups, uoms, territories, companies] = await Promise.all([
-    getErpnextItemGroups(),
+    getErpnextItemGroups({ onlyUsable: true }),
     getErpnextUoms(),
     getErpnextTerritories(),
     getErpnextCompanies(),

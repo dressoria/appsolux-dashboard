@@ -18,6 +18,8 @@ export const routes = {
   erpPurchasesPayables: "/erp/purchases/payables",
   erpInventory: "/erp/inventory",
   erpInventoryProducts: "/erp/inventory/products",
+  erpInventoryCategories: "/erp/inventory/categories",
+  erpInventoryUnits: "/erp/inventory/units",
   erpInventoryStock: "/erp/inventory/stock",
   erpInventoryMovements: "/erp/inventory/movements",
   erpInventoryAdjustments: "/erp/inventory/adjustments",

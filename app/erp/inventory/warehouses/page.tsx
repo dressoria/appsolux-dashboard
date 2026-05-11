@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { CreateWarehouseDialog } from "@/components/appsolux/erp/create-warehouse-dialog";
+import { WarehousesTable } from "@/components/appsolux/erp/warehouses-table";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { getErpnextCompanies } from "@/lib/api/erpnext/companies";
 import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -67,7 +68,6 @@ export default async function ErpInventoryWarehousesPage() {
     getErpnextWarehouses().catch(() => []),
     getErpnextCompanies().catch(() => []),
   ]);
-  const operative = warehouses.filter((w) => w.is_group !== 1);
   const groups = warehouses.filter((w) => w.is_group === 1);
 
   return (
@@ -121,86 +121,7 @@ export default async function ErpInventoryWarehousesPage() {
           <CreateWarehouseDialog companies={companies} />
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Bodegas operativas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {operative.length === 0 ? (
-              <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                Aun no hay bodegas operativas configuradas. Usa el boton
-                &ldquo;Nueva Bodega&rdquo; para crear la primera.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="border-b text-xs text-muted-foreground">
-                    <tr>
-                      <th className="py-2 pr-4 font-medium">Bodega</th>
-                      <th className="py-2 pr-4 font-medium">Empresa</th>
-                      <th className="py-2 font-medium">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {operative.map((warehouse) => (
-                      <tr key={warehouse.name}>
-                        <td className="py-2 pr-4 font-medium">
-                          {warehouse.warehouse_name}
-                        </td>
-                        <td className="py-2 pr-4 text-muted-foreground">
-                          {warehouse.company ?? "-"}
-                        </td>
-                        <td className="py-2">
-                          {warehouse.disabled === 1 ? (
-                            <span className="inline-flex h-5 items-center rounded-full border border-slate-200 bg-slate-50 px-2 text-xs font-medium text-slate-500">
-                              Inactiva
-                            </span>
-                          ) : (
-                            <span className="inline-flex h-5 items-center rounded-full border border-green-200 bg-green-50 px-2 text-xs font-medium text-green-700">
-                              Activa
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {groups.length > 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>Grupos de bodegas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="border-b text-xs text-muted-foreground">
-                    <tr>
-                      <th className="py-2 pr-4 font-medium">Grupo</th>
-                      <th className="py-2 font-medium">Empresa</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {groups.map((warehouse) => (
-                      <tr key={warehouse.name}>
-                        <td className="py-2 pr-4 font-medium">
-                          {warehouse.warehouse_name}
-                        </td>
-                        <td className="py-2 text-muted-foreground">
-                          {warehouse.company ?? "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        ) : null}
+        <WarehousesTable warehouses={warehouses} />
       </div>
     </DashboardShell>
   );

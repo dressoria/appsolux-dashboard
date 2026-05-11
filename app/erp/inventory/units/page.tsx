@@ -1,24 +1,15 @@
 import Link from "next/link";
+import { UomManager } from "@/components/appsolux/erp/uom-manager";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AdjustStockForm } from "@/components/appsolux/erp/adjust-stock-form";
-import { BulkStockAdjustment } from "@/components/appsolux/erp/bulk-stock-adjustment";
-import { CreateStockEntryForm } from "@/components/appsolux/erp/create-stock-entry-form";
-import { getErpnextItems } from "@/lib/api/erpnext/items";
-import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
+import { getErpnextUoms } from "@/lib/api/erpnext/uoms";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { routes } from "@/config/routes";
 
-type AdjustmentsPageProps = {
-  searchParams: { item?: string; warehouse?: string };
-};
-
-export default async function ErpInventoryAdjustmentsPage({
-  searchParams,
-}: AdjustmentsPageProps) {
+export default async function ErpInventoryUnitsPage() {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -29,7 +20,7 @@ export default async function ErpInventoryAdjustmentsPage({
             Sesion requerida
           </h1>
           <p className="text-muted-foreground">
-            Inicia sesion para ajustar inventario.
+            Inicia sesion para ver unidades.
           </p>
         </div>
       </DashboardShell>
@@ -52,17 +43,15 @@ export default async function ErpInventoryAdjustmentsPage({
               <Link href={routes.erpInventory} className="hover:underline">
                 Inventario
               </Link>{" "}
-              / Ajustes
+              / Unidades
             </p>
             <h1 className="text-3xl font-semibold tracking-tight">
-              Ajustes de inventario
+              Unidades de medida
             </h1>
           </div>
           <Card>
             <CardContent className="p-6 text-sm text-muted-foreground">
-              <p>
-                El ERP dedicado es necesario para ajustar inventario.
-              </p>
+              <p>El ERP dedicado es necesario para gestionar unidades.</p>
               <Button asChild variant="outline" size="sm" className="mt-3">
                 <Link href={routes.erp}>Ir al ERP</Link>
               </Button>
@@ -73,10 +62,7 @@ export default async function ErpInventoryAdjustmentsPage({
     );
   }
 
-  const [items, warehouses] = await Promise.all([
-    getErpnextItems(),
-    getErpnextWarehouses(),
-  ]);
+  const uoms = await getErpnextUoms().catch(() => []);
 
   return (
     <DashboardShell>
@@ -91,67 +77,34 @@ export default async function ErpInventoryAdjustmentsPage({
               <Link href={routes.erpInventory} className="hover:underline">
                 Inventario
               </Link>{" "}
-              / Ajustes
+              / Unidades
             </p>
             <h1 className="text-3xl font-semibold tracking-tight">
-              Ajustes de inventario
+              Unidades de medida
             </h1>
             <p className="mt-2 text-muted-foreground">
-              Usa ajustes para corregir diferencias de stock por conteo fisico,
-              merma o errores.
+              Administra UOM reales de ERPNext para compras, stock y ventas.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
-              <Link href={routes.erpInventoryStock}>Ver stock</Link>
+              <Link href={routes.erpInventoryProducts}>Productos</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href={routes.erpInventoryMovements}>Ver movimientos</Link>
+              <Link href={routes.erpInventoryCategories}>Categorias</Link>
             </Button>
             <Button asChild variant="outline">
               <Link href={routes.erpInventory}>Volver a inventario</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href={routes.erp}>Volver al ERP</Link>
             </Button>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Como funcionan los ajustes</CardTitle>
+            <CardTitle>Unidades registradas</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>
-              Cuando el stock contado fisicamente no coincide con lo que
-              registra el sistema, puedes corregirlo aqui.
-            </p>
-            <p>
-              Cada ajuste genera un movimiento trazable en el historial para
-              mantener auditoria completa de los cambios.
-            </p>
-          </CardContent>
-        </Card>
-
-        <CreateStockEntryForm items={items} warehouses={warehouses} />
-
-        <AdjustStockForm
-          items={items}
-          warehouses={warehouses}
-          initialItemCode={searchParams.item}
-          initialWarehouse={searchParams.warehouse}
-        />
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Ajuste masivo desde CSV</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Carga un archivo CSV para ajustar multiples productos a la vez. Descarga la plantilla,
-              completa las cantidades objetivo y sube el archivo para validar y aplicar.
-            </p>
-            <BulkStockAdjustment items={items} warehouses={warehouses} />
+          <CardContent>
+            <UomManager uoms={uoms} />
           </CardContent>
         </Card>
       </div>

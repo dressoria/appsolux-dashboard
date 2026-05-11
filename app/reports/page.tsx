@@ -709,6 +709,16 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                   <Link href={routes.erpInventoryStock}>Stock actual</Link>
                 </Button>
                 <Button asChild size="sm" variant="outline">
+                  <Link href={`${routes.erpInventoryStock}?filter=low`}>
+                    Stock bajo
+                  </Link>
+                </Button>
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`${routes.erpInventoryStock}?filter=out`}>
+                    Sin stock
+                  </Link>
+                </Button>
+                <Button asChild size="sm" variant="outline">
                   <Link href={routes.erpInventoryValuation}>
                     Inventario valorizado
                   </Link>

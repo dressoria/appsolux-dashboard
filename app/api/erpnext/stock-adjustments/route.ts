@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createErpnextStockAdjustment } from "@/lib/api/erpnext/stock-adjustments";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import type { CreateStockAdjustmentInput } from "@/types/erpnext";
 
@@ -40,7 +41,21 @@ export async function POST(request: Request) {
       );
     }
 
-    await getCurrentTenant(user);
+    const tenant = await getCurrentTenant(user);
+    const tenantMode = await getTenantModeState(tenant);
+
+    if (!tenantMode.erpProvisioning.isRealActive) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "ERP_NOT_ACTIVE",
+            message: "ERP dedicado no esta activo.",
+          },
+        },
+        { status: 403 }
+      );
+    }
 
     const body = (await request.json()) as Record<string, unknown>;
     const itemCode = getStringField(body, "item_code");

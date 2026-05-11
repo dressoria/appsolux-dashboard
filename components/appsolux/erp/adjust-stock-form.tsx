@@ -22,6 +22,8 @@ import type {
 type AdjustStockFormProps = {
   items: ErpnextItem[];
   warehouses: ErpnextWarehouse[];
+  initialItemCode?: string;
+  initialWarehouse?: string;
 };
 
 type AdjustStockResponse = ApiResponse<StockAdjustmentResult>;
@@ -38,7 +40,12 @@ const adjustmentReasons = [
   "Otro",
 ];
 
-export function AdjustStockForm({ items, warehouses }: AdjustStockFormProps) {
+export function AdjustStockForm({
+  items,
+  warehouses,
+  initialItemCode,
+  initialWarehouse,
+}: AdjustStockFormProps) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
@@ -127,6 +134,7 @@ export function AdjustStockForm({ items, warehouses }: AdjustStockFormProps) {
                 name="item_code"
                 className={selectClassName}
                 disabled={!canAdjustStock}
+                defaultValue={initialItemCode ?? ""}
                 required
               >
                 <option value="">Selecciona un producto</option>
@@ -144,6 +152,7 @@ export function AdjustStockForm({ items, warehouses }: AdjustStockFormProps) {
                 name="warehouse"
                 className={selectClassName}
                 disabled={!canAdjustStock}
+                defaultValue={initialWarehouse ?? ""}
                 required
               >
                 <option value="">Selecciona una bodega</option>

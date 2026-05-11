@@ -13,6 +13,8 @@ const stockLedgerFields = [
   "warehouse",
   "actual_qty",
   "qty_after_transaction",
+  "valuation_rate",
+  "stock_value_difference",
   "voucher_type",
   "voucher_no",
 ];

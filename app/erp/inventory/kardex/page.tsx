@@ -10,21 +10,21 @@ import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { routes } from "@/config/routes";
 
 type KardexPageProps = {
-  searchParams: { item?: string };
+  searchParams: { item?: string; warehouse?: string };
 };
-
-function formatQty(value: number | undefined) {
-  if (value === undefined) return "-";
-  return new Intl.NumberFormat("es-EC", {
-    maximumFractionDigits: 4,
-    signDisplay: "exceptZero",
-  }).format(value);
-}
 
 function formatBalance(value: number | undefined) {
   if (value === undefined) return "-";
   return new Intl.NumberFormat("es-EC", {
     maximumFractionDigits: 4,
+  }).format(value);
+}
+
+function formatMoney(value: number | undefined) {
+  if (value === undefined) return "-";
+  return new Intl.NumberFormat("es-EC", {
+    style: "currency",
+    currency: "USD",
   }).format(value);
 }
 
@@ -94,11 +94,15 @@ export default async function ErpInventoryKardexPage({
   }
 
   const selectedItem = searchParams.item ?? null;
+  const selectedWarehouse = searchParams.warehouse ?? null;
 
   const [items, entries] = await Promise.all([
     getErpnextItems(),
     selectedItem
-      ? getErpnextStockLedger({ item_code: selectedItem })
+      ? getErpnextStockLedger({
+          item_code: selectedItem,
+          warehouse: selectedWarehouse ?? undefined,
+        })
       : Promise.resolve([]),
   ]);
 
@@ -209,6 +213,15 @@ export default async function ErpInventoryKardexPage({
                     ? `${selectedItemDetail.item_name} (${selectedItem})`
                     : selectedItem}
                 </span>
+                {selectedWarehouse ? (
+                  <>
+                    <span className="mx-2 text-muted-foreground">/</span>
+                    <span className="text-sm text-muted-foreground">
+                      Bodega:
+                    </span>{" "}
+                    <span className="font-semibold">{selectedWarehouse}</span>
+                  </>
+                ) : null}
               </div>
             </div>
 
@@ -229,12 +242,18 @@ export default async function ErpInventoryKardexPage({
                           <th className="py-2 pr-4 font-medium">Fecha</th>
                           <th className="py-2 pr-4 font-medium">Bodega</th>
                           <th className="py-2 pr-4 font-medium text-right">
-                            Entrada / Salida
+                            Entrada
+                          </th>
+                          <th className="py-2 pr-4 font-medium text-right">
+                            Salida
                           </th>
                           <th className="py-2 pr-4 font-medium text-right">
                             Saldo
                           </th>
                           <th className="py-2 pr-4 font-medium">Tipo</th>
+                          <th className="py-2 pr-4 font-medium text-right">
+                            Valoracion
+                          </th>
                           <th className="py-2 font-medium">Referencia</th>
                         </tr>
                       </thead>
@@ -249,16 +268,11 @@ export default async function ErpInventoryKardexPage({
                               <td className="py-2 pr-4 text-muted-foreground">
                                 {entry.warehouse}
                               </td>
-                              <td
-                                className={`py-2 pr-4 text-right font-semibold ${
-                                  qty > 0
-                                    ? "text-green-700"
-                                    : qty < 0
-                                      ? "text-rose-600"
-                                      : "text-muted-foreground"
-                                }`}
-                              >
-                                {formatQty(entry.actual_qty)}
+                              <td className="py-2 pr-4 text-right font-semibold text-green-700">
+                                {qty > 0 ? formatBalance(qty) : "-"}
+                              </td>
+                              <td className="py-2 pr-4 text-right font-semibold text-rose-600">
+                                {qty < 0 ? formatBalance(Math.abs(qty)) : "-"}
                               </td>
                               <td className="py-2 pr-4 text-right font-medium">
                                 {formatBalance(entry.qty_after_transaction)}
@@ -267,6 +281,9 @@ export default async function ErpInventoryKardexPage({
                                 <span className="inline-flex h-5 items-center rounded-full border border-slate-200 bg-slate-50 px-2 text-xs font-medium text-slate-600">
                                   {getVoucherLabel(entry.voucher_type)}
                                 </span>
+                              </td>
+                              <td className="py-2 pr-4 text-right text-muted-foreground">
+                                {formatMoney(entry.valuation_rate)}
                               </td>
                               <td className="py-2 font-mono text-xs text-muted-foreground">
                                 {entry.voucher_no ?? "-"}

@@ -7,6 +7,7 @@ import {
   updateErpnextWarehouse,
 } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 type WarehouseRouteContext = {
@@ -33,7 +34,23 @@ async function getAuthorizedWarehouseName(context: WarehouseRouteContext) {
     };
   }
 
-  await getCurrentTenant(user);
+  const tenant = await getCurrentTenant(user);
+  const tenantMode = await getTenantModeState(tenant);
+
+  if (!tenantMode.erpProvisioning.isRealActive) {
+    return {
+      error: NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "ERP_NOT_ACTIVE",
+            message: "El ERP dedicado debe estar activo para bodegas.",
+          },
+        },
+        { status: 403 }
+      ),
+    };
+  }
 
   const { warehouseName } = await context.params;
   const decodedName = decodeURIComponent(warehouseName).trim();

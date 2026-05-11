@@ -6,6 +6,7 @@ import {
   updateErpnextWarehouse,
 } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 function getStringField(body: Record<string, unknown>, field: string) {
@@ -13,12 +14,12 @@ function getStringField(body: Record<string, unknown>, field: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-export async function PUT(request: Request) {
-  try {
-    const user = await getCurrentUser();
+async function requireActiveErp() {
+  const user = await getCurrentUser();
 
-    if (!user) {
-      return NextResponse.json(
+  if (!user) {
+    return {
+      error: NextResponse.json(
         {
           success: false,
           error: {
@@ -27,14 +28,41 @@ export async function PUT(request: Request) {
           },
         },
         { status: 401 }
-      );
-    }
+      ),
+    };
+  }
 
-    const tenant = await getCurrentTenant(user);
+  const tenant = await getCurrentTenant(user);
+  const tenantMode = await getTenantModeState(tenant);
+
+  if (!tenantMode.erpProvisioning.isRealActive) {
+    return {
+      error: NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "ERP_NOT_ACTIVE",
+            message: "El ERP dedicado debe estar activo para bodegas.",
+          },
+        },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return { error: null, tenant };
+}
+
+export async function PUT(request: Request) {
+  try {
+    const guard = await requireActiveErp();
+    if (guard.error) return guard.error;
+
     const body = (await request.json()) as Record<string, unknown>;
     const name = getStringField(body, "name");
     const warehouseName = getStringField(body, "warehouse_name");
-    const company = getStringField(body, "company") || tenant.erpnext_company_id;
+    const company =
+      getStringField(body, "company") || guard.tenant.erpnext_company_id;
 
     if (!name || !warehouseName || !company) {
       return NextResponse.json(
@@ -79,20 +107,8 @@ export async function PUT(request: Request) {
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
-
-    if (!user) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "UNAUTHORIZED",
-            message: "User session is required",
-          },
-        },
-        { status: 401 }
-      );
-    }
+    const guard = await requireActiveErp();
+    if (guard.error) return guard.error;
 
     const warehouses = await getErpnextWarehouses();
 
@@ -121,20 +137,8 @@ export async function GET() {
 
 export async function DELETE(request: Request) {
   try {
-    const user = await getCurrentUser();
-
-    if (!user) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "UNAUTHORIZED",
-            message: "User session is required",
-          },
-        },
-        { status: 401 }
-      );
-    }
+    const guard = await requireActiveErp();
+    if (guard.error) return guard.error;
 
     const body = (await request.json()) as Record<string, unknown>;
     const name = getStringField(body, "name");
@@ -152,15 +156,27 @@ export async function DELETE(request: Request) {
       );
     }
 
-    await deleteErpnextWarehouse(name);
+    try {
+      await deleteErpnextWarehouse(name);
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        action: "deleted",
-        name,
-      },
-    });
+      return NextResponse.json({
+        success: true,
+        data: {
+          action: "deleted",
+          name,
+        },
+      });
+    } catch {
+      const warehouse = await updateErpnextWarehouse(name, { disabled: true });
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          action: "disabled",
+          warehouse,
+        },
+      });
+    }
   } catch (error) {
     const message =
       error instanceof Error
@@ -182,25 +198,13 @@ export async function DELETE(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
+    const guard = await requireActiveErp();
+    if (guard.error) return guard.error;
 
-    if (!user) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "UNAUTHORIZED",
-            message: "User session is required",
-          },
-        },
-        { status: 401 }
-      );
-    }
-
-    const tenant = await getCurrentTenant(user);
     const body = (await request.json()) as Record<string, unknown>;
     const warehouseName = getStringField(body, "warehouse_name");
-    const company = getStringField(body, "company") || tenant.erpnext_company_id;
+    const company =
+      getStringField(body, "company") || guard.tenant.erpnext_company_id;
     const parentWarehouse = getStringField(body, "parent_warehouse");
 
     if (!warehouseName) {

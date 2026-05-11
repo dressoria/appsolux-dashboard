@@ -231,6 +231,7 @@ export default async function ErpInventoryStockPage({ searchParams }: StockPageP
                       <th className="py-2 pr-4 font-medium text-right">Proyectado</th>
                       <th className="py-2 pr-4 font-medium text-right">Reservado</th>
                       <th className="py-2 font-medium">Estado</th>
+                      <th className="py-2 font-medium">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -276,6 +277,33 @@ export default async function ErpInventoryStockPage({ searchParams }: StockPageP
                                 Con stock
                               </span>
                             )}
+                          </td>
+                          <td className="py-2">
+                            <div className="flex flex-wrap gap-1.5">
+                              <Button asChild size="xs" variant="outline">
+                                <Link
+                                  href={`${routes.erpInventoryAdjustments}?item=${encodeURIComponent(
+                                    bin.item_code
+                                  )}&warehouse=${encodeURIComponent(bin.warehouse)}`}
+                                >
+                                  Ajustar
+                                </Link>
+                              </Button>
+                              <Button asChild size="xs" variant="outline">
+                                <Link
+                                  href={`${routes.erpInventoryKardex}?item=${encodeURIComponent(
+                                    bin.item_code
+                                  )}&warehouse=${encodeURIComponent(bin.warehouse)}`}
+                                >
+                                  Kardex
+                                </Link>
+                              </Button>
+                              <Button asChild size="xs" variant="outline">
+                                <Link href={routes.erpInventoryTransfers}>
+                                  Transferir
+                                </Link>
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       );
