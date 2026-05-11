@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActiveErpTenantForApi } from "@/lib/core/require-active-erp-tenant";
 import {
   deleteErpnextSalesInvoiceDraft,
   getErpnextSalesInvoiceDetail,
@@ -98,6 +99,8 @@ function getDraftItems(body: Record<string, unknown>) {
 
 export async function GET(_request: Request, context: SalesInvoiceRouteContext) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const resolved = await getAuthorizedInvoiceName(context);
 
     if (resolved.error) {
@@ -131,6 +134,8 @@ export async function GET(_request: Request, context: SalesInvoiceRouteContext) 
 
 export async function PATCH(request: Request, context: SalesInvoiceRouteContext) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const resolved = await getAuthorizedInvoiceName(context);
 
     if (resolved.error) {
@@ -254,6 +259,8 @@ export async function DELETE(
   context: SalesInvoiceRouteContext
 ) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const resolved = await getAuthorizedInvoiceName(context);
 
     if (resolved.error) {

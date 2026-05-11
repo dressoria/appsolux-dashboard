@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { requireActiveErpTenantForApi } from "@/lib/core/require-active-erp-tenant";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
@@ -20,6 +21,8 @@ function sanitizeFilename(doctype: string, name: string): string {
 
 export async function GET(request: NextRequest) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });

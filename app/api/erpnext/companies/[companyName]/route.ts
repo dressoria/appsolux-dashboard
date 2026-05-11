@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import {
+  type ActiveErpTenantResult,
+  requireActiveErpTenantForApi,
+  resolveTenantErpCompany,
+} from "@/lib/core/require-active-erp-tenant";
+import {
   getErpnextCompanyDetail,
   updateErpnextCompanyBasicInfo,
 } from "@/lib/api/erpnext/companies";
@@ -13,7 +18,10 @@ type CompanyRouteContext = {
   }>;
 };
 
-async function getAuthorizedCompanyName(context: CompanyRouteContext) {
+async function getAuthorizedCompanyName(
+  context: CompanyRouteContext,
+  guard: Extract<ActiveErpTenantResult, { ok: true }>
+) {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -51,7 +59,12 @@ async function getAuthorizedCompanyName(context: CompanyRouteContext) {
     };
   }
 
-  return { name: decodedName };
+  const companyResult = await resolveTenantErpCompany(guard, decodedName);
+  if (!companyResult.ok) {
+    return { error: companyResult.response };
+  }
+
+  return { name: companyResult.company };
 }
 
 function getStringField(body: Record<string, unknown>, field: string) {
@@ -61,7 +74,9 @@ function getStringField(body: Record<string, unknown>, field: string) {
 
 export async function GET(_request: Request, context: CompanyRouteContext) {
   try {
-    const resolved = await getAuthorizedCompanyName(context);
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
+    const resolved = await getAuthorizedCompanyName(context, erpGuard);
 
     if (resolved.error) {
       return resolved.error;
@@ -92,7 +107,9 @@ export async function GET(_request: Request, context: CompanyRouteContext) {
 
 export async function PATCH(request: Request, context: CompanyRouteContext) {
   try {
-    const resolved = await getAuthorizedCompanyName(context);
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
+    const resolved = await getAuthorizedCompanyName(context, erpGuard);
 
     if (resolved.error) {
       return resolved.error;

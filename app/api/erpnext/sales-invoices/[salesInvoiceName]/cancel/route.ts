@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActiveErpTenantForApi } from "@/lib/core/require-active-erp-tenant";
 import {
   cancelErpnextSalesInvoice,
   getErpnextSalesInvoiceDetail,
@@ -29,6 +30,8 @@ function getFriendlyCancelError(message: string) {
 
 export async function POST(request: Request, context: SalesInvoiceRouteContext) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const user = await getCurrentUser();
 
     if (!user) {

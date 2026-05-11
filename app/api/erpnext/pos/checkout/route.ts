@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import {
+  requireActiveErpTenantForApi,
+  resolveTenantErpCompany,
+} from "@/lib/core/require-active-erp-tenant";
 import { createErpnextPosCheckout } from "@/lib/api/erpnext/pos-checkout";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import type { PosCheckoutInput } from "@/types/erpnext";
 
 function getStringField(body: Record<string, unknown>, field: string) {
@@ -45,6 +48,8 @@ function getCheckoutItems(body: Record<string, unknown>) {
 
 export async function POST(request: Request) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const user = await getCurrentUser();
 
     if (!user) {
@@ -60,12 +65,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const tenant = await getCurrentTenant(user);
-
     const body = (await request.json()) as Record<string, unknown>;
     const customer = getStringField(body, "customer");
-    const requestedCompany = getStringField(body, "company");
-    const company = tenant.erpnext_company_id ?? requestedCompany;
+    const companyResult = await resolveTenantErpCompany(
+      erpGuard,
+      getStringField(body, "company")
+    );
+    if (!companyResult.ok) return companyResult.response;
+    const company = companyResult.company;
     const warehouse = getStringField(body, "warehouse");
     const modeOfPayment = getStringField(body, "mode_of_payment");
     const paidAmount = getNumberField(body, "paid_amount");

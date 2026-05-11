@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PaymentEntryActionsMenu } from "@/components/appsolux/erp/payment-entry-actions-menu";
 import { getErpnextPaymentEntries } from "@/lib/api/erpnext/payment-entries";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { routes } from "@/config/routes";
 import type { CashRegisterSummary, ErpnextPaymentEntry } from "@/types/erpnext";
@@ -93,7 +94,20 @@ export default async function PosPaymentsPage() {
     );
   }
 
-  await getCurrentTenant(user);
+  const tenant = await getCurrentTenant(user);
+  const tenantMode = await getTenantModeState(tenant);
+
+  if (!tenantMode.erpProvisioning.isRealActive) {
+    return (
+      <DashboardShell>
+        <Card>
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            El ERP dedicado real debe estar activo para usar el POS avanzado.
+          </CardContent>
+        </Card>
+      </DashboardShell>
+    );
+  }
   const paymentEntries = await getErpnextPaymentEntries();
   const summary = getCashRegisterSummary(paymentEntries);
 

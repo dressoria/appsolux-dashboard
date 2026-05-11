@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActiveErpTenantForApi } from "@/lib/core/require-active-erp-tenant";
 import {
   getErpnextDocumentFiles,
   uploadErpnextDocumentFile,
@@ -76,6 +77,8 @@ async function requireActiveErp() {
 
 export async function GET(request: Request) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const guard = await requireActiveErp();
     if (guard.error) return guard.error;
 
@@ -117,6 +120,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const guard = await requireActiveErp();
     if (guard.error) return guard.error;
 

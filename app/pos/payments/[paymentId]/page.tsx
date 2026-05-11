@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getErpnextPaymentEntryDetail } from "@/lib/api/erpnext/payment-entries";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { routes } from "@/config/routes";
 
@@ -52,7 +53,20 @@ export default async function PosPaymentDetailPage({
     );
   }
 
-  await getCurrentTenant(user);
+  const tenant = await getCurrentTenant(user);
+  const tenantMode = await getTenantModeState(tenant);
+
+  if (!tenantMode.erpProvisioning.isRealActive) {
+    return (
+      <DashboardShell>
+        <Card>
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            El ERP dedicado real debe estar activo para usar el POS avanzado.
+          </CardContent>
+        </Card>
+      </DashboardShell>
+    );
+  }
 
   let paymentEntry;
   try {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActiveErpTenantForApi } from "@/lib/core/require-active-erp-tenant";
 import { createErpnextSupplierPaymentEntry } from "@/lib/api/erpnext/payment-entries";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -19,6 +20,8 @@ function getNumberField(body: Record<string, unknown>, field: string) {
 
 export async function POST(request: Request) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const user = await getCurrentUser();
 
     if (!user) {

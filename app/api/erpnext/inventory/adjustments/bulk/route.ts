@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActiveErpTenantForApi } from "@/lib/core/require-active-erp-tenant";
 import { createErpnextStockAdjustment } from "@/lib/api/erpnext/stock-adjustments";
 import { getCurrentUser } from "@/lib/auth/current-user";
 
@@ -19,6 +20,8 @@ type BulkResult = {
 
 export async function POST(request: Request) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json(

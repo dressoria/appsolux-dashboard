@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getErpnextModesOfPayment } from "@/lib/api/erpnext/modes-of-payment";
 import { getErpnextSalesInvoices } from "@/lib/api/erpnext/sales-invoices";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { routes } from "@/config/routes";
 
@@ -66,7 +67,20 @@ export default async function PosInvoicesPage() {
     );
   }
 
-  await getCurrentTenant(user);
+  const tenant = await getCurrentTenant(user);
+  const tenantMode = await getTenantModeState(tenant);
+
+  if (!tenantMode.erpProvisioning.isRealActive) {
+    return (
+      <DashboardShell>
+        <Card>
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            El ERP dedicado real debe estar activo para usar el POS avanzado.
+          </CardContent>
+        </Card>
+      </DashboardShell>
+    );
+  }
   const [salesInvoices, modesOfPayment] = await Promise.all([
     getErpnextSalesInvoices(),
     getErpnextModesOfPayment(),

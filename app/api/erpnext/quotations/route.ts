@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+  requireActiveErpTenantForApi,
+  resolveTenantErpCompany,
+} from "@/lib/core/require-active-erp-tenant";
+import {
   createErpnextQuotation,
   getErpnextQuotations,
 } from "@/lib/api/erpnext/quotations";
@@ -78,6 +82,8 @@ async function requireActiveErp() {
 
 export async function GET() {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const guard = await requireActiveErp();
     if (guard.error) return guard.error;
 
@@ -105,12 +111,19 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const guard = await requireActiveErp();
     if (guard.error) return guard.error;
 
     const body = (await request.json()) as Record<string, unknown>;
     const customer = getStringField(body, "customer");
-    const company = getStringField(body, "company");
+    const companyResult = await resolveTenantErpCompany(
+      erpGuard,
+      getStringField(body, "company")
+    );
+    if (!companyResult.ok) return companyResult.response;
+    const company = companyResult.company;
     const transactionDate = getStringField(body, "transaction_date");
     const validTill = getStringField(body, "valid_till");
     const notes = getStringField(body, "notes");

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActiveErpTenantForApi } from "@/lib/core/require-active-erp-tenant";
 import {
   createErpnextStockTransfer,
   getErpnextStockTransfers,
@@ -13,6 +14,8 @@ function getStringField(body: Record<string, unknown>, field: string) {
 
 export async function GET() {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json(
@@ -33,6 +36,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json(

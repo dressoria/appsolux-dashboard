@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActiveErpTenantForApi } from "@/lib/core/require-active-erp-tenant";
 import {
   getErpnextSalesInvoiceDetail,
   submitErpnextSalesInvoice,
@@ -14,6 +15,8 @@ type SalesInvoiceRouteContext = {
 
 export async function POST(_request: Request, context: SalesInvoiceRouteContext) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const user = await getCurrentUser();
 
     if (!user) {

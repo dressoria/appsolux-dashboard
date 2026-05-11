@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActiveErpTenantForApi } from "@/lib/core/require-active-erp-tenant";
 import {
   deleteErpnextSupplier,
   disableErpnextSupplier,
@@ -56,6 +57,8 @@ async function requireActiveErp() {
 
 export async function PUT(request: Request, context: RouteContext) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const guard = await requireActiveErp();
     if (guard.error) return guard.error;
 
@@ -105,6 +108,8 @@ export async function PUT(request: Request, context: RouteContext) {
 
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const guard = await requireActiveErp();
     if (guard.error) return guard.error;
 

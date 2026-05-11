@@ -72,6 +72,13 @@ function isLegacyOrDemoErpReady(tenant: AppsoluxTenant) {
   return Boolean(tenant.erpnext_company_id?.trim());
 }
 
+function canUseLegacyErpFallback() {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    process.env.APPSOLUX_ALLOW_LEGACY_ERP_ACTIVE === "true"
+  );
+}
+
 export async function getErpProvisioningState(
   tenant: AppsoluxTenant
 ): Promise<ErpProvisioningState> {
@@ -144,7 +151,7 @@ export async function getErpProvisioningState(
     };
   }
 
-  if (legacyOrDemoReady && !integration) {
+  if (legacyOrDemoReady && !integration && canUseLegacyErpFallback()) {
     return {
       status: "active",
       isReady: true,
@@ -156,6 +163,22 @@ export async function getErpProvisioningState(
       desiredCompanyName: tenant.erpnext_company_id,
       expectedSiteName: undefined,
       displayStatus: "ERP activo",
+      mode: "legacy_or_demo",
+    };
+  }
+
+  if (legacyOrDemoReady && !integration) {
+    return {
+      status: "active_simulated",
+      isReady: false,
+      isSimulated: true,
+      isRealActive: false,
+      isPending: false,
+      isFailed: false,
+      canStartProvisioning: true,
+      desiredCompanyName: tenant.erpnext_company_id,
+      expectedSiteName: undefined,
+      displayStatus: "ERP legacy no habilitado para beta",
       mode: "legacy_or_demo",
     };
   }

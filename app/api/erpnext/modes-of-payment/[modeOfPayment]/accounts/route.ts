@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  requireActiveErpTenantForApi,
+  resolveTenantErpCompany,
+} from "@/lib/core/require-active-erp-tenant";
 import { getCashAndBankAccounts } from "@/lib/api/erpnext/accounts";
 import { updateModeOfPaymentAccountMapping } from "@/lib/api/erpnext/modes-of-payment";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -20,6 +24,8 @@ export async function PATCH(
   context: ModeAccountRouteContext
 ) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const user = await getCurrentUser();
 
     if (!user) {
@@ -40,7 +46,12 @@ export async function PATCH(
     const { modeOfPayment } = await context.params;
     const decodedModeOfPayment = decodeURIComponent(modeOfPayment).trim();
     const body = (await request.json()) as Record<string, unknown>;
-    const company = getStringField(body, "company");
+    const companyResult = await resolveTenantErpCompany(
+      erpGuard,
+      getStringField(body, "company")
+    );
+    if (!companyResult.ok) return companyResult.response;
+    const company = companyResult.company;
     const account = getStringField(body, "account");
 
     if (!decodedModeOfPayment || !company || !account) {

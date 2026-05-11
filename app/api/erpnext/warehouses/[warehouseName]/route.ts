@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActiveErpTenantForApi } from "@/lib/core/require-active-erp-tenant";
 import { getErpnextInventory } from "@/lib/api/erpnext/inventory";
 import { getErpnextStockLedger } from "@/lib/api/erpnext/stock-ledger";
 import {
@@ -85,6 +86,8 @@ function getBooleanField(body: Record<string, unknown>, field: string) {
 
 export async function PATCH(request: Request, context: WarehouseRouteContext) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const resolved = await getAuthorizedWarehouseName(context);
 
     if (resolved.error) {
@@ -125,6 +128,8 @@ export async function DELETE(
   context: WarehouseRouteContext
 ) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const resolved = await getAuthorizedWarehouseName(context);
 
     if (resolved.error) {

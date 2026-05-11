@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+  requireActiveErpTenantForApi,
+  resolveTenantErpCompany,
+} from "@/lib/core/require-active-erp-tenant";
+import {
   createErpnextWarehouse,
   deleteErpnextWarehouse,
   getErpnextWarehouses,
@@ -55,14 +59,20 @@ async function requireActiveErp() {
 
 export async function PUT(request: Request) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const guard = await requireActiveErp();
     if (guard.error) return guard.error;
 
     const body = (await request.json()) as Record<string, unknown>;
     const name = getStringField(body, "name");
     const warehouseName = getStringField(body, "warehouse_name");
-    const company =
-      getStringField(body, "company") || guard.tenant.erpnext_company_id;
+    const companyResult = await resolveTenantErpCompany(
+      erpGuard,
+      getStringField(body, "company")
+    );
+    if (!companyResult.ok) return companyResult.response;
+    const company = companyResult.company;
 
     if (!name || !warehouseName || !company) {
       return NextResponse.json(
@@ -107,6 +117,8 @@ export async function PUT(request: Request) {
 
 export async function GET() {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const guard = await requireActiveErp();
     if (guard.error) return guard.error;
 
@@ -137,6 +149,8 @@ export async function GET() {
 
 export async function DELETE(request: Request) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const guard = await requireActiveErp();
     if (guard.error) return guard.error;
 
@@ -198,13 +212,19 @@ export async function DELETE(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const erpGuard = await requireActiveErpTenantForApi();
+    if (!erpGuard.ok) return erpGuard.response;
     const guard = await requireActiveErp();
     if (guard.error) return guard.error;
 
     const body = (await request.json()) as Record<string, unknown>;
     const warehouseName = getStringField(body, "warehouse_name");
-    const company =
-      getStringField(body, "company") || guard.tenant.erpnext_company_id;
+    const companyResult = await resolveTenantErpCompany(
+      erpGuard,
+      getStringField(body, "company")
+    );
+    if (!companyResult.ok) return companyResult.response;
+    const company = companyResult.company;
     const parentWarehouse = getStringField(body, "parent_warehouse");
 
     if (!warehouseName) {

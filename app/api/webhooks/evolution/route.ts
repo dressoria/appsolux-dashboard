@@ -17,6 +17,16 @@ function validateWebhookSecret(request: Request) {
   const expectedSecret = process.env.EVOLUTION_WEBHOOK_SECRET?.trim();
 
   if (!expectedSecret) {
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[Evolution] Webhook rejected: EVOLUTION_WEBHOOK_SECRET is not configured."
+      );
+      return false;
+    }
+
+    console.warn(
+      "[Evolution] Webhook secret not configured; accepting request outside production."
+    );
     return true;
   }
 
