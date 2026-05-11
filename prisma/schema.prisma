@@ -131,6 +131,7 @@ model User {
   requestedPlanUpgrades     PlanUpgradeRequest[] @relation("RequestedPlanUpgrades")
   reviewedPlanUpgrades      PlanUpgradeRequest[] @relation("ReviewedPlanUpgrades")
   conversationNotes ConversationNote[]
+  cashClosings              CashClosing[]       @relation("CashClosingCreatedBy")
 }
 
 model Tenant {
@@ -157,6 +158,7 @@ model Tenant {
   lightweightSales          LightweightSale[]
   lightweightStockMovements LightweightStockMovement[]
   conversationNotes ConversationNote[]
+  cashClosings              CashClosing[]
 }
 
 model Plan {
@@ -458,4 +460,32 @@ model ConversationNote {
   @@index([tenantId, conversationExternalId])
   @@index([createdAt])
   @@index([authorUserId])
+}
+
+model CashClosing {
+  id                     String   @id @default(cuid())
+  tenantId               String
+  erpCompanyName         String?
+  cashAccountName        String?
+  date                   DateTime
+  closedAt               DateTime @default(now())
+  expectedCashAmount     Decimal  @default(0) @db.Decimal(12, 2)
+  expectedTransferAmount Decimal  @default(0) @db.Decimal(12, 2)
+  expectedCardAmount     Decimal  @default(0) @db.Decimal(12, 2)
+  expectedOtherAmount    Decimal  @default(0) @db.Decimal(12, 2)
+  expectedTotalAmount    Decimal  @default(0) @db.Decimal(12, 2)
+  countedCashAmount      Decimal  @default(0) @db.Decimal(12, 2)
+  differenceAmount       Decimal  @default(0) @db.Decimal(12, 2)
+  notes                  String?
+  status                 String   @default("closed")
+  createdByUserId        String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation("CashClosingCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, date])
+  @@index([createdByUserId])
+  @@index([status])
 }

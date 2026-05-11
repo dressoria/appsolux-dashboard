@@ -207,7 +207,15 @@ export default async function ErpFinancePage() {
                 <Link href={routes.erpFinanceCash}>Caja</Link>
               </Button>
               <Button asChild variant="outline">
+                <Link href={routes.erpFinanceCashClosing}>Cierre de caja</Link>
+              </Button>
+              <Button asChild variant="outline">
                 <Link href={routes.erpFinanceBanks}>Bancos</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href={routes.erpFinanceBankReconciliation}>
+                  Conciliacion bancaria
+                </Link>
               </Button>
             </div>
           </CardContent>
@@ -242,7 +250,7 @@ export default async function ErpFinancePage() {
                 },
                 {
                   step: 5,
-                  text: "Supervisa caja y bancos",
+                  text: "Supervisa caja, bancos y cierre diario",
                   href: routes.erpFinanceCash,
                 },
               ].map(({ step, text, href }) => (
@@ -329,21 +337,21 @@ export default async function ErpFinancePage() {
             },
             {
               title: "Cierre de caja",
-              desc: "Apertura, cierre y cuadre de caja diario.",
-              badge: "En preparacion",
+              desc: "Cuadre diario de efectivo con historial por tenant.",
+              badge: "Disponible",
               badgeClass:
-                "border-amber-200 bg-amber-50 text-amber-700",
-              href: null,
-              linkLabel: null,
+                "border-green-200 bg-green-50 text-green-700",
+              href: routes.erpFinanceCashClosing,
+              linkLabel: "Cerrar caja",
             },
             {
               title: "Conciliacion bancaria",
-              desc: "Contrasta movimientos del banco con los registros del ERP.",
-              badge: "Proximamente",
+              desc: "Revisa Payment Entry de cuentas caja/banco contra extractos.",
+              badge: "Asistida",
               badgeClass:
-                "border-slate-200 bg-slate-50 text-slate-500",
-              href: null,
-              linkLabel: null,
+                "border-green-200 bg-green-50 text-green-700",
+              href: routes.erpFinanceBankReconciliation,
+              linkLabel: "Conciliar movimientos",
             },
           ].map((card) => (
             <div

@@ -84,6 +84,11 @@ export default async function ErpFinanceBanksPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button asChild>
+              <Link href={routes.erpFinanceBankReconciliation}>
+                Conciliar movimientos
+              </Link>
+            </Button>
             <Button asChild variant="outline">
               <Link href={routes.settings}>Configurar cuentas</Link>
             </Button>
@@ -203,17 +208,22 @@ export default async function ErpFinanceBanksPage() {
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <CardTitle>Conciliacion bancaria</CardTitle>
-              <span className="inline-flex h-5 items-center rounded-full border border-slate-200 bg-slate-50 px-2 text-xs font-medium text-slate-500">
-                Proximamente
+              <span className="inline-flex h-5 items-center rounded-full border border-green-200 bg-green-50 px-2 text-xs font-medium text-green-700">
+                Conciliacion asistida
               </span>
             </div>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              La conciliacion bancaria permitira contrastar los movimientos de
-              tus cuentas bancarias con los registros del ERP para asegurar que
-              los saldos coincidan.
+              Contrasta movimientos ERPNext de caja/banco con tu estado
+              bancario. La revision es operativa inicial y no conecta bancos
+              automaticamente.
             </p>
+            <Button asChild size="sm">
+              <Link href={routes.erpFinanceBankReconciliation}>
+                Abrir conciliacion
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       </div>

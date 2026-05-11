@@ -22,6 +22,8 @@ const paymentEntryFields = [
   "party",
   "party_name",
   "mode_of_payment",
+  "paid_from",
+  "paid_to",
   "paid_amount",
   "received_amount",
   "company",

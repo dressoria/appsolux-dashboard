@@ -4,6 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getErpnextPaymentEntries } from "@/lib/api/erpnext/payment-entries";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import {
+  buildCashClosingSummary,
+  getCashClosingForDate,
+} from "@/lib/core/cash-closings";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { routes } from "@/config/routes";
@@ -82,33 +86,11 @@ export default async function ErpFinanceCashPage({ searchParams }: CashPageProps
   const rawDate = searchParams.date ?? "";
   const selectedDate = rawDate && isValidDate(rawDate) ? rawDate : today;
 
-  const allPayments = await getErpnextPaymentEntries();
-
-  const todayPayments = allPayments.filter(
-    (p) =>
-      p.posting_date === selectedDate &&
-      p.docstatus === 1 &&
-      p.payment_type === "Receive"
-  );
-
-  const totalToday = todayPayments.reduce(
-    (sum, p) => sum + (p.paid_amount ?? p.received_amount ?? 0),
-    0
-  );
-
-  const byMode: Record<string, number> = {};
-  for (const p of todayPayments) {
-    const mode = p.mode_of_payment ?? "Sin método";
-    byMode[mode] = (byMode[mode] ?? 0) + (p.paid_amount ?? p.received_amount ?? 0);
-  }
-
-  const allConfirmedReceived = allPayments.filter(
-    (p) => p.docstatus === 1 && p.payment_type === "Receive"
-  );
-  const totalAll = allConfirmedReceived.reduce(
-    (sum, p) => sum + (p.paid_amount ?? p.received_amount ?? 0),
-    0
-  );
+  const [allPayments, closingForDate] = await Promise.all([
+    getErpnextPaymentEntries(),
+    getCashClosingForDate(tenant.id, selectedDate).catch(() => null),
+  ]);
+  const summary = buildCashClosingSummary(allPayments, selectedDate);
 
   return (
     <DashboardShell>
@@ -182,30 +164,57 @@ export default async function ErpFinanceCashPage({ searchParams }: CashPageProps
               </CardTitle>
             </CardHeader>
             <CardContent className="text-2xl font-semibold text-green-700">
-              {formatMoney(totalToday)}
+              {formatMoney(summary.receivedTotal)}
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
               <CardTitle>
-                {selectedDate === today ? "Pagos hoy" : "Pagos en fecha"}
+                {selectedDate === today ? "Pagos a proveedores hoy" : "Pagos a proveedores"}
               </CardTitle>
             </CardHeader>
-            <CardContent className="text-2xl font-semibold">
-              {todayPayments.length}
+            <CardContent className="text-2xl font-semibold text-rose-600">
+              {formatMoney(summary.supplierPaidTotal)}
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Total historico cobrado</CardTitle>
+              <CardTitle>Neto del dia</CardTitle>
             </CardHeader>
             <CardContent className="text-2xl font-semibold">
-              {formatMoney(totalAll)}
+              {formatMoney(summary.netTotal)}
             </CardContent>
           </Card>
         </div>
 
-        {Object.keys(byMode).length > 0 ? (
+        <div className="grid gap-3 md:grid-cols-3">
+          <Card>
+            <CardHeader>
+              <CardTitle>Efectivo esperado</CardTitle>
+            </CardHeader>
+            <CardContent className="text-2xl font-semibold">
+              {formatMoney(summary.expectedCashAmount)}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Cobros anulados</CardTitle>
+            </CardHeader>
+            <CardContent className="text-2xl font-semibold">
+              {formatMoney(summary.cancelledAmount)}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Facturas cobradas</CardTitle>
+            </CardHeader>
+            <CardContent className="text-2xl font-semibold">
+              {summary.receivedPayments.length}
+            </CardContent>
+          </Card>
+        </div>
+
+        {summary.byMode.length > 0 ? (
           <Card>
             <CardHeader>
               <CardTitle>
@@ -225,10 +234,7 @@ export default async function ErpFinanceCashPage({ searchParams }: CashPageProps
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {Object.entries(byMode).map(([mode, amount]) => {
-                      const count = todayPayments.filter(
-                        (p) => (p.mode_of_payment ?? "Sin método") === mode
-                      ).length;
+                    {summary.byMode.map(({ mode, amount, count }) => {
                       return (
                         <tr key={mode}>
                           <td className="py-2 pr-4 font-medium">{mode}</td>
@@ -268,17 +274,30 @@ export default async function ErpFinanceCashPage({ searchParams }: CashPageProps
           <CardHeader>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <CardTitle>Cierre de caja</CardTitle>
-              <span className="inline-flex h-5 items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700">
-                En preparacion
+              <span className="inline-flex h-5 items-center rounded-full border border-green-200 bg-green-50 px-2 text-xs font-medium text-green-700">
+                Operativo
               </span>
             </div>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              El flujo de apertura y cierre de caja estara disponible
-              proximamente. Permitira cuadrar el efectivo del dia, registrar
-              diferencias y generar un reporte de cierre.
+              El cierre registra el arqueo de efectivo del dia y guarda la
+              diferencia contra los cobros esperados desde ERPNext.
             </p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm">
+                <Link href={`${routes.erpFinanceCashClosing}?date=${selectedDate}`}>
+                  Cerrar caja de este dia
+                </Link>
+              </Button>
+              {closingForDate ? (
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`${routes.erpFinanceCashClosing}?date=${selectedDate}`}>
+                    Ver cierre registrado
+                  </Link>
+                </Button>
+              ) : null}
+            </div>
           </CardContent>
         </Card>
       </div>

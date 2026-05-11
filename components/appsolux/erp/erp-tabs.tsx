@@ -280,13 +280,21 @@ const MODULES: Module[] = [
         status: "available",
         href: routes.erpFinanceCash,
       },
-      { label: "Cierre de caja", status: "in-preparation" },
+      {
+        label: "Cierre de caja",
+        status: "available",
+        href: routes.erpFinanceCashClosing,
+      },
       {
         label: "Bancos",
         status: "available",
         href: routes.erpFinanceBanks,
       },
-      { label: "Conciliación bancaria", status: "coming-soon" },
+      {
+        label: "Conciliación bancaria",
+        status: "available",
+        href: routes.erpFinanceBankReconciliation,
+      },
     ],
   },
   {
