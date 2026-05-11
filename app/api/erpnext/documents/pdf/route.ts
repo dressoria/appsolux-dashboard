@@ -4,6 +4,7 @@ import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import {
   getErpnextPrintPdf,
+  isAllowedPrintFormat,
   isAllowedDoctype,
 } from "@/lib/api/erpnext/print";
 
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
     const doctype = searchParams.get("doctype") ?? "";
     const name = searchParams.get("name") ?? "";
     const action = searchParams.get("action") ?? "view";
+    const printFormat = searchParams.get("print_format") ?? "Standard";
 
     if (!isAllowedDoctype(doctype)) {
       return NextResponse.json(
@@ -60,7 +62,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const pdfResponse = await getErpnextPrintPdf(doctype, name);
+    if (!isAllowedPrintFormat(printFormat)) {
+      return NextResponse.json(
+        { error: "Formato de impresion no permitido" },
+        { status: 400 }
+      );
+    }
+
+    const pdfResponse = await getErpnextPrintPdf(doctype, name, {
+      format: printFormat,
+    });
 
     if (!pdfResponse.ok) {
       return NextResponse.json(

@@ -177,6 +177,9 @@ export default async function ErpFinanceReceivablesPage() {
                         Total
                       </th>
                       <th className="py-2 pr-4 font-medium text-right">
+                        Pagado
+                      </th>
+                      <th className="py-2 pr-4 font-medium text-right">
                         Saldo
                       </th>
                       <th className="py-2 pr-4 font-medium">Estado</th>
@@ -203,6 +206,9 @@ export default async function ErpFinanceReceivablesPage() {
                           <td className="py-2 pr-4 text-right">
                             {formatMoney(inv.grand_total)}
                           </td>
+                          <td className="py-2 pr-4 text-right">
+                            {formatMoney(inv.paid_amount)}
+                          </td>
                           <td className="py-2 pr-4 text-right font-semibold text-amber-600">
                             {formatMoney(inv.outstanding_amount)}
                           </td>
@@ -224,7 +230,7 @@ export default async function ErpFinanceReceivablesPage() {
                                 <Link
                                   href={`${routes.posInvoices}/${encodeURIComponent(inv.name)}`}
                                 >
-                                  Ver
+                                  Ver factura
                                 </Link>
                               </Button>
                               <Button asChild size="xs">

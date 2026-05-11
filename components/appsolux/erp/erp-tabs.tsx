@@ -112,9 +112,17 @@ const MODULES: Module[] = [
         status: "available",
         href: routes.posPayments,
       },
-      { label: "Proformas / cotizaciones", status: "coming-soon" },
+      {
+        label: "Proformas / cotizaciones",
+        status: "available",
+        href: routes.erpSalesQuotations,
+      },
       { label: "Clientes", status: "available", sectionId: "customers" },
-      { label: "Cuentas por cobrar", status: "coming-soon" },
+      {
+        label: "Cuentas por cobrar",
+        status: "available",
+        href: routes.erpFinanceReceivables,
+      },
     ],
   },
   {
@@ -395,8 +403,16 @@ const MODULES: Module[] = [
         status: "available",
         href: routes.reports,
       },
-      { label: "Cuentas por cobrar", status: "coming-soon" },
-      { label: "Cuentas por pagar", status: "coming-soon" },
+      {
+        label: "Cuentas por cobrar",
+        status: "available",
+        href: routes.erpFinanceReceivables,
+      },
+      {
+        label: "Cuentas por pagar",
+        status: "available",
+        href: routes.erpFinancePayables,
+      },
     ],
   },
   {

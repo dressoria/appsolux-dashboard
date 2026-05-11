@@ -281,7 +281,8 @@ export function CommercePanel({
     <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 space-y-2">
       <p className="text-xs font-semibold text-blue-700">ERP avanzado activo</p>
       <p className="text-xs text-muted-foreground">
-        Las ventas, facturas, pagos e inventario principal viven en el ERP.
+        Las ventas, facturas, pagos, inventario y clientes principales viven en
+        el ERP.
       </p>
       <div className="flex flex-wrap gap-2 pt-1">
         <Button asChild size="sm" variant="outline">
@@ -295,7 +296,8 @@ export function CommercePanel({
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Vinculacion directa con cliente ERP proximamente.
+        Este panel muestra clientes de Appsolux Basico. Vincular o crear tambien
+        en ERP queda como accion futura, sin mezclar datos automaticamente.
       </p>
     </div>
   ) : isErpPending ? (

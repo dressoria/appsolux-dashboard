@@ -11,12 +11,21 @@ type DocumentActionsProps = {
   showXml?: boolean;
   xmlStatus?: "disabled" | "preparation" | "available";
   xmlLabel?: string;
+  printFormat?: string;
   className?: string;
   size?: "xs" | "sm" | "default";
 };
 
-function buildPdfHref(doctype: ErpnextPrintDoctype, name: string, action: string) {
+function buildPdfHref(
+  doctype: ErpnextPrintDoctype,
+  name: string,
+  action: string,
+  printFormat?: string
+) {
   const params = new URLSearchParams({ doctype, name, action });
+  if (printFormat) {
+    params.set("print_format", printFormat);
+  }
   return `/api/erpnext/documents/pdf?${params.toString()}`;
 }
 
@@ -28,6 +37,7 @@ export function DocumentActions({
   showXml = false,
   xmlStatus = "preparation",
   xmlLabel,
+  printFormat,
   className,
   size = "sm",
 }: DocumentActionsProps) {
@@ -42,7 +52,7 @@ export function DocumentActions({
       {showPdf ? (
         <Button asChild size={size} variant="outline">
           <Link
-            href={buildPdfHref(doctype, name, "view")}
+            href={buildPdfHref(doctype, name, "view", printFormat)}
             target="_blank"
             rel="noreferrer"
           >
@@ -52,7 +62,7 @@ export function DocumentActions({
       ) : null}
       {showDownload ? (
         <Button asChild size={size} variant="outline">
-          <Link href={buildPdfHref(doctype, name, "download")}>
+          <Link href={buildPdfHref(doctype, name, "download", printFormat)}>
             Descargar PDF
           </Link>
         </Button>

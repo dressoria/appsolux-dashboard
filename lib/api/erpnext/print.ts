@@ -4,6 +4,7 @@ import { getErpnextConfig } from "./client";
 export const ALLOWED_PRINT_DOCTYPES = [
   "Sales Invoice",
   "Sales Order",
+  "Quotation",
   "Payment Entry",
   "Purchase Order",
   "Purchase Invoice",
@@ -13,9 +14,19 @@ export const ALLOWED_PRINT_DOCTYPES = [
 export type ErpnextPrintDoctype = (typeof ALLOWED_PRINT_DOCTYPES)[number];
 
 const ALLOWED_DOCTYPES = new Set<string>(ALLOWED_PRINT_DOCTYPES);
+const ALLOWED_PRINT_FORMATS = new Set([
+  "Standard",
+  "Appsolux Sales Invoice",
+  "Appsolux Invoice Ecuador",
+  "Appsolux Quotation",
+]);
 
 export function isAllowedDoctype(doctype: string): boolean {
   return ALLOWED_DOCTYPES.has(doctype);
+}
+
+export function isAllowedPrintFormat(format: string): boolean {
+  return ALLOWED_PRINT_FORMATS.has(format);
 }
 
 export function assertErpnextPrintRequest(
@@ -59,13 +70,16 @@ export function buildErpnextPrintUrl(
 
 export async function getErpnextPrintPdf(
   doctype: string,
-  name: string
+  name: string,
+  options?: {
+    format?: string;
+  }
 ): Promise<Response> {
   assertErpnextPrintRequest(doctype, name);
 
   const { apiKey, apiSecret } = getErpnextConfig();
 
-  return fetch(buildErpnextPrintUrl(doctype, name), {
+  return fetch(buildErpnextPrintUrl(doctype, name, options), {
     headers: {
       Authorization: `token ${apiKey}:${apiSecret}`,
     },

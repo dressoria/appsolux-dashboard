@@ -220,6 +220,50 @@ export type CreateSalesOrderInput = {
   note?: string;
 };
 
+export type ErpnextQuotationItem = {
+  name?: string;
+  item_code: string;
+  item_name?: string;
+  qty: number;
+  rate: number;
+  amount?: number;
+  discount_percentage?: number;
+};
+
+export type ErpnextQuotation = {
+  name: string;
+  quotation_to?: "Customer" | "Lead" | "Prospect";
+  party_name: string;
+  customer_name?: string;
+  transaction_date?: string;
+  valid_till?: string;
+  status?: string;
+  docstatus?: 0 | 1 | 2;
+  grand_total?: number;
+  net_total?: number;
+  currency?: string;
+  company?: string;
+  order_type?: string;
+  notes?: string;
+  items?: ErpnextQuotationItem[];
+};
+
+export type CreateQuotationItemInput = {
+  item_code: string;
+  qty: number;
+  rate: number;
+  discount_percentage?: number;
+};
+
+export type CreateQuotationInput = {
+  customer: string;
+  company: string;
+  transaction_date: string;
+  valid_till?: string;
+  notes?: string;
+  items: CreateQuotationItemInput[];
+};
+
 export type PosCartItem = {
   item_code: string;
   item_name: string;

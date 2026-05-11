@@ -2,8 +2,7 @@ import Link from "next/link";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CancelPaymentButton } from "@/components/appsolux/erp/cancel-payment-button";
-import { DocumentActions } from "@/components/appsolux/erp/document-actions";
+import { PaymentEntryActionsMenu } from "@/components/appsolux/erp/payment-entry-actions-menu";
 import { getErpnextPaymentEntries } from "@/lib/api/erpnext/payment-entries";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
@@ -258,22 +257,11 @@ export default async function ErpFinancePaymentsReceivedPage() {
                           {p.reference_no ?? "-"}
                         </td>
                         <td className="py-2">
-                          <div className="flex flex-col gap-1.5">
-                            <DocumentActions
-                              doctype="Payment Entry"
-                              name={p.name}
-                              size="xs"
-                            />
-                            <Button asChild size="xs" variant="outline">
-                              <Link href={`${routes.posPayments}/${encodeURIComponent(p.name)}`}>
-                                Ver
-                              </Link>
-                            </Button>
-                            <CancelPaymentButton
-                              paymentEntryName={p.name}
-                              docstatus={p.docstatus}
-                            />
-                          </div>
+                          <PaymentEntryActionsMenu
+                            paymentEntryName={p.name}
+                            docstatus={p.docstatus}
+                            detailHref={`${routes.posPayments}/${encodeURIComponent(p.name)}`}
+                          />
                         </td>
                       </tr>
                     ))}
