@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CreateSupplierForm } from "@/components/appsolux/erp/create-supplier-form";
+import { SupplierActions } from "@/components/appsolux/erp/supplier-actions";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -118,7 +119,8 @@ export default async function ErpPurchasesSuppliersPage() {
                       <th className="py-2 pr-4 font-medium">RUC / ID fiscal</th>
                       <th className="py-2 pr-4 font-medium">Email</th>
                       <th className="py-2 pr-4 font-medium">Telefono</th>
-                      <th className="py-2 font-medium">Estado</th>
+                      <th className="py-2 pr-4 font-medium">Estado</th>
+                      <th className="py-2 font-medium">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -143,7 +145,7 @@ export default async function ErpPurchasesSuppliersPage() {
                         <td className="py-2 pr-4 text-muted-foreground">
                           {supplier.mobile_no ?? "-"}
                         </td>
-                        <td className="py-2">
+                        <td className="py-2 pr-4">
                           {supplier.disabled === 1 ? (
                             <span className="inline-flex h-5 items-center rounded-full border border-slate-200 bg-slate-50 px-2 text-xs font-medium text-slate-500">
                               Inactivo
@@ -153,6 +155,9 @@ export default async function ErpPurchasesSuppliersPage() {
                               Activo
                             </span>
                           )}
+                        </td>
+                        <td className="py-2">
+                          <SupplierActions supplier={supplier} />
                         </td>
                       </tr>
                     ))}

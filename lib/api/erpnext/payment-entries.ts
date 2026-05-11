@@ -20,6 +20,7 @@ const paymentEntryFields = [
   "payment_type",
   "party_type",
   "party",
+  "party_name",
   "mode_of_payment",
   "paid_amount",
   "received_amount",

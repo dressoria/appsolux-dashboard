@@ -2,6 +2,7 @@ import Link from "next/link";
 import { DocumentActions } from "@/components/appsolux/erp/document-actions";
 import { CreatePurchaseInvoiceDialog } from "@/components/appsolux/erp/create-purchase-invoice-dialog";
 import { CreatePurchaseOrderDialog } from "@/components/appsolux/erp/create-purchase-order-dialog";
+import { SupplierDocumentUpload } from "@/components/appsolux/erp/supplier-document-upload";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -185,22 +186,10 @@ export default async function ErpPurchasesDocumentsPage() {
           />
         </div>
 
-        <Card className="border-dashed">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-muted-foreground">
-              Cargar PDF / XML
-              <span className="inline-flex h-5 items-center rounded-full border border-slate-200 bg-slate-50 px-2 text-xs font-medium text-slate-500">
-                En preparacion
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            <p>
-              La carga de PDF/XML de proveedor se conectara luego con OCR/XML
-              fiscal. Por ahora registra la compra manualmente.
-            </p>
-          </CardContent>
-        </Card>
+        <SupplierDocumentUpload
+          purchaseOrders={purchaseOrders}
+          purchaseInvoices={purchaseInvoices}
+        />
 
         <Card>
           <CardHeader>
@@ -331,8 +320,6 @@ export default async function ErpPurchasesDocumentsPage() {
                             doctype="Purchase Invoice"
                             name={invoice.name}
                             size="xs"
-                            showXml
-                            xmlLabel="XML proveedor en preparacion"
                           />
                         </td>
                       </tr>

@@ -6,6 +6,7 @@ import type {
   ErpnextDeleteResponse,
   ErpnextListResponse,
   ErpnextSupplier,
+  UpdateErpnextSupplierInput,
 } from "@/types/erpnext";
 
 const supplierFields = [
@@ -49,6 +50,27 @@ export async function createErpnextSupplier(
     "/api/resource/Supplier",
     {
       method: "POST",
+      body: JSON.stringify({
+        supplier_name: input.supplier_name,
+        supplier_type: input.supplier_type ?? "Company",
+        tax_id: input.tax_id ?? undefined,
+        mobile_no: input.mobile_no ?? undefined,
+        email_id: input.email_id ?? undefined,
+      }),
+    }
+  );
+
+  return response.data;
+}
+
+export async function updateErpnextSupplier(
+  name: string,
+  input: UpdateErpnextSupplierInput
+): Promise<ErpnextSupplier> {
+  const response = await erpnextFetch<ErpnextCreateResponse<ErpnextSupplier>>(
+    `/api/resource/Supplier/${encodeURIComponent(name)}`,
+    {
+      method: "PUT",
       body: JSON.stringify({
         supplier_name: input.supplier_name,
         supplier_type: input.supplier_type ?? "Company",

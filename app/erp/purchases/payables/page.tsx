@@ -3,7 +3,9 @@ import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DocumentActions } from "@/components/appsolux/erp/document-actions";
+import { PaymentEntryActionsMenu } from "@/components/appsolux/erp/payment-entry-actions-menu";
 import { RegisterSupplierPaymentForm } from "@/components/appsolux/erp/register-supplier-payment-form";
+import { getErpnextPaymentEntries } from "@/lib/api/erpnext/payment-entries";
 import { getErpnextPurchaseInvoices } from "@/lib/api/erpnext/purchase-invoices";
 import { getErpnextModesOfPayment } from "@/lib/api/erpnext/modes-of-payment";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -71,13 +73,15 @@ export default async function ErpPurchasesPayablesPage() {
     );
   }
 
-  const [allInvoices, modesOfPayment] = await Promise.all([
+  const [allInvoices, modesOfPayment, paymentEntries] = await Promise.all([
     getErpnextPurchaseInvoices().catch(() => []),
     getErpnextModesOfPayment().catch(() => []),
+    getErpnextPaymentEntries().catch(() => []),
   ]);
   const pendingInvoices = allInvoices.filter(
     (inv) => inv.docstatus === 1 && (inv.outstanding_amount ?? 0) > 0
   );
+  const supplierPayments = paymentEntries.filter((p) => p.payment_type === "Pay");
 
   const totalPayable = pendingInvoices.reduce(
     (sum, inv) => sum + (inv.outstanding_amount ?? 0),
@@ -170,9 +174,12 @@ export default async function ErpPurchasesPayablesPage() {
                       <th className="py-2 pr-4 font-medium">Factura</th>
                       <th className="py-2 pr-4 font-medium">Proveedor</th>
                       <th className="py-2 pr-4 font-medium">Fecha</th>
+                      <th className="py-2 pr-4 font-medium">Vencimiento</th>
                       <th className="py-2 pr-4 font-medium">Nro. factura proveedor</th>
                       <th className="py-2 pr-4 font-medium">Total</th>
+                      <th className="py-2 pr-4 font-medium">Pagado</th>
                       <th className="py-2 pr-4 font-medium">Pendiente</th>
+                      <th className="py-2 pr-4 font-medium">Estado</th>
                       <th className="py-2 font-medium">Acciones</th>
                     </tr>
                   </thead>
@@ -187,20 +194,40 @@ export default async function ErpPurchasesPayablesPage() {
                           {invoice.posting_date ?? "-"}
                         </td>
                         <td className="py-2 pr-4 text-muted-foreground">
+                          {invoice.due_date ?? "-"}
+                        </td>
+                        <td className="py-2 pr-4 text-muted-foreground">
                           {invoice.bill_no ?? "-"}
                         </td>
                         <td className="py-2 pr-4">
                           {formatMoney(invoice.grand_total)}
                         </td>
+                        <td className="py-2 pr-4">
+                          {formatMoney(
+                            invoice.paid_amount ??
+                              (invoice.grand_total ?? 0) -
+                                (invoice.outstanding_amount ?? 0)
+                          )}
+                        </td>
                         <td className="py-2 pr-4 font-semibold text-amber-600">
                           {formatMoney(invoice.outstanding_amount)}
                         </td>
+                        <td className="py-2 pr-4">
+                          <span className="inline-flex h-5 items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700">
+                            Pendiente
+                          </span>
+                        </td>
                         <td className="py-2">
-                          <DocumentActions
-                            doctype="Purchase Invoice"
-                            name={invoice.name}
-                            size="xs"
-                          />
+                          <div className="flex flex-wrap gap-1.5">
+                            <DocumentActions
+                              doctype="Purchase Invoice"
+                              name={invoice.name}
+                              size="xs"
+                            />
+                            <Button asChild size="xs">
+                              <a href="#registrar-pago-proveedor">Pagar</a>
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -211,10 +238,76 @@ export default async function ErpPurchasesPayablesPage() {
           </CardContent>
         </Card>
 
-        <RegisterSupplierPaymentForm
-          pendingInvoices={pendingInvoices}
-          modesOfPayment={modesOfPayment}
-        />
+        <div id="registrar-pago-proveedor">
+          <RegisterSupplierPaymentForm
+            pendingInvoices={pendingInvoices}
+            modesOfPayment={modesOfPayment}
+          />
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Pagos a proveedores</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {supplierPayments.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                Aun no hay pagos a proveedores registrados.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b text-xs text-muted-foreground">
+                    <tr>
+                      <th className="py-2 pr-4 font-medium">Pago</th>
+                      <th className="py-2 pr-4 font-medium">Fecha</th>
+                      <th className="py-2 pr-4 font-medium">Proveedor</th>
+                      <th className="py-2 pr-4 font-medium">Metodo</th>
+                      <th className="py-2 pr-4 font-medium">Monto</th>
+                      <th className="py-2 pr-4 font-medium">Estado</th>
+                      <th className="py-2 font-medium">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {supplierPayments.map((payment) => (
+                      <tr key={payment.name}>
+                        <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">
+                          {payment.name}
+                        </td>
+                        <td className="py-2 pr-4 text-muted-foreground">
+                          {payment.posting_date ?? "-"}
+                        </td>
+                        <td className="py-2 pr-4">
+                          {payment.party_name ?? payment.party ?? "-"}
+                        </td>
+                        <td className="py-2 pr-4">
+                          {payment.mode_of_payment ?? "-"}
+                        </td>
+                        <td className="py-2 pr-4 font-semibold">
+                          {formatMoney(payment.paid_amount)}
+                        </td>
+                        <td className="py-2 pr-4">
+                          {payment.docstatus === 2
+                            ? "Anulado"
+                            : payment.docstatus === 1
+                              ? "Confirmado"
+                              : "Borrador"}
+                        </td>
+                        <td className="py-2">
+                          <PaymentEntryActionsMenu
+                            paymentEntryName={payment.name}
+                            docstatus={payment.docstatus}
+                            detailHref={`${routes.posPayments}/${encodeURIComponent(payment.name)}`}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </DashboardShell>
   );

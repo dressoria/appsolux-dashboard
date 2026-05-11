@@ -463,6 +463,8 @@ export type CreateErpnextSupplierInput = {
   email_id?: string;
 };
 
+export type UpdateErpnextSupplierInput = CreateErpnextSupplierInput;
+
 export type ErpnextPurchaseOrderItem = {
   name?: string;
   item_code: string;
@@ -502,10 +504,12 @@ export type ErpnextPurchaseInvoice = {
   supplier: string;
   supplier_name?: string;
   posting_date?: string;
+  due_date?: string;
   bill_date?: string;
   bill_no?: string;
   grand_total?: number;
   outstanding_amount?: number;
+  paid_amount?: number;
   status?: string;
   docstatus?: 0 | 1 | 2;
   company?: string;
@@ -513,6 +517,16 @@ export type ErpnextPurchaseInvoice = {
   currency?: string;
   company_currency?: string;
   items?: ErpnextPurchaseInvoiceItem[];
+};
+
+export type ErpnextFileAttachment = {
+  name: string;
+  file_name?: string;
+  file_url?: string;
+  attached_to_doctype?: string;
+  attached_to_name?: string;
+  is_private?: 0 | 1;
+  creation?: string;
 };
 
 export type ErpnextPurchaseReceiptItem = {

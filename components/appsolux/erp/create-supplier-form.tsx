@@ -28,11 +28,12 @@ export function CreateSupplierForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     setIsSubmitting(true);
     setMessage(null);
     setIsError(false);
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(form);
     const payload = {
       supplier_name: String(formData.get("supplier_name") ?? "").trim(),
       supplier_type: String(formData.get("supplier_type") ?? "").trim(),
@@ -56,7 +57,7 @@ export function CreateSupplierForm() {
       }
 
       setMessage(`Proveedor creado: ${result.data.supplier.supplier_name}`);
-      event.currentTarget.reset();
+      form.reset();
       router.refresh();
     } catch (error) {
       setIsError(true);

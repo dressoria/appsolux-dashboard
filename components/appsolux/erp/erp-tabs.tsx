@@ -157,7 +157,11 @@ const MODULES: Module[] = [
         status: "available",
         href: routes.erpPurchasesPayables,
       },
-      { label: "Pagos a proveedores", status: "coming-soon" },
+      {
+        label: "Pagos a proveedores",
+        status: "available",
+        href: routes.erpPurchasesPayables,
+      },
     ],
   },
   {
@@ -244,7 +248,11 @@ const MODULES: Module[] = [
         status: "available",
         href: routes.erpFinancePayables,
       },
-      { label: "Pagos a proveedores", status: "in-preparation" },
+      {
+        label: "Pagos a proveedores",
+        status: "available",
+        href: routes.erpFinancePayables,
+      },
       {
         label: "Métodos de pago",
         status: "available",
