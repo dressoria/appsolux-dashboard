@@ -50,7 +50,7 @@ export async function loginAction(formData: FormData) {
     redirect("/login?error=login");
   }
 
-  redirect("/dashboard");
+  redirect("/workspace");
 }
 
 function isRedirectError(error: unknown) {

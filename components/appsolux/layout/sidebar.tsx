@@ -15,6 +15,10 @@ const navigationGroups = [
     items: dashboardNavigation.filter((item) => item.href === "/basic"),
   },
   {
+    title: "Facturacion SRI",
+    items: dashboardNavigation.filter((item) => item.href === "/sri"),
+  },
+  {
     title: "ERP Avanzado",
     items: dashboardNavigation.filter((item) =>
       ["/erp", "/pos", "/reports"].includes(item.href)

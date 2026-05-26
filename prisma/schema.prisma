@@ -114,6 +114,32 @@ enum LightweightStockMovementType {
   adjustment
 }
 
+enum SriEnvironment {
+  TEST
+  PRODUCTION
+}
+
+enum SriConfigStatus {
+  PENDING
+  CONFIGURED
+  DISABLED
+}
+
+enum SriSignatureStatus {
+  NOT_UPLOADED
+  UPLOADED_METADATA_ONLY
+  READY_FOR_TESTING
+  EXPIRED
+}
+
+enum SriDocumentType {
+  INVOICE
+  CREDIT_NOTE
+  DEBIT_NOTE
+  WITHHOLDING
+  REFERRAL_GUIDE
+}
+
 model User {
   id              String     @id @default(cuid())
   name            String
@@ -157,8 +183,13 @@ model Tenant {
   lightweightCustomers      LightweightCustomer[]
   lightweightSales          LightweightSale[]
   lightweightStockMovements LightweightStockMovement[]
-  conversationNotes ConversationNote[]
+  conversationNotes         ConversationNote[]
   cashClosings              CashClosing[]
+  sriProfile                SriTaxpayerProfile?
+  sriEstablishments         SriEstablishment[]
+  sriIssuePoints            SriIssuePoint[]
+  sriDocumentSequences      SriDocumentSequence[]
+  sriSignatureConfig        SriSignatureConfig?
 }
 
 model Plan {
@@ -488,4 +519,107 @@ model CashClosing {
   @@index([tenantId, date])
   @@index([createdByUserId])
   @@index([status])
+}
+
+model SriTaxpayerProfile {
+  id                         String          @id @default(cuid())
+  tenantId                   String          @unique
+  legalName                  String
+  tradeName                  String?
+  ruc                        String
+  environment                SriEnvironment  @default(TEST)
+  accountingRequired         Boolean         @default(false)
+  specialTaxpayerNumber      String?
+  withholdingAgentResolution String?
+  status                     SriConfigStatus @default(PENDING)
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @updatedAt
+
+  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  establishments  SriEstablishment[]
+  signatureConfig SriSignatureConfig?
+
+  @@index([tenantId])
+  @@index([ruc])
+}
+
+model SriEstablishment {
+  id        String          @id @default(cuid())
+  tenantId  String
+  profileId String
+  code      String
+  name      String
+  address   String
+  isMain    Boolean         @default(false)
+  isActive  Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  profile     SriTaxpayerProfile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  issuePoints SriIssuePoint[]
+  sequences   SriDocumentSequence[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([profileId])
+}
+
+model SriIssuePoint {
+  id              String   @id @default(cuid())
+  tenantId        String
+  establishmentId String
+  code            String
+  name            String
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  establishment SriEstablishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+  sequences     SriDocumentSequence[]
+
+  @@unique([establishmentId, code])
+  @@index([tenantId])
+  @@index([establishmentId])
+}
+
+model SriDocumentSequence {
+  id              String          @id @default(cuid())
+  tenantId        String
+  establishmentId String
+  issuePointId    String
+  documentType    SriDocumentType
+  currentNumber   Int             @default(1)
+  startNumber     Int             @default(1)
+  maxNumber       Int?
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  establishment SriEstablishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+  issuePoint    SriIssuePoint    @relation(fields: [issuePointId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, establishmentId, issuePointId, documentType])
+  @@index([tenantId])
+  @@index([establishmentId])
+  @@index([issuePointId])
+}
+
+model SriSignatureConfig {
+  id                    String             @id @default(cuid())
+  tenantId              String             @unique
+  profileId             String             @unique
+  status                SriSignatureStatus @default(NOT_UPLOADED)
+  certificateFileName   String?
+  certificateUploadedAt DateTime?
+  expiresAt             DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  tenant  Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  profile SriTaxpayerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
 }

@@ -53,6 +53,11 @@ export const dashboardNavigation: NavigationItem[] = [
     description: "Centro de ventas, productos, clientes, caja y stock simple.",
   },
   {
+    title: "Facturacion Electronica",
+    href: routes.sri,
+    description: "Configura empresa, establecimientos, secuenciales, firma y comprobantes SRI Ecuador.",
+  },
+  {
     title: "Reportes",
     href: routes.reports,
     description: "Indicadores de ventas, cobros, inventario y productos.",

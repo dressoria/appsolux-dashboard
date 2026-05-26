@@ -64,6 +64,8 @@ export const routes = {
   adminBilling: "/admin/billing",
   adminBillingUpgradeRequests: "/admin/billing/upgrade-requests",
   settings: "/settings",
+  workspace: "/workspace",
+
   basic: "/basic",
   basicProducts: "/basic/products",
   basicCustomers: "/basic/customers",
@@ -72,6 +74,15 @@ export const routes = {
   basicReports: "/basic/reports",
   basicStock: "/basic/stock",
   basicCash: "/basic/cash",
+
+  sri: "/sri",
+  sriCompany: "/sri/company",
+  sriEstablishments: "/sri/establishments",
+  sriIssuePoints: "/sri/issue-points",
+  sriSequences: "/sri/sequences",
+  sriEnvironment: "/sri/environment",
+  sriSignature: "/sri/signature",
+  sriDocuments: "/sri/documents",
 
   whatsappEvolution: "/channels/whatsapp-evolution",
   whatsappCloud: "/channels/whatsapp-cloud",
