@@ -88,13 +88,13 @@ export default async function ErpPage() {
     return (
       <DashboardShell>
         <div className="space-y-6">
+          <Link
+            href={routes.workspace}
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
+          >
+            ← Volver a mis apps
+          </Link>
           <div>
-            <p className="text-sm text-muted-foreground">
-              <Link href={routes.dashboard} className="hover:underline">
-                Dashboard
-              </Link>{" "}
-              / ERP Comercial
-            </p>
             <h1 className="text-3xl font-semibold tracking-tight">
               ERP Comercial
             </h1>
@@ -202,15 +202,15 @@ export default async function ErpPage() {
   return (
     <DashboardShell>
       <div className="space-y-6">
+        <Link
+          href={routes.workspace}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
+        >
+          ← Volver a mis apps
+        </Link>
         <div>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-sm text-muted-foreground">
-                <Link href={routes.dashboard} className="hover:underline">
-                  Dashboard
-                </Link>{" "}
-                / ERP Comercial
-              </p>
               <h1 className="text-3xl font-semibold tracking-tight">
                 ERP Comercial
               </h1>

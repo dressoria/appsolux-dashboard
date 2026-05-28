@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
+import { AppModuleShell } from "@/components/appsolux/layout/app-module-shell";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/config/routes";
 
@@ -27,50 +27,26 @@ export function BasicModuleShell({
   children: React.ReactNode;
 }) {
   return (
-    <DashboardShell>
-      <div className="space-y-6">
-        <div className="rounded-md border bg-muted/30 p-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="inline-flex h-6 items-center rounded-full border border-slate-200 bg-slate-50 px-2 text-xs font-medium text-slate-600">
-                  Modo Basico
-                </span>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Appsolux Basico
-                </p>
-              </div>
-              <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
-              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-                {description}
-              </p>
-              <p className="mt-1 max-w-3xl text-xs text-muted-foreground">
-                Ideal para ventas rapidas, stock simple y clientes. Basico y
-                ERP Avanzado son modos separados; la migracion o sincronizacion
-                se manejara desde un flujo dedicado.
-              </p>
-            </div>
-            <Button asChild>
-              <Link href={routes.basicPos}>Nueva venta</Link>
-            </Button>
-          </div>
-
-          <nav className="mt-4 flex gap-2 overflow-x-auto pb-1">
-            {basicNavigation.map((item) => (
-              <Button
-                key={item.href}
-                asChild
-                variant={activeHref === item.href ? "default" : "outline"}
-                className="shrink-0"
-              >
-                <Link href={item.href}>{item.title}</Link>
-              </Button>
-            ))}
-          </nav>
+    <AppModuleShell
+      appName="Inventario & POS"
+      appDescription="Productos, stock, clientes, ventas, caja y reportes para operacion diaria."
+      badge="Modo Basico"
+      badgeVariant="slate"
+      navItems={basicNavigation}
+      activeHref={activeHref}
+      action={
+        <Button asChild>
+          <Link href={routes.basicPos}>Nueva venta</Link>
+        </Button>
+      }
+    >
+      {(title || description) && (
+        <div className="px-1">
+          {title && <h2 className="text-lg font-semibold tracking-tight">{title}</h2>}
+          {description && <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>}
         </div>
-
-        {children}
-      </div>
-    </DashboardShell>
+      )}
+      {children}
+    </AppModuleShell>
   );
 }

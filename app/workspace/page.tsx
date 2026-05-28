@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getBasicReports } from "@/lib/core/lightweight-pos";
@@ -10,32 +9,61 @@ import { getTenantPlanState } from "@/lib/core/plans";
 import { getSriModuleStatus } from "@/lib/core/sri";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
-function SriStatusBadge({ label }: { label: string }) {
-  if (label === "not_started") {
-    return (
-      <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600">
-        Pendiente
-      </span>
-    );
-  }
-  if (label === "incomplete") {
-    return (
-      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
-        Configuracion incompleta
-      </span>
-    );
-  }
-  if (label === "ready_for_testing") {
-    return (
-      <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
-        Listo para pruebas
-      </span>
-    );
-  }
+function StatusBadge({
+  variant,
+  label,
+}: {
+  variant: "active" | "pending" | "incomplete" | "locked" | "testing";
+  label: string;
+}) {
+  const classes = {
+    active: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    pending: "border-slate-200 bg-slate-50 text-slate-500",
+    incomplete: "border-amber-200 bg-amber-50 text-amber-700",
+    locked: "border-slate-100 bg-slate-50 text-slate-400",
+    testing: "border-blue-200 bg-blue-50 text-blue-700",
+  }[variant];
+
   return (
-    <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
-      Listo para produccion
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${classes}`}>
+      {label}
     </span>
+  );
+}
+
+type AppCardProps = {
+  title: string;
+  description: string;
+  features: string[];
+  status: React.ReactNode;
+  cta: React.ReactNode;
+  locked?: boolean;
+  meta?: React.ReactNode;
+};
+
+function AppCard({ title, description, features, status, cta, locked, meta }: AppCardProps) {
+  return (
+    <div
+      className={`flex flex-col rounded-xl border bg-card p-5 shadow-sm transition hover:shadow-md ${
+        locked ? "opacity-60" : ""
+      }`}
+    >
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <h3 className="text-base font-semibold">{title}</h3>
+        {status}
+      </div>
+      <p className="mb-4 text-sm text-muted-foreground">{description}</p>
+      <ul className="mb-4 space-y-1">
+        {features.map((f) => (
+          <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="text-xs text-primary">✓</span>
+            {f}
+          </li>
+        ))}
+      </ul>
+      {meta && <div className="mb-4">{meta}</div>}
+      <div className="mt-auto">{cta}</div>
+    </div>
   );
 }
 
@@ -57,152 +85,188 @@ export default async function WorkspacePage() {
     getBasicReports(tenant.id),
   ]);
 
+  const sriStatusVariant =
+    sriStatus.readinessLabel === "not_started"
+      ? ("pending" as const)
+      : sriStatus.readinessLabel === "incomplete"
+      ? ("incomplete" as const)
+      : sriStatus.readinessLabel === "ready_for_testing"
+      ? ("testing" as const)
+      : ("active" as const);
+
+  const sriStatusLabel =
+    sriStatus.readinessLabel === "not_started"
+      ? "Pendiente"
+      : sriStatus.readinessLabel === "incomplete"
+      ? "Incompleto"
+      : sriStatus.readinessLabel === "ready_for_testing"
+      ? "Listo para pruebas"
+      : "Listo para produccion";
+
   return (
     <DashboardShell>
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Workspace</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Mis Aplicaciones</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Selecciona un modulo para operar. Cada modulo es independiente y se activa segun tu plan.
+            Selecciona un modulo para operar. Cada app es independiente y se activa segun tu plan.
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {/* Basic POS */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-start justify-between gap-2">
-                <CardTitle className="text-base">Inventario y POS</CardTitle>
-                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
-                  Activo
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Productos, stock, clientes, ventas, caja y reportes para operacion diaria.
-              </p>
-              <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          <AppCard
+            title="Inventario & POS"
+            description="Punto de venta diario: vende, cobra, registra clientes y controla tu inventario."
+            features={[
+              "Punto de venta (POS)",
+              "Productos y categorias",
+              "Control de stock",
+              "Clientes y fiados",
+              "Caja y cierre diario",
+            ]}
+            status={<StatusBadge variant="active" label="Activo" />}
+            meta={
+              <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/50 p-3 text-xs">
                 <div>
                   <p className="text-muted-foreground">Productos</p>
-                  <p className="font-medium">{basicReports.counts.products}</p>
+                  <p className="font-semibold">{basicReports.counts.products}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Clientes</p>
-                  <p className="font-medium">{basicReports.counts.customers}</p>
+                  <p className="font-semibold">{basicReports.counts.customers}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Ventas</p>
-                  <p className="font-medium">{basicReports.counts.receipts}</p>
+                  <p className="font-semibold">{basicReports.counts.receipts}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Stock critico</p>
-                  <p className="font-medium">
+                  <p className="font-semibold">
                     {basicReports.outOfStockProducts.length + basicReports.lowStockProducts.length}
                   </p>
                 </div>
               </div>
+            }
+            cta={
               <Button asChild className="w-full">
-                <Link href={routes.basic}>Abrir</Link>
+                <Link href={routes.basic}>Abrir app</Link>
               </Button>
-            </CardContent>
-          </Card>
+            }
+          />
 
-          {/* SRI */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-start justify-between gap-2">
-                <CardTitle className="text-base">Facturacion Electronica</CardTitle>
-                <SriStatusBadge label={sriStatus.readinessLabel} />
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Configura empresa, establecimientos, secuenciales, firma y comprobantes SRI Ecuador.
-              </p>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <p className="text-muted-foreground">RUC</p>
-                  <p className="font-medium">{sriStatus.ruc ?? "—"}</p>
+          <AppCard
+            title="Ventas"
+            description="Vista agrupada de ventas, pedidos, clientes y cuentas por cobrar."
+            features={[
+              "Resumen de ventas",
+              "Pedidos y cotizaciones",
+              "Clientes activos",
+              "Cuentas por cobrar",
+              "Historial de pagos",
+            ]}
+            status={<StatusBadge variant="active" label="Disponible" />}
+            cta={
+              <Button asChild variant="outline" className="w-full">
+                <Link href={routes.sales}>Abrir app</Link>
+              </Button>
+            }
+          />
+
+          <AppCard
+            title="Facturacion Electronica"
+            description="Configura empresa, establecimientos, secuenciales y firma electronica para SRI Ecuador."
+            features={[
+              "Perfil de empresa y RUC",
+              "Establecimientos y puntos de emision",
+              "Secuenciales por tipo de comprobante",
+              "Firma electronica (.p12)",
+              "Ambiente pruebas / produccion",
+            ]}
+            status={<StatusBadge variant={sriStatusVariant} label={sriStatusLabel} />}
+            meta={
+              sriStatus.hasProfile ? (
+                <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/50 p-3 text-xs">
+                  <div>
+                    <p className="text-muted-foreground">RUC</p>
+                    <p className="font-mono font-semibold">{sriStatus.ruc ?? "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Ambiente</p>
+                    <p className="font-semibold">
+                      {sriStatus.environment === "TEST" ? "Pruebas" : "Produccion"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Establecimientos</p>
+                    <p className="font-semibold">{sriStatus.establishmentCount}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Secuenciales</p>
+                    <p className="font-semibold">{sriStatus.sequenceCount}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-muted-foreground">Ambiente</p>
-                  <p className="font-medium">
-                    {sriStatus.environment === "TEST"
-                      ? "Pruebas"
-                      : sriStatus.environment === "PRODUCTION"
-                      ? "Produccion"
-                      : "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Establecimientos</p>
-                  <p className="font-medium">{sriStatus.establishmentCount}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Secuenciales</p>
-                  <p className="font-medium">{sriStatus.sequenceCount}</p>
-                </div>
-              </div>
-              <Button asChild variant={sriStatus.hasProfile ? "outline" : "default"} className="w-full">
+              ) : null
+            }
+            cta={
+              <Button
+                asChild
+                variant={sriStatus.hasProfile ? "outline" : "default"}
+                className="w-full"
+              >
                 <Link href={routes.sri}>
-                  {sriStatus.hasProfile ? "Abrir" : "Configurar"}
+                  {sriStatus.hasProfile ? "Abrir app" : "Configurar"}
                 </Link>
               </Button>
-            </CardContent>
-          </Card>
+            }
+          />
 
-          {/* ERP Avanzado */}
-          <Card className={!plan.canRequestDedicatedErp ? "opacity-60" : ""}>
-            <CardHeader>
-              <div className="flex items-start justify-between gap-2">
-                <CardTitle className="text-base">ERP Avanzado</CardTitle>
-                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${
-                  plan.canRequestDedicatedErp
-                    ? "border-slate-200 bg-slate-50 text-slate-600"
-                    : "border-slate-100 bg-slate-50 text-slate-400"
-                }`}>
-                  {plan.canRequestDedicatedErp ? "Disponible" : "Plan Pro requerido"}
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                ERP dedicado con contabilidad, compras, inventario avanzado y reportes financieros.
-              </p>
-              {plan.canRequestDedicatedErp ? (
+          <AppCard
+            title="ERP Avanzado"
+            description="Compras, proveedores, contabilidad, inventario avanzado y finanzas empresariales."
+            features={[
+              "Gestion de compras y proveedores",
+              "Contabilidad y libro diario",
+              "Inventario avanzado con kardex",
+              "Cuentas por pagar y cobrar",
+              "Reportes financieros",
+            ]}
+            status={
+              plan.canRequestDedicatedErp ? (
+                <StatusBadge variant="pending" label="Disponible" />
+              ) : (
+                <StatusBadge variant="locked" label="Plan Pro" />
+              )
+            }
+            locked={!plan.canRequestDedicatedErp}
+            cta={
+              plan.canRequestDedicatedErp ? (
                 <Button asChild variant="outline" className="w-full">
-                  <Link href={routes.erp}>Abrir ERP</Link>
+                  <Link href={routes.erp}>Abrir app</Link>
                 </Button>
               ) : (
                 <Button asChild variant="outline" className="w-full">
                   <Link href={routes.billing}>Mejorar plan</Link>
                 </Button>
-              )}
-            </CardContent>
-          </Card>
+              )
+            }
+          />
         </div>
 
-        {/* Plan summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Plan activo: {plan.planName}</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap items-center gap-4 text-sm">
-            <p className="text-muted-foreground">
-              Productos: {basicReports.counts.products} / {plan.limits.products}
-            </p>
-            <p className="text-muted-foreground">
-              Clientes: {basicReports.counts.customers} / {plan.limits.customers}
-            </p>
-            <p className="text-muted-foreground">
-              Ventas: {basicReports.counts.receipts} / {plan.limits.receipts}
-            </p>
+        <div className="rounded-xl border bg-muted/30 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Plan activo: {plan.planName}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Productos: {basicReports.counts.products}/{plan.limits.products} ·{" "}
+                Clientes: {basicReports.counts.customers}/{plan.limits.customers} ·{" "}
+                Ventas: {basicReports.counts.receipts}/{plan.limits.receipts}
+              </p>
+            </div>
             <Button asChild variant="outline" size="sm">
               <Link href={routes.billing}>Ver plan</Link>
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </DashboardShell>
   );
