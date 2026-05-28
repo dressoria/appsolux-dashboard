@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getBasicReports } from "@/lib/core/lightweight-pos";
-import { getSriModuleStatus } from "@/lib/core/sri";
+import { getSriModuleStatus, getSriDocuments } from "@/lib/core/sri";
 import { getTenantPlanState } from "@/lib/core/plans";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
@@ -27,10 +27,11 @@ export default async function SalesPage() {
   }
 
   const tenant = await getCurrentTenant(user);
-  const [reports, sriStatus, plan] = await Promise.all([
+  const [reports, sriStatus, plan, sriDocs] = await Promise.all([
     getBasicReports(tenant.id),
     getSriModuleStatus(tenant.id),
     getTenantPlanState(tenant.id),
+    getSriDocuments(tenant.id, { take: 5 }),
   ]);
 
   function money(value: { toString(): string }) {
@@ -108,9 +109,19 @@ export default async function SalesPage() {
                   Empresa configurada con RUC {sriStatus.ruc ?? ""}. Ambiente:{" "}
                   {sriStatus.environment === "TEST" ? "Pruebas" : "Produccion"}.
                 </p>
-                <Button asChild variant="outline" className="w-full">
-                  <Link href={routes.sri}>Abrir SRI</Link>
-                </Button>
+                {sriDocs.length > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    {sriDocs.length} comprobante{sriDocs.length !== 1 ? "s" : ""} preparado{sriDocs.length !== 1 ? "s" : ""}.
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <Button asChild variant="outline" className="flex-1">
+                    <Link href={routes.sri}>Configuracion</Link>
+                  </Button>
+                  <Button asChild variant="outline" className="flex-1">
+                    <Link href={routes.sriDocuments}>Comprobantes</Link>
+                  </Button>
+                </div>
               </>
             ) : (
               <>

@@ -1,10 +1,15 @@
+import Link from "next/link";
+
 import { BasicModuleShell } from "@/components/appsolux/basic/basic-module-shell";
 import { SaleDetailActions } from "@/components/appsolux/basic/sale-detail-actions";
 import { SimpleReceipt } from "@/components/appsolux/basic/simple-receipt";
-import { Card, CardContent } from "@/components/ui/card";
+import { CreateSriDraftFromSaleButton } from "@/components/appsolux/sri/create-sri-draft-from-sale-button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getSaleById } from "@/lib/core/lightweight-pos";
+import { getSriDraftForSale, getSriModuleStatus } from "@/lib/core/sri";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 type BasicSaleDetailPageProps = {
@@ -32,7 +37,11 @@ export default async function BasicSaleDetailPage({
 
   const tenant = await getCurrentTenant(user);
   const { saleId } = await params;
-  const sale = await getSaleById(tenant.id, saleId);
+
+  const [sale, sriStatus] = await Promise.all([
+    getSaleById(tenant.id, saleId),
+    getSriModuleStatus(tenant.id),
+  ]);
 
   if (!sale) {
     return (
@@ -50,11 +59,17 @@ export default async function BasicSaleDetailPage({
     );
   }
 
+  const existingDraft = sale.status !== "canceled"
+    ? await getSriDraftForSale(tenant.id, sale.id)
+    : null;
+
   const paid = sale.payments.reduce(
     (sum, payment) => sum + Number(payment.amount),
     0
   );
   const pending = Math.max(Number(sale.total) - paid, 0);
+
+  const sriReady = sriStatus.hasProfile && sriStatus.establishmentCount > 0 && sriStatus.issuePointCount > 0;
 
   return (
     <BasicModuleShell
@@ -90,6 +105,55 @@ export default async function BasicSaleDetailPage({
           })),
         }}
       />
+
+      {/* SRI draft section */}
+      {sale.status !== "canceled" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Facturacion Electronica SRI</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {!sriStatus.hasProfile ? (
+              <div className="space-y-2">
+                <p className="text-muted-foreground">
+                  Configura Facturacion SRI antes de preparar comprobantes.
+                </p>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={routes.sri}>Configurar SRI</Link>
+                </Button>
+              </div>
+            ) : !sriReady ? (
+              <div className="space-y-2">
+                <p className="text-muted-foreground">
+                  Completa la configuracion SRI: necesitas al menos un establecimiento,
+                  un punto de emision y una secuencia de factura.
+                </p>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={routes.sriEstablishments}>Completar configuracion</Link>
+                </Button>
+              </div>
+            ) : existingDraft ? (
+              <div className="space-y-2">
+                <p className="text-emerald-700 font-medium">Borrador SRI creado</p>
+                <p className="text-muted-foreground">
+                  Ya existe un borrador de factura electronica para esta venta.
+                </p>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/sri/documents/${existingDraft.id}`}>Ver borrador</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-muted-foreground">
+                  Prepara un borrador interno de factura electronica desde esta venta.
+                  No se emite nada todavia — es solo un registro preparatorio.
+                </p>
+                <CreateSriDraftFromSaleButton saleId={sale.id} />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </BasicModuleShell>
   );
 }
