@@ -338,9 +338,9 @@ export const SRI_DOCUMENT_STATUS_LABELS: Record<string, string> = {
   READY_FOR_TESTING: "Listo para pruebas",
   VALIDATION_ERROR: "Error de validacion",
   SIGNED: "Firmado",
-  SENT: "Enviado",
-  AUTHORIZED: "Autorizado",
-  REJECTED: "Rechazado",
+  SENT: "Recibido por SRI",
+  AUTHORIZED: "Autorizado por SRI",
+  REJECTED: "Rechazado por SRI",
   CANCELLED: "Anulado",
 };
 

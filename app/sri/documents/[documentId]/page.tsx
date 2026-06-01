@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { SriModuleShell } from "@/components/appsolux/sri/sri-module-shell";
 import { SriSigningJobSection } from "@/components/appsolux/sri/sri-signing-job-section";
+import { SriSubmissionJobSection } from "@/components/appsolux/sri/sri-submission-job-section";
 import { SriTechnicalChecklistSection } from "@/components/appsolux/sri/sri-technical-checklist-section";
 import { SriXmlPreviewSection } from "@/components/appsolux/sri/sri-xml-preview-section";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
   formatSequentialNumber,
 } from "@/lib/core/sri";
 import { getLatestSriSigningJobForDocument } from "@/lib/core/sri-signing-jobs";
+import { getLatestSriSubmissionJobForDocument } from "@/lib/core/sri-submission-jobs";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 type Props = { params: Promise<{ documentId: string }> };
@@ -42,10 +44,11 @@ export default async function SriDocumentDetailPage({ params }: Props) {
 
   const tenant = await getCurrentTenant(user);
   const { documentId } = await params;
-  const [doc, profile, latestJob] = await Promise.all([
+  const [doc, profile, latestJob, latestSubmissionJob] = await Promise.all([
     getSriDocumentById(tenant.id, documentId),
     getSriProfile(tenant.id),
     getLatestSriSigningJobForDocument(tenant.id, documentId),
+    getLatestSriSubmissionJobForDocument(tenant.id, documentId),
   ]);
 
   if (!doc) {
@@ -68,7 +71,27 @@ export default async function SriDocumentDetailPage({ params }: Props) {
   const statusLabel = SRI_DOCUMENT_STATUS_LABELS[doc.status] ?? doc.status;
   const typeLabel = SRI_DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType;
   const banner =
-    doc.status === "SIGNED"
+    doc.status === "AUTHORIZED"
+      ? {
+          title: "Autorizado por SRI",
+          text: "El comprobante ya fue autorizado en ambiente de pruebas. El RIDE/PDF final sigue pendiente.",
+          className: "border-emerald-200 bg-emerald-50 text-emerald-800",
+        }
+      : doc.status === "REJECTED"
+        ? {
+            title: "Rechazado por SRI",
+            text:
+              latestSubmissionJob?.errorMessage ??
+              "El SRI rechazo el comprobante en pruebas. Revisa el detalle del envio para corregirlo.",
+            className: "border-red-200 bg-red-50 text-red-800",
+          }
+      : doc.status === "SENT"
+        ? {
+            title: "Recibido por SRI",
+            text: "El XML ya fue recibido por el SRI y esta pendiente de autorizacion final.",
+            className: "border-cyan-200 bg-cyan-50 text-cyan-900",
+          }
+      : doc.status === "SIGNED"
       ? {
           title: "XML firmado",
           text: "XML firmado. Aun no enviado al SRI.",
@@ -98,8 +121,14 @@ export default async function SriDocumentDetailPage({ params }: Props) {
                 className: "border-amber-200 bg-amber-50 text-amber-800",
               };
   const nextStep =
-    doc.status === "SIGNED"
-      ? "Siguiente fase: habilitar envio al SRI en ambiente de pruebas."
+    doc.status === "AUTHORIZED"
+      ? "Comprobante autorizado. La siguiente fase sera generar RIDE/PDF final."
+      : doc.status === "REJECTED"
+        ? "Revisa la respuesta del SRI, corrige el problema y vuelve a intentar el envio."
+      : doc.status === "SENT"
+        ? "Consulta nuevamente la autorizacion del SRI desde el worker si el proceso sigue pendiente."
+      : doc.status === "SIGNED"
+      ? "Siguiente fase: enviar al SRI en ambiente de pruebas."
       : latestJob?.status === "SUCCEEDED"
         ? "Verifica el XML firmado en el worker y prepara la siguiente fase de envio al SRI."
         : latestJob?.status === "FAILED"
@@ -210,6 +239,15 @@ export default async function SriDocumentDetailPage({ params }: Props) {
             )}
             {doc.status === "SIGNED" && (
               <p className="text-emerald-700">XML firmado. Aun no enviado al SRI.</p>
+            )}
+            {doc.status === "SENT" && (
+              <p className="text-cyan-700">Recibido por SRI. Pendiente de autorizacion.</p>
+            )}
+            {doc.status === "AUTHORIZED" && (
+              <p className="text-emerald-700">Autorizado por SRI en ambiente de pruebas.</p>
+            )}
+            {doc.status === "REJECTED" && (
+              <p className="text-destructive">SRI rechazo este comprobante en pruebas.</p>
             )}
             {latestJob?.status === "SUCCEEDED" && doc.status !== "SIGNED" && (
               <p className="text-emerald-700">
@@ -371,8 +409,19 @@ export default async function SriDocumentDetailPage({ params }: Props) {
         </Card>
       )}
 
+      {(doc.status === "SIGNED" || doc.status === "SENT" || doc.status === "AUTHORIZED" || doc.status === "REJECTED") && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Envio SRI pruebas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SriSubmissionJobSection documentId={doc.id} documentStatus={doc.status} />
+          </CardContent>
+        </Card>
+      )}
+
       <p className="text-center text-xs text-muted-foreground">
-        Envio al SRI, autorizacion oficial y RIDE todavia no forman parte de este flujo.
+        Produccion SRI y RIDE/PDF final permanecen fuera de esta fase.
       </p>
     </SriModuleShell>
   );
