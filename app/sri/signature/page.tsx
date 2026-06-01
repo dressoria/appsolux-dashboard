@@ -190,6 +190,37 @@ export default async function SriSignaturePage() {
         </CardContent>
       </Card>
 
+      {/* Procesamiento de firma — arquitectura worker */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Procesamiento de firma — Arquitectura worker</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <p>
+            La firma electrónica XAdES-BES <strong>no se ejecuta desde Next.js directamente.</strong>{" "}
+            Se usa una arquitectura de cola de jobs (Camino B):
+          </p>
+          <ol className="space-y-1.5">
+            <li>1. Next.js crea un <code className="font-mono text-xs">SriSigningJob</code> con estado QUEUED.</li>
+            <li>2. Un worker separado (proceso independiente) reclama el job.</li>
+            <li>3. El worker carga el certificado .p12 desde almacenamiento cifrado (server-side).</li>
+            <li>4. El worker firma el XML con XAdES-BES.</li>
+            <li>5. El worker guarda el XML firmado y actualiza el job a SUCCEEDED.</li>
+            <li>6. El documento queda SIGNED — listo para envío al SRI.</li>
+          </ol>
+          <ul className="space-y-1 border-t pt-3">
+            <li>• El certificado <strong>nunca se envía al navegador</strong>.</li>
+            <li>• La contraseña del certificado <strong>no se guarda</strong> en base de datos.</li>
+            <li>• Los jobs tienen reintentos automáticos con backoff.</li>
+            <li>• El estado de firma es visible en tiempo real desde el detalle del comprobante.</li>
+          </ul>
+          <p className="text-xs">
+            Detalles en{" "}
+            <span className="font-mono">docs/SRI_SIGNING_WORKER.md</span>.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Próxima fase */}
       <Card>
         <CardHeader>
@@ -199,7 +230,7 @@ export default async function SriSignaturePage() {
           <ol className="space-y-1.5 text-sm text-muted-foreground">
             <li>1. Configurar almacenamiento cifrado del archivo .p12</li>
             <li>2. Implementar carga segura del certificado (server-side, sin log)</li>
-            <li>3. Implementar firma XAdES-BES con la librería adecuada</li>
+            <li>3. Implementar firma XAdES-BES con la librería adecuada en el worker</li>
             <li>4. Envío real al web service del SRI (ambiente pruebas)</li>
             <li>5. Autorización, número y RIDE del comprobante</li>
           </ol>

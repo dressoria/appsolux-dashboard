@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { SriModuleShell } from "@/components/appsolux/sri/sri-module-shell";
-import { SriSignPreviewButton } from "@/components/appsolux/sri/sri-sign-preview-button";
+import { SriSigningJobSection } from "@/components/appsolux/sri/sri-signing-job-section";
 import { SriTechnicalChecklistSection } from "@/components/appsolux/sri/sri-technical-checklist-section";
 import { SriXmlPreviewSection } from "@/components/appsolux/sri/sri-xml-preview-section";
 import { Button } from "@/components/ui/button";
@@ -286,22 +286,14 @@ export default async function SriDocumentDetailPage({ params }: Props) {
         </CardContent>
       </Card>
 
-      {/* Firma electronica — solo si esta listo para pruebas */}
-      {doc.status === "READY_FOR_TESTING" && (
+      {/* Firma electronica — visible si esta listo para pruebas o ya hay job */}
+      {(doc.status === "READY_FOR_TESTING" || doc.status === "SIGNED") && (
         <Card>
           <CardHeader>
             <CardTitle>Firma electronica</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              El comprobante está listo para pruebas. El siguiente paso es la firma XAdES-BES
-              con el certificado .p12 emitido por el BCE o Security Data. Puedes intentar el
-              flujo — el sistema indicará claramente si la firma real está habilitada.
-            </p>
-            <SriSignPreviewButton documentId={doc.id} />
-            <p className="text-xs text-muted-foreground">
-              Envío al SRI, autorización y RIDE estarán disponibles en la fase de emisión real.
-            </p>
+          <CardContent>
+            <SriSigningJobSection documentId={doc.id} documentStatus={doc.status} />
           </CardContent>
         </Card>
       )}

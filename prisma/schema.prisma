@@ -157,6 +157,14 @@ enum SriDocumentStatus {
   CANCELLED
 }
 
+enum SriSigningJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
 model User {
   id              String     @id @default(cuid())
   name            String
@@ -208,6 +216,7 @@ model Tenant {
   sriDocumentSequences      SriDocumentSequence[]
   sriSignatureConfig        SriSignatureConfig?
   sriDocuments              SriDocument[]
+  sriSigningJobs            SriSigningJob[]
 }
 
 model Plan {
@@ -679,6 +688,7 @@ model SriDocument {
   establishment SriEstablishment @relation(fields: [establishmentId], references: [id])
   issuePoint    SriIssuePoint    @relation(fields: [issuePointId], references: [id])
   lines         SriDocumentLine[]
+  signingJobs   SriSigningJob[]
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -686,6 +696,39 @@ model SriDocument {
   @@index([establishmentId])
   @@index([issuePointId])
   @@index([createdAt])
+}
+
+model SriSigningJob {
+  id                    String              @id @default(cuid())
+  tenantId              String
+  documentId            String
+  status                SriSigningJobStatus @default(QUEUED)
+  priority              Int                 @default(0)
+  attempts              Int                 @default(0)
+  maxAttempts           Int                 @default(3)
+  lockedAt              DateTime?
+  lockedBy              String?
+  runAfter              DateTime?
+  startedAt             DateTime?
+  finishedAt            DateTime?
+  errorCode             String?
+  errorMessage          String?
+  unsignedXmlHash       String?
+  signedXmlStorageKey   String?
+  signedXmlHash         String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  document SriDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([documentId])
+  @@index([status])
+  @@index([runAfter])
+  @@index([lockedAt])
+  @@index([status, runAfter])
+  @@index([tenantId, documentId])
 }
 
 model SriDocumentLine {
