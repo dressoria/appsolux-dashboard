@@ -55,6 +55,7 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
   const sequentialNumber = doc.sequentialNumber ?? sequence?.currentNumber ?? 1;
 
   const result = buildUnsignedSriInvoiceXmlPreview({
+    documentId,
     profile: {
       legalName: profile.legalName,
       tradeName: profile.tradeName,
@@ -99,6 +100,7 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
     displayNumber: result.displayNumber,
     warnings: result.warnings,
     missingFields: result.missingFields,
+    accessKey: result.accessKey,
     status: doc.status,
   });
 }

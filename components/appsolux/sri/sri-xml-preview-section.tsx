@@ -12,6 +12,7 @@ type XmlPreviewState =
       displayNumber: string;
       warnings: string[];
       missingFields: string[];
+      accessKey: string | null;
     }
   | { phase: "error"; message: string };
 
@@ -32,6 +33,7 @@ export function SriXmlPreviewSection({ documentId }: Props) {
         displayNumber?: string;
         warnings?: string[];
         missingFields?: string[];
+        accessKey?: string | null;
         error?: string;
       };
       if (!res.ok || !data.xml) {
@@ -44,6 +46,7 @@ export function SriXmlPreviewSection({ documentId }: Props) {
         displayNumber: data.displayNumber ?? "",
         warnings: data.warnings ?? [],
         missingFields: data.missingFields ?? [],
+        accessKey: data.accessKey ?? null,
       });
     } catch {
       setState({ phase: "error", message: "Error de red. Intenta de nuevo." });
@@ -93,8 +96,20 @@ export function SriXmlPreviewSection({ documentId }: Props) {
         <div className="space-y-3">
           {state.displayNumber && (
             <p className="font-mono text-sm font-medium">
-              Número interno: <span className="text-slate-700">{state.displayNumber}</span>
+              Número: <span className="text-slate-700">{state.displayNumber}</span>
             </p>
+          )}
+
+          {state.accessKey && (
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 space-y-1.5">
+              <p className="text-xs font-semibold text-slate-700">Clave de acceso — preparación técnica:</p>
+              <p className="font-mono text-xs break-all text-slate-800 leading-relaxed">
+                {state.accessKey}
+              </p>
+              <p className="text-xs text-slate-500">
+                Generada localmente. El comprobante no está firmado ni autorizado por el SRI.
+              </p>
+            </div>
           )}
 
           {state.missingFields.length > 0 && (

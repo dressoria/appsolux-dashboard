@@ -1,6 +1,8 @@
 import "@/lib/security/server-only";
+import { buildSriAccessKey, createStableNumericCode } from "./sri-access-key";
 
 export type SriXmlPreviewParams = {
+  documentId: string;
   profile: {
     legalName: string;
     tradeName: string | null;
@@ -45,6 +47,7 @@ export type SriXmlPreviewResult = {
   displayNumber: string;
   warnings: string[];
   missingFields: string[];
+  accessKey: string | null;
 };
 
 function pad(n: number, digits: number): string {
@@ -180,6 +183,7 @@ export function buildUnsignedSriInvoiceXmlPreview(
       displayNumber,
       warnings,
       missingFields,
+      accessKey: null,
     };
   }
 
@@ -190,6 +194,30 @@ export function buildUnsignedSriInvoiceXmlPreview(
   );
   const linesXml = params.lines.map((l, i) => buildLineXml(l, i)).join("\n");
 
+  // Generar clave de acceso si la validación pasó sin errores
+  let accessKey: string | null = null;
+  let claveAcceso = "PENDIENTE_DE_GENERAR";
+
+  if (missingFields.length === 0) {
+    try {
+      const numericCode = createStableNumericCode(params.documentId);
+      const keyResult = buildSriAccessKey({
+        issuedAt: params.document.issuedAt ?? params.document.createdAt,
+        documentType: params.document.documentType,
+        ruc: params.profile.ruc,
+        environment: params.profile.environment,
+        establishmentCode: params.establishment.code,
+        issuePointCode: params.issuePoint.code,
+        sequentialNumber: params.sequentialNumber,
+        numericCode,
+      });
+      accessKey = keyResult.accessKey;
+      claveAcceso = keyResult.accessKey;
+    } catch {
+      warnings.push("No se pudo generar la clave de acceso. Verifica la configuración SRI.");
+    }
+  }
+
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <!-- XML PRELIMINAR — NO FIRMADO — SIN VALIDEZ TRIBUTARIA -->
 <factura id="comprobante" version="2.1.0">
@@ -199,7 +227,7 @@ export function buildUnsignedSriInvoiceXmlPreview(
     <razonSocial>${xmlEscape(params.profile.legalName)}</razonSocial>
     <nombreComercial>${xmlEscape(params.profile.tradeName ?? params.profile.legalName)}</nombreComercial>
     <ruc>${xmlEscape(params.profile.ruc)}</ruc>
-    <claveAcceso>PENDIENTE_DE_GENERAR</claveAcceso>
+    <claveAcceso>${claveAcceso}</claveAcceso>
     <codDoc>01</codDoc>
     <estab>${xmlEscape(params.establishment.code)}</estab>
     <ptoEmi>${xmlEscape(params.issuePoint.code)}</ptoEmi>
@@ -232,5 +260,5 @@ ${linesXml}
   </detalles>
 </factura>`;
 
-  return { xml, displayNumber, warnings, missingFields };
+  return { xml, displayNumber, warnings, missingFields, accessKey };
 }
