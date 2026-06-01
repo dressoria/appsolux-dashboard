@@ -25,17 +25,17 @@ const STATUS_LABELS: Record<string, { label: string; dotClass: string; textClass
     textClass: "text-emerald-700",
   },
   EXPIRED: {
-    label: "Certificado vencido",
+    label: "Expirada",
     dotClass: "bg-red-400",
     textClass: "text-destructive",
   },
 };
 
 const SECURITY_CHECKLIST = [
-  "El certificado .p12 no se envía al navegador — la firma ocurre solo server-side.",
-  "La contraseña del certificado no se guarda en texto plano ni en base de datos.",
-  "La firma XAdES-BES se ejecutará exclusivamente en el servidor, nunca en el cliente.",
-  "Para producción se requiere almacenamiento cifrado del certificado (KMS o volumen cifrado).",
+  "Cada empresa usa su propio certificado .p12 o .pfx.",
+  "El dashboard no firma directamente; la firma se procesa en un worker separado.",
+  "El certificado no se expone al navegador y debe mantenerse cifrado server-side.",
+  "Antes de usar un certificado de produccion, valida una firma real en ambiente de pruebas.",
 ];
 
 export default async function SriSignaturePage() {
@@ -61,6 +61,18 @@ export default async function SriSignaturePage() {
       : STATUS_LABELS.NOT_UPLOADED;
 
   const isExpired = sigConfig?.expiresAt && sigConfig.expiresAt < new Date();
+  const hasEncryptedCertificate = Boolean(sigConfig?.encryptedCertificateStorageKey);
+  const statusLabel = isExpired
+    ? "Expirada"
+    : sigConfig?.status === "READY_FOR_TESTING"
+      ? "Lista para pruebas"
+      : hasEncryptedCertificate
+        ? "Certificado cifrado cargado"
+        : sigConfig?.status === "UPLOADED_METADATA_ONLY"
+          ? "Metadata registrada"
+          : sigConfig
+            ? "Requiere revision"
+            : "No configurada";
 
   return (
     <SriModuleShell
@@ -69,11 +81,11 @@ export default async function SriSignaturePage() {
       activeHref={routes.sriSignature}
     >
       <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-        <p className="font-semibold">Fase de preparación — sin carga real todavía</p>
+        <p className="font-semibold">Flujo real de firma para pruebas controladas</p>
         <p className="mt-0.5">
-          En esta fase se registra únicamente la metadata del certificado. La carga segura del
-          archivo .p12 se habilitará cuando esté configurado el almacenamiento cifrado.{" "}
-          <strong>No se almacenan contraseñas.</strong>
+          La firma electronica se procesa mediante un worker separado. Cada empresa usa su propio
+          certificado y el dashboard no firma directamente. Antes de emitir en produccion, valida
+          una firma real en ambiente de pruebas.
         </p>
       </div>
 
@@ -87,6 +99,7 @@ export default async function SriSignaturePage() {
             <div className={`mt-1 h-3 w-3 shrink-0 rounded-full ${statusInfo.dotClass}`} />
             <div className="space-y-1 text-sm">
               <p className={`font-semibold ${statusInfo.textClass}`}>{statusInfo.label}</p>
+              <p className="text-muted-foreground">Estado operativo: {statusLabel}</p>
 
               {sigConfig?.certificateFileName && (
                 <p className="text-muted-foreground">
@@ -129,9 +142,36 @@ export default async function SriSignaturePage() {
 
               {!sigConfig && (
                 <p className="text-muted-foreground">
-                  Aún no has registrado metadata de ningún certificado.
+                  Aun no has registrado metadata ni certificado para esta empresa.
                 </p>
               )}
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-md border p-3 text-sm">
+              <p className="font-medium">Metadata registrada</p>
+              <p className={sigConfig ? "text-emerald-700" : "text-amber-700"}>
+                {sigConfig ? "Disponible" : "Pendiente"}
+              </p>
+            </div>
+            <div className="rounded-md border p-3 text-sm">
+              <p className="font-medium">Certificado cifrado cargado</p>
+              <p className={hasEncryptedCertificate ? "text-emerald-700" : "text-amber-700"}>
+                {hasEncryptedCertificate ? "Detectado en arquitectura" : "Pendiente o no visible desde esta vista"}
+              </p>
+            </div>
+            <div className="rounded-md border p-3 text-sm">
+              <p className="font-medium">Contrasena cifrada registrada</p>
+              <p className="text-muted-foreground">
+                No se muestra en dashboard. Debe gestionarse solo del lado servidor.
+              </p>
+            </div>
+            <div className="rounded-md border p-3 text-sm">
+              <p className="font-medium">Worker de firma</p>
+              <p className={sigConfig?.status === "READY_FOR_TESTING" ? "text-emerald-700" : "text-amber-700"}>
+                {sigConfig?.status === "READY_FOR_TESTING" ? "Listo para pruebas" : "Pendiente de QA completa"}
+              </p>
             </div>
           </div>
 
@@ -175,7 +215,7 @@ export default async function SriSignaturePage() {
           </ul>
           <p className="mt-2 text-xs">
             El certificado debe estar emitido a nombre del RUC configurado en la empresa.
-            Un certificado para ambiente de pruebas es distinto al de producción.
+            No uses el certificado de produccion hasta validar el flujo completo en pruebas.
           </p>
           <p className="mt-1 text-xs">
             Lee también:{" "}
@@ -197,8 +237,8 @@ export default async function SriSignaturePage() {
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>
-            La firma electrónica XAdES-BES <strong>no se ejecuta desde Next.js directamente.</strong>{" "}
-            Se usa una arquitectura de cola de jobs (Camino B):
+            La firma electronica XAdES-BES <strong>no se ejecuta desde Next.js directamente.</strong>{" "}
+            Se usa una arquitectura de cola de jobs con worker separado:
           </p>
           <ol className="space-y-1.5">
             <li>1. Next.js crea un <code className="font-mono text-xs">SriSigningJob</code> con estado QUEUED.</li>
@@ -206,11 +246,11 @@ export default async function SriSignaturePage() {
             <li>3. El worker carga el certificado .p12 desde almacenamiento cifrado (server-side).</li>
             <li>4. El worker firma el XML con XAdES-BES.</li>
             <li>5. El worker guarda el XML firmado y actualiza el job a SUCCEEDED.</li>
-            <li>6. El documento queda SIGNED — listo para envío al SRI.</li>
+            <li>6. El XML firmado queda listo para la siguiente fase de envio al SRI.</li>
           </ol>
           <ul className="space-y-1 border-t pt-3">
-            <li>• El certificado <strong>nunca se envía al navegador</strong>.</li>
-            <li>• La contraseña del certificado <strong>no se guarda</strong> en base de datos.</li>
+            <li>• El certificado <strong>nunca se envia al navegador</strong>.</li>
+            <li>• La contrasena <strong>no se muestra</strong> en dashboard ni en logs.</li>
             <li>• Los jobs tienen reintentos automáticos con backoff.</li>
             <li>• El estado de firma es visible en tiempo real desde el detalle del comprobante.</li>
           </ul>
@@ -224,15 +264,14 @@ export default async function SriSignaturePage() {
       {/* Próxima fase */}
       <Card>
         <CardHeader>
-          <CardTitle>Proxima fase: carga y uso real del certificado</CardTitle>
+          <CardTitle>Siguientes validaciones</CardTitle>
         </CardHeader>
         <CardContent>
           <ol className="space-y-1.5 text-sm text-muted-foreground">
-            <li>1. Configurar almacenamiento cifrado del archivo .p12</li>
-            <li>2. Implementar carga segura del certificado (server-side, sin log)</li>
-            <li>3. Implementar firma XAdES-BES con la librería adecuada en el worker</li>
-            <li>4. Envío real al web service del SRI (ambiente pruebas)</li>
-            <li>5. Autorización, número y RIDE del comprobante</li>
+            <li>1. Validar una firma real de punta a punta en ambiente de pruebas.</li>
+            <li>2. Confirmar QA del worker con certificados empresariales controlados.</li>
+            <li>3. Habilitar envio al web service del SRI en pruebas.</li>
+            <li>4. Implementar autorizacion SRI y RIDE/PDF final.</li>
           </ol>
         </CardContent>
       </Card>

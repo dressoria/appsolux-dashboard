@@ -34,6 +34,111 @@ function StatusRow({
   );
 }
 
+function getTaxConfigurationLabel(status: Awaited<ReturnType<typeof getSriModuleStatus>>) {
+  const complete =
+    status.profileStatus === "CONFIGURED" &&
+    status.establishmentCount > 0 &&
+    status.issuePointCount > 0 &&
+    status.sequenceCount > 0;
+
+  if (complete) return "Configurado";
+  if (!status.hasProfile) return "Pendiente";
+  return "Incompleto";
+}
+
+function getSignatureLabel(status: Awaited<ReturnType<typeof getSriModuleStatus>>) {
+  if (status.signatureStatus === "EXPIRED") return "Expirada";
+  if (status.signatureStatus === "READY_FOR_TESTING") return "Lista para pruebas";
+  if (status.signatureHasEncryptedCertificate) return "Certificado cifrado cargado";
+  if (status.signatureStatus === "UPLOADED_METADATA_ONLY") return "Metadata registrada";
+  return "No configurada";
+}
+
+function getDocumentLabel(status: Awaited<ReturnType<typeof getSriModuleStatus>>) {
+  if (status.documentStatusCounts.signed > 0) {
+    return `${status.documentStatusCounts.signed} firmado(s) · pendiente envio SRI`;
+  }
+  if (status.documentStatusCounts.readyForTesting > 0) {
+    return `${status.documentStatusCounts.readyForTesting} listo(s) para pruebas`;
+  }
+  if (status.documentStatusCounts.draft > 0) {
+    return `${status.documentStatusCounts.draft} borrador(es)`;
+  }
+  return "Sin comprobantes";
+}
+
+function getRecommendedStep(status: Awaited<ReturnType<typeof getSriModuleStatus>>) {
+  if (!status.hasProfile) {
+    return {
+      text: "Completa Empresa / RUC.",
+      href: routes.sriCompany,
+      actionLabel: "Configurar empresa",
+      variant: "default" as const,
+    };
+  }
+
+  if (status.establishmentCount === 0) {
+    return {
+      text: "Configura al menos un establecimiento.",
+      href: routes.sriEstablishments,
+      actionLabel: "Agregar establecimiento",
+      variant: "default" as const,
+    };
+  }
+
+  if (status.issuePointCount === 0) {
+    return {
+      text: "Configura al menos un punto de emision.",
+      href: routes.sriIssuePoints,
+      actionLabel: "Agregar punto de emision",
+      variant: "default" as const,
+    };
+  }
+
+  if (status.sequenceCount === 0) {
+    return {
+      text: "Configura secuencial de factura.",
+      href: routes.sriSequences,
+      actionLabel: "Configurar secuenciales",
+      variant: "default" as const,
+    };
+  }
+
+  if (!status.signatureStatus || status.signatureStatus === "NOT_UPLOADED") {
+    return {
+      text: "Configura la firma electronica.",
+      href: routes.sriSignature,
+      actionLabel: "Ver firma",
+      variant: "outline" as const,
+    };
+  }
+
+  if (status.signatureStatus === "UPLOADED_METADATA_ONLY" && !status.signatureHasEncryptedCertificate) {
+    return {
+      text: "Carga el certificado .p12/.pfx de la empresa para pruebas controladas.",
+      href: routes.sriSignature,
+      actionLabel: "Revisar firma",
+      variant: "outline" as const,
+    };
+  }
+
+  if (status.documentStatusCounts.signed > 0) {
+    return {
+      text: "Siguiente fase: envio al SRI en ambiente de pruebas.",
+      href: routes.sriDocuments,
+      actionLabel: "Ver comprobantes",
+      variant: "outline" as const,
+    };
+  }
+
+  return {
+    text: "Crea una venta, genera borrador SRI, marca listo para pruebas y solicita firma.",
+    href: routes.sriDocuments,
+    actionLabel: "Ir a comprobantes",
+    variant: "outline" as const,
+  };
+}
+
 export default async function SriPage() {
   const user = await getCurrentUser();
 
@@ -51,6 +156,10 @@ export default async function SriPage() {
 
   const tenant = await getCurrentTenant(user);
   const status = await getSriModuleStatus(tenant.id);
+  const recommendedStep = getRecommendedStep(status);
+  const taxConfigurationLabel = getTaxConfigurationLabel(status);
+  const signatureLabel = getSignatureLabel(status);
+  const documentLabel = getDocumentLabel(status);
 
   return (
     <SriModuleShell
@@ -59,13 +168,19 @@ export default async function SriPage() {
       activeHref={routes.sri}
     >
       <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-        <p className="font-medium">Fase de configuracion</p>
+        <p className="font-medium">Ruta actual del modulo SRI</p>
         <p className="mt-1">
-          Esta fase prepara la configuracion tributaria. La emision real, autorizacion SRI,
-          generacion de XML y RIDE se implementaran en una fase posterior.
-          No subas certificados reales todavia.
+          El modulo ya cuenta con configuracion tributaria, clave de acceso, XML preliminar,
+          checklist tecnico y cola de firma por worker. En esta etapa todavia siguen pendientes
+          el envio al SRI, la autorizacion oficial y el RIDE/PDF final.
         </p>
       </div>
+
+      {status.environment === "TEST" && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          Estas trabajando en ambiente de pruebas. No se emiten comprobantes con validez tributaria.
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -126,6 +241,13 @@ export default async function SriPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <StatusRow
+              label="Configuracion tributaria"
+              value={taxConfigurationLabel}
+              ok={taxConfigurationLabel === "Configurado"}
+              href={routes.sriCompany}
+              actionLabel="Ver configuracion"
+            />
+            <StatusRow
               label="Empresa y RUC"
               value={status.profileStatus === "CONFIGURED" ? "Configurado" : "Pendiente"}
               ok={status.profileStatus === "CONFIGURED"}
@@ -168,18 +290,31 @@ export default async function SriPage() {
             />
             <StatusRow
               label="Firma electronica"
-              value={
-                status.signatureStatus === "READY_FOR_TESTING"
-                  ? "Lista para pruebas"
-                  : status.signatureStatus === "UPLOADED_METADATA_ONLY"
-                  ? "Metadata registrada"
-                  : status.signatureStatus === "EXPIRED"
-                  ? "Expirada"
-                  : "No cargada"
-              }
+              value={signatureLabel}
               ok={status.signatureStatus === "READY_FOR_TESTING"}
               href={routes.sriSignature}
               actionLabel="Ver firma"
+            />
+            <StatusRow
+              label="Documentos"
+              value={documentLabel}
+              ok={status.documentCount > 0}
+              href={routes.sriDocuments}
+              actionLabel="Ver documentos"
+            />
+            <StatusRow
+              label="Autorizacion SRI"
+              value="Pendiente de implementacion"
+              ok={false}
+              href={routes.sriDocuments}
+              actionLabel="Ver flujo"
+            />
+            <StatusRow
+              label="RIDE / PDF"
+              value="Pendiente de implementacion"
+              ok={false}
+              href={routes.sriDocuments}
+              actionLabel="Ver flujo"
             />
           </CardContent>
         </Card>
@@ -189,51 +324,15 @@ export default async function SriPage() {
             <CardTitle>Proximo paso recomendado</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!status.hasProfile && (
-              <div className="space-y-2">
-                <p className="text-sm">Comienza configurando los datos de tu empresa y RUC.</p>
-                <Button asChild>
-                  <Link href={routes.sriCompany}>Configurar empresa</Link>
-                </Button>
-              </div>
-            )}
-            {status.hasProfile && status.establishmentCount === 0 && (
-              <div className="space-y-2">
-                <p className="text-sm">Agrega tu primer establecimiento (ejemplo: 001).</p>
-                <Button asChild>
-                  <Link href={routes.sriEstablishments}>Agregar establecimiento</Link>
-                </Button>
-              </div>
-            )}
-            {status.hasProfile && status.establishmentCount > 0 && status.issuePointCount === 0 && (
-              <div className="space-y-2">
-                <p className="text-sm">Agrega un punto de emision a tu establecimiento (ejemplo: 001).</p>
-                <Button asChild>
-                  <Link href={routes.sriIssuePoints}>Agregar punto de emision</Link>
-                </Button>
-              </div>
-            )}
-            {status.hasProfile && status.issuePointCount > 0 && status.sequenceCount === 0 && (
-              <div className="space-y-2">
-                <p className="text-sm">Configura los secuenciales para cada tipo de comprobante.</p>
-                <Button asChild>
-                  <Link href={routes.sriSequences}>Configurar secuenciales</Link>
-                </Button>
-              </div>
-            )}
-            {status.hasProfile && status.sequenceCount > 0 && status.signatureStatus !== "READY_FOR_TESTING" && (
-              <div className="space-y-2">
-                <p className="text-sm">
-                  La carga segura del certificado de firma electronica se implementara en una fase posterior.
-                </p>
-                <Button asChild variant="outline">
-                  <Link href={routes.sriSignature}>Ver estado de firma</Link>
-                </Button>
-              </div>
-            )}
+            <div className="space-y-2">
+              <p className="text-sm">{recommendedStep.text}</p>
+              <Button asChild variant={recommendedStep.variant}>
+                <Link href={recommendedStep.href}>{recommendedStep.actionLabel}</Link>
+              </Button>
+            </div>
             {status.readinessLabel === "ready_for_testing" && (
               <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-                Configuracion lista para pruebas. La emision real se habilitara en la siguiente fase.
+                Configuracion lista para pruebas. Antes de emitir en produccion, valida una firma real en ambiente de pruebas.
               </div>
             )}
           </CardContent>
@@ -246,18 +345,24 @@ export default async function SriPage() {
         </CardHeader>
         <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           {[
-            { type: "Factura", code: "01" },
-            { type: "Nota de credito", code: "04" },
-            { type: "Nota de debito", code: "05" },
-            { type: "Retencion", code: "07" },
-            { type: "Guia de remision", code: "06" },
+            { type: "Factura", code: "01", status: "Flujo inicial activo", detail: "Borrador, XML, checklist y firma en avance." },
+            { type: "Nota de credito", code: "04", status: "Estructura pendiente", detail: "Aun no hay flujo operativo completo." },
+            { type: "Nota de debito", code: "05", status: "Estructura pendiente", detail: "Aun no hay flujo operativo completo." },
+            { type: "Retencion", code: "07", status: "Estructura pendiente", detail: "Aun no hay flujo operativo completo." },
+            { type: "Guia de remision", code: "06", status: "Estructura pendiente", detail: "Aun no hay flujo operativo completo." },
           ].map((doc) => (
             <div key={doc.code} className="rounded-md border p-3 text-sm">
               <p className="font-medium">{doc.type}</p>
               <p className="text-xs text-muted-foreground">Tipo {doc.code}</p>
-              <p className="mt-1 text-xs text-blue-600">Estructura preparada</p>
+              <p className={`mt-1 text-xs ${doc.code === "01" ? "text-emerald-700" : "text-amber-700"}`}>
+                {doc.status}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{doc.detail}</p>
             </div>
           ))}
+        </CardContent>
+        <CardContent className="pt-0 text-sm text-muted-foreground">
+          Por ahora el flujo operativo se concentra en Factura. Los demas comprobantes estan contemplados en estructura, pero se activaran despues.
         </CardContent>
       </Card>
     </SriModuleShell>

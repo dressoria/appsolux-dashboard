@@ -42,9 +42,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Iniciar sesion</CardTitle>
+          <CardTitle>Bionvers App</CardTitle>
           <CardDescription>
-            Entra a tu dashboard de Appsolux con tu usuario de empresa.
+            Inicia sesion para entrar al panel de gestion de tu negocio.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -55,7 +55,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                 id="email"
                 name="email"
                 type="email"
-                placeholder="admin@appsolux.com"
+                placeholder="admin@empresa.com"
                 required
                 autoComplete="email"
               />
@@ -78,7 +78,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             ) : null}
 
             <Button type="submit" className="w-full">
-              Iniciar sesion
+              Entrar
             </Button>
 
             <p className="text-center text-sm text-muted-foreground">

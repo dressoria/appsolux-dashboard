@@ -66,11 +66,11 @@ export function SriSignatureMetadataForm() {
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4 rounded-md border p-4">
       <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-        <p className="font-semibold">Solo metadata — sin archivo real</p>
+        <p className="font-semibold">Registro seguro de referencia</p>
         <p className="mt-0.5">
-          Registra los datos del certificado que ya tienes. El archivo .p12 y la contraseña{" "}
-          <strong>no se suben aquí</strong>. La carga segura real se habilitará con almacenamiento
-          cifrado en una fase posterior.
+          Registra la metadata del certificado de la empresa para identificarlo en el flujo SRI.
+          Esta vista no expone el archivo real ni la contrasena; ambos deben gestionarse cifrados
+          del lado servidor o mediante el worker.
         </p>
       </div>
 

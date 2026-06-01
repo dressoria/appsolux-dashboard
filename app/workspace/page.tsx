@@ -67,6 +67,16 @@ function AppCard({ title, description, features, status, cta, locked, meta }: Ap
   );
 }
 
+function getSriSignatureLabel(
+  sriStatus: Awaited<ReturnType<typeof getSriModuleStatus>>
+) {
+  if (sriStatus.signatureStatus === "EXPIRED") return "Expirada";
+  if (sriStatus.signatureStatus === "READY_FOR_TESTING") return "Lista";
+  if (sriStatus.signatureHasEncryptedCertificate) return "Certificado cargado";
+  if (sriStatus.signatureStatus === "UPLOADED_METADATA_ONLY") return "Metadata";
+  return "No configurada";
+}
+
 export default async function WorkspacePage() {
   const user = await getCurrentUser();
 
@@ -101,7 +111,13 @@ export default async function WorkspacePage() {
       ? "Incompleto"
       : sriStatus.readinessLabel === "ready_for_testing"
       ? "Listo para pruebas"
-      : "Listo para produccion";
+      : "Configurado para produccion";
+  const sriConfigurationComplete =
+    sriStatus.profileStatus === "CONFIGURED" &&
+    sriStatus.establishmentCount > 0 &&
+    sriStatus.issuePointCount > 0 &&
+    sriStatus.sequenceCount > 0;
+  const sriSignatureLabel = getSriSignatureLabel(sriStatus);
 
   return (
     <DashboardShell>
@@ -187,22 +203,34 @@ export default async function WorkspacePage() {
               sriStatus.hasProfile ? (
                 <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/50 p-3 text-xs">
                   <div>
-                    <p className="text-muted-foreground">RUC</p>
-                    <p className="font-mono font-semibold">{sriStatus.ruc ?? "—"}</p>
+                    <p className="text-muted-foreground">Configuracion</p>
+                    <p className="font-semibold">
+                      {sriConfigurationComplete ? "Completa" : "Pendiente"}
+                    </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Ambiente</p>
                     <p className="font-semibold">
-                      {sriStatus.environment === "TEST" ? "Pruebas" : "Produccion"}
+                      {sriStatus.environment === "TEST"
+                        ? "Pruebas"
+                        : sriStatus.environment === "PRODUCTION"
+                          ? "Produccion"
+                          : "Sin definir"}
                     </p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Establecimientos</p>
-                    <p className="font-semibold">{sriStatus.establishmentCount}</p>
+                    <p className="text-muted-foreground">Firma</p>
+                    <p className="font-semibold">{sriSignatureLabel}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Secuenciales</p>
-                    <p className="font-semibold">{sriStatus.sequenceCount}</p>
+                    <p className="text-muted-foreground">Documentos</p>
+                    <p className="font-semibold">
+                      {sriStatus.documentStatusCounts.signed > 0
+                        ? `${sriStatus.documentStatusCounts.signed} firmados`
+                        : sriStatus.documentStatusCounts.readyForTesting > 0
+                          ? `${sriStatus.documentStatusCounts.readyForTesting} listos`
+                          : `${sriStatus.documentStatusCounts.draft} borradores`}
+                    </p>
                   </div>
                 </div>
               ) : null

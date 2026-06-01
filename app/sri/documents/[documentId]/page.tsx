@@ -16,6 +16,7 @@ import {
   SRI_DOCUMENT_TYPE_LABELS,
   formatSequentialNumber,
 } from "@/lib/core/sri";
+import { getLatestSriSigningJobForDocument } from "@/lib/core/sri-signing-jobs";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 type Props = { params: Promise<{ documentId: string }> };
@@ -41,9 +42,10 @@ export default async function SriDocumentDetailPage({ params }: Props) {
 
   const tenant = await getCurrentTenant(user);
   const { documentId } = await params;
-  const [doc, profile] = await Promise.all([
+  const [doc, profile, latestJob] = await Promise.all([
     getSriDocumentById(tenant.id, documentId),
     getSriProfile(tenant.id),
+    getLatestSriSigningJobForDocument(tenant.id, documentId),
   ]);
 
   if (!doc) {
@@ -65,6 +67,36 @@ export default async function SriDocumentDetailPage({ params }: Props) {
   const sourceLabel = SRI_DOCUMENT_SOURCE_LABELS[doc.sourceType] ?? doc.sourceType;
   const statusLabel = SRI_DOCUMENT_STATUS_LABELS[doc.status] ?? doc.status;
   const typeLabel = SRI_DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType;
+  const banner =
+    doc.status === "SIGNED"
+      ? {
+          title: "XML firmado",
+          text: "XML firmado. Aun no enviado al SRI.",
+          className: "border-emerald-200 bg-emerald-50 text-emerald-800",
+        }
+      : latestJob?.status === "SUCCEEDED"
+        ? {
+            title: "Firma procesada por worker",
+            text: "Firmado correctamente por worker. Pendiente de envio al SRI en proxima fase.",
+            className: "border-emerald-200 bg-emerald-50 text-emerald-800",
+          }
+        : latestJob?.status === "FAILED"
+          ? {
+              title: "Firma con error",
+              text: latestJob.errorMessage ?? "La ultima ejecucion del worker fallo. Revisa el detalle antes de reintentar.",
+              className: "border-red-200 bg-red-50 text-red-800",
+            }
+          : doc.status === "READY_FOR_TESTING"
+            ? {
+                title: "Listo para pruebas",
+                text: "El documento ya tiene checklist tecnico y XML preliminar. Puedes solicitar firma en ambiente de pruebas.",
+                className: "border-blue-200 bg-blue-50 text-blue-800",
+              }
+            : {
+                title: "Borrador interno",
+                text: "Este comprobante aun no fue firmado ni enviado al SRI. Sirve como base operativa para la siguiente etapa del flujo.",
+                className: "border-amber-200 bg-amber-50 text-amber-800",
+              };
 
   return (
     <SriModuleShell
@@ -72,11 +104,10 @@ export default async function SriDocumentDetailPage({ params }: Props) {
       description={`${statusLabel} · ${sourceLabel}`}
       activeHref={routes.sriDocuments}
     >
-      <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-        <p className="font-medium">Borrador interno</p>
+      <div className={`rounded-md border p-4 text-sm ${banner.className}`}>
+        <p className="font-medium">{banner.title}</p>
         <p className="mt-0.5">
-          Este comprobante es un borrador interno. Todavia no fue firmado ni enviado al SRI.
-          La emision real se habilitara en la siguiente fase.
+          {banner.text}
         </p>
       </div>
 
@@ -165,6 +196,19 @@ export default async function SriDocumentDetailPage({ params }: Props) {
             {doc.accessKey && (
               <p className="font-mono text-xs text-muted-foreground break-all">
                 Clave: {doc.accessKey}
+              </p>
+            )}
+            {doc.status === "SIGNED" && (
+              <p className="text-emerald-700">XML firmado. Aun no enviado al SRI.</p>
+            )}
+            {latestJob?.status === "SUCCEEDED" && doc.status !== "SIGNED" && (
+              <p className="text-emerald-700">
+                Worker completado. Pendiente de verificacion final y de envio al SRI.
+              </p>
+            )}
+            {latestJob?.status === "FAILED" && (
+              <p className="text-destructive">
+                Error de firma: {latestJob.errorMessage ?? "Revisa el job mas reciente."}
               </p>
             )}
           </CardContent>
@@ -299,7 +343,7 @@ export default async function SriDocumentDetailPage({ params }: Props) {
       )}
 
       <p className="text-center text-xs text-muted-foreground">
-        Envío al SRI, autorización y RIDE estarán disponibles en la fase de emisión real.
+        Envio al SRI, autorizacion oficial y RIDE todavia no forman parte de este flujo.
       </p>
     </SriModuleShell>
   );

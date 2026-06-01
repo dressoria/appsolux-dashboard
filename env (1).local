@@ -1,0 +1,61 @@
+# Appsolux
+NEXT_PUBLIC_APP_NAME=Appsolux
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# App environment
+APP_ENV=development
+APP_SESSION_SECRET=
+
+# n8n
+N8N_BASE_URL=https://engine.appsolux.com
+N8N_REGISTER_WEBHOOK_URL=https://engine.appsolux.com/webhook/appsolux-register
+N8N_PROVISION_WEBHOOK_URL=https://engine.appsolux.com/webhook/appsolux-provision
+N8N_WEBHOOK_SECRET=
+
+#chatwoot
+CHATWOOT_BASE_URL=https://chat.appsolux.com
+CHATWOOT_ADMIN_API_ACCESS_TOKEN=J3wccT6S697Qo7e2Ygay8kmm
+CHATWOOT_BOT_API_ACCESS_TOKEN=hGyCqtM3ekeWodJfVtxQTNQD
+CHATWOOT_PLATFORM_API_TOKEN=iszRmU998s5pCa6bYkeAoLN7
+# Usuario técnico que se asignará automáticamente a cada cuenta nueva
+CHATWOOT_OPERATIONAL_USER_ID=6
+CHATWOOT_OPERATIONAL_USER_EMAIL=bot@appsolux.com
+
+
+# ERPNext
+ERPNEXT_BASE_URL=https://erp.appsolux.com
+ERPNEXT_API_KEY=15addde70b20c5a
+ERPNEXT_API_SECRET=3447af04ceb015c
+
+# Evolution API
+EVOLUTION_API_BASE_URL=https://api-wa.appsolux.com
+EVOLUTION_API_KEY=Milusk_Secure_Key_2026
+
+# Meta
+META_APP_ID=
+META_APP_SECRET=
+META_VERIFY_TOKEN=
+META_GRAPH_API_VERSION=v21.0
+
+# Meta WhatsApp Cloud API
+META_WHATSAPP_BUSINESS_ACCOUNT_ID=
+META_WHATSAPP_ACCESS_TOKEN=
+
+# Meta Instagram / Messenger
+META_PAGE_ACCESS_TOKEN=
+META_INSTAGRAM_BUSINESS_ACCOUNT_ID=
+
+# Internal
+INTERNAL_API_SECRET=
+
+DATABASE_URL="postgresql://Dres:Skarchita02@localhost:5433/appsolux_core?schema=public"
+
+APPSOLUX_ENABLE_DEV_SESSION=false
+APPSOLUX_CORE_DB_REQUIRED=false
+APPSOLUX_AUTH_SECRET="appsolux_dev_secret_local_cambialo_en_produccion_2026"
+
+APPSOLUX_DEV_EMAIL="admin@appsolux.com"
+APPSOLUX_DEV_PASSWORD="Skarchita02"
+
+# REDIS_URL=redis://localhost:6379
+APPSOLUX_CHATWOOT_WEBHOOK_TOKEN=6757f914f903531257f2c7577fe0b47d26eea384ad60cd9b84b3c9ec4e9feaf2

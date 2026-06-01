@@ -12,8 +12,14 @@ export type SriModuleStatus = {
   issuePointCount: number;
   sequenceCount: number;
   signatureStatus: "NOT_UPLOADED" | "UPLOADED_METADATA_ONLY" | "READY_FOR_TESTING" | "EXPIRED" | null;
+  signatureHasEncryptedCertificate: boolean;
   readinessLabel: "not_started" | "incomplete" | "ready_for_testing" | "production_ready";
   documentCount: number;
+  documentStatusCounts: {
+    draft: number;
+    readyForTesting: number;
+    signed: number;
+  };
 };
 
 export async function getSriModuleStatus(tenantId: string): Promise<SriModuleStatus> {
@@ -23,7 +29,7 @@ export async function getSriModuleStatus(tenantId: string): Promise<SriModuleSta
     where: { tenantId },
     include: {
       establishments: { where: { isActive: true }, select: { id: true } },
-      signatureConfig: { select: { status: true } },
+      signatureConfig: { select: { status: true, encryptedCertificateStorageKey: true } },
     },
   });
 
@@ -38,19 +44,31 @@ export async function getSriModuleStatus(tenantId: string): Promise<SriModuleSta
       issuePointCount: 0,
       sequenceCount: 0,
       signatureStatus: null,
+      signatureHasEncryptedCertificate: false,
       readinessLabel: "not_started",
       documentCount: 0,
+      documentStatusCounts: {
+        draft: 0,
+        readyForTesting: 0,
+        signed: 0,
+      },
     };
   }
 
-  const [issuePointCount, sequenceCount, documentCount] = await Promise.all([
+  const [issuePointCount, sequenceCount, documentCount, draftCount, readyForTestingCount, signedCount] = await Promise.all([
     prisma.sriIssuePoint.count({ where: { tenantId, isActive: true } }),
     prisma.sriDocumentSequence.count({ where: { tenantId, isActive: true } }),
     prisma.sriDocument.count({ where: { tenantId } }),
+    prisma.sriDocument.count({ where: { tenantId, status: "DRAFT" } }),
+    prisma.sriDocument.count({ where: { tenantId, status: "READY_FOR_TESTING" } }),
+    prisma.sriDocument.count({ where: { tenantId, status: "SIGNED" } }),
   ]);
 
   const establishmentCount = profile.establishments.length;
   const signatureStatus = profile.signatureConfig?.status ?? null;
+  const signatureHasEncryptedCertificate = Boolean(
+    profile.signatureConfig?.encryptedCertificateStorageKey
+  );
 
   let readinessLabel: SriModuleStatus["readinessLabel"] = "incomplete";
   if (profile.status === "CONFIGURED" && establishmentCount > 0 && issuePointCount > 0 && sequenceCount > 0) {
@@ -74,8 +92,14 @@ export async function getSriModuleStatus(tenantId: string): Promise<SriModuleSta
     issuePointCount,
     sequenceCount,
     signatureStatus,
+    signatureHasEncryptedCertificate,
     readinessLabel,
     documentCount,
+    documentStatusCounts: {
+      draft: draftCount,
+      readyForTesting: readyForTestingCount,
+      signed: signedCount,
+    },
   };
 }
 

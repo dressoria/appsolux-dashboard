@@ -17,6 +17,7 @@ const FILTER_TABS = [
   { label: "Todos", status: undefined },
   { label: "Borradores", status: "DRAFT" },
   { label: "Listos", status: "READY_FOR_TESTING" },
+  { label: "Firmados", status: "SIGNED" },
   { label: "Con errores", status: "VALIDATION_ERROR" },
 ] as const;
 
@@ -28,6 +29,8 @@ function statusBadgeClass(status: string): string {
       return "border-blue-200 bg-blue-50 text-blue-700";
     case "VALIDATION_ERROR":
       return "border-red-200 bg-red-50 text-red-700";
+    case "SIGNED":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
     case "AUTHORIZED":
       return "border-emerald-200 bg-emerald-50 text-emerald-700";
     default:
@@ -65,13 +68,12 @@ export default async function SriDocumentsPage({ searchParams }: Props) {
   return (
     <SriModuleShell
       title="Comprobantes electronicos"
-      description="Borradores internos preparados desde ventas basicas. No firmados ni autorizados por el SRI."
+      description="Borradores internos, documentos listos para pruebas y XML firmados pendientes de envio al SRI."
       activeHref={routes.sriDocuments}
     >
       <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-        Estos comprobantes son preliminares.{" "}
-        <span className="font-semibold">No están firmados ni autorizados por el SRI</span>{" "}
-        y no tienen validez tributaria. La firma y autorización real se implementarán en la siguiente fase.
+        Este listado mezcla borradores, comprobantes listos para pruebas y XML firmados.
+        <span className="font-semibold"> La autorizacion oficial del SRI y el RIDE todavia no estan activos.</span>
       </div>
 
       <Card>
@@ -184,16 +186,15 @@ export default async function SriDocumentsPage({ searchParams }: Props) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Proxima fase: emision real</CardTitle>
+          <CardTitle>Siguientes fases del flujo</CardTitle>
         </CardHeader>
         <CardContent>
           <ol className="space-y-1.5 text-sm text-muted-foreground">
-            <li>1. Generacion de XML segun esquema SRI</li>
-            <li>2. Firma digital con certificado .p12 (XAdES-BES)</li>
-            <li>3. Envio al web service del SRI (pruebas o produccion)</li>
-            <li>4. Recepcion de clave de acceso y numero de autorizacion</li>
-            <li>5. Generacion de RIDE (representacion impresa)</li>
-            <li>6. Envio por correo al cliente (opcional)</li>
+            <li>1. Revisar checklist tecnico y XML preliminar.</li>
+            <li>2. Solicitar firma al worker para pruebas controladas.</li>
+            <li>3. Habilitar envio al web service del SRI en pruebas.</li>
+            <li>4. Implementar autorizacion SRI y numero oficial.</li>
+            <li>5. Implementar RIDE/PDF y entrega final al cliente.</li>
           </ol>
         </CardContent>
       </Card>

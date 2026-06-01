@@ -29,8 +29,8 @@ export function Sidebar() {
   return (
     <aside className="hidden min-h-screen w-64 border-r bg-background px-4 py-6 lg:block">
       <div className="mb-6 px-2">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Appsolux</p>
-        <h2 className="mt-1 text-lg font-semibold tracking-tight">Suite Empresarial</h2>
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Bionvers App</p>
+        <h2 className="mt-1 text-lg font-semibold tracking-tight">Panel empresarial</h2>
       </div>
 
       <div className="mb-4">

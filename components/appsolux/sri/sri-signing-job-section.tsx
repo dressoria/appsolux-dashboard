@@ -27,7 +27,7 @@ type Props = {
 const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   QUEUED: "En cola",
   RUNNING: "Procesando",
-  SUCCEEDED: "Firmado",
+  SUCCEEDED: "Worker completado",
   FAILED: "Fallida",
   CANCELLED: "Cancelada",
 };
@@ -139,10 +139,10 @@ export function SriSigningJobSection({ documentId, documentStatus }: Props) {
   return (
     <div className="space-y-4">
       <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
-        <p className="font-semibold">Arquitectura de worker — sin firma real todavía</p>
+        <p className="font-semibold">Firma por worker separado</p>
         <p className="mt-0.5">
-          La solicitud crea un job en cola. Un worker separado procesará la firma XAdES-BES cuando
-          esté habilitado. Next.js no firma directamente ni expone el certificado al navegador.
+          La solicitud crea un job en cola y un worker separado procesa la firma XAdES-BES.
+          Next.js no firma directamente ni expone el certificado al navegador.
         </p>
       </div>
 
@@ -169,7 +169,12 @@ export function SriSigningJobSection({ documentId, documentStatus }: Props) {
               )}
               {job.status === "SUCCEEDED" && (
                 <p className="text-xs text-emerald-700 font-medium">
-                  Firmado — pendiente envío al SRI (próxima fase).
+                  XML firmado por worker. Pendiente de envio al SRI en la proxima fase.
+                </p>
+              )}
+              {job.status === "FAILED" && (
+                <p className="text-xs text-destructive font-medium">
+                  La firma fallo. Revisa el error y vuelve a solicitar el proceso cuando corresponda.
                 </p>
               )}
             </div>
@@ -229,7 +234,7 @@ export function SriSigningJobSection({ documentId, documentStatus }: Props) {
       )}
 
       <p className="text-xs text-muted-foreground">
-        Envío al SRI, autorización y RIDE estarán disponibles en la fase de emisión real.
+        Envio al SRI, autorizacion oficial y RIDE permaneceran pendientes hasta la siguiente fase.
       </p>
     </div>
   );

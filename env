@@ -1,0 +1,18 @@
+DATABASE_URL="postgresql://Dres:Skarchita02@localhost:5433/appsolux_core?schema=public"
+
+DATABASE_URL="postgresql://Dres:Skarchita02@localhost:5433/appsolux_core?schema=public"
+
+APPSOLUX_ENABLE_DEV_SESSION=false
+APPSOLUX_CORE_DB_REQUIRED=false
+APPSOLUX_AUTH_SECRET="appsolux_dev_secret_local_cambialo_en_produccion_2026"
+
+APPSOLUX_DEV_EMAIL="admin@appsolux.com"
+APPSOLUX_DEV_PASSWORD="Skarchita02"
+
+
+DATABASE_URL_WORKER=postgresql://Dres:Skarchita02@localhost:5433/appsolux_core
+WORKER_ID=erp-provisioner-local
+DB_SSL=falses
+
+# REDIS_URL=redis://:Skarchita02@appsolux-redis:6379
+# APPSOLUX_CHATWOOT_WEBHOOK_TOKEN=6757f914f903531257f2c7577fe0b47d26eea384ad60cd9b84b3c9ec4e9feaf2
