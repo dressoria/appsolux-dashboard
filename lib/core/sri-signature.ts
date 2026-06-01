@@ -52,3 +52,29 @@ export function validateCertificateMetadata(params: {
 
   return { valid: errors.length === 0, errors };
 }
+
+export function validateCertificateUpload(params: {
+  fileName: string;
+  fileSize: number;
+  password: string;
+}) {
+  const errors: string[] = [];
+  const lower = params.fileName.trim().toLowerCase();
+
+  if (!lower.endsWith(".p12") && !lower.endsWith(".pfx")) {
+    errors.push("Solo se permiten archivos .p12 o .pfx.");
+  }
+
+  if (!params.password.trim()) {
+    errors.push("La contrasena del certificado es obligatoria.");
+  }
+
+  const maxBytes = 5 * 1024 * 1024;
+  if (!Number.isFinite(params.fileSize) || params.fileSize <= 0) {
+    errors.push("El archivo del certificado esta vacio.");
+  } else if (params.fileSize > maxBytes) {
+    errors.push("El certificado supera el maximo permitido de 5 MB.");
+  }
+
+  return { valid: errors.length === 0, errors };
+}

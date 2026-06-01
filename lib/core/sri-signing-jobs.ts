@@ -69,6 +69,7 @@ export async function createSriSigningJobForDocument(params: {
       expiresAt: true,
       status: true,
       encryptedCertificateStorageKey: true,
+      encryptedCertificatePassword: true,
     },
   });
 
@@ -80,11 +81,11 @@ export async function createSriSigningJobForDocument(params: {
     };
   }
 
-  if (!sigConfig.encryptedCertificateStorageKey) {
+  if (!sigConfig.encryptedCertificateStorageKey || !sigConfig.encryptedCertificatePassword) {
     return {
       ok: false,
       reason:
-        "La metadata del certificado ya existe, pero falta el certificado cifrado para pruebas reales. Revisa SRI → Firma electrónica.",
+        "La metadata del certificado ya existe, pero faltan el certificado cifrado o la contrasena cifrada para pruebas reales. Revisa SRI → Firma electrónica.",
       code: "NO_SIGNATURE_CONFIG",
     };
   }

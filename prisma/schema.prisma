@@ -649,6 +649,8 @@ model SriSignatureConfig {
   serialNumber                   String?
   fingerprintSha256              String?
   encryptedCertificateStorageKey String?
+  encryptedCertificatePassword   String?
+  encryptionKeyVersion           String?
   createdAt                      DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 

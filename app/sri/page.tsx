@@ -49,7 +49,10 @@ function getTaxConfigurationLabel(status: Awaited<ReturnType<typeof getSriModule
 function getSignatureLabel(status: Awaited<ReturnType<typeof getSriModuleStatus>>) {
   if (status.signatureStatus === "EXPIRED") return "Expirada";
   if (status.signatureStatus === "READY_FOR_TESTING") return "Lista para pruebas";
-  if (status.signatureHasEncryptedCertificate) return "Certificado cifrado cargado";
+  if (status.signatureHasEncryptedCertificate && status.signatureHasEncryptedPassword) {
+    return "Certificado cargado para pruebas";
+  }
+  if (status.signatureHasEncryptedCertificate) return "Certificado cargado";
   if (status.signatureStatus === "UPLOADED_METADATA_ONLY") return "Metadata registrada";
   return "No configurada";
 }
@@ -113,7 +116,10 @@ function getRecommendedStep(status: Awaited<ReturnType<typeof getSriModuleStatus
     };
   }
 
-  if (status.signatureStatus === "UPLOADED_METADATA_ONLY" && !status.signatureHasEncryptedCertificate) {
+  if (
+    status.signatureStatus === "UPLOADED_METADATA_ONLY" &&
+    (!status.signatureHasEncryptedCertificate || !status.signatureHasEncryptedPassword)
+  ) {
     return {
       text: "Carga el certificado .p12/.pfx de la empresa para pruebas controladas.",
       href: routes.sriSignature,
@@ -294,6 +300,13 @@ export default async function SriPage() {
               ok={status.signatureStatus === "READY_FOR_TESTING"}
               href={routes.sriSignature}
               actionLabel="Ver firma"
+            />
+            <StatusRow
+              label="Contrasena cifrada"
+              value={status.signatureHasEncryptedPassword ? "Registrada" : "Pendiente"}
+              ok={status.signatureHasEncryptedPassword}
+              href={routes.sriSignature}
+              actionLabel="Revisar firma"
             />
             <StatusRow
               label="Documentos"

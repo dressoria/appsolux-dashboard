@@ -30,6 +30,7 @@ Next.js valida:
   - Checklist técnico sin bloqueos
   - Signature config lista para pruebas
   - Certificado cifrado referenciado para el worker
+  - Contraseña cifrada registrada para el worker
         ↓
 Crea SriSigningJob { status: QUEUED }
         ↓
@@ -126,7 +127,8 @@ Opciones de almacenamiento (para la fase de implementación real):
 2. **Volumen cifrado:** El worker corre en una VM con volumen cifrado montado. El certificado vive en el filesystem cifrado.
 3. **Secreto de entorno:** Para ambientes de prueba, como variable de entorno base64 en el worker (no recomendado para producción).
 
-El campo `encryptedCertificateStorageKey` en `SriSignatureConfig` almacena la referencia al certificado cifrado (e.g. `s3://bucket/tenant-id/cert.enc`) — nunca el contenido.
+Los campos `encryptedCertificateStorageKey` y `encryptedCertificatePassword` en `SriSignatureConfig`
+almacenan solo referencias o valores cifrados — nunca el contenido original ni secretos en texto plano.
 
 ---
 

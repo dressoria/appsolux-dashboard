@@ -25,6 +25,8 @@ export async function GET() {
           serialNumber: config.serialNumber,
           fingerprintSha256: config.fingerprintSha256,
           hasEncryptedCertificate: Boolean(config.encryptedCertificateStorageKey),
+          hasEncryptedPassword: Boolean(config.encryptedCertificatePassword),
+          encryptionKeyVersion: config.encryptionKeyVersion,
           createdAt: config.createdAt,
           updatedAt: config.updatedAt,
         }

@@ -38,6 +38,10 @@ yarn-error.log*
 env
 env.*
 *.local
+.appsolux-secure/
+*.p12
+*.pfx
+*signed*.xml
 !.env.example
 !.env.production.example
 

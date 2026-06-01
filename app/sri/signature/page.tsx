@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { SriSignatureMetadataForm } from "@/components/appsolux/sri/sri-signature-metadata-form";
+import { SriSignatureUploadForm } from "@/components/appsolux/sri/sri-signature-upload-form";
 import { SriModuleShell } from "@/components/appsolux/sri/sri-module-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/config/routes";
@@ -62,13 +63,14 @@ export default async function SriSignaturePage() {
 
   const isExpired = sigConfig?.expiresAt && sigConfig.expiresAt < new Date();
   const hasEncryptedCertificate = Boolean(sigConfig?.encryptedCertificateStorageKey);
+  const hasEncryptedPassword = Boolean(sigConfig?.encryptedCertificatePassword);
   const statusLabel = isExpired
     ? "Expirada"
     : sigConfig?.status === "READY_FOR_TESTING"
       ? "Lista para pruebas"
-      : hasEncryptedCertificate
+      : hasEncryptedCertificate && hasEncryptedPassword
         ? "Certificado cifrado cargado"
-        : sigConfig?.status === "UPLOADED_METADATA_ONLY"
+      : sigConfig?.status === "UPLOADED_METADATA_ONLY"
           ? "Metadata registrada"
           : sigConfig
             ? "Requiere revision"
@@ -158,13 +160,15 @@ export default async function SriSignaturePage() {
             <div className="rounded-md border p-3 text-sm">
               <p className="font-medium">Certificado cifrado cargado</p>
               <p className={hasEncryptedCertificate ? "text-emerald-700" : "text-amber-700"}>
-                {hasEncryptedCertificate ? "Detectado en arquitectura" : "Pendiente o no visible desde esta vista"}
+                {hasEncryptedCertificate ? "Disponible para el worker" : "Pendiente"}
               </p>
             </div>
             <div className="rounded-md border p-3 text-sm">
               <p className="font-medium">Contrasena cifrada registrada</p>
-              <p className="text-muted-foreground">
-                No se muestra en dashboard. Debe gestionarse solo del lado servidor.
+              <p className={hasEncryptedPassword ? "text-emerald-700" : "text-amber-700"}>
+                {hasEncryptedPassword
+                  ? "Registrada de forma cifrada"
+                  : "Pendiente para pruebas reales"}
               </p>
             </div>
             <div className="rounded-md border p-3 text-sm">
@@ -176,6 +180,7 @@ export default async function SriSignaturePage() {
           </div>
 
           <SriSignatureMetadataForm />
+          <SriSignatureUploadForm />
         </CardContent>
       </Card>
 

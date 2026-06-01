@@ -221,6 +221,16 @@ export default async function SriDocumentDetailPage({ params }: Props) {
                 Error de firma: {latestJob.errorMessage ?? "Revisa el job mas reciente."}
               </p>
             )}
+            {latestJob?.signedXmlHash && (
+              <p className="font-mono text-xs text-muted-foreground break-all">
+                Hash XML firmado: {latestJob.signedXmlHash}
+              </p>
+            )}
+            {latestJob?.signedXmlStorageKey && (
+              <p className="text-xs text-muted-foreground">
+                Referencia segura del XML firmado: {latestJob.signedXmlStorageKey}
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>

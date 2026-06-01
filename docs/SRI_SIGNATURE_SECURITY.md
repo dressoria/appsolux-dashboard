@@ -28,11 +28,11 @@ La DB solo guarda metadata: nombre, fecha de expiración, emisor, serial, finger
 
 ### 2. Contraseña del certificado
 
-La contraseña **nunca** se guarda. Opciones para producción:
+La contraseña **nunca** se guarda en texto plano. Si debe persistirse para el worker:
 
-- Inyectarla via variable de entorno cifrada en tiempo de inicio del servidor.
-- Pedirla al operador en cada arranque (para entornos de alta seguridad).
-- Usar un KMS que maneje la clave derivada.
+- Se cifra server-side con AES-256-GCM.
+- Se guarda solo el valor cifrado (`encryptedCertificatePassword`).
+- Nunca se devuelve al frontend ni se escribe en logs.
 
 ### 3. Ejecución de la firma
 
@@ -65,10 +65,11 @@ Cada intento de firma debe registrar (sin secretos):
 - resultado (ok / error)
 - Sin certificado, sin contraseña, sin XML en el log.
 
-## Estado actual (fase de preparación)
+## Estado actual
 
-- La DB almacena únicamente metadata del certificado.
-- `encryptedCertificateStorageKey` está preparado pero sin implementar.
-- La firma real (`signSriXmlDraft`) devuelve `{ ok: false }` de forma controlada.
-- No se envía nada al SRI.
-- La carga segura del certificado se habilitará cuando se configure el storage cifrado.
+- La DB almacena metadata del certificado.
+- El certificado cifrado se guarda fuera de la DB y la referencia queda en `encryptedCertificateStorageKey`.
+- La contraseña cifrada se guarda en `encryptedCertificatePassword`.
+- El dashboard no devuelve ni la ruta real del storage ni secretos al frontend.
+- El worker usa ambos valores cifrados para la firma real en ambiente de pruebas.
+- No se envía nada al SRI en esta fase.

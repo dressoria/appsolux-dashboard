@@ -72,7 +72,9 @@ function getSriSignatureLabel(
 ) {
   if (sriStatus.signatureStatus === "EXPIRED") return "Expirada";
   if (sriStatus.signatureStatus === "READY_FOR_TESTING") return "Lista";
-  if (sriStatus.signatureHasEncryptedCertificate) return "Certificado cargado";
+  if (sriStatus.signatureHasEncryptedCertificate && sriStatus.signatureHasEncryptedPassword) {
+    return "Certificado cargado";
+  }
   if (sriStatus.signatureStatus === "UPLOADED_METADATA_ONLY") return "Metadata";
   return "No configurada";
 }

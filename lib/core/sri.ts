@@ -13,6 +13,7 @@ export type SriModuleStatus = {
   sequenceCount: number;
   signatureStatus: "NOT_UPLOADED" | "UPLOADED_METADATA_ONLY" | "READY_FOR_TESTING" | "EXPIRED" | null;
   signatureHasEncryptedCertificate: boolean;
+  signatureHasEncryptedPassword: boolean;
   readinessLabel: "not_started" | "incomplete" | "ready_for_testing" | "production_ready";
   documentCount: number;
   documentStatusCounts: {
@@ -29,7 +30,13 @@ export async function getSriModuleStatus(tenantId: string): Promise<SriModuleSta
     where: { tenantId },
     include: {
       establishments: { where: { isActive: true }, select: { id: true } },
-      signatureConfig: { select: { status: true, encryptedCertificateStorageKey: true } },
+      signatureConfig: {
+        select: {
+          status: true,
+          encryptedCertificateStorageKey: true,
+          encryptedCertificatePassword: true,
+        },
+      },
     },
   });
 
@@ -45,6 +52,7 @@ export async function getSriModuleStatus(tenantId: string): Promise<SriModuleSta
       sequenceCount: 0,
       signatureStatus: null,
       signatureHasEncryptedCertificate: false,
+      signatureHasEncryptedPassword: false,
       readinessLabel: "not_started",
       documentCount: 0,
       documentStatusCounts: {
@@ -68,6 +76,9 @@ export async function getSriModuleStatus(tenantId: string): Promise<SriModuleSta
   const signatureStatus = profile.signatureConfig?.status ?? null;
   const signatureHasEncryptedCertificate = Boolean(
     profile.signatureConfig?.encryptedCertificateStorageKey
+  );
+  const signatureHasEncryptedPassword = Boolean(
+    profile.signatureConfig?.encryptedCertificatePassword
   );
 
   let readinessLabel: SriModuleStatus["readinessLabel"] = "incomplete";
@@ -93,6 +104,7 @@ export async function getSriModuleStatus(tenantId: string): Promise<SriModuleSta
     sequenceCount,
     signatureStatus,
     signatureHasEncryptedCertificate,
+    signatureHasEncryptedPassword,
     readinessLabel,
     documentCount,
     documentStatusCounts: {
@@ -243,6 +255,60 @@ export async function updateSriSignatureMetadata(
       status: "UPLOADED_METADATA_ONLY",
       certificateUploadedAt: new Date(),
       ...data,
+    },
+  });
+}
+
+export async function updateSriSignatureSecureMaterial(
+  tenantId: string,
+  data: {
+    certificateFileName: string;
+    encryptedCertificateStorageKey: string;
+    encryptedCertificatePassword: string;
+    encryptionKeyVersion: string;
+  }
+) {
+  const prisma = getPrismaClient();
+  const profile = await prisma.sriTaxpayerProfile.findUnique({
+    where: { tenantId },
+    select: { id: true },
+  });
+
+  if (!profile) {
+    throw new Error("Perfil SRI no configurado. Configura el RUC y razon social primero.");
+  }
+
+  const current = await prisma.sriSignatureConfig.findUnique({
+    where: { tenantId },
+    select: { expiresAt: true },
+  });
+
+  const nextStatus =
+    current?.expiresAt == null
+      ? "UPLOADED_METADATA_ONLY"
+      : current.expiresAt < new Date()
+        ? "EXPIRED"
+        : "READY_FOR_TESTING";
+
+  return prisma.sriSignatureConfig.upsert({
+    where: { tenantId },
+    create: {
+      tenantId,
+      profileId: profile.id,
+      status: nextStatus,
+      certificateFileName: data.certificateFileName,
+      certificateUploadedAt: new Date(),
+      encryptedCertificateStorageKey: data.encryptedCertificateStorageKey,
+      encryptedCertificatePassword: data.encryptedCertificatePassword,
+      encryptionKeyVersion: data.encryptionKeyVersion,
+    },
+    update: {
+      status: nextStatus,
+      certificateFileName: data.certificateFileName,
+      certificateUploadedAt: new Date(),
+      encryptedCertificateStorageKey: data.encryptedCertificateStorageKey,
+      encryptedCertificatePassword: data.encryptedCertificatePassword,
+      encryptionKeyVersion: data.encryptionKeyVersion,
     },
   });
 }
