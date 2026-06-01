@@ -631,11 +631,16 @@ model SriSignatureConfig {
   id                    String             @id @default(cuid())
   tenantId              String             @unique
   profileId             String             @unique
-  status                SriSignatureStatus @default(NOT_UPLOADED)
-  certificateFileName   String?
-  certificateUploadedAt DateTime?
-  expiresAt             DateTime?
-  createdAt             DateTime           @default(now())
+  status                         SriSignatureStatus @default(NOT_UPLOADED)
+  certificateFileName            String?
+  certificateUploadedAt          DateTime?
+  expiresAt                      DateTime?
+  issuerName                     String?
+  subjectName                    String?
+  serialNumber                   String?
+  fingerprintSha256              String?
+  encryptedCertificateStorageKey String?
+  createdAt                      DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
   tenant  Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)

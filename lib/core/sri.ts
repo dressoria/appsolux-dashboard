@@ -188,6 +188,41 @@ export async function getSriSignatureConfig(tenantId: string) {
   return prisma.sriSignatureConfig.findUnique({ where: { tenantId } });
 }
 
+export async function updateSriSignatureMetadata(
+  tenantId: string,
+  data: {
+    certificateFileName: string;
+    expiresAt: Date;
+    issuerName?: string | null;
+    subjectName?: string | null;
+    serialNumber?: string | null;
+    fingerprintSha256?: string | null;
+  }
+) {
+  const prisma = getPrismaClient();
+  const profile = await prisma.sriTaxpayerProfile.findUnique({
+    where: { tenantId },
+    select: { id: true },
+  });
+  if (!profile) throw new Error("Perfil SRI no configurado. Configura el RUC y razón social primero.");
+
+  return prisma.sriSignatureConfig.upsert({
+    where: { tenantId },
+    create: {
+      tenantId,
+      profileId: profile.id,
+      status: "UPLOADED_METADATA_ONLY",
+      certificateUploadedAt: new Date(),
+      ...data,
+    },
+    update: {
+      status: "UPLOADED_METADATA_ONLY",
+      certificateUploadedAt: new Date(),
+      ...data,
+    },
+  });
+}
+
 export function validateRuc(ruc: string): boolean {
   return /^\d{13}$/.test(ruc.trim());
 }
