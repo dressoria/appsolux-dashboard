@@ -16,7 +16,7 @@ services:
     networks:
       - appsolux-network
     volumes:
-      - /home/ubuntu/appsolux-secure/sri-certificates:/app/.appsolux-secure/sri-certificates:ro
+      - /home/ubuntu/appsolux-secure/sri-certificates:/app/.appsolux-secure/sri-certificates
       - /home/ubuntu/appsolux-secure/sri-signed-xml:/app/.appsolux-secure/sri-signed-xml
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/login"]
