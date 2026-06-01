@@ -22,6 +22,13 @@ type SigningJob = {
 type Props = {
   documentId: string;
   documentStatus: string;
+  readiness: {
+    canRequestSigning: boolean;
+    blockingErrors: string[];
+    missingSignatureReasons: string[];
+    displayNumber: string | null;
+    accessKey: string | null;
+  } | null;
 };
 
 const JOB_STATUS_LABELS: Record<JobStatus, string> = {
@@ -48,7 +55,7 @@ const JOB_STATUS_DOT: Record<JobStatus, string> = {
   CANCELLED: "bg-slate-300",
 };
 
-export function SriSigningJobSection({ documentId, documentStatus }: Props) {
+export function SriSigningJobSection({ documentId, documentStatus, readiness }: Props) {
   const router = useRouter();
   const [job, setJob] = useState<SigningJob | null | undefined>(undefined);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -136,6 +143,12 @@ export function SriSigningJobSection({ documentId, documentStatus }: Props) {
     );
   }
 
+  const signatureOnlyReasons =
+    readiness?.missingSignatureReasons.filter((reason) => reason !== "Ya existe un job en cola/proceso") ?? [];
+  const hasChecklistDrift =
+    documentStatus === "READY_FOR_TESTING" &&
+    (readiness?.blockingErrors.length ?? 0) > 0;
+
   return (
     <div className="space-y-4">
       <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
@@ -145,6 +158,38 @@ export function SriSigningJobSection({ documentId, documentStatus }: Props) {
           Next.js no firma directamente ni expone el certificado al navegador.
         </p>
       </div>
+
+      {documentStatus === "READY_FOR_TESTING" && readiness?.canRequestSigning && (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+          <p className="font-semibold">Listo para solicitar firma</p>
+          {readiness.displayNumber && (
+            <p className="mt-0.5 text-xs">
+              Comprobante {readiness.displayNumber}
+              {readiness.accessKey ? " con clave preliminar generada." : "."}
+            </p>
+          )}
+        </div>
+      )}
+
+      {documentStatus === "READY_FOR_TESTING" && !readiness?.canRequestSigning && signatureOnlyReasons.length > 0 && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <p className="font-semibold">Falta completar firma electrónica</p>
+          <ul className="mt-1 space-y-1 text-xs">
+            {signatureOnlyReasons.map((reason) => (
+              <li key={reason}>- {reason}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {hasChecklistDrift && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <p className="font-semibold">Revisa el checklist técnico visible</p>
+          <p className="mt-0.5 text-xs">
+            La firma requiere que el checklist del comprobante siga sin errores bloqueantes.
+          </p>
+        </div>
+      )}
 
       {/* Estado actual del job */}
       {job ? (
@@ -208,16 +253,18 @@ export function SriSigningJobSection({ documentId, documentStatus }: Props) {
       )}
 
       {/* Botón de solicitud */}
-      {documentStatus === "READY_FOR_TESTING" && (!job || job.status === "FAILED" || job.status === "CANCELLED") && (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => void handleRequestSigningJob()}
-          disabled={requesting}
-        >
-          {requesting ? "Solicitando..." : "Solicitar firma"}
-        </Button>
-      )}
+      {documentStatus === "READY_FOR_TESTING" &&
+        readiness?.canRequestSigning &&
+        (!job || job.status === "FAILED" || job.status === "CANCELLED") && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void handleRequestSigningJob()}
+            disabled={requesting}
+          >
+            {requesting ? "Solicitando..." : "Solicitar firma"}
+          </Button>
+        )}
 
       {(job?.status === "QUEUED" || job?.status === "RUNNING") && (
         <Button

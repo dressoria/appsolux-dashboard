@@ -4,6 +4,9 @@ import {
   buildSriDisplayNumber,
   createStableNumericCode,
 } from "./sri-access-key";
+import type { SriSigningJobStatus } from "@prisma/client";
+
+import { getPrismaClient } from "@/lib/db/prisma";
 
 export type SriChecklistItemStatus = "PASS" | "WARN" | "FAIL";
 
@@ -57,6 +60,19 @@ export type SriTechnicalChecklistInput = {
     isActive: boolean;
     currentNumber: number;
   } | null;
+};
+
+export type SriSigningReadiness = {
+  document: NonNullable<Awaited<ReturnType<typeof loadSriDocumentReadinessContext>>["document"]>;
+  latestChecklist: SriTechnicalChecklistResult;
+  blockingErrors: string[];
+  warnings: string[];
+  canRequestSigning: boolean;
+  missingSignatureReasons: string[];
+  displayNumber: string | null;
+  accessKey: string | null;
+  hasActiveSigningJob: boolean;
+  activeSigningJobStatus: SriSigningJobStatus | null;
 };
 
 export function runSriTechnicalChecklist(
@@ -249,4 +265,189 @@ export function runSriTechnicalChecklist(
     blockingIssues.length > 0 ? "BLOCKED" : warnings.length > 0 ? "WARNING" : "READY";
 
   return { status, blockingIssues, warnings, passedChecks, displayNumber, accessKey, items };
+}
+
+function getSignatureReadinessReasons(params: {
+  signatureConfig: {
+    certificateFileName: string | null;
+    status: "NOT_UPLOADED" | "UPLOADED_METADATA_ONLY" | "READY_FOR_TESTING" | "EXPIRED";
+    encryptedCertificateStorageKey: string | null;
+    encryptedCertificatePassword: string | null;
+  } | null;
+}): string[] {
+  const sigConfig = params.signatureConfig;
+  const reasons: string[] = [];
+
+  if (!sigConfig?.certificateFileName || !sigConfig?.encryptedCertificateStorageKey) {
+    reasons.push("Falta cargar certificado .p12/.pfx");
+  }
+
+  if (!sigConfig?.encryptedCertificatePassword) {
+    reasons.push("Falta contraseña cifrada");
+  }
+
+  if (!sigConfig || sigConfig.status !== "READY_FOR_TESTING") {
+    reasons.push("Firma electrónica no está lista para pruebas");
+  }
+
+  return Array.from(new Set(reasons));
+}
+
+async function loadSriDocumentReadinessContext(tenantId: string, documentId: string) {
+  const prisma = getPrismaClient();
+
+  const document = await prisma.sriDocument.findFirst({
+    where: { id: documentId, tenantId },
+    include: {
+      establishment: true,
+      issuePoint: true,
+      lines: { orderBy: { createdAt: "asc" } },
+    },
+  });
+
+  if (!document) {
+    return {
+      document: null,
+      profile: null,
+      sequence: null,
+      signatureConfig: null,
+      activeSigningJob: null,
+    };
+  }
+
+  const [profile, sequence, signatureConfig, activeSigningJob] = await Promise.all([
+    prisma.sriTaxpayerProfile.findUnique({
+      where: { tenantId },
+    }),
+    prisma.sriDocumentSequence.findFirst({
+      where: {
+        tenantId,
+        establishmentId: document.establishmentId,
+        issuePointId: document.issuePointId,
+        documentType: document.documentType,
+        isActive: true,
+      },
+    }),
+    prisma.sriSignatureConfig.findUnique({
+      where: { tenantId },
+      select: {
+        certificateFileName: true,
+        status: true,
+        encryptedCertificateStorageKey: true,
+        encryptedCertificatePassword: true,
+      },
+    }),
+    prisma.sriSigningJob.findFirst({
+      where: {
+        tenantId,
+        documentId,
+        status: { in: ["QUEUED", "RUNNING"] },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { status: true },
+    }),
+  ]);
+
+  return {
+    document,
+    profile,
+    sequence,
+    signatureConfig,
+    activeSigningJob,
+  };
+}
+
+export async function getSriDocumentTechnicalChecklist(
+  tenantId: string,
+  documentId: string
+): Promise<SriTechnicalChecklistResult | null> {
+  const context = await loadSriDocumentReadinessContext(tenantId, documentId);
+
+  if (!context.document) {
+    return null;
+  }
+
+  return runSriTechnicalChecklist({
+    documentId: context.document.id,
+    document: {
+      documentType: context.document.documentType,
+      status: context.document.status,
+      grandTotal: context.document.grandTotal.toString(),
+      sequentialNumber: context.document.sequentialNumber,
+      customerName: context.document.customerName,
+      customerIdentification: context.document.customerIdentification,
+      customerEmail: context.document.customerEmail,
+      issuedAt: context.document.issuedAt,
+      createdAt: context.document.createdAt,
+    },
+    lines: context.document.lines.map((line) => ({
+      itemName: line.itemName,
+      quantity: line.quantity.toString(),
+      unitPrice: line.unitPrice.toString(),
+    })),
+    profile: context.profile
+      ? {
+          ruc: context.profile.ruc,
+          legalName: context.profile.legalName,
+          environment: context.profile.environment,
+        }
+      : null,
+    establishment: context.document.establishment
+      ? {
+          code: context.document.establishment.code,
+          name: context.document.establishment.name,
+        }
+      : null,
+    issuePoint: context.document.issuePoint
+      ? {
+          code: context.document.issuePoint.code,
+        }
+      : null,
+    sequence: context.sequence
+      ? {
+          isActive: context.sequence.isActive,
+          currentNumber: context.sequence.currentNumber,
+        }
+      : null,
+  });
+}
+
+export async function getSriDocumentReadinessForSigning(
+  tenantId: string,
+  documentId: string
+): Promise<SriSigningReadiness | null> {
+  const context = await loadSriDocumentReadinessContext(tenantId, documentId);
+
+  if (!context.document) {
+    return null;
+  }
+
+  const latestChecklist = await getSriDocumentTechnicalChecklist(tenantId, documentId);
+  if (!latestChecklist) {
+    return null;
+  }
+
+  const missingSignatureReasons = getSignatureReadinessReasons({
+    signatureConfig: context.signatureConfig,
+  });
+
+  if (context.activeSigningJob) {
+    missingSignatureReasons.push("Ya existe un job en cola/proceso");
+  }
+
+  return {
+    document: context.document,
+    latestChecklist,
+    blockingErrors: latestChecklist.blockingIssues,
+    warnings: latestChecklist.warnings,
+    canRequestSigning:
+      context.document.status === "READY_FOR_TESTING" &&
+      latestChecklist.blockingIssues.length === 0 &&
+      missingSignatureReasons.length === 0,
+    missingSignatureReasons: Array.from(new Set(missingSignatureReasons)),
+    displayNumber: latestChecklist.displayNumber,
+    accessKey: latestChecklist.accessKey,
+    hasActiveSigningJob: Boolean(context.activeSigningJob),
+    activeSigningJobStatus: context.activeSigningJob?.status ?? null,
+  };
 }

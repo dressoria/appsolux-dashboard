@@ -1,6 +1,6 @@
 import "@/lib/security/server-only";
 import { getPrismaClient } from "@/lib/db/prisma";
-import { runSriTechnicalChecklist } from "./sri-technical-checklist";
+import { getSriDocumentReadinessForSigning } from "./sri-technical-checklist";
 import type { SriSigningJobStatus } from "@prisma/client";
 
 export type { SriSigningJobStatus };
@@ -37,20 +37,14 @@ export async function createSriSigningJobForDocument(params: {
   requestedByUserId?: string;
 }): Promise<CreateSriSigningJobResult> {
   const prisma = getPrismaClient();
+  const readiness = await getSriDocumentReadinessForSigning(params.tenantId, params.documentId);
+  const doc = readiness?.document ?? null;
 
-  // Load document — validate it belongs to tenant
-  const doc = await prisma.sriDocument.findFirst({
-    where: { id: params.documentId, tenantId: params.tenantId },
-    include: {
-      establishment: true,
-      issuePoint: true,
-      lines: true,
-    },
-  });
-
-  if (!doc) {
+  if (!doc || !readiness) {
     return { ok: false, reason: "Comprobante no encontrado o no pertenece a este tenant.", code: "NOT_FOUND" };
   }
+
+  const readinessData = readiness;
 
   if (doc.status !== "READY_FOR_TESTING") {
     return {
@@ -60,41 +54,10 @@ export async function createSriSigningJobForDocument(params: {
     };
   }
 
-  // Validate signature config exists and has minimum metadata
-  const sigConfig = await prisma.sriSignatureConfig.findUnique({
-    where: { tenantId: params.tenantId },
-    select: {
-      id: true,
-      certificateFileName: true,
-      expiresAt: true,
-      status: true,
-      encryptedCertificateStorageKey: true,
-      encryptedCertificatePassword: true,
-    },
-  });
-
-  if (!sigConfig || !sigConfig.certificateFileName) {
+  if (readinessData.missingSignatureReasons.some((reason) => reason !== "Ya existe un job en cola/proceso")) {
     return {
       ok: false,
-      reason: "Configura la firma electrónica antes de solicitar firma. Ve a SRI → Firma electrónica.",
-      code: "NO_SIGNATURE_CONFIG",
-    };
-  }
-
-  if (!sigConfig.encryptedCertificateStorageKey || !sigConfig.encryptedCertificatePassword) {
-    return {
-      ok: false,
-      reason:
-        "La metadata del certificado ya existe, pero faltan el certificado cifrado o la contrasena cifrada para pruebas reales. Revisa SRI → Firma electrónica.",
-      code: "NO_SIGNATURE_CONFIG",
-    };
-  }
-
-  if (sigConfig.status !== "READY_FOR_TESTING") {
-    return {
-      ok: false,
-      reason:
-        "La firma electrónica todavía no está lista para pruebas. Verifica certificado, vencimiento y estado en SRI → Firma electrónica.",
+      reason: readinessData.missingSignatureReasons.join(". "),
       code: "NO_SIGNATURE_CONFIG",
     };
   }
@@ -115,59 +78,10 @@ export async function createSriSigningJobForDocument(params: {
     };
   }
 
-  // Run technical checklist to confirm no blocking issues
-  const profile = await prisma.sriTaxpayerProfile.findUnique({
-    where: { tenantId: params.tenantId },
-  });
-
-  const sequence = doc.sequenceId
-    ? await prisma.sriDocumentSequence.findUnique({ where: { id: doc.sequenceId } })
-    : null;
-
-  const checklist = runSriTechnicalChecklist({
-    documentId: params.documentId,
-    document: {
-      documentType: doc.documentType,
-      status: doc.status,
-      sequentialNumber: doc.sequentialNumber,
-      customerName: doc.customerName,
-      customerIdentification: doc.customerIdentification ?? null,
-      customerEmail: doc.customerEmail ?? null,
-      grandTotal: Number(doc.grandTotal),
-      issuedAt: doc.issuedAt,
-      createdAt: doc.createdAt,
-    },
-    lines: doc.lines.map((l) => ({
-      itemName: l.itemName,
-      quantity: Number(l.quantity),
-      unitPrice: Number(l.unitPrice),
-    })),
-    establishment: {
-      code: doc.establishment.code,
-      name: doc.establishment.name,
-    },
-    issuePoint: {
-      code: doc.issuePoint.code,
-    },
-    profile: profile
-      ? {
-          ruc: profile.ruc,
-          legalName: profile.legalName,
-          environment: profile.environment,
-        }
-      : null,
-    sequence: sequence
-      ? {
-          isActive: sequence.isActive,
-          currentNumber: sequence.currentNumber,
-        }
-      : null,
-  });
-
-  if (checklist.blockingIssues.length > 0) {
+  if (readinessData.blockingErrors.length > 0) {
     return {
       ok: false,
-      reason: `El checklist técnico tiene problemas bloqueantes: ${checklist.blockingIssues.join("; ")}`,
+      reason: `El checklist técnico tiene problemas bloqueantes: ${readinessData.blockingErrors.join("; ")}`,
       code: "BLOCKED",
     };
   }

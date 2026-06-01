@@ -19,6 +19,7 @@ import {
 } from "@/lib/core/sri";
 import { getLatestSriSigningJobForDocument } from "@/lib/core/sri-signing-jobs";
 import { getLatestSriSubmissionJobForDocument } from "@/lib/core/sri-submission-jobs";
+import { getSriDocumentReadinessForSigning } from "@/lib/core/sri-technical-checklist";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 type Props = { params: Promise<{ documentId: string }> };
@@ -44,11 +45,12 @@ export default async function SriDocumentDetailPage({ params }: Props) {
 
   const tenant = await getCurrentTenant(user);
   const { documentId } = await params;
-  const [doc, profile, latestJob, latestSubmissionJob] = await Promise.all([
+  const [doc, profile, latestJob, latestSubmissionJob, signingReadiness] = await Promise.all([
     getSriDocumentById(tenant.id, documentId),
     getSriProfile(tenant.id),
     getLatestSriSigningJobForDocument(tenant.id, documentId),
     getLatestSriSubmissionJobForDocument(tenant.id, documentId),
+    getSriDocumentReadinessForSigning(tenant.id, documentId),
   ]);
 
   if (!doc) {
@@ -404,7 +406,21 @@ export default async function SriDocumentDetailPage({ params }: Props) {
             <CardTitle>Firma electronica</CardTitle>
           </CardHeader>
           <CardContent>
-            <SriSigningJobSection documentId={doc.id} documentStatus={doc.status} />
+            <SriSigningJobSection
+              documentId={doc.id}
+              documentStatus={doc.status}
+              readiness={
+                signingReadiness
+                  ? {
+                      canRequestSigning: signingReadiness.canRequestSigning,
+                      blockingErrors: signingReadiness.blockingErrors,
+                      missingSignatureReasons: signingReadiness.missingSignatureReasons,
+                      displayNumber: signingReadiness.displayNumber,
+                      accessKey: signingReadiness.accessKey,
+                    }
+                  : null
+              }
+            />
           </CardContent>
         </Card>
       )}
