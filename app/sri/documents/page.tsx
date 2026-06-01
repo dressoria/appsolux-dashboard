@@ -13,6 +13,13 @@ import {
 } from "@/lib/core/sri";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
+const FILTER_TABS = [
+  { label: "Todos", status: undefined },
+  { label: "Borradores", status: "DRAFT" },
+  { label: "Listos", status: "READY_FOR_TESTING" },
+  { label: "Con errores", status: "VALIDATION_ERROR" },
+] as const;
+
 function statusBadgeClass(status: string): string {
   switch (status) {
     case "DRAFT":
@@ -32,7 +39,9 @@ function money(value: string | number) {
   return `$${Number(value).toFixed(2)}`;
 }
 
-export default async function SriDocumentsPage() {
+type Props = { searchParams: Promise<{ status?: string }> };
+
+export default async function SriDocumentsPage({ searchParams }: Props) {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -48,78 +57,126 @@ export default async function SriDocumentsPage() {
   }
 
   const tenant = await getCurrentTenant(user);
-  const documents = await getSriDocuments(tenant.id);
+  const { status: statusFilter } = await searchParams;
+  const documents = await getSriDocuments(tenant.id, { status: statusFilter });
+
+  const activeTab = FILTER_TABS.find((t) => t.status === statusFilter) ?? FILTER_TABS[0];
 
   return (
     <SriModuleShell
       title="Comprobantes electronicos"
-      description="Borradores internos preparados desde ventas basicas. La emision real se implementara en la proxima fase."
+      description="Borradores internos preparados desde ventas basicas. No firmados ni autorizados por el SRI."
       activeHref={routes.sriDocuments}
     >
-      <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-        <p className="font-medium">Fase de preparacion interna</p>
-        <p className="mt-1">
-          Estos comprobantes son borradores internos. No han sido firmados ni enviados al SRI.
-          La emision real (XML, firma XAdES, autorizacion y RIDE) se implementara en la siguiente fase.
-        </p>
+      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+        Estos comprobantes son preliminares.{" "}
+        <span className="font-semibold">No están firmados ni autorizados por el SRI</span>{" "}
+        y no tienen validez tributaria. La firma y autorización real se implementarán en la siguiente fase.
       </div>
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Comprobantes preparados ({documents.length})</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle>
+              Comprobantes ({documents.length}
+              {statusFilter ? ` · ${activeTab.label}` : ""})
+            </CardTitle>
             <Button asChild variant="outline" size="sm">
               <Link href={routes.basicSales}>Ir a ventas</Link>
             </Button>
           </div>
+
+          {/* Filtros de estado */}
+          <div className="flex flex-wrap gap-1 pt-1">
+            {FILTER_TABS.map((tab) => {
+              const isActive = tab.status === statusFilter || (!statusFilter && !tab.status);
+              const href = tab.status ? `?status=${tab.status}` : routes.sriDocuments;
+              return (
+                <Link
+                  key={tab.label}
+                  href={href}
+                  className={`rounded-full border px-3 py-0.5 text-xs font-medium transition-colors ${
+                    isActive
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  {tab.label}
+                </Link>
+              );
+            })}
+          </div>
         </CardHeader>
+
         <CardContent>
           {documents.length === 0 ? (
             <div className="space-y-2 py-4 text-center text-sm text-muted-foreground">
-              <p>Aun no tienes comprobantes preparados.</p>
-              <p>
-                Puedes crear un borrador desde el detalle de una venta en{" "}
-                <Link href={routes.basicSales} className="text-primary underline-offset-4 hover:underline">
-                  Inventario & POS → Ventas
-                </Link>
-                .
-              </p>
+              {statusFilter ? (
+                <p>No hay comprobantes con este estado.</p>
+              ) : (
+                <>
+                  <p>Aun no tienes comprobantes preparados.</p>
+                  <p>
+                    Puedes crear un borrador desde el detalle de una venta en{" "}
+                    <Link
+                      href={routes.basicSales}
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      Inventario & POS → Ventas
+                    </Link>
+                    .
+                  </p>
+                </>
+              )}
             </div>
           ) : (
             <div className="space-y-2">
-              {documents.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="grid gap-2 rounded-md border p-3 text-sm md:grid-cols-[auto_1fr_auto_auto_auto]"
-                >
-                  <span
-                    className={`self-start inline-flex h-6 items-center rounded-full border px-2 text-xs font-medium ${statusBadgeClass(doc.status)}`}
+              {documents.map((doc) => {
+                const displayNumber =
+                  doc.sequentialNumber != null
+                    ? `${doc.establishment.code}-${doc.issuePoint.code}-${String(doc.sequentialNumber).padStart(9, "0")}`
+                    : null;
+
+                return (
+                  <div
+                    key={doc.id}
+                    className="grid gap-2 rounded-md border p-3 text-sm md:grid-cols-[auto_1fr_auto_auto_auto]"
                   >
-                    {SRI_DOCUMENT_STATUS_LABELS[doc.status] ?? doc.status}
-                  </span>
+                    <span
+                      className={`self-start inline-flex h-6 items-center rounded-full border px-2 text-xs font-medium ${statusBadgeClass(doc.status)}`}
+                    >
+                      {SRI_DOCUMENT_STATUS_LABELS[doc.status] ?? doc.status}
+                    </span>
 
-                  <div>
-                    <p className="font-medium">{doc.customerName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {SRI_DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType} ·{" "}
-                      {SRI_DOCUMENT_SOURCE_LABELS[doc.sourceType] ?? doc.sourceType} ·{" "}
-                      {doc.establishment.code}-{doc.issuePoint.code}
-                    </p>
+                    <div>
+                      <p className="font-medium">{doc.customerName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {SRI_DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType} ·{" "}
+                        {SRI_DOCUMENT_SOURCE_LABELS[doc.sourceType] ?? doc.sourceType}
+                      </p>
+                      {displayNumber ? (
+                        <p className="font-mono text-xs text-slate-500">{displayNumber}</p>
+                      ) : (
+                        <p className="text-xs text-slate-400">
+                          {doc.establishment.code}-{doc.issuePoint.code} · sin secuencial
+                        </p>
+                      )}
+                    </div>
+
+                    <span className="self-start text-xs text-muted-foreground">
+                      {new Date(doc.createdAt).toLocaleDateString("es-EC")}
+                    </span>
+
+                    <span className="self-start font-mono text-xs font-semibold">
+                      {money(doc.grandTotal.toString())}
+                    </span>
+
+                    <Button asChild variant="outline" size="sm" className="self-start">
+                      <Link href={`/sri/documents/${doc.id}`}>Ver</Link>
+                    </Button>
                   </div>
-
-                  <span className="self-start text-xs text-muted-foreground">
-                    {doc.lines.length} {doc.lines.length === 1 ? "item" : "items"}
-                  </span>
-
-                  <span className="self-start font-mono text-xs font-semibold">
-                    {money(doc.grandTotal.toString())}
-                  </span>
-
-                  <Button asChild variant="outline" size="sm" className="self-start">
-                    <Link href={`/sri/documents/${doc.id}`}>Ver</Link>
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

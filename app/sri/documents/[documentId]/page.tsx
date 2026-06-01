@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { SriModuleShell } from "@/components/appsolux/sri/sri-module-shell";
+import { SriTechnicalChecklistSection } from "@/components/appsolux/sri/sri-technical-checklist-section";
 import { SriXmlPreviewSection } from "@/components/appsolux/sri/sri-xml-preview-section";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -231,6 +232,21 @@ export default async function SriDocumentDetailPage({ params }: Props) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Checklist técnico */}
+      {(doc.status === "DRAFT" || doc.status === "READY_FOR_TESTING") && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Verificación técnica</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SriTechnicalChecklistSection
+              documentId={doc.id}
+              documentStatus={doc.status}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* XML preliminar */}
       {(doc.status === "DRAFT" || doc.status === "READY_FOR_TESTING") && (

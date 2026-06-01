@@ -23,6 +23,8 @@ export type SriXmlPreviewParams = {
     documentType: string;
     customerName: string;
     customerIdentification: string | null;
+    customerEmail?: string | null;
+    customerPhone?: string | null;
     subtotal: string | number;
     taxTotal: string | number;
     discountTotal: string | number;
@@ -194,6 +196,49 @@ export function buildUnsignedSriInvoiceXmlPreview(
   );
   const linesXml = params.lines.map((l, i) => buildLineXml(l, i)).join("\n");
 
+  // Agrupar impuestos por tasa para totalConImpuestos
+  const taxMap = new Map<number, { codigoPorcentaje: string; baseImponible: number; valor: number }>();
+  for (const line of params.lines) {
+    const rate = Number(line.taxRate);
+    const cp = resolveIvaCodigoPorcentaje(rate);
+    const base = Number(line.subtotal);
+    const tax = Number(line.taxAmount);
+    const existing = taxMap.get(rate);
+    if (existing) {
+      existing.baseImponible += base;
+      existing.valor += tax;
+    } else {
+      taxMap.set(rate, { codigoPorcentaje: cp, baseImponible: base, valor: tax });
+    }
+  }
+  const taxGroupsXml = Array.from(taxMap.values())
+    .map(
+      (g) => `      <totalImpuesto>
+        <codigo>2</codigo>
+        <codigoPorcentaje>${g.codigoPorcentaje}</codigoPorcentaje>
+        <baseImponible>${dec(g.baseImponible)}</baseImponible>
+        <valor>${dec(g.valor)}</valor>
+      </totalImpuesto>`
+    )
+    .join("\n");
+
+  // infoAdicional opcional (email, teléfono)
+  const infoAdicionalItems: string[] = [];
+  if (params.document.customerEmail) {
+    infoAdicionalItems.push(
+      `    <campoAdicional nombre="email">${xmlEscape(params.document.customerEmail)}</campoAdicional>`
+    );
+  }
+  if (params.document.customerPhone) {
+    infoAdicionalItems.push(
+      `    <campoAdicional nombre="telefono">${xmlEscape(params.document.customerPhone)}</campoAdicional>`
+    );
+  }
+  const infoAdicionalXml =
+    infoAdicionalItems.length > 0
+      ? `\n  <infoAdicional>\n${infoAdicionalItems.join("\n")}\n  </infoAdicional>`
+      : "";
+
   // Generar clave de acceso si la validación pasó sin errores
   let accessKey: string | null = null;
   let claveAcceso = "PENDIENTE_DE_GENERAR";
@@ -244,12 +289,7 @@ export function buildUnsignedSriInvoiceXmlPreview(
     <totalSinImpuestos>${dec(params.document.subtotal)}</totalSinImpuestos>
     <totalDescuento>${dec(params.document.discountTotal)}</totalDescuento>
     <totalConImpuestos>
-      <totalImpuesto>
-        <codigo>2</codigo>
-        <codigoPorcentaje>0</codigoPorcentaje>
-        <baseImponible>${dec(params.document.subtotal)}</baseImponible>
-        <valor>${dec(params.document.taxTotal)}</valor>
-      </totalImpuesto>
+${taxGroupsXml}
     </totalConImpuestos>
     <propina>0.00</propina>
     <importeTotal>${dec(params.document.grandTotal)}</importeTotal>
@@ -257,7 +297,7 @@ export function buildUnsignedSriInvoiceXmlPreview(
   </infoFactura>
   <detalles>
 ${linesXml}
-  </detalles>
+  </detalles>${infoAdicionalXml}
 </factura>`;
 
   return { xml, displayNumber, warnings, missingFields, accessKey };

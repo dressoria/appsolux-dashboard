@@ -1,5 +1,5 @@
 import "@/lib/security/server-only";
-import { Prisma } from "@prisma/client";
+import { Prisma, SriDocumentType } from "@prisma/client";
 import { getPrismaClient } from "@/lib/db/prisma";
 
 export type SriModuleStatus = {
@@ -254,6 +254,18 @@ export async function getSriDocumentById(tenantId: string, documentId: string) {
       issuePoint: true,
       lines: { orderBy: { createdAt: "asc" } },
     },
+  });
+}
+
+export async function getSriDocumentSequence(
+  tenantId: string,
+  establishmentId: string,
+  issuePointId: string,
+  documentType: SriDocumentType = SriDocumentType.INVOICE
+) {
+  const prisma = getPrismaClient();
+  return prisma.sriDocumentSequence.findFirst({
+    where: { tenantId, establishmentId, issuePointId, documentType, isActive: true },
   });
 }
 
