@@ -1,0 +1,30 @@
+services:
+  app-bionvers-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: app-bionvers-dashboard
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    expose:
+      - "3000"
+    networks:
+      - appsolux-network
+    volumes:
+      - /home/ubuntu/appsolux-secure/sri-certificates:/app/.appsolux-secure/sri-certificates:ro
+      - /home/ubuntu/appsolux-secure/sri-signed-xml:/app/.appsolux-secure/sri-signed-xml
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+networks:
+  appsolux-network:
+    external: true

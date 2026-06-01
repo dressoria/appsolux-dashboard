@@ -1,0 +1,46 @@
+# Runtime artifacts (rebuilt inside Docker)
+node_modules
+.next
+out
+build
+
+# Git
+.git
+.gitignore
+
+# Environment files — NEVER bake secrets into the image
+.env
+.env.*
+!.env.production.example
+env.local
+env\ (1).local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+logs/
+
+# Dev-only files
+coverage/
+.claude/
+scripts/
+
+# Docker compose files (not needed inside image)
+docker-compose*.yml
+
+# Secure local storage (mounted as volume in production)
+.appsolux-secure/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TypeScript build info
+*.tsbuildinfo
+next-env.d.ts
+
+# Editor
+.vscode/
+.idea/
