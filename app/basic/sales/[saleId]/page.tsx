@@ -69,7 +69,18 @@ export default async function BasicSaleDetailPage({
   );
   const pending = Math.max(Number(sale.total) - paid, 0);
 
-  const sriReady = sriStatus.hasProfile && sriStatus.establishmentCount > 0 && sriStatus.issuePointCount > 0;
+  const sriReady =
+    sriStatus.hasProfile &&
+    sriStatus.establishmentCount > 0 &&
+    sriStatus.issuePointCount > 0 &&
+    sriStatus.sequenceCount > 0;
+
+  const sriConfigLink =
+    sriStatus.establishmentCount === 0
+      ? routes.sriEstablishments
+      : sriStatus.issuePointCount === 0
+        ? routes.sriIssuePoints
+        : routes.sriSequences;
 
   return (
     <BasicModuleShell
@@ -129,7 +140,7 @@ export default async function BasicSaleDetailPage({
                   un punto de emision y una secuencia de factura.
                 </p>
                 <Button asChild variant="outline" size="sm">
-                  <Link href={routes.sriEstablishments}>Completar configuracion</Link>
+                  <Link href={sriConfigLink}>Completar configuracion</Link>
                 </Button>
               </div>
             ) : existingDraft ? (
