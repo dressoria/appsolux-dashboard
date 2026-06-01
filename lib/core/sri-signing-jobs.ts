@@ -63,13 +63,37 @@ export async function createSriSigningJobForDocument(params: {
   // Validate signature config exists and has minimum metadata
   const sigConfig = await prisma.sriSignatureConfig.findUnique({
     where: { tenantId: params.tenantId },
-    select: { id: true, certificateFileName: true, expiresAt: true, status: true },
+    select: {
+      id: true,
+      certificateFileName: true,
+      expiresAt: true,
+      status: true,
+      encryptedCertificateStorageKey: true,
+    },
   });
 
   if (!sigConfig || !sigConfig.certificateFileName) {
     return {
       ok: false,
       reason: "Configura la firma electrónica antes de solicitar firma. Ve a SRI → Firma electrónica.",
+      code: "NO_SIGNATURE_CONFIG",
+    };
+  }
+
+  if (!sigConfig.encryptedCertificateStorageKey) {
+    return {
+      ok: false,
+      reason:
+        "La metadata del certificado ya existe, pero falta el certificado cifrado para pruebas reales. Revisa SRI → Firma electrónica.",
+      code: "NO_SIGNATURE_CONFIG",
+    };
+  }
+
+  if (sigConfig.status !== "READY_FOR_TESTING") {
+    return {
+      ok: false,
+      reason:
+        "La firma electrónica todavía no está lista para pruebas. Verifica certificado, vencimiento y estado en SRI → Firma electrónica.",
       code: "NO_SIGNATURE_CONFIG",
     };
   }

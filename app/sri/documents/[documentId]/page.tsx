@@ -97,6 +97,16 @@ export default async function SriDocumentDetailPage({ params }: Props) {
                 text: "Este comprobante aun no fue firmado ni enviado al SRI. Sirve como base operativa para la siguiente etapa del flujo.",
                 className: "border-amber-200 bg-amber-50 text-amber-800",
               };
+  const nextStep =
+    doc.status === "SIGNED"
+      ? "Siguiente fase: habilitar envio al SRI en ambiente de pruebas."
+      : latestJob?.status === "SUCCEEDED"
+        ? "Verifica el XML firmado en el worker y prepara la siguiente fase de envio al SRI."
+        : latestJob?.status === "FAILED"
+          ? "Corrige el problema de firma y vuelve a solicitar el job."
+          : doc.status === "READY_FOR_TESTING"
+            ? "Solicita firma para crear un job en cola."
+            : "Revisa checklist tecnico y XML preliminar antes de marcar listo para pruebas.";
 
   return (
     <SriModuleShell
@@ -327,6 +337,15 @@ export default async function SriDocumentDetailPage({ params }: Props) {
           <Button disabled variant="outline" title="Disponible en fase de emision real">
             RIDE
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Siguiente paso</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">{nextStep}</p>
         </CardContent>
       </Card>
 

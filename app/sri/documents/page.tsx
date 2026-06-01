@@ -38,6 +38,36 @@ function statusBadgeClass(status: string): string {
   }
 }
 
+function signingJobBadgeClass(status: string): string {
+  switch (status) {
+    case "QUEUED":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "RUNNING":
+      return "border-blue-200 bg-blue-50 text-blue-700";
+    case "SUCCEEDED":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "FAILED":
+      return "border-red-200 bg-red-50 text-red-700";
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-500";
+  }
+}
+
+function signingJobLabel(status: string) {
+  switch (status) {
+    case "QUEUED":
+      return "Firma en cola";
+    case "RUNNING":
+      return "Firma procesando";
+    case "SUCCEEDED":
+      return "Firma procesada";
+    case "FAILED":
+      return "Firma fallida";
+    default:
+      return "Sin solicitud";
+  }
+}
+
 function money(value: string | number) {
   return `$${Number(value).toFixed(2)}`;
 }
@@ -134,6 +164,7 @@ export default async function SriDocumentsPage({ searchParams }: Props) {
           ) : (
             <div className="space-y-2">
               {documents.map((doc) => {
+                const latestJob = doc.signingJobs[0] ?? null;
                 const displayNumber =
                   doc.sequentialNumber != null
                     ? `${doc.establishment.code}-${doc.issuePoint.code}-${String(doc.sequentialNumber).padStart(9, "0")}`
@@ -144,11 +175,20 @@ export default async function SriDocumentsPage({ searchParams }: Props) {
                     key={doc.id}
                     className="grid gap-2 rounded-md border p-3 text-sm md:grid-cols-[auto_1fr_auto_auto_auto]"
                   >
-                    <span
-                      className={`self-start inline-flex h-6 items-center rounded-full border px-2 text-xs font-medium ${statusBadgeClass(doc.status)}`}
-                    >
-                      {SRI_DOCUMENT_STATUS_LABELS[doc.status] ?? doc.status}
-                    </span>
+                    <div className="flex flex-wrap gap-1 self-start">
+                      <span
+                        className={`inline-flex h-6 items-center rounded-full border px-2 text-xs font-medium ${statusBadgeClass(doc.status)}`}
+                      >
+                        {doc.status === "SIGNED"
+                          ? "Firmado, pendiente de envio al SRI"
+                          : SRI_DOCUMENT_STATUS_LABELS[doc.status] ?? doc.status}
+                      </span>
+                      <span
+                        className={`inline-flex h-6 items-center rounded-full border px-2 text-xs font-medium ${signingJobBadgeClass(latestJob?.status ?? "NONE")}`}
+                      >
+                        {signingJobLabel(latestJob?.status ?? "NONE")}
+                      </span>
+                    </div>
 
                     <div>
                       <p className="font-medium">{doc.customerName}</p>
@@ -163,6 +203,13 @@ export default async function SriDocumentsPage({ searchParams }: Props) {
                           {doc.establishment.code}-{doc.issuePoint.code} · sin secuencial
                         </p>
                       )}
+                      <p className="text-xs text-muted-foreground">
+                        {doc.status === "SIGNED"
+                          ? "XML firmado guardado. Falta envio al SRI."
+                          : latestJob
+                            ? `Ultimo job: ${signingJobLabel(latestJob.status)}`
+                            : "Aun no se ha solicitado firma."}
+                      </p>
                     </div>
 
                     <span className="self-start text-xs text-muted-foreground">

@@ -298,6 +298,11 @@ export async function getSriDocuments(
       establishment: { select: { code: true, name: true } },
       issuePoint: { select: { code: true, name: true } },
       lines: { select: { id: true } },
+      signingJobs: {
+        select: { id: true, status: true, createdAt: true, finishedAt: true },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
     },
     orderBy: { createdAt: "desc" },
     take: options.take ?? 50,

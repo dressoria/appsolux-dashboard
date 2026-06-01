@@ -145,12 +145,18 @@ export default async function BasicSaleDetailPage({
               </div>
             ) : existingDraft ? (
               <div className="space-y-2">
-                <p className="text-emerald-700 font-medium">Borrador SRI creado</p>
+                <p className="text-emerald-700 font-medium">
+                  {existingDraft.status === "SIGNED"
+                    ? "Documento SRI firmado"
+                    : existingDraft.status === "READY_FOR_TESTING"
+                      ? "Documento SRI listo para pruebas"
+                      : "Borrador SRI creado"}
+                </p>
                 <p className="text-muted-foreground">
-                  Ya existe un borrador de factura electronica para esta venta.
+                  Ya existe un documento SRI asociado a esta venta. Puedes continuar el flujo desde su detalle.
                 </p>
                 <Button asChild variant="outline" size="sm">
-                  <Link href={`/sri/documents/${existingDraft.id}`}>Ver borrador</Link>
+                  <Link href={`/sri/documents/${existingDraft.id}`}>Abrir documento SRI</Link>
                 </Button>
               </div>
             ) : (

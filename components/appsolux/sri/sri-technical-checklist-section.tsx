@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
@@ -25,6 +26,15 @@ type ChecklistResult = {
 type Props = {
   documentId: string;
   documentStatus: string;
+};
+
+const CHECKLIST_ACTIONS: Partial<Record<string, { href: string; label: string }>> = {
+  profile_exists: { href: "/sri/company", label: "Configurar empresa / RUC" },
+  ruc_valid: { href: "/sri/company", label: "Revisar RUC" },
+  legal_name: { href: "/sri/company", label: "Revisar razon social" },
+  establishment: { href: "/sri/establishments", label: "Revisar establecimiento" },
+  issue_point: { href: "/sri/issue-points", label: "Revisar punto de emision" },
+  sequence: { href: "/sri/sequences", label: "Revisar secuencial" },
 };
 
 function ItemIcon({ status }: { status: ChecklistItemStatus }) {
@@ -86,8 +96,14 @@ export function SriTechnicalChecklistSection({ documentId, documentStatus }: Pro
       const res = await fetch(`/api/sri/documents/${documentId}/mark-ready`, {
         method: "POST",
       });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(data.error ?? "Error al marcar como listo.");
+      const data = (await res.json()) as { error?: string; blockingIssues?: string[] };
+      if (!res.ok) {
+        const details =
+          data.blockingIssues && data.blockingIssues.length > 0
+            ? ` ${data.blockingIssues.join(" ")}`
+            : "";
+        throw new Error((data.error ?? "Error al marcar como listo.") + details);
+      }
       router.refresh();
     } catch (e) {
       setMarkError(e instanceof Error ? e.message : "Error de red.");
@@ -114,6 +130,14 @@ export function SriTechnicalChecklistSection({ documentId, documentStatus }: Pro
   if (!result) return null;
 
   const canMarkReady = documentStatus === "DRAFT" && result.blockingIssues.length === 0;
+  const actionLinks = Array.from(
+    new Map(
+      result.items
+        .filter((item) => item.status === "FAIL")
+        .map((item) => [item.key, CHECKLIST_ACTIONS[item.key]])
+        .filter((entry): entry is [string, { href: string; label: string }] => Boolean(entry[1]))
+    ).values()
+  );
 
   const statusBanner = {
     READY: "rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800",
@@ -178,6 +202,19 @@ export function SriTechnicalChecklistSection({ documentId, documentStatus }: Pro
         </div>
       )}
 
+      {actionLinks.length > 0 && (
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-3 space-y-2">
+          <p className="text-xs font-semibold text-slate-700">Pasos recomendados para desbloquear:</p>
+          <div className="flex flex-wrap gap-2">
+            {actionLinks.map((action) => (
+              <Button key={action.href} asChild size="sm" variant="outline">
+                <Link href={action.href}>{action.label}</Link>
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {documentStatus === "DRAFT" && (
         <div className="space-y-2 pt-1">
           <Button
@@ -199,7 +236,7 @@ export function SriTechnicalChecklistSection({ documentId, documentStatus }: Pro
 
       {documentStatus === "READY_FOR_TESTING" && (
         <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
-          Este comprobante está marcado como listo para pruebas. La firma y autorización real se implementarán en la siguiente fase.
+          Este comprobante esta marcado como listo para pruebas. Ya puede solicitar firma, pero todavia no esta autorizado por el SRI.
         </p>
       )}
     </div>

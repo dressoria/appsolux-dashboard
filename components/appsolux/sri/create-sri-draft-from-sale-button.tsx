@@ -49,11 +49,11 @@ export function CreateSriDraftFromSaleButton({ saleId }: Props) {
       <div className="space-y-2">
         <p className="text-sm text-emerald-700">
           {state.alreadyExisted
-            ? "Ya existe un borrador SRI para esta venta."
+            ? "Ya existe un documento SRI para esta venta."
             : "Borrador SRI creado correctamente."}
         </p>
         <Button asChild variant="outline" size="sm">
-          <Link href={`/sri/documents/${state.documentId}`}>Ver borrador</Link>
+          <Link href={`/sri/documents/${state.documentId}`}>Abrir documento SRI</Link>
         </Button>
       </div>
     );

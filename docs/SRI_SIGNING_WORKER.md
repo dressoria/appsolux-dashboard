@@ -28,7 +28,8 @@ Next.js valida:
   - Documento existe y pertenece al tenant
   - Status == READY_FOR_TESTING
   - Checklist técnico sin bloqueos
-  - Signature config con metadata mínima
+  - Signature config lista para pruebas
+  - Certificado cifrado referenciado para el worker
         ↓
 Crea SriSigningJob { status: QUEUED }
         ↓
@@ -125,7 +126,7 @@ Opciones de almacenamiento (para la fase de implementación real):
 2. **Volumen cifrado:** El worker corre en una VM con volumen cifrado montado. El certificado vive en el filesystem cifrado.
 3. **Secreto de entorno:** Para ambientes de prueba, como variable de entorno base64 en el worker (no recomendado para producción).
 
-El campo `encryptedCertificateStorageKey` en `SriSignatureConfig` almacenará la referencia al certificado cifrado (e.g. `s3://bucket/tenant-id/cert.enc`) — nunca el contenido.
+El campo `encryptedCertificateStorageKey` en `SriSignatureConfig` almacena la referencia al certificado cifrado (e.g. `s3://bucket/tenant-id/cert.enc`) — nunca el contenido.
 
 ---
 
@@ -158,7 +159,7 @@ LOG_LEVEL=info
 
 ---
 
-## Estado actual (Fase 11)
+## Estado actual
 
 - [x] Modelo `SriSigningJob` en Prisma
 - [x] Enum `SriSigningJobStatus`
@@ -166,19 +167,31 @@ LOG_LEVEL=info
 - [x] API: `POST /api/sri/documents/[documentId]/signing-jobs`
 - [x] API: `GET /api/sri/documents/[documentId]/signing-jobs/latest`
 - [x] UI: `SriSigningJobSection` en detalle del comprobante
-- [ ] Worker real (proceso separado — fase posterior)
-- [ ] Carga de certificado .p12 desde almacenamiento cifrado
-- [ ] Firma XAdES-BES real
+- [x] Worker real (proceso separado, mantenido fuera de este dashboard)
+- [x] Lectura de certificado .p12 desde almacenamiento cifrado
+- [x] Firma XAdES-BES real
 - [ ] Envío al SRI
 - [ ] Autorización y RIDE
 
 ---
 
+## QA manual recomendado
+
+1. Crear una venta básica desde el dashboard.
+2. Abrir la venta y preparar el borrador SRI.
+3. Revisar checklist técnico y XML preliminar.
+4. Marcar el documento como `READY_FOR_TESTING`.
+5. Solicitar firma desde el detalle del comprobante.
+6. En el entorno del worker ejecutar:
+   - `npm run scan`
+   - `npm run run:once`
+7. Volver al dashboard y confirmar:
+   - `SriSigningJob` en `SUCCEEDED`
+   - `SriDocument.status` en `SIGNED`
+   - UI mostrando `Firmado, pendiente de envío al SRI`
+
 ## Fase siguiente
 
-1. Crear repositorio/carpeta `signing-worker/` (Node.js o similar).
-2. Instalar librería XAdES (e.g. `xades4j` equivalente en JS, o invocar herramienta CLI).
-3. Implementar `claimNextSriSigningJob` desde el worker con polling o notificación.
-4. Configurar almacenamiento cifrado para el `.p12`.
-5. Conectar al web service del SRI (SOAP, ambiente pruebas primero).
-6. Implementar flujo de autorización y generación de RIDE.
+1. Habilitar envío al web service del SRI en ambiente de pruebas.
+2. Implementar autorización oficial y persistencia del resultado.
+3. Generar RIDE/PDF final.
