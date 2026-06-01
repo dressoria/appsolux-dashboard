@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { SriModuleShell } from "@/components/appsolux/sri/sri-module-shell";
+import { SriXmlPreviewSection } from "@/components/appsolux/sri/sri-xml-preview-section";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/config/routes";
@@ -230,6 +231,18 @@ export default async function SriDocumentDetailPage({ params }: Props) {
           </div>
         </CardContent>
       </Card>
+
+      {/* XML preliminar */}
+      {(doc.status === "DRAFT" || doc.status === "READY_FOR_TESTING") && (
+        <Card>
+          <CardHeader>
+            <CardTitle>XML preliminar</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SriXmlPreviewSection documentId={doc.id} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Acciones */}
       <Card>
