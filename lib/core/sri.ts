@@ -1,6 +1,7 @@
 import "@/lib/security/server-only";
 import { Prisma, SriDocumentType } from "@prisma/client";
 import { getPrismaClient } from "@/lib/db/prisma";
+import { buildSriAccessKey, createStableNumericCode } from "./sri-access-key";
 
 export type SriModuleStatus = {
   hasProfile: boolean;
@@ -504,4 +505,172 @@ export async function createDraftSriDocumentFromBasicSale({
   });
 
   return { documentId: document.id, alreadyExists: false };
+}
+
+type ReservedSriDocumentNumbering = {
+  sequenceId: string;
+  sequentialNumber: number;
+  accessKey: string;
+  issuedAt: Date;
+};
+
+type LockedSriDocumentRow = {
+  id: string;
+  tenantId: string;
+  status: string;
+  documentType: string;
+  environment: "TEST" | "PRODUCTION";
+  establishmentId: string;
+  issuePointId: string;
+  sequenceId: string | null;
+  sequentialNumber: number | null;
+  accessKey: string | null;
+  issuedAt: Date | null;
+  createdAt: Date;
+};
+
+type LockedSriSequenceRow = {
+  id: string;
+  currentNumber: number;
+  maxNumber: number | null;
+};
+
+export async function reserveSriDocumentNumberingForTesting(params: {
+  tenantId: string;
+  documentId: string;
+}): Promise<ReservedSriDocumentNumbering> {
+  const prisma = getPrismaClient();
+
+  return prisma.$transaction(async (tx) => {
+    const lockedDocs = await tx.$queryRaw<LockedSriDocumentRow[]>`
+      SELECT
+        id,
+        "tenantId",
+        status,
+        "documentType",
+        environment,
+        "establishmentId",
+        "issuePointId",
+        "sequenceId",
+        "sequentialNumber",
+        "accessKey",
+        "issuedAt",
+        "createdAt"
+      FROM "SriDocument"
+      WHERE id = ${params.documentId} AND "tenantId" = ${params.tenantId}
+      FOR UPDATE
+    `;
+
+    const doc = lockedDocs[0];
+    if (!doc) {
+      throw new Error("Comprobante no encontrado o no pertenece a este tenant.");
+    }
+
+    if (doc.status !== "DRAFT" && doc.status !== "READY_FOR_TESTING") {
+      throw new Error("Solo se puede reservar numeracion para comprobantes en borrador o listos para pruebas.");
+    }
+
+    if (doc.accessKey && doc.sequentialNumber == null) {
+      throw new Error("El comprobante tiene clave persistida pero no secuencial. Corrige la numeracion antes de continuar.");
+    }
+
+    const [profile, establishment, issuePoint] = await Promise.all([
+      tx.sriTaxpayerProfile.findUnique({
+        where: { tenantId: params.tenantId },
+        select: { ruc: true },
+      }),
+      tx.sriEstablishment.findUnique({
+        where: { id: doc.establishmentId },
+        select: { code: true },
+      }),
+      tx.sriIssuePoint.findUnique({
+        where: { id: doc.issuePointId },
+        select: { code: true },
+      }),
+    ]);
+
+    if (!profile) {
+      throw new Error("Perfil SRI no configurado.");
+    }
+    if (!establishment) {
+      throw new Error("Establecimiento no encontrado para este comprobante.");
+    }
+    if (!issuePoint) {
+      throw new Error("Punto de emision no encontrado para este comprobante.");
+    }
+
+    let sequenceId = doc.sequenceId;
+    let sequentialNumber = doc.sequentialNumber;
+    let shouldAdvanceSequence = false;
+
+    if (sequentialNumber == null || !sequenceId) {
+      const lockedSequences = await tx.$queryRaw<LockedSriSequenceRow[]>`
+        SELECT id, "currentNumber", "maxNumber"
+        FROM "SriDocumentSequence"
+        WHERE
+          "tenantId" = ${params.tenantId}
+          AND "establishmentId" = ${doc.establishmentId}
+          AND "issuePointId" = ${doc.issuePointId}
+          AND "documentType" = ${doc.documentType}::"SriDocumentType"
+          AND "isActive" = true
+        FOR UPDATE
+      `;
+
+      const sequence = lockedSequences[0];
+      if (!sequence) {
+        throw new Error("No hay secuencia activa para este establecimiento y punto de emision.");
+      }
+
+      sequenceId = sequence.id;
+      if (sequentialNumber == null) {
+        if (sequence.maxNumber != null && sequence.currentNumber > sequence.maxNumber) {
+          throw new Error("La secuencia activa ya alcanzo su numero maximo configurado.");
+        }
+        sequentialNumber = sequence.currentNumber;
+        shouldAdvanceSequence = true;
+      }
+    }
+
+    if (sequentialNumber == null || !sequenceId) {
+      throw new Error("No se pudo resolver la secuencia persistida para este comprobante.");
+    }
+
+    const issuedAt = doc.issuedAt ?? new Date();
+    const accessKey =
+      doc.accessKey ??
+      buildSriAccessKey({
+        issuedAt,
+        documentType: doc.documentType,
+        ruc: profile.ruc,
+        environment: doc.environment,
+        establishmentCode: establishment.code,
+        issuePointCode: issuePoint.code,
+        sequentialNumber,
+        numericCode: createStableNumericCode(doc.id),
+      }).accessKey;
+
+    await tx.sriDocument.update({
+      where: { id: doc.id },
+      data: {
+        sequenceId,
+        sequentialNumber,
+        accessKey,
+        issuedAt,
+      },
+    });
+
+    if (shouldAdvanceSequence) {
+      await tx.sriDocumentSequence.update({
+        where: { id: sequenceId },
+        data: { currentNumber: { increment: 1 } },
+      });
+    }
+
+    return {
+      sequenceId,
+      sequentialNumber,
+      accessKey,
+      issuedAt,
+    };
+  });
 }

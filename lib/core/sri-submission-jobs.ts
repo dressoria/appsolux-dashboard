@@ -39,6 +39,15 @@ export async function createSriSubmissionJobForDocument(params: {
     };
   }
 
+  if (doc.status === "REJECTED") {
+    return {
+      ok: false,
+      code: "WRONG_STATUS",
+      reason:
+        "Este comprobante ya fue rechazado por SRI. No debe reenviarse con la misma clave; crea uno nuevo con nueva numeracion.",
+    };
+  }
+
   if (doc.status !== "SIGNED") {
     return {
       ok: false,

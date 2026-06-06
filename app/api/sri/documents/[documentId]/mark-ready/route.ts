@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
-import { getSriDocumentById } from "@/lib/core/sri";
+import { getSriDocumentById, reserveSriDocumentNumberingForTesting } from "@/lib/core/sri";
 import { getSriDocumentTechnicalChecklist } from "@/lib/core/sri-technical-checklist";
 import { getPrismaClient } from "@/lib/db/prisma";
 
@@ -37,6 +37,23 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
       {
         error: "El comprobante tiene errores bloqueantes que deben resolverse primero.",
         blockingIssues: checklist.blockingIssues,
+      },
+      { status: 422 }
+    );
+  }
+
+  try {
+    await reserveSriDocumentNumberingForTesting({
+      tenantId: tenant.id,
+      documentId,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "No se pudo reservar la numeracion SRI para este comprobante.",
       },
       { status: 422 }
     );

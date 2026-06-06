@@ -13,6 +13,7 @@ type XmlPreviewState =
       warnings: string[];
       missingFields: string[];
       accessKey: string | null;
+      numberingPersisted: boolean;
     }
   | { phase: "error"; message: string };
 
@@ -34,6 +35,7 @@ export function SriXmlPreviewSection({ documentId }: Props) {
         warnings?: string[];
         missingFields?: string[];
         accessKey?: string | null;
+        numberingPersisted?: boolean;
         error?: string;
       };
       if (!res.ok || !data.xml) {
@@ -47,6 +49,7 @@ export function SriXmlPreviewSection({ documentId }: Props) {
         warnings: data.warnings ?? [],
         missingFields: data.missingFields ?? [],
         accessKey: data.accessKey ?? null,
+        numberingPersisted: data.numberingPersisted ?? false,
       });
     } catch {
       setState({ phase: "error", message: "Error de red. Intenta de nuevo." });
@@ -107,7 +110,9 @@ export function SriXmlPreviewSection({ documentId }: Props) {
                 {state.accessKey}
               </p>
               <p className="text-xs text-slate-500">
-                Generada localmente. El comprobante no está firmado ni autorizado por el SRI.
+                {state.numberingPersisted
+                  ? "Tomada del comprobante persistido. Aun no está firmada ni autorizada por el SRI."
+                  : "Generada localmente. Aun no está reservada ni autorizada por el SRI."}
               </p>
             </div>
           )}

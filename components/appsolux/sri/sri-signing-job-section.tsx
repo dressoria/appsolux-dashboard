@@ -165,7 +165,7 @@ export function SriSigningJobSection({ documentId, documentStatus, readiness }: 
           {readiness.displayNumber && (
             <p className="mt-0.5 text-xs">
               Comprobante {readiness.displayNumber}
-              {readiness.accessKey ? " con clave preliminar generada." : "."}
+              {readiness.accessKey ? " con clave persistida y reservada." : "."}
             </p>
           )}
         </div>

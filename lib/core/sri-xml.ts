@@ -3,6 +3,7 @@ import { buildSriAccessKey, createStableNumericCode } from "./sri-access-key";
 
 export type SriXmlPreviewParams = {
   documentId: string;
+  persistedAccessKey?: string | null;
   profile: {
     legalName: string;
     tradeName: string | null;
@@ -50,6 +51,7 @@ export type SriXmlPreviewResult = {
   warnings: string[];
   missingFields: string[];
   accessKey: string | null;
+  numberingPersisted: boolean;
 };
 
 function pad(n: number, digits: number): string {
@@ -186,6 +188,7 @@ export function buildUnsignedSriInvoiceXmlPreview(
       warnings,
       missingFields,
       accessKey: null,
+      numberingPersisted: false,
     };
   }
 
@@ -243,7 +246,10 @@ export function buildUnsignedSriInvoiceXmlPreview(
   let accessKey: string | null = null;
   let claveAcceso = "PENDIENTE_DE_GENERAR";
 
-  if (missingFields.length === 0) {
+  if (params.persistedAccessKey) {
+    accessKey = params.persistedAccessKey;
+    claveAcceso = params.persistedAccessKey;
+  } else if (missingFields.length === 0) {
     try {
       const numericCode = createStableNumericCode(params.documentId);
       const keyResult = buildSriAccessKey({
@@ -300,5 +306,12 @@ ${linesXml}
   </detalles>${infoAdicionalXml}
 </factura>`;
 
-  return { xml, displayNumber, warnings, missingFields, accessKey };
+  return {
+    xml,
+    displayNumber,
+    warnings,
+    missingFields,
+    accessKey,
+    numberingPersisted: Boolean(params.persistedAccessKey),
+  };
 }

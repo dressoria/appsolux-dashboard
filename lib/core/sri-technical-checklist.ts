@@ -23,6 +23,7 @@ export type SriTechnicalChecklistResult = {
   passedChecks: string[];
   displayNumber: string | null;
   accessKey: string | null;
+  numberingPersisted: boolean;
   items: SriChecklistItem[];
 };
 
@@ -31,8 +32,10 @@ export type SriTechnicalChecklistInput = {
   document: {
     documentType: string;
     status: string;
+    sequenceId: string | null;
     grandTotal: string | number;
     sequentialNumber: number | null;
+    accessKey: string | null;
     customerName: string;
     customerIdentification: string | null;
     customerEmail: string | null;
@@ -151,9 +154,11 @@ export function runSriTechnicalChecklist(
     fail("issue_point", "Punto de emisión no encontrado");
   }
 
-  if (input.sequence) {
+  if (input.document.sequenceId && input.document.sequentialNumber != null) {
+    pass("sequence", "Secuencia persistida en el comprobante");
+  } else if (input.sequence) {
     if (input.sequence.isActive) {
-      pass("sequence", "Secuencia de factura activa");
+      pass("sequence", "Secuencia de factura activa y disponible para reservar");
     } else {
       fail("sequence", "La secuencia de factura está inactiva");
     }
@@ -220,15 +225,23 @@ export function runSriTechnicalChecklist(
   // ── Numeración y clave de acceso ─────────────────────────────────────────────
   let displayNumber: string | null = null;
   let accessKey: string | null = null;
+  const numberingPersisted = Boolean(
+    input.document.sequenceId && input.document.sequentialNumber != null && input.document.accessKey
+  );
 
-  if (input.establishment && input.issuePoint && input.sequence) {
-    const sequential = input.document.sequentialNumber ?? input.sequence.currentNumber;
+  if (input.establishment && input.issuePoint && (input.document.sequentialNumber != null || input.sequence)) {
+    const sequential = input.document.sequentialNumber ?? input.sequence!.currentNumber;
     displayNumber = buildSriDisplayNumber(
       input.establishment.code,
       input.issuePoint.code,
       sequential
     );
-    pass("display_number", `Número de comprobante calculado: ${displayNumber}`);
+    pass(
+      "display_number",
+      numberingPersisted
+        ? `Número de comprobante reservado: ${displayNumber}`
+        : `Número de comprobante candidato: ${displayNumber}`
+    );
   } else {
     fail(
       "display_number",
@@ -236,7 +249,10 @@ export function runSriTechnicalChecklist(
     );
   }
 
-  if (input.profile && input.establishment && input.issuePoint && input.sequence) {
+  if (input.document.accessKey) {
+    accessKey = input.document.accessKey;
+    pass("access_key", `Clave de acceso persistida (${accessKey.length} dígitos)`);
+  } else if (input.profile && input.establishment && input.issuePoint && input.sequence) {
     const sequential = input.document.sequentialNumber ?? input.sequence.currentNumber;
     try {
       const numericCode = createStableNumericCode(input.documentId);
@@ -251,7 +267,7 @@ export function runSriTechnicalChecklist(
         numericCode,
       });
       accessKey = keyResult.accessKey;
-      pass("access_key", `Clave de acceso generada (${accessKey.length} dígitos)`);
+      pass("access_key", `Clave de acceso candidata (${accessKey.length} dígitos)`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
       fail("access_key", `Error al generar clave de acceso: ${msg}`);
@@ -260,11 +276,27 @@ export function runSriTechnicalChecklist(
     fail("access_key", "No se puede generar clave de acceso — faltan datos del emisor");
   }
 
+  if (input.document.status === "READY_FOR_TESTING" && !numberingPersisted) {
+    fail(
+      "numbering_persisted",
+      "El comprobante listo para pruebas debe tener secuencia y clave persistidas antes de firmarse."
+    );
+  }
+
   // ── Estado final ──────────────────────────────────────────────────────────────
   const status: "BLOCKED" | "WARNING" | "READY" =
     blockingIssues.length > 0 ? "BLOCKED" : warnings.length > 0 ? "WARNING" : "READY";
 
-  return { status, blockingIssues, warnings, passedChecks, displayNumber, accessKey, items };
+  return {
+    status,
+    blockingIssues,
+    warnings,
+    passedChecks,
+    displayNumber,
+    accessKey,
+    numberingPersisted,
+    items,
+  };
 }
 
 function getSignatureReadinessReasons(params: {
@@ -372,8 +404,10 @@ export async function getSriDocumentTechnicalChecklist(
     document: {
       documentType: context.document.documentType,
       status: context.document.status,
+      sequenceId: context.document.sequenceId,
       grandTotal: context.document.grandTotal.toString(),
       sequentialNumber: context.document.sequentialNumber,
+      accessKey: context.document.accessKey,
       customerName: context.document.customerName,
       customerIdentification: context.document.customerIdentification,
       customerEmail: context.document.customerEmail,

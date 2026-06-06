@@ -84,7 +84,7 @@ export default async function SriDocumentDetailPage({ params }: Props) {
             title: "Rechazado por SRI",
             text:
               latestSubmissionJob?.errorMessage ??
-              "El SRI rechazo el comprobante en pruebas. Revisa el detalle del envio para corregirlo.",
+              "El SRI rechazo el comprobante en pruebas. Este mismo comprobante no debe reenviarse con la misma clave.",
             className: "border-red-200 bg-red-50 text-red-800",
           }
       : doc.status === "SENT"
@@ -126,8 +126,8 @@ export default async function SriDocumentDetailPage({ params }: Props) {
     doc.status === "AUTHORIZED"
       ? "Comprobante autorizado. La siguiente fase sera generar RIDE/PDF final."
       : doc.status === "REJECTED"
-        ? "Revisa la respuesta del SRI, corrige el problema y vuelve a intentar el envio."
-      : doc.status === "SENT"
+        ? "Revisa la respuesta del SRI y emite un nuevo comprobante con nueva clave de acceso. No reintentes este mismo documento."
+        : doc.status === "SENT"
         ? "Consulta nuevamente la autorizacion del SRI desde el worker si el proceso sigue pendiente."
       : doc.status === "SIGNED"
       ? "Siguiente fase: enviar al SRI en ambiente de pruebas."

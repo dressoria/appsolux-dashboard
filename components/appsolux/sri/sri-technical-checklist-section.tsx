@@ -20,6 +20,7 @@ type ChecklistResult = {
   passedChecks: string[];
   displayNumber: string | null;
   accessKey: string | null;
+  numberingPersisted: boolean;
   items: ChecklistItem[];
 };
 
@@ -169,13 +170,15 @@ export function SriTechnicalChecklistSection({ documentId, documentStatus }: Pro
           {result.accessKey && (
             <div className="flex-1 min-w-0">
               <span className="text-muted-foreground text-xs uppercase tracking-wide">
-                Clave de acceso (preliminar)
+                {result.numberingPersisted ? "Clave de acceso persistida" : "Clave de acceso candidata"}
               </span>
               <p className="font-mono text-xs break-all text-slate-700 leading-relaxed mt-0.5">
                 {result.accessKey}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                No firmada · No autorizada · Sin validez tributaria
+                {result.numberingPersisted
+                  ? "Reservada para este comprobante. Aun no firmada ni autorizada."
+                  : "Vista previa local. Aun no reservada para este comprobante."}
               </p>
             </div>
           )}

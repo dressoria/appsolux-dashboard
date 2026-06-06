@@ -162,6 +162,15 @@ export function SriSubmissionJobSection({ documentId, documentStatus }: Props) {
         Este paso usa solo el ambiente de pruebas del SRI. No envia a produccion y no genera RIDE todavia.
       </div>
 
+      {documentStatus === "REJECTED" && (
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <p className="font-semibold">Este comprobante ya no debe reenviarse</p>
+          <p className="mt-0.5 text-xs">
+            Si el rechazo fue por recepcion SRI, la misma clave no debe reutilizarse. La correccion requiere un nuevo comprobante con nueva clave de acceso.
+          </p>
+        </div>
+      )}
+
       {job ? (
         <div className="rounded-md border p-4">
           <div className="flex items-start gap-3">
@@ -208,6 +217,11 @@ export function SriSubmissionJobSection({ documentId, documentStatus }: Props) {
               {job.status === "AUTHORIZED" && (
                 <p className="text-xs text-emerald-700 font-medium">
                   Autorizado por SRI. El RIDE/PDF final sigue pendiente en una fase posterior.
+                </p>
+              )}
+              {job.status === "REJECTED" && (
+                <p className="text-xs text-red-700 font-medium">
+                  Rechazado por SRI. No reenvíes este mismo comprobante; crea uno nuevo con nueva clave.
                 </p>
               )}
             </div>

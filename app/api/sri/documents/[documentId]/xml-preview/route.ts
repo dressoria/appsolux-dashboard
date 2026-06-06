@@ -56,6 +56,7 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
 
   const result = buildUnsignedSriInvoiceXmlPreview({
     documentId,
+    persistedAccessKey: doc.accessKey,
     profile: {
       legalName: profile.legalName,
       tradeName: profile.tradeName,
@@ -103,6 +104,7 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
     warnings: result.warnings,
     missingFields: result.missingFields,
     accessKey: result.accessKey,
+    numberingPersisted: result.numberingPersisted,
     status: doc.status,
   });
 }
