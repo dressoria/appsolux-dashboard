@@ -1,5 +1,10 @@
 import Link from "next/link";
+import { ArrowLeft, CheckCircle2, Clock3, FileCheck2, ReceiptText, Send, XCircle } from "lucide-react";
 
+import {
+  FacturationStatusBadge,
+  FacturationSummaryPanel,
+} from "@/components/appsolux/sri/facturation-ui";
 import { SriModuleShell } from "@/components/appsolux/sri/sri-module-shell";
 import { SriSigningJobSection } from "@/components/appsolux/sri/sri-signing-job-section";
 import { SriSubmissionJobSection } from "@/components/appsolux/sri/sri-submission-job-section";
@@ -72,6 +77,18 @@ export default async function SriDocumentDetailPage({ params }: Props) {
   const sourceLabel = SRI_DOCUMENT_SOURCE_LABELS[doc.sourceType] ?? doc.sourceType;
   const statusLabel = SRI_DOCUMENT_STATUS_LABELS[doc.status] ?? doc.status;
   const typeLabel = SRI_DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType;
+  const flowStatus =
+    doc.status === "AUTHORIZED"
+      ? { label: "Autorizado", variant: "success" as const, icon: CheckCircle2 }
+      : doc.status === "REJECTED"
+        ? { label: "Rechazado", variant: "danger" as const, icon: XCircle }
+        : doc.status === "SENT"
+          ? { label: "Recibido por SRI", variant: "info" as const, icon: Send }
+          : doc.status === "SIGNED"
+            ? { label: "Enviando", variant: "info" as const, icon: FileCheck2 }
+            : doc.status === "READY_FOR_TESTING"
+              ? { label: "Preparando", variant: "warning" as const, icon: Clock3 }
+              : { label: "Borrador", variant: "neutral" as const, icon: ReceiptText };
   const banner =
     doc.status === "AUTHORIZED"
       ? {
@@ -141,15 +158,52 @@ export default async function SriDocumentDetailPage({ params }: Props) {
 
   return (
     <SriModuleShell
-      title={typeLabel}
-      description={`${statusLabel} · ${sourceLabel}`}
+      title="Detalle de factura"
+      description={`${typeLabel} · ${statusLabel} · ${sourceLabel}`}
       activeHref={routes.sriDocuments}
+      appName="Facturacion"
+      appDescription="Comprobantes, estados y seguimiento operativo de facturacion electronica Ecuador / SRI."
+      badge="Ecuador / SRI"
+      badgeVariant="blue"
     >
-      <div className={`rounded-md border p-4 text-sm ${banner.className}`}>
+      <div className={`rounded-[28px] border p-5 text-sm ${banner.className}`}>
         <p className="font-medium">{banner.title}</p>
         <p className="mt-0.5">
           {banner.text}
         </p>
+      </div>
+
+      <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <FacturationStatusBadge label={flowStatus.label} variant={flowStatus.variant} />
+              <FacturationStatusBadge label={typeLabel} variant="neutral" />
+              <FacturationStatusBadge label={sourceLabel} variant="info" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-semibold tracking-tight text-slate-900">
+                {doc.customerName}
+              </h3>
+              <p className="mt-1 text-sm text-slate-600">
+                {displayDocumentTitle(doc.establishment.code, doc.issuePoint.code, doc.sequentialNumber)}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href={routes.sriDocuments}>
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                Volver
+              </Link>
+            </Button>
+            {doc.sourceType === "BASIC_SALE" && doc.sourceId ? (
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/basic/sales/${doc.sourceId}`}>Ver venta origen</Link>
+              </Button>
+            ) : null}
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -275,8 +329,16 @@ export default async function SriDocumentDetailPage({ params }: Props) {
         </Card>
       </div>
 
-      {/* Lineas */}
-      <Card>
+      <FacturationSummaryPanel
+        title="Siguiente paso"
+        description={nextStep}
+        primaryHref={routes.sriDocuments}
+        primaryLabel="Volver a facturacion"
+        secondaryHref={doc.sourceType === "BASIC_SALE" && doc.sourceId ? `/basic/sales/${doc.sourceId}` : undefined}
+        secondaryLabel={doc.sourceType === "BASIC_SALE" && doc.sourceId ? "Abrir venta origen" : undefined}
+      />
+
+      <Card className="rounded-[28px] border-slate-200 bg-white py-0 shadow-sm">
         <CardHeader>
           <CardTitle>Detalle de items</CardTitle>
         </CardHeader>
@@ -365,10 +427,9 @@ export default async function SriDocumentDetailPage({ params }: Props) {
         </Card>
       )}
 
-      {/* Acciones */}
-      <Card>
+      <Card className="rounded-[28px] border-slate-200 bg-white py-0 shadow-sm">
         <CardHeader>
-          <CardTitle>Acciones</CardTitle>
+          <CardTitle>Acciones y accesos</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
           <Button asChild variant="outline">
@@ -387,15 +448,6 @@ export default async function SriDocumentDetailPage({ params }: Props) {
           <Button disabled variant="outline" title="Disponible en fase de emision real">
             RIDE
           </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Siguiente paso</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">{nextStep}</p>
         </CardContent>
       </Card>
 
@@ -441,4 +493,12 @@ export default async function SriDocumentDetailPage({ params }: Props) {
       </p>
     </SriModuleShell>
   );
+}
+
+function displayDocumentTitle(establishmentCode: string, issuePointCode: string, sequentialNumber: number | null) {
+  if (sequentialNumber == null) {
+    return `${establishmentCode}-${issuePointCode} · sin secuencial asignado`;
+  }
+
+  return `${establishmentCode}-${issuePointCode}-${formatSequentialNumber(sequentialNumber)}`;
 }

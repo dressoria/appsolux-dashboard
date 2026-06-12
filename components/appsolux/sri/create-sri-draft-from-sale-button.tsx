@@ -11,7 +11,13 @@ type Props = {
 type State =
   | { phase: "idle" }
   | { phase: "loading" }
-  | { phase: "done"; documentId: string; alreadyExisted: boolean }
+  | {
+      phase: "done";
+      documentId: string;
+      alreadyExisted: boolean;
+      flowLabel: string;
+      message: string;
+    }
   | { phase: "error"; message: string };
 
 export function CreateSriDraftFromSaleButton({ saleId }: Props) {
@@ -28,6 +34,8 @@ export function CreateSriDraftFromSaleButton({ saleId }: Props) {
       const data = (await res.json()) as {
         documentId?: string;
         alreadyExists?: boolean;
+        flowLabel?: string;
+        message?: string;
         error?: string;
       };
       if (!res.ok || !data.documentId) {
@@ -38,6 +46,8 @@ export function CreateSriDraftFromSaleButton({ saleId }: Props) {
         phase: "done",
         documentId: data.documentId,
         alreadyExisted: data.alreadyExists ?? false,
+        flowLabel: data.flowLabel ?? "Preparando",
+        message: data.message ?? "Se inicio el flujo SRI.",
       });
     } catch {
       setState({ phase: "error", message: "Error de red. Intenta de nuevo." });
@@ -50,8 +60,9 @@ export function CreateSriDraftFromSaleButton({ saleId }: Props) {
         <p className="text-sm text-emerald-700">
           {state.alreadyExisted
             ? "Ya existe un documento SRI para esta venta."
-            : "Borrador SRI creado correctamente."}
+            : state.message}
         </p>
+        <p className="text-xs text-muted-foreground">Estado actual: {state.flowLabel}</p>
         <Button asChild variant="outline" size="sm">
           <Link href={`/sri/documents/${state.documentId}`}>Abrir documento SRI</Link>
         </Button>
@@ -80,7 +91,7 @@ export function CreateSriDraftFromSaleButton({ saleId }: Props) {
       onClick={handleCreate}
       disabled={state.phase === "loading"}
     >
-      {state.phase === "loading" ? "Preparando..." : "Preparar factura electronica"}
+      {state.phase === "loading" ? "Preparando..." : "Emitir factura electronica"}
     </Button>
   );
 }

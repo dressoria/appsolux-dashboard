@@ -1,147 +1,85 @@
 import Link from "next/link";
+import {
+  Building2,
+  FileCheck2,
+  Globe,
+  KeyRound,
+  MapPinned,
+  ShieldCheck,
+  Store,
+  TriangleAlert,
+} from "lucide-react";
 
+import {
+  SriCenterActionCard,
+  SriCenterBadge,
+  SriCenterChecklistItem,
+  SriCenterMetricCard,
+} from "@/components/appsolux/sri/config-center-ui";
 import { SriModuleShell } from "@/components/appsolux/sri/sri-module-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getPrismaClient } from "@/lib/db/prisma";
 import { getSriModuleStatus } from "@/lib/core/sri";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
-
-function StatusRow({
-  label,
-  value,
-  ok,
-  href,
-  actionLabel,
-}: {
-  label: string;
-  value: string;
-  ok: boolean;
-  href: string;
-  actionLabel: string;
-}) {
-  return (
-    <div className="flex items-center justify-between rounded-md border p-3 text-sm">
-      <div className="space-y-0.5">
-        <p className="font-medium">{label}</p>
-        <p className={ok ? "text-emerald-700" : "text-amber-700"}>{value}</p>
-      </div>
-      <Button asChild variant="outline" size="sm">
-        <Link href={href}>{actionLabel}</Link>
-      </Button>
-    </div>
-  );
-}
-
-function getTaxConfigurationLabel(status: Awaited<ReturnType<typeof getSriModuleStatus>>) {
-  const complete =
-    status.profileStatus === "CONFIGURED" &&
-    status.establishmentCount > 0 &&
-    status.issuePointCount > 0 &&
-    status.sequenceCount > 0;
-
-  if (complete) return "Configurado";
-  if (!status.hasProfile) return "Pendiente";
-  return "Incompleto";
-}
 
 function getSignatureLabel(status: Awaited<ReturnType<typeof getSriModuleStatus>>) {
   if (status.signatureStatus === "EXPIRED") return "Expirada";
   if (status.signatureStatus === "READY_FOR_TESTING") return "Lista para pruebas";
   if (status.signatureHasEncryptedCertificate && status.signatureHasEncryptedPassword) {
-    return "Certificado cargado para pruebas";
+    return "Certificado cargado";
   }
-  if (status.signatureHasEncryptedCertificate) return "Certificado cargado";
   if (status.signatureStatus === "UPLOADED_METADATA_ONLY") return "Metadata registrada";
-  return "No configurada";
-}
-
-function getDocumentLabel(status: Awaited<ReturnType<typeof getSriModuleStatus>>) {
-  if (status.documentStatusCounts.signed > 0) {
-    return `${status.documentStatusCounts.signed} firmado(s) · pendiente envio SRI`;
-  }
-  if (status.documentStatusCounts.readyForTesting > 0) {
-    return `${status.documentStatusCounts.readyForTesting} listo(s) para pruebas`;
-  }
-  if (status.documentStatusCounts.draft > 0) {
-    return `${status.documentStatusCounts.draft} borrador(es)`;
-  }
-  return "Sin comprobantes";
+  return "Pendiente";
 }
 
 function getRecommendedStep(status: Awaited<ReturnType<typeof getSriModuleStatus>>) {
   if (!status.hasProfile) {
     return {
-      text: "Completa Empresa / RUC.",
+      text: "Configura primero la empresa y el RUC.",
       href: routes.sriCompany,
       actionLabel: "Configurar empresa",
-      variant: "default" as const,
     };
   }
 
   if (status.establishmentCount === 0) {
     return {
-      text: "Configura al menos un establecimiento.",
+      text: "Agrega al menos un establecimiento activo.",
       href: routes.sriEstablishments,
       actionLabel: "Agregar establecimiento",
-      variant: "default" as const,
     };
   }
 
   if (status.issuePointCount === 0) {
     return {
-      text: "Configura al menos un punto de emision.",
+      text: "Configura un punto de emision para continuar.",
       href: routes.sriIssuePoints,
       actionLabel: "Agregar punto de emision",
-      variant: "default" as const,
     };
   }
 
   if (status.sequenceCount === 0) {
     return {
-      text: "Configura secuencial de factura.",
+      text: "Activa una secuencia de factura para emitir comprobantes.",
       href: routes.sriSequences,
       actionLabel: "Configurar secuenciales",
-      variant: "default" as const,
     };
   }
 
-  if (!status.signatureStatus || status.signatureStatus === "NOT_UPLOADED") {
+  if (!status.signatureHasEncryptedCertificate || !status.signatureHasEncryptedPassword) {
     return {
-      text: "Configura la firma electronica.",
+      text: "Sube la firma electronica de la empresa.",
       href: routes.sriSignature,
-      actionLabel: "Ver firma",
-      variant: "outline" as const,
-    };
-  }
-
-  if (
-    status.signatureStatus === "UPLOADED_METADATA_ONLY" &&
-    (!status.signatureHasEncryptedCertificate || !status.signatureHasEncryptedPassword)
-  ) {
-    return {
-      text: "Carga el certificado .p12/.pfx de la empresa para pruebas controladas.",
-      href: routes.sriSignature,
-      actionLabel: "Revisar firma",
-      variant: "outline" as const,
-    };
-  }
-
-  if (status.documentStatusCounts.signed > 0) {
-    return {
-      text: "Siguiente fase: envio al SRI en ambiente de pruebas.",
-      href: routes.sriDocuments,
-      actionLabel: "Ver comprobantes",
-      variant: "outline" as const,
+      actionLabel: "Subir firma electronica",
     };
   }
 
   return {
-    text: "Crea una venta, genera borrador SRI, marca listo para pruebas y solicita firma.",
+    text: "La configuracion base esta lista. Revisa facturas y monitoreo para seguir el flujo.",
     href: routes.sriDocuments,
-    actionLabel: "Ir a comprobantes",
-    variant: "outline" as const,
+    actionLabel: "Ver facturas",
   };
 }
 
@@ -151,8 +89,8 @@ export default async function SriPage() {
   if (!user) {
     return (
       <SriModuleShell
-        title="Facturacion Electronica Ecuador"
-        description="Configura empresa, establecimientos, secuenciales, firma electronica y comprobantes."
+        title="Configuracion SRI"
+        description="Configura tu empresa, firma electronica, establecimientos y secuenciales para emitir comprobantes electronicos."
         activeHref={routes.sri}
       >
         <p className="text-muted-foreground">Sesion requerida.</p>
@@ -161,223 +99,384 @@ export default async function SriPage() {
   }
 
   const tenant = await getCurrentTenant(user);
+  const prisma = getPrismaClient();
   const status = await getSriModuleStatus(tenant.id);
   const recommendedStep = getRecommendedStep(status);
-  const taxConfigurationLabel = getTaxConfigurationLabel(status);
   const signatureLabel = getSignatureLabel(status);
-  const documentLabel = getDocumentLabel(status);
+
+  const [sentCount, authorizedCount, rejectedCount, latestSubmissionErrors, latestSigningErrors] =
+    await Promise.all([
+      prisma.sriDocument.count({ where: { tenantId: tenant.id, status: "SENT" } }),
+      prisma.sriDocument.count({ where: { tenantId: tenant.id, status: "AUTHORIZED" } }),
+      prisma.sriDocument.count({ where: { tenantId: tenant.id, status: "REJECTED" } }),
+      prisma.sriSubmissionJob.findMany({
+        where: {
+          tenantId: tenant.id,
+          status: { in: ["FAILED", "REJECTED"] },
+        },
+        select: {
+          id: true,
+          errorMessage: true,
+          updatedAt: true,
+          documentId: true,
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 3,
+      }),
+      prisma.sriSigningJob.findMany({
+        where: {
+          tenantId: tenant.id,
+          status: "FAILED",
+        },
+        select: {
+          id: true,
+          errorMessage: true,
+          updatedAt: true,
+          documentId: true,
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 2,
+      }),
+    ]);
+
+  const pendingAuthorizationCount = sentCount + status.documentStatusCounts.signed;
+  const latestErrors = [
+    ...latestSubmissionErrors.map((item) => ({
+      id: item.id,
+      kind: "Envio",
+      errorMessage: item.errorMessage,
+      updatedAt: item.updatedAt,
+      documentId: item.documentId,
+    })),
+    ...latestSigningErrors.map((item) => ({
+      id: item.id,
+      kind: "Firma",
+      errorMessage: item.errorMessage,
+      updatedAt: item.updatedAt,
+      documentId: item.documentId,
+    })),
+  ]
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    .slice(0, 4);
+
+  const integrationReady =
+    status.hasProfile &&
+    status.profileStatus === "CONFIGURED" &&
+    status.establishmentCount > 0 &&
+    status.issuePointCount > 0 &&
+    status.sequenceCount > 0;
 
   return (
     <SriModuleShell
-      title="Facturacion Electronica Ecuador"
-      description="Configura empresa, establecimientos, secuenciales, firma electronica y comprobantes para emitir documentos electronicos."
+      title="Configuracion SRI"
+      description="Configura tu empresa, firma electronica, establecimientos y secuenciales para emitir comprobantes electronicos."
       activeHref={routes.sri}
-    >
-      <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-        <p className="font-medium">Ruta actual del modulo SRI</p>
-        <p className="mt-1">
-          El modulo ya cuenta con configuracion tributaria, clave de acceso, XML preliminar,
-          checklist tecnico y cola de firma por worker. En esta etapa todavia siguen pendientes
-          el envio al SRI, la autorizacion oficial y el RIDE/PDF final.
-        </p>
-      </div>
-
-      {status.environment === "TEST" && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          Estas trabajando en ambiente de pruebas. No se emiten comprobantes con validez tributaria.
+      appName="Configuracion SRI"
+      appDescription="Centro de configuracion, firma, secuenciales, ambiente y monitoreo tributario."
+      badge="Configuracion"
+      badgeVariant="blue"
+      action={
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href={routes.sriDocuments}>Ver facturas</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.sriSignature}>Subir firma electronica</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={routes.sriEnvironment}>Revisar ambiente</Link>
+          </Button>
         </div>
-      )}
+      }
+    >
+      <div className="space-y-8">
+        <section className="overflow-hidden rounded-[32px] border border-sky-100 bg-linear-to-br from-sky-100 via-white to-slate-50">
+          <div className="grid gap-8 px-6 py-8 lg:grid-cols-[1.4fr_0.95fr] lg:px-8">
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+                  Centro de configuracion
+                </p>
+                <h2 className="text-3xl font-semibold tracking-tight text-slate-900">
+                  Configura y monitorea tu integracion con el SRI.
+                </h2>
+                <p className="max-w-3xl text-sm leading-6 text-slate-600">
+                  Este espacio sirve para preparar la emision: empresa, firma electronica,
+                  establecimientos, secuenciales, ambiente y monitoreo. Para emitir y revisar
+                  facturas, usa Facturacion.
+                </p>
+              </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">Empresa / RUC</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-semibold">
-              {status.hasProfile ? status.ruc : "—"}
-            </p>
-            <p className={`mt-1 text-xs ${status.profileStatus === "CONFIGURED" ? "text-emerald-700" : "text-amber-700"}`}>
-              {status.profileStatus === "CONFIGURED" ? "Configurado" : "Pendiente"}
-            </p>
-          </CardContent>
-        </Card>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <SriCenterMetricCard
+                  icon={Building2}
+                  label="Perfil tributario"
+                  value={status.hasProfile ? "Listo" : "Pendiente"}
+                  helper={status.ruc ? `RUC ${status.ruc}` : "Empresa y RUC aun no configurados."}
+                  tone={status.hasProfile ? "success" : "warning"}
+                />
+                <SriCenterMetricCard
+                  icon={ShieldCheck}
+                  label="Firma electronica"
+                  value={signatureLabel}
+                  helper="Estado real de la firma y sus credenciales cifradas."
+                  tone={status.signatureHasEncryptedCertificate ? "success" : "warning"}
+                />
+                <SriCenterMetricCard
+                  icon={MapPinned}
+                  label="Estructura activa"
+                  value={`${status.establishmentCount}/${status.issuePointCount}/${status.sequenceCount}`}
+                  helper="Establecimientos, puntos de emision y secuenciales activos."
+                  tone={integrationReady ? "success" : "warning"}
+                />
+                <SriCenterMetricCard
+                  icon={Globe}
+                  label="Ambiente"
+                  value={
+                    status.environment === "TEST"
+                      ? "Pruebas"
+                      : status.environment === "PRODUCTION"
+                        ? "Produccion"
+                        : "Pendiente"
+                  }
+                  helper="Controla si la emision va a pruebas o produccion."
+                  tone={status.environment ? "info" : "warning"}
+                />
+              </div>
+            </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">Establecimientos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-semibold">{status.establishmentCount}</p>
-            <p className={`mt-1 text-xs ${status.establishmentCount > 0 ? "text-emerald-700" : "text-amber-700"}`}>
-              {status.establishmentCount > 0 ? "Configurados" : "Sin configurar"}
-            </p>
-          </CardContent>
-        </Card>
+            <Card className="rounded-[28px] border-slate-200 bg-white/95 py-0 shadow-sm">
+              <CardHeader className="px-6 pt-6">
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="text-slate-900">Estado de integracion</CardTitle>
+                  <SriCenterBadge
+                    label={integrationReady ? "Base lista" : "Pendiente"}
+                    variant={integrationReady ? "success" : "warning"}
+                  />
+                </div>
+                <p className="text-sm text-slate-600">
+                  Checklist visual para saber que falta antes de emitir comprobantes.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-3 px-6 pb-6">
+                <SriCenterChecklistItem
+                  label="Perfil tributario"
+                  value={status.profileStatus === "CONFIGURED" ? "Configurado" : "Pendiente"}
+                  ok={status.profileStatus === "CONFIGURED"}
+                  href={routes.sriCompany}
+                  actionLabel={status.profileStatus === "CONFIGURED" ? "Editar" : "Configurar"}
+                />
+                <SriCenterChecklistItem
+                  label="Firma electronica"
+                  value={signatureLabel}
+                  ok={status.signatureHasEncryptedCertificate && status.signatureHasEncryptedPassword}
+                  href={routes.sriSignature}
+                  actionLabel="Revisar"
+                />
+                <SriCenterChecklistItem
+                  label="Establecimiento activo"
+                  value={status.establishmentCount > 0 ? `${status.establishmentCount} activo(s)` : "Pendiente"}
+                  ok={status.establishmentCount > 0}
+                  href={routes.sriEstablishments}
+                  actionLabel="Ver"
+                />
+                <SriCenterChecklistItem
+                  label="Punto de emision activo"
+                  value={status.issuePointCount > 0 ? `${status.issuePointCount} activo(s)` : "Pendiente"}
+                  ok={status.issuePointCount > 0}
+                  href={routes.sriIssuePoints}
+                  actionLabel="Ver"
+                />
+                <SriCenterChecklistItem
+                  label="Secuencia activa"
+                  value={status.sequenceCount > 0 ? `${status.sequenceCount} configurada(s)` : "Pendiente"}
+                  ok={status.sequenceCount > 0}
+                  href={routes.sriSequences}
+                  actionLabel="Ver"
+                />
+                <SriCenterChecklistItem
+                  label="Ambiente"
+                  value={
+                    status.environment === "TEST"
+                      ? "Pruebas activas"
+                      : status.environment === "PRODUCTION"
+                        ? "Produccion activa"
+                        : "Pendiente"
+                  }
+                  ok={status.environment !== null}
+                  href={routes.sriEnvironment}
+                  actionLabel="Revisar"
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">Puntos de emision</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-semibold">{status.issuePointCount}</p>
-            <p className={`mt-1 text-xs ${status.issuePointCount > 0 ? "text-emerald-700" : "text-amber-700"}`}>
-              {status.issuePointCount > 0 ? "Configurados" : "Sin configurar"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">Secuenciales</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-semibold">{status.sequenceCount}</p>
-            <p className={`mt-1 text-xs ${status.sequenceCount > 0 ? "text-emerald-700" : "text-amber-700"}`}>
-              {status.sequenceCount > 0 ? "Configurados" : "Sin configurar"}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Estado de configuracion</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <StatusRow
-              label="Configuracion tributaria"
-              value={taxConfigurationLabel}
-              ok={taxConfigurationLabel === "Configurado"}
-              href={routes.sriCompany}
-              actionLabel="Ver configuracion"
-            />
-            <StatusRow
-              label="Empresa y RUC"
-              value={status.profileStatus === "CONFIGURED" ? "Configurado" : "Pendiente"}
-              ok={status.profileStatus === "CONFIGURED"}
-              href={routes.sriCompany}
-              actionLabel={status.profileStatus === "CONFIGURED" ? "Editar" : "Configurar"}
-            />
-            <StatusRow
-              label="Establecimientos"
-              value={status.establishmentCount > 0 ? `${status.establishmentCount} activos` : "Sin establecimientos"}
-              ok={status.establishmentCount > 0}
-              href={routes.sriEstablishments}
-              actionLabel={status.establishmentCount > 0 ? "Ver" : "Agregar"}
-            />
-            <StatusRow
-              label="Puntos de emision"
-              value={status.issuePointCount > 0 ? `${status.issuePointCount} activos` : "Sin puntos de emision"}
-              ok={status.issuePointCount > 0}
-              href={routes.sriIssuePoints}
-              actionLabel={status.issuePointCount > 0 ? "Ver" : "Agregar"}
-            />
-            <StatusRow
-              label="Secuenciales"
-              value={status.sequenceCount > 0 ? `${status.sequenceCount} configurados` : "Sin secuenciales"}
-              ok={status.sequenceCount > 0}
-              href={routes.sriSequences}
-              actionLabel={status.sequenceCount > 0 ? "Ver" : "Configurar"}
-            />
-            <StatusRow
-              label="Ambiente"
-              value={
-                status.environment === "TEST"
-                  ? "Pruebas (TEST)"
-                  : status.environment === "PRODUCTION"
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <SriCenterActionCard
+            href={routes.sriCompany}
+            title="Empresa y RUC"
+            description="Actualiza razon social, RUC y datos tributarios base."
+            icon={Building2}
+            status={status.hasProfile ? "Configurado" : "Pendiente"}
+            statusVariant={status.hasProfile ? "success" : "warning"}
+          />
+          <SriCenterActionCard
+            href={routes.sriEstablishments}
+            title="Establecimientos"
+            description="Gestiona sucursales autorizadas para emitir comprobantes."
+            icon={Store}
+            status={status.establishmentCount > 0 ? `${status.establishmentCount} activo(s)` : "Pendiente"}
+            statusVariant={status.establishmentCount > 0 ? "success" : "warning"}
+          />
+          <SriCenterActionCard
+            href={routes.sriIssuePoints}
+            title="Puntos de emision"
+            description="Define los puntos de emision disponibles por establecimiento."
+            icon={MapPinned}
+            status={status.issuePointCount > 0 ? `${status.issuePointCount} activo(s)` : "Pendiente"}
+            statusVariant={status.issuePointCount > 0 ? "success" : "warning"}
+          />
+          <SriCenterActionCard
+            href={routes.sriSequences}
+            title="Secuenciales"
+            description="Activa y revisa las secuencias para facturas electronicas."
+            icon={KeyRound}
+            status={status.sequenceCount > 0 ? `${status.sequenceCount} lista(s)` : "Pendiente"}
+            statusVariant={status.sequenceCount > 0 ? "success" : "warning"}
+          />
+          <SriCenterActionCard
+            href={routes.sriSignature}
+            title="Firma electronica"
+            description="Carga el certificado y valida si ya esta listo para pruebas."
+            icon={ShieldCheck}
+            status={signatureLabel}
+            statusVariant={
+              status.signatureHasEncryptedCertificate && status.signatureHasEncryptedPassword
+                ? "success"
+                : "warning"
+            }
+          />
+          <SriCenterActionCard
+            href={routes.sriEnvironment}
+            title="Ambiente"
+            description="Confirma si la integracion apunta a pruebas o produccion."
+            icon={Globe}
+            status={
+              status.environment === "TEST"
+                ? "Pruebas"
+                : status.environment === "PRODUCTION"
                   ? "Produccion"
-                  : "No configurado"
-              }
-              ok={status.environment !== null}
-              href={routes.sriEnvironment}
-              actionLabel="Ver ambiente"
-            />
-            <StatusRow
-              label="Firma electronica"
-              value={signatureLabel}
-              ok={status.signatureStatus === "READY_FOR_TESTING"}
-              href={routes.sriSignature}
-              actionLabel="Ver firma"
-            />
-            <StatusRow
-              label="Contrasena cifrada"
-              value={status.signatureHasEncryptedPassword ? "Registrada" : "Pendiente"}
-              ok={status.signatureHasEncryptedPassword}
-              href={routes.sriSignature}
-              actionLabel="Revisar firma"
-            />
-            <StatusRow
-              label="Documentos"
-              value={documentLabel}
-              ok={status.documentCount > 0}
-              href={routes.sriDocuments}
-              actionLabel="Ver documentos"
-            />
-            <StatusRow
-              label="Autorizacion SRI"
-              value="Pendiente de implementacion"
-              ok={false}
-              href={routes.sriDocuments}
-              actionLabel="Ver flujo"
-            />
-            <StatusRow
-              label="RIDE / PDF"
-              value="Pendiente de implementacion"
-              ok={false}
-              href={routes.sriDocuments}
-              actionLabel="Ver flujo"
-            />
-          </CardContent>
-        </Card>
+                  : "Pendiente"
+            }
+            statusVariant={status.environment ? "info" : "warning"}
+          />
+          <SriCenterActionCard
+            href={routes.sriDocuments}
+            title="Comprobantes / monitoreo"
+            description="Ver facturas y comprobantes con sus estados operativos."
+            icon={FileCheck2}
+            status={status.documentCount > 0 ? `${status.documentCount} documento(s)` : "Sin actividad"}
+            statusVariant={status.documentCount > 0 ? "info" : "neutral"}
+          />
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Proximo paso recomendado</CardTitle>
+        <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
+          <Card className="rounded-[28px] border-slate-200 bg-white py-0 shadow-sm">
+            <CardHeader className="px-6 pt-6">
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="text-slate-900">Monitoreo</CardTitle>
+                <SriCenterBadge label="Resumen operativo" variant="info" />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 px-6 pb-6">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Preparando</p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-900">
+                    {status.documentStatusCounts.draft + status.documentStatusCounts.readyForTesting}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Enviando / por autorizar</p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-900">{pendingAuthorizationCount}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Autorizados</p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-900">{authorizedCount}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Rechazados</p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-900">{rejectedCount}</p>
+                </div>
+              </div>
+              <Button asChild variant="outline">
+                <Link href={routes.sriDocuments}>Ver facturas y comprobantes</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[28px] border-slate-200 bg-white py-0 shadow-sm">
+            <CardHeader className="px-6 pt-6">
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="text-slate-900">Ultimos errores</CardTitle>
+                <SriCenterBadge label={latestErrors.length > 0 ? "Revisar" : "Sin errores"} variant={latestErrors.length > 0 ? "warning" : "success"} />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 px-6 pb-6">
+              {latestErrors.length > 0 ? (
+                latestErrors.map((error) => (
+                  <div
+                    key={error.id}
+                    className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div className="rounded-xl bg-amber-100 p-2 text-amber-700">
+                          <TriangleAlert className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-slate-900">{error.kind}</p>
+                          <p className="mt-1 text-slate-600">
+                            {error.errorMessage ?? "Sin detalle disponible."}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {new Date(error.updatedAt).toLocaleString("es-EC")}
+                          </p>
+                        </div>
+                      </div>
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/sri/documents/${error.documentId}`}>Abrir</Link>
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-8 text-center text-sm text-slate-500">
+                  No hay errores recientes de firma o envio SRI para mostrar.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="rounded-[28px] border-slate-200 bg-white py-0 shadow-sm">
+          <CardHeader className="px-6 pt-6">
+            <CardTitle className="text-slate-900">Siguiente paso recomendado</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <p className="text-sm">{recommendedStep.text}</p>
-              <Button asChild variant={recommendedStep.variant}>
+          <CardContent className="space-y-4 px-6 pb-6">
+            <p className="text-sm text-slate-600">{recommendedStep.text}</p>
+            <div className="flex flex-wrap gap-3">
+              <Button asChild>
                 <Link href={recommendedStep.href}>{recommendedStep.actionLabel}</Link>
               </Button>
+              <Button asChild variant="outline">
+                <Link href={routes.sriDocuments}>Ir a Facturacion</Link>
+              </Button>
             </div>
-            {status.readinessLabel === "ready_for_testing" && (
-              <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-                Configuracion lista para pruebas. Antes de emitir en produccion, valida una firma real en ambiente de pruebas.
-              </div>
-            )}
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Comprobantes soportados</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          {[
-            { type: "Factura", code: "01", status: "Flujo inicial activo", detail: "Borrador, XML, checklist y firma en avance." },
-            { type: "Nota de credito", code: "04", status: "Estructura pendiente", detail: "Aun no hay flujo operativo completo." },
-            { type: "Nota de debito", code: "05", status: "Estructura pendiente", detail: "Aun no hay flujo operativo completo." },
-            { type: "Retencion", code: "07", status: "Estructura pendiente", detail: "Aun no hay flujo operativo completo." },
-            { type: "Guia de remision", code: "06", status: "Estructura pendiente", detail: "Aun no hay flujo operativo completo." },
-          ].map((doc) => (
-            <div key={doc.code} className="rounded-md border p-3 text-sm">
-              <p className="font-medium">{doc.type}</p>
-              <p className="text-xs text-muted-foreground">Tipo {doc.code}</p>
-              <p className={`mt-1 text-xs ${doc.code === "01" ? "text-emerald-700" : "text-amber-700"}`}>
-                {doc.status}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">{doc.detail}</p>
-            </div>
-          ))}
-        </CardContent>
-        <CardContent className="pt-0 text-sm text-muted-foreground">
-          Por ahora el flujo operativo se concentra en Factura. Los demas comprobantes estan contemplados en estructura, pero se activaran despues.
-        </CardContent>
-      </Card>
     </SriModuleShell>
   );
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { createDraftSriDocumentFromBasicSale } from "@/lib/core/sri";
+import { startSriFlowFromBasicSale } from "@/lib/core/basic-sales-sri";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 export async function POST(req: NextRequest) {
@@ -26,13 +26,14 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await createDraftSriDocumentFromBasicSale({
+    const result = await startSriFlowFromBasicSale({
       tenantId: tenant.id,
       saleId: saleId.trim(),
+      requestedByUserId: user.id,
     });
 
     return NextResponse.json(
-      { documentId: result.documentId, alreadyExists: result.alreadyExists },
+      result,
       { status: result.alreadyExists ? 200 : 201 }
     );
   } catch (err) {

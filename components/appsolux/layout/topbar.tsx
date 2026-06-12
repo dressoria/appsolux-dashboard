@@ -12,7 +12,7 @@ export async function Topbar({ user }: { user: AppsoluxUser }) {
       <div className="min-w-0">
         <p className="text-sm font-medium">Dashboard</p>
         <p className="hidden text-xs text-muted-foreground sm:block">
-          Gestiona conversaciones, canales, automatizaciones y ERP.
+          Gestiona operacion, facturacion, canales y configuracion.
         </p>
       </div>
 

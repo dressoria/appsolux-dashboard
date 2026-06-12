@@ -1,12 +1,23 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import {
+  FileCheck2,
+  ReceiptText,
+} from "lucide-react";
 
 import { SimpleReceipt } from "@/components/appsolux/basic/simple-receipt";
+import {
+  CheckoutModeCard,
+  SaleCompletionPanel,
+  SaleStatusBadge,
+} from "@/components/appsolux/basic/sales-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { routes } from "@/config/routes";
 
 type Product = {
   id: string;
@@ -45,6 +56,20 @@ type SaleResponse = {
   }>;
 };
 
+type SaleOutputResult = {
+  mode: "internal_receipt" | "sri_invoice";
+  status: "completed" | "partial";
+  saleId: string;
+  errorMessage?: string;
+  sri?: {
+    documentId: string;
+    flowState: "preparing" | "sending" | "received" | "authorized" | "rejected";
+    flowLabel: string;
+    message: string;
+    documentStatus: string;
+  };
+};
+
 function toNumber(value: string | number) {
   return typeof value === "number" ? value : Number(value ?? 0);
 }
@@ -64,9 +89,11 @@ export function BasicPosClient({
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerId, setCustomerId] = useState(initialCustomerId ?? "");
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [outputMode, setOutputMode] = useState<"internal_receipt" | "sri_invoice">("internal_receipt");
   const [paidAmount, setPaidAmount] = useState("");
   const [search, setSearch] = useState("");
   const [lastSale, setLastSale] = useState<SaleResponse | null>(null);
+  const [lastOutput, setLastOutput] = useState<SaleOutputResult | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -141,6 +168,7 @@ export function BasicPosClient({
     setMessage("");
     setError("");
     setLastSale(null);
+    setLastOutput(null);
 
     try {
       if (paymentMethod === "credit" && !customerId) {
@@ -167,6 +195,7 @@ export function BasicPosClient({
               : paidAmount
                 ? Number(paidAmount)
                 : total,
+          outputMode,
           items: cart,
         }),
       });
@@ -174,6 +203,7 @@ export function BasicPosClient({
         ok?: boolean;
         message?: string;
         sale?: SaleResponse;
+        output?: SaleOutputResult;
       };
 
       if (!response.ok || !result.ok) {
@@ -184,7 +214,14 @@ export function BasicPosClient({
       setCustomerId("");
       setPaidAmount("");
       setLastSale(result.sale ?? null);
-      setMessage("Venta confirmada.");
+      setLastOutput(result.output ?? null);
+      setMessage(
+        result.output?.mode === "sri_invoice"
+          ? result.output.status === "partial"
+            ? "Venta registrada. La factura SRI requiere revision adicional."
+            : "Venta registrada e inicio de factura SRI solicitado."
+          : "Venta confirmada. Recibo interno disponible."
+      );
       router.refresh();
     } catch (requestError) {
       setError(
@@ -199,15 +236,101 @@ export function BasicPosClient({
 
   return (
     <div className="space-y-4">
-      {lastSale ? <SimpleReceipt tenantName={tenantName} sale={lastSale} /> : null}
+      {lastOutput && lastSale ? (
+        <SaleCompletionPanel
+          title={
+            lastOutput.mode === "sri_invoice"
+              ? "Venta finalizada con factura SRI"
+              : "Venta finalizada con recibo interno"
+          }
+          description={
+            lastOutput.mode === "sri_invoice"
+              ? lastOutput.status === "partial"
+                ? lastOutput.errorMessage ??
+                  "La venta se guardo correctamente, pero la factura SRI no pudo arrancar por completo."
+                : lastOutput.sri?.message ??
+                  "La venta ya quedo registrada y el flujo SRI se inicio."
+              : "La venta ya quedo registrada, el stock se desconto y el recibo interno esta listo."
+          }
+          badges={[
+            {
+              label:
+                lastOutput.mode === "sri_invoice"
+                  ? lastOutput.sri?.flowLabel ?? "Preparando"
+                  : "Recibo interno",
+              variant:
+                lastOutput.mode === "sri_invoice"
+                  ? lastOutput.status === "partial"
+                    ? "warning"
+                    : "info"
+                  : "success",
+            },
+            {
+              label: `Venta #${lastSale.id.slice(-8)}`,
+              variant: "neutral",
+            },
+          ]}
+          primaryHref={`/basic/sales/${lastSale.id}`}
+          primaryLabel="Ver venta"
+          secondaryHref={
+            lastOutput.mode === "sri_invoice" && lastOutput.sri?.documentId
+              ? `/sri/documents/${lastOutput.sri.documentId}`
+              : routes.basicSales
+          }
+          secondaryLabel={
+            lastOutput.mode === "sri_invoice" && lastOutput.sri?.documentId
+              ? "Ver factura SRI"
+              : "Ver ventas"
+          }
+        />
+      ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-        <div className="space-y-3">
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar producto o codigo"
-          />
+      {lastSale && lastOutput?.mode === "internal_receipt" ? (
+        <SimpleReceipt tenantName={tenantName} sale={lastSale} />
+      ) : null}
+
+      <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="space-y-4">
+          <div className="rounded-[28px] border border-sky-100 bg-linear-to-br from-sky-50 via-white to-slate-50 px-5 py-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+                  Checkout
+                </p>
+                <h3 className="text-2xl font-semibold tracking-tight text-slate-900">
+                  Vende, cobra y elige la salida final
+                </h3>
+                <p className="max-w-2xl text-sm leading-6 text-slate-600">
+                  La venta siempre registra historial y descuenta inventario. Al final decides si
+                  entregas un recibo interno o si arrancas la factura electronica SRI.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild variant="outline" size="sm">
+                  <Link href={routes.basicSales}>Ver ventas</Link>
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={routes.sriDocuments}>Facturas SRI</Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <Label className="text-sm font-medium text-slate-900">Productos</Label>
+              <SaleStatusBadge
+                label={`${filteredProducts.length} disponibles`}
+                variant="info"
+              />
+            </div>
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar producto o codigo"
+              className="rounded-2xl border-slate-200 bg-white"
+            />
+          </div>
 
           <div className="grid gap-3 md:grid-cols-2">
             {filteredProducts.map((product) => (
@@ -215,11 +338,25 @@ export function BasicPosClient({
                 key={product.id}
                 type="button"
                 onClick={() => addProduct(product.id)}
-                className="rounded-md border p-3 text-left text-sm transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-[22px] border border-slate-200 bg-white p-4 text-left text-sm shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={isLoading || product.stock <= 0}
               >
-                <span className="block font-medium">{product.name}</span>
-                <span className="text-muted-foreground">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <span className="block font-medium text-slate-900">{product.name}</span>
+                    <span className="text-slate-500">
+                      ${toNumber(product.price).toFixed(2)} · stock {product.stock}
+                    </span>
+                  </div>
+                  <SaleStatusBadge
+                    label={product.stock > 0 ? "Disponible" : "Agotado"}
+                    variant={product.stock > 0 ? "success" : "danger"}
+                  />
+                </div>
+                <p className="mt-3 text-xs text-slate-500">
+                  Toca para agregar al carrito.
+                </p>
+                <span className="sr-only">
                   ${toNumber(product.price).toFixed(2)} · stock {product.stock}
                 </span>
               </button>
@@ -233,10 +370,10 @@ export function BasicPosClient({
           ) : null}
         </div>
 
-        <div className="space-y-4 rounded-md border p-4">
+        <div className="space-y-4 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
           <div>
-            <p className="text-sm font-medium">Carrito</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm font-medium text-slate-900">Carrito</p>
+            <p className="text-xs text-slate-500">
               Total: ${total.toFixed(2)}
             </p>
           </div>
@@ -248,8 +385,8 @@ export function BasicPosClient({
               return (
                 <div key={item.productId} className="grid grid-cols-[1fr_80px] gap-2">
                   <div>
-                    <p className="text-sm">{product?.name}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-sm text-slate-900">{product?.name}</p>
+                    <p className="text-xs text-slate-500">
                       Max {product?.stock ?? 0}
                     </p>
                   </div>
@@ -270,7 +407,7 @@ export function BasicPosClient({
           <div className="space-y-2">
             <Label htmlFor="customerId">Cliente</Label>
             {initialCustomerId && customerId === initialCustomerId && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-slate-500">
                 Cliente seleccionado desde conversacion.
               </p>
             )}
@@ -278,7 +415,7 @@ export function BasicPosClient({
               id="customerId"
               value={customerId}
               onChange={(event) => setCustomerId(event.target.value)}
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              className="h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm"
             >
               <option value="">Consumidor final</option>
               {customers.map((customer) => (
@@ -295,7 +432,7 @@ export function BasicPosClient({
               id="paymentMethod"
               value={paymentMethod}
               onChange={(event) => setPaymentMethod(event.target.value)}
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              className="h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm"
             >
               <option value="cash">Efectivo</option>
               <option value="transfer">Transferencia</option>
@@ -317,10 +454,38 @@ export function BasicPosClient({
               disabled={paymentMethod === "credit"}
             />
             {paymentMethod === "credit" ? (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-slate-500">
                 El total quedara pendiente en el saldo del cliente.
               </p>
             ) : null}
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <Label className="text-sm font-medium text-slate-900">Salida de la venta</Label>
+              <SaleStatusBadge
+                label={outputMode === "sri_invoice" ? "Factura SRI" : "Recibo interno"}
+                variant={outputMode === "sri_invoice" ? "info" : "success"}
+              />
+            </div>
+            <div className="grid gap-3">
+              <CheckoutModeCard
+                title="Generar recibo interno"
+                description="Confirma la venta, descuenta inventario y entrega un recibo operativo sin enviarlo al SRI."
+                selected={outputMode === "internal_receipt"}
+                icon={ReceiptText}
+                status="Rapido"
+                onSelect={() => setOutputMode("internal_receipt")}
+              />
+              <CheckoutModeCard
+                title="Emitir factura electronica SRI"
+                description="Usa la misma venta como origen y arranca el flujo SRI sin mostrar pasos tecnicos al usuario."
+                selected={outputMode === "sri_invoice"}
+                icon={FileCheck2}
+                status="Con SRI"
+                onSelect={() => setOutputMode("sri_invoice")}
+              />
+            </div>
           </div>
 
           <Button
@@ -329,10 +494,36 @@ export function BasicPosClient({
             disabled={isLoading || cart.length === 0}
             className="w-full"
           >
-            {isLoading ? "Confirmando..." : "Confirmar venta"}
+            {isLoading
+              ? "Finalizando..."
+              : outputMode === "sri_invoice"
+                ? "Finalizar venta con factura SRI"
+                : "Finalizar venta con recibo"}
           </Button>
 
-          {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            <div className="flex items-start gap-3">
+              <div className="rounded-2xl bg-sky-100 p-2.5 text-sky-700">
+                {outputMode === "sri_invoice" ? (
+                  <FileCheck2 className="h-5 w-5" />
+                ) : (
+                  <ReceiptText className="h-5 w-5" />
+                )}
+              </div>
+              <div className="space-y-1 text-sm">
+                <p className="font-medium text-slate-900">
+                  {outputMode === "sri_invoice"
+                    ? "La venta descuenta inventario y prepara la factura SRI."
+                    : "La venta descuenta inventario y genera un recibo interno."}
+                </p>
+                <p className="text-slate-600">
+                  En ambos casos se registra la venta, el historial y la trazabilidad del cliente.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {message ? <p className="text-sm text-slate-600">{message}</p> : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
         </div>
       </div>

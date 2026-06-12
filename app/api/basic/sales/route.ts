@@ -2,6 +2,7 @@ import { LightweightPaymentMethod } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { startSriFlowFromBasicSale } from "@/lib/core/basic-sales-sri";
 import { createSale, listSales } from "@/lib/core/lightweight-pos";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
@@ -29,6 +30,10 @@ function readItems(value: unknown) {
           : Number(row.quantity ?? 0),
     };
   });
+}
+
+function isOutputMode(value: unknown): value is "internal_receipt" | "sri_invoice" {
+  return value === "internal_receipt" || value === "sri_invoice";
 }
 
 export async function GET(request: Request) {
@@ -67,6 +72,8 @@ export async function POST(request: Request) {
       throw new Error("Metodo de pago invalido.");
     }
 
+    const outputMode = isOutputMode(body.outputMode) ? body.outputMode : "internal_receipt";
+
     const sale = await createSale({
       tenantId: tenant.id,
       customerId:
@@ -81,7 +88,38 @@ export async function POST(request: Request) {
       items: readItems(body.items),
     });
 
-    return NextResponse.json({ ok: true, sale });
+    let output: Record<string, unknown> = {
+      mode: outputMode,
+      status: "completed",
+      saleId: sale.id,
+    };
+
+    if (outputMode === "sri_invoice") {
+      try {
+        const sri = await startSriFlowFromBasicSale({
+          tenantId: tenant.id,
+          saleId: sale.id,
+          requestedByUserId: user.id,
+        });
+
+        output = {
+          ...output,
+          status: "completed",
+          sri,
+        };
+      } catch (sriError) {
+        output = {
+          ...output,
+          status: "partial",
+          errorMessage:
+            sriError instanceof Error
+              ? sriError.message
+              : "La venta se creo, pero no se pudo iniciar la factura SRI.",
+        };
+      }
+    }
+
+    return NextResponse.json({ ok: true, sale, output });
   } catch (error) {
     return NextResponse.json(
       {

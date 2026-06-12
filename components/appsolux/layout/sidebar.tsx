@@ -1,44 +1,70 @@
 import Link from "next/link";
+import {
+  Boxes,
+  FileCheck,
+  LayoutGrid,
+  MessageSquareText,
+  MessageSquareWarning,
+  Settings2,
+  ShoppingCart,
+  Sparkles,
+  WalletCards,
+} from "lucide-react";
 import { routes } from "@/config/routes";
-
-const appItems = [
-  { title: "Inventario & POS", href: routes.basic },
-  { title: "Ventas", href: routes.sales },
-  { title: "Facturacion SRI", href: routes.sri },
-  { title: "ERP Avanzado", href: routes.erp },
-];
-
-const comunicacionItems = [
-  { title: "Conversaciones", href: routes.conversations },
-  { title: "Canales", href: routes.channels },
-  { title: "Automatizaciones", href: routes.automations },
-];
-
-const cuentaItems = [
-  { title: "Mi Plan", href: routes.billing },
-  { title: "Ajustes", href: routes.settings },
-];
+import { cn } from "@/lib/utils";
 
 const navigationGroups = [
-  { title: "Mis Apps", items: appItems },
-  { title: "Comunicacion", items: comunicacionItems },
-  { title: "Cuenta", items: cuentaItems },
+  {
+    title: "Operacion",
+    items: [
+      { title: "Inventario", href: routes.basicStock, icon: Boxes },
+      { title: "POS / Ventas", href: routes.sales, icon: ShoppingCart },
+      { title: "Facturacion", href: routes.sriDocuments, icon: FileCheck },
+      { title: "ERP Avanzado", href: routes.erp, icon: Sparkles },
+    ],
+  },
+  {
+    title: "Configuracion",
+    items: [
+      { title: "Configuracion SRI", href: routes.sri, icon: Settings2 },
+      { title: "Ajustes", href: routes.settings, icon: MessageSquareWarning },
+    ],
+  },
+  {
+    title: "Comunicacion",
+    items: [
+      { title: "Conversaciones", href: routes.conversations, icon: MessageSquareText },
+      { title: "Canales", href: routes.channels, icon: LayoutGrid },
+      { title: "Automatizaciones", href: routes.automations, icon: Sparkles },
+    ],
+  },
+  {
+    title: "Cuenta",
+    items: [{ title: "Mi Plan", href: routes.billing, icon: WalletCards }],
+  },
 ];
 
 export function Sidebar() {
   return (
-    <aside className="hidden min-h-screen w-64 border-r bg-background px-4 py-6 lg:block">
-      <div className="mb-6 px-2">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Bionvers App</p>
-        <h2 className="mt-1 text-lg font-semibold tracking-tight">Panel empresarial</h2>
+    <aside className="hidden min-h-screen w-72 border-r border-slate-200 bg-linear-to-b from-slate-50 via-white to-slate-50/60 px-4 py-6 lg:block">
+      <div className="mb-6 rounded-2xl border border-sky-100 bg-white px-4 py-4 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">Workspace</p>
+        <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-900">
+          Panel empresarial
+        </h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Operacion, facturacion y canales en una navegacion mas clara.
+        </p>
       </div>
 
       <div className="mb-4">
         <Link
           href={routes.workspace}
-          className="flex items-center gap-2 rounded-lg bg-primary/5 border border-primary/10 px-3 py-2.5 text-sm font-medium text-primary transition hover:bg-primary/10"
+          className="flex items-center gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-700 transition hover:bg-sky-100"
         >
-          <span className="text-base">⊞</span>
+          <div className="rounded-xl bg-white p-2 text-sky-700 shadow-sm">
+            <LayoutGrid className="h-4 w-4" />
+          </div>
           Mis Aplicaciones
         </Link>
       </div>
@@ -46,15 +72,18 @@ export function Sidebar() {
       <nav className="space-y-5">
         {navigationGroups.map((group) => (
           <div key={group.title} className="space-y-1">
-            <p className="px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <p className="px-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
               {group.title}
             </p>
             {group.items.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="block rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                className={cn(
+                  "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                )}
               >
+                <item.icon className="h-4 w-4 text-slate-400" />
                 {item.title}
               </Link>
             ))}

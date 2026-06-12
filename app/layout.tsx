@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Bionvers App",
-  description: "Panel de gestion para negocios",
+  title: "Dashboard empresarial",
+  description: "Plataforma de operacion, facturacion y gestion para negocios",
 };
 
 export default function RootLayout({

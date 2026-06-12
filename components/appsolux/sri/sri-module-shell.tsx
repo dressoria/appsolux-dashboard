@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { routes } from "@/config/routes";
 
 const sriNavigation = [
-  { title: "Resumen", href: routes.sri },
+  { title: "Facturacion", href: routes.sriDocuments },
+  { title: "Configuracion SRI", href: routes.sri },
   { title: "Empresa", href: routes.sriCompany },
   { title: "Establecimientos", href: routes.sriEstablishments },
   { title: "Puntos de emision", href: routes.sriIssuePoints },
@@ -20,24 +21,36 @@ export function SriModuleShell({
   description,
   activeHref,
   children,
+  appName = "Configuracion SRI",
+  appDescription = "Centro de configuracion, firma, secuenciales, ambiente y monitoreo tributario.",
+  badge = "Configuracion",
+  badgeVariant = "blue",
+  action,
 }: {
   title: string;
   description: string;
   activeHref: string;
   children: React.ReactNode;
+  appName?: string;
+  appDescription?: string;
+  badge?: string;
+  badgeVariant?: "slate" | "blue" | "emerald" | "amber" | "violet";
+  action?: React.ReactNode;
 }) {
   return (
     <AppModuleShell
-      appName="Facturacion Electronica Ecuador"
-      appDescription="Configura empresa, RUC, establecimientos, secuenciales, firma electronica y comprobantes."
-      badge="Ecuador SRI"
-      badgeVariant="blue"
+      appName={appName}
+      appDescription={appDescription}
+      badge={badge}
+      badgeVariant={badgeVariant}
       navItems={sriNavigation}
       activeHref={activeHref}
       action={
+        action ?? (
         <Button asChild variant="outline">
-          <Link href={routes.sriCompany}>Configurar empresa</Link>
+          <Link href={routes.sriDocuments}>Ver facturas</Link>
         </Button>
+        )
       }
     >
       {(title || description) && (

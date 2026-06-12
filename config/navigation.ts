@@ -10,22 +10,27 @@ export const dashboardNavigation: NavigationItem[] = [
   {
     title: "Workspace",
     href: routes.workspace,
-    description: "Portal de aplicaciones: accede a todos tus modulos desde un solo lugar.",
+    description: "Launcher principal con acceso claro a inventario, ventas, facturacion y configuracion.",
   },
   {
-    title: "Inventario & POS",
-    href: routes.basic,
-    description: "Productos, stock, clientes, ventas, caja y reportes para operacion diaria.",
+    title: "Inventario",
+    href: routes.basicStock,
+    description: "Productos, stock, movimientos y alertas para la operacion diaria.",
   },
   {
-    title: "Ventas",
+    title: "POS / Ventas",
     href: routes.sales,
-    description: "Pedidos, cotizaciones, ventas y cuentas por cobrar.",
+    description: "Punto de venta, cobros, pedidos, clientes y seguimiento comercial.",
   },
   {
-    title: "Facturacion Electronica",
+    title: "Facturacion",
+    href: routes.sriDocuments,
+    description: "Comprobantes, estados y seguimiento de facturacion electronica Ecuador / SRI.",
+  },
+  {
+    title: "Configuracion SRI",
     href: routes.sri,
-    description: "Configura empresa, establecimientos, secuenciales, firma y comprobantes SRI Ecuador.",
+    description: "Empresa, RUC, firma, secuenciales, ambiente y monitoreo tecnico del SRI.",
   },
   {
     title: "ERP Avanzado",
