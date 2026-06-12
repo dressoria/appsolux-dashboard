@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { BasicModuleShell } from "@/components/appsolux/basic/basic-module-shell";
+import { InventorySection, InventoryStatusBadge } from "@/components/appsolux/basic/inventory-ui";
 import { ProductForm } from "@/components/appsolux/basic/product-form";
 import { ProductInventory } from "@/components/appsolux/basic/product-inventory";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,12 @@ export default async function BasicProductsPage({
   searchParams,
 }: BasicProductsPageProps) {
   const user = await getCurrentUser();
+  const inventoryNavigation = [
+    { title: "Dashboard", href: routes.basicStock },
+    { title: "Productos", href: routes.basicProducts },
+    { title: "Reportes", href: routes.basicReports },
+    { title: "Ventas", href: routes.basicSales },
+  ];
 
   if (!user) {
     return (
@@ -29,6 +36,16 @@ export default async function BasicProductsPage({
         title="Productos"
         description="Agrega productos para comenzar a vender y controla stock minimo."
         activeHref={routes.basicProducts}
+        appName="Inventario"
+        appDescription="Catalogo, ajustes y niveles minimos para una operacion ordenada."
+        badge="App"
+        badgeVariant="blue"
+        navItems={inventoryNavigation}
+        action={
+          <Button asChild>
+            <Link href={routes.basicStock}>Ver dashboard</Link>
+          </Button>
+        }
       >
         <p className="text-muted-foreground">Sesion requerida.</p>
       </BasicModuleShell>
@@ -52,13 +69,27 @@ export default async function BasicProductsPage({
       title="Productos"
       description="Catalogo ligero con precios, codigos, stock minimo y ajustes manuales."
       activeHref={routes.basicProducts}
+      appName="Inventario"
+      appDescription="Catalogo, ajustes y niveles minimos para una operacion ordenada."
+      badge="App"
+      badgeVariant="blue"
+      navItems={inventoryNavigation}
+      action={
+        <Button asChild>
+          <Link href={routes.basicStock}>Ver dashboard</Link>
+        </Button>
+      }
     >
       <div className="space-y-6">
-        <p className="text-sm text-muted-foreground">
-          {counts.products} / {plan.limits.products} productos del plan.
-        </p>
+        <div className="rounded-[28px] border border-sky-100 bg-linear-to-br from-sky-50 via-white to-slate-50 px-6 py-5">
+          <InventorySection
+            title="Catalogo de productos"
+            description="Desde aqui puedes crear productos y ajustar stock sin salir de Inventario."
+            action={<InventoryStatusBadge label={`${counts.products} / ${plan.limits.products} del plan`} variant="info" />}
+          />
+        </div>
 
-        <Card>
+        <Card id="nuevo-producto" className="rounded-[28px] border-slate-200 bg-white py-0 shadow-sm">
           <CardHeader>
             <CardTitle>Nuevo producto</CardTitle>
           </CardHeader>
@@ -75,7 +106,7 @@ export default async function BasicProductsPage({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card id="catalogo" className="rounded-[28px] border-slate-200 bg-white py-0 shadow-sm">
           <CardHeader>
             <CardTitle>Inventario basico</CardTitle>
           </CardHeader>

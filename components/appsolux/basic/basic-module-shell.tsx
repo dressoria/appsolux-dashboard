@@ -20,24 +20,38 @@ export function BasicModuleShell({
   description,
   activeHref,
   children,
+  appName = "Inventario & POS",
+  appDescription = "Productos, stock, clientes, ventas, caja y reportes para operacion diaria.",
+  badge = "Modo Basico",
+  badgeVariant = "slate",
+  navItems = basicNavigation,
+  action,
 }: {
   title: string;
   description: string;
   activeHref: string;
   children: React.ReactNode;
+  appName?: string;
+  appDescription?: string;
+  badge?: string;
+  badgeVariant?: "slate" | "blue" | "emerald" | "amber" | "violet";
+  navItems?: Array<{ title: string; href: string }>;
+  action?: React.ReactNode;
 }) {
   return (
     <AppModuleShell
-      appName="Inventario & POS"
-      appDescription="Productos, stock, clientes, ventas, caja y reportes para operacion diaria."
-      badge="Modo Basico"
-      badgeVariant="slate"
-      navItems={basicNavigation}
+      appName={appName}
+      appDescription={appDescription}
+      badge={badge}
+      badgeVariant={badgeVariant}
+      navItems={navItems}
       activeHref={activeHref}
       action={
-        <Button asChild>
-          <Link href={routes.basicPos}>Nueva venta</Link>
-        </Button>
+        action ?? (
+          <Button asChild>
+            <Link href={routes.basicPos}>Nueva venta</Link>
+          </Button>
+        )
       }
     >
       {(title || description) && (
