@@ -11,40 +11,45 @@ import {
   WalletCards,
 } from "lucide-react";
 import { routes } from "@/config/routes";
+import { resolveTenantAppRouting } from "@/lib/core/tenant-app-routing";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { cn } from "@/lib/utils";
+import type { AppsoluxUser } from "@/types/user";
 
-const navigationGroups = [
-  {
-    title: "Operacion",
-    items: [
-      { title: "Inventario", href: routes.basicStock, icon: Boxes },
-      { title: "POS / Ventas", href: routes.sales, icon: ShoppingCart },
-      { title: "Facturacion", href: routes.sriDocuments, icon: FileCheck },
-      { title: "ERP Avanzado", href: routes.erp, icon: Sparkles },
-    ],
-  },
-  {
-    title: "Configuracion",
-    items: [
-      { title: "Configuracion SRI", href: routes.sri, icon: Settings2 },
-      { title: "Ajustes", href: routes.settings, icon: MessageSquareWarning },
-    ],
-  },
-  {
-    title: "Comunicacion",
-    items: [
-      { title: "Conversaciones", href: routes.conversations, icon: MessageSquareText },
-      { title: "Canales", href: routes.channels, icon: LayoutGrid },
-      { title: "Automatizaciones", href: routes.automations, icon: Sparkles },
-    ],
-  },
-  {
-    title: "Cuenta",
-    items: [{ title: "Mi Plan", href: routes.billing, icon: WalletCards }],
-  },
-];
+export async function Sidebar({ user }: { user: AppsoluxUser }) {
+  const tenantMode = await getTenantModeState(user.tenant);
+  const appRouting = resolveTenantAppRouting(tenantMode);
+  const navigationGroups = [
+    {
+      title: "Operacion",
+      items: [
+        { title: "Inventario", href: appRouting.inventoryHref, icon: Boxes },
+        { title: "POS / Ventas", href: appRouting.salesHref, icon: ShoppingCart },
+        { title: "Facturacion", href: routes.sriDocuments, icon: FileCheck },
+        { title: "ERP Avanzado", href: appRouting.erpActionHref, icon: Sparkles },
+      ],
+    },
+    {
+      title: "Configuracion",
+      items: [
+        { title: "Configuracion SRI", href: routes.sri, icon: Settings2 },
+        { title: "Ajustes", href: routes.settings, icon: MessageSquareWarning },
+      ],
+    },
+    {
+      title: "Comunicacion",
+      items: [
+        { title: "Conversaciones", href: routes.conversations, icon: MessageSquareText },
+        { title: "Canales", href: routes.channels, icon: LayoutGrid },
+        { title: "Automatizaciones", href: routes.automations, icon: Sparkles },
+      ],
+    },
+    {
+      title: "Cuenta",
+      items: [{ title: "Mi Plan", href: routes.billing, icon: WalletCards }],
+    },
+  ];
 
-export function Sidebar() {
   return (
     <aside className="hidden min-h-screen w-72 border-r border-slate-200 bg-linear-to-b from-slate-50 via-white to-slate-50/60 px-4 py-6 lg:block">
       <div className="mb-6 rounded-2xl border border-sky-100 bg-white px-4 py-4 shadow-sm">
@@ -53,7 +58,9 @@ export function Sidebar() {
           Panel empresarial
         </h2>
         <p className="mt-1 text-sm text-slate-600">
-          Operacion, facturacion y canales en una navegacion mas clara.
+          {appRouting.hasActiveErp
+            ? "Operacion ERP, facturacion y canales en una navegacion mas clara."
+            : "Operacion basica, facturacion y canales en una navegacion mas clara."}
         </p>
       </div>
 

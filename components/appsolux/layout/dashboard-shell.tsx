@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
+import type { AppsoluxUser } from "@/types/user";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 
@@ -21,7 +22,7 @@ export async function DashboardShell({
   return (
     <div className="min-h-screen bg-background">
       <div className="flex">
-        <Sidebar />
+        <Sidebar user={user as AppsoluxUser} />
 
         <div className="min-h-screen flex-1">
           {hideTopbar ? null : <Topbar user={user} />}

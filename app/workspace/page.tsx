@@ -22,7 +22,8 @@ import { Button } from "@/components/ui/button";
 import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getBasicReports } from "@/lib/core/lightweight-pos";
-import { getTenantPlanState } from "@/lib/core/plans";
+import { resolveTenantAppRouting } from "@/lib/core/tenant-app-routing";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getSriModuleStatus } from "@/lib/core/sri";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
@@ -50,11 +51,12 @@ export default async function WorkspacePage() {
   }
 
   const tenant = await getCurrentTenant(user);
-  const [plan, sriStatus, basicReports] = await Promise.all([
-    getTenantPlanState(tenant.id),
+  const [tenantMode, sriStatus, basicReports] = await Promise.all([
+    getTenantModeState(tenant),
     getSriModuleStatus(tenant.id),
     getBasicReports(tenant.id),
   ]);
+  const appRouting = resolveTenantAppRouting(tenantMode);
 
   const sriStatusVariant =
     sriStatus.readinessLabel === "not_started"
@@ -136,15 +138,23 @@ export default async function WorkspacePage() {
 
               <div className="mt-6 space-y-3">
                 <QuickActionCard
-                  href={routes.basicStock}
+                  href={appRouting.inventoryHref}
                   title="Revisar inventario"
-                  description="Consulta stock, productos criticos y movimientos."
+                  description={
+                    appRouting.hasActiveErp
+                      ? "Consulta stock ERP, bodegas, kardex y productos criticos."
+                      : "Consulta stock, productos criticos y movimientos."
+                  }
                   icon={Boxes}
                 />
                 <QuickActionCard
-                  href={routes.basicPos}
+                  href={appRouting.posHref}
                   title="Abrir POS"
-                  description="Registrar ventas y cobrar sin navegar por modulos tecnicos."
+                  description={
+                    appRouting.hasActiveErp
+                      ? "Registrar ventas y cobrar desde el POS avanzado conectado al ERP."
+                      : "Registrar ventas y cobrar sin navegar por modulos tecnicos."
+                  }
                   icon={ShoppingCart}
                 />
                 <QuickActionCard
@@ -156,11 +166,13 @@ export default async function WorkspacePage() {
               </div>
 
               <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <p className="text-sm font-medium text-slate-900">Plan activo: {plan.planName}</p>
+                <p className="text-sm font-medium text-slate-900">
+                  Plan activo: {tenantMode.planName}
+                </p>
                 <p className="mt-1 text-xs leading-5 text-slate-600">
-                  Productos: {basicReports.counts.products}/{plan.limits.products} · Clientes:{" "}
-                  {basicReports.counts.customers}/{plan.limits.customers} · Ventas:{" "}
-                  {basicReports.counts.receipts}/{plan.limits.receipts}
+                  Productos: {basicReports.counts.products}/{tenantMode.limits.products} ·
+                  Clientes: {basicReports.counts.customers}/{tenantMode.limits.customers} ·
+                  Ventas: {basicReports.counts.receipts}/{tenantMode.limits.receipts}
                 </p>
                 <Button asChild variant="outline" size="sm" className="mt-3">
                   <Link href={routes.billing}>Ver plan</Link>
@@ -181,15 +193,14 @@ export default async function WorkspacePage() {
             <AppCard
               icon={Boxes}
               title="Inventario"
-              description="Productos, stock, entradas, salidas y alertas criticas para que la operacion no se detenga."
-              features={[
-                "Catalogo de productos",
-                "Control de stock",
-                "Entradas y salidas",
-                "Alertas por stock critico",
-                "Base para kardex y movimientos",
-              ]}
-              status={<StatusBadge variant="active" label="Activo" />}
+              description={appRouting.inventoryDescription}
+              features={appRouting.inventoryFeatures}
+              status={
+                <StatusBadge
+                  variant={appRouting.inventoryStatusVariant}
+                  label={appRouting.inventoryStatusLabel}
+                />
+              }
               meta={
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
@@ -197,42 +208,53 @@ export default async function WorkspacePage() {
                     <p className="font-semibold text-slate-900">{basicReports.counts.products}</p>
                   </div>
                   <div>
-                    <p className="text-slate-500">Stock critico</p>
+                    <p className="text-slate-500">
+                      {appRouting.hasActiveErp ? "Base local" : "Stock critico"}
+                    </p>
                     <p className="font-semibold text-slate-900">
-                      {basicReports.outOfStockProducts.length + basicReports.lowStockProducts.length}
+                      {appRouting.hasActiveErp
+                        ? "ERP"
+                        : basicReports.outOfStockProducts.length + basicReports.lowStockProducts.length}
                     </p>
                   </div>
                 </div>
               }
-              href={routes.basicStock}
+              href={appRouting.inventoryHref}
               priority
             />
 
             <AppCard
               icon={ShoppingCart}
               title="POS / Ventas"
-              description="Vende, cobra y registra pedidos desde una experiencia mas operativa, con acceso a caja, clientes y recibos."
-              features={[
-                "Punto de venta",
-                "Cobros y caja",
-                "Clientes y fiados",
-                "Pedidos y seguimiento",
-                "Puente a factura electronica",
-              ]}
-              status={<StatusBadge variant="active" label="Activo" />}
+              description={appRouting.salesDescription}
+              features={appRouting.salesFeatures}
+              status={
+                <StatusBadge
+                  variant={appRouting.salesStatusVariant}
+                  label={appRouting.salesStatusLabel}
+                />
+              }
               meta={
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <p className="text-slate-500">Ventas</p>
-                    <p className="font-semibold text-slate-900">{basicReports.counts.receipts}</p>
+                    <p className="text-slate-500">
+                      {appRouting.hasActiveErp ? "Modo" : "Ventas"}
+                    </p>
+                    <p className="font-semibold text-slate-900">
+                      {appRouting.hasActiveErp ? "ERP" : basicReports.counts.receipts}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-slate-500">Clientes</p>
-                    <p className="font-semibold text-slate-900">{basicReports.counts.customers}</p>
+                    <p className="text-slate-500">
+                      {appRouting.hasActiveErp ? "Cobranza" : "Clientes"}
+                    </p>
+                    <p className="font-semibold text-slate-900">
+                      {appRouting.hasActiveErp ? "ERP" : basicReports.counts.customers}
+                    </p>
                   </div>
                 </div>
               }
-              href={routes.sales}
+              href={appRouting.salesHref}
               priority
             />
 
@@ -331,14 +353,23 @@ export default async function WorkspacePage() {
                 "Reportes financieros",
               ]}
               status={
-                plan.canRequestDedicatedErp ? (
-                  <StatusBadge variant="pending" label="Activo" />
+                tenantMode.canRequestDedicatedErp ? (
+                  <StatusBadge
+                    variant={appRouting.erpStatusVariant}
+                    label={appRouting.erpStatusLabel}
+                  />
                 ) : (
                   <StatusBadge variant="locked" label="Plan Pro" />
                 )
               }
-              href={plan.canRequestDedicatedErp ? routes.erp : routes.billing}
-              actionLabel={plan.canRequestDedicatedErp ? "Abrir app" : "Mejorar plan"}
+              meta={
+                <div className="text-xs text-slate-600">
+                  <p className="font-medium text-slate-900">{appRouting.erpStatusLabel}</p>
+                  <p className="mt-1 leading-5">{appRouting.erpHelperText}</p>
+                </div>
+              }
+              href={appRouting.erpActionHref}
+              actionLabel={appRouting.erpActionLabel}
             />
 
             <AppCard
