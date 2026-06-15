@@ -90,6 +90,54 @@ enum PlanUpgradeRequestStatus {
   canceled
 }
 
+enum CommercialPlan {
+  BASIC
+  PLUS
+  ADVANCED
+  ENTERPRISE
+}
+
+enum OperatingMode {
+  CORE
+  SHARED_ERP
+  DEDICATED_ERP
+}
+
+enum FeatureKey {
+  inventory_basic
+  pos_basic
+  sales_basic
+  customers_basic
+  reports_basic
+  sri_invoicing
+  sri_configuration
+  inventory_advanced
+  purchases
+  warehouses
+  kardex
+  advanced_reports
+  shared_erp
+  dedicated_erp
+  erp_provisioning
+  admin_access
+  beta_access
+}
+
+enum FeatureSource {
+  PLAN
+  ADMIN
+  BETA
+  MIGRATION
+  SYSTEM
+}
+
+enum TenantOperationalStatus {
+  active
+  pending_setup
+  suspended
+  disabled
+}
+
 enum LightweightSaleStatus {
   open
   paid
@@ -193,6 +241,7 @@ model User {
   reviewedPlanUpgrades      PlanUpgradeRequest[] @relation("ReviewedPlanUpgrades")
   conversationNotes ConversationNote[]
   cashClosings              CashClosing[]       @relation("CashClosingCreatedBy")
+  tenantFeatureOverridesCreated TenantFeatureOverride[]
 }
 
 model Tenant {
@@ -228,6 +277,8 @@ model Tenant {
   sriDocuments              SriDocument[]
   sriSigningJobs            SriSigningJob[]
   sriSubmissionJobs         SriSubmissionJob[]
+  operationalConfig         TenantOperationalConfig?
+  featureOverrides          TenantFeatureOverride[]
 }
 
 model Plan {
@@ -261,6 +312,45 @@ model TenantSubscription {
   @@index([tenantId])
   @@index([planId])
   @@index([status])
+}
+
+model TenantOperationalConfig {
+  id                  String                  @id @default(cuid())
+  tenantId            String                  @unique
+  operatingMode       OperatingMode           @default(CORE)
+  status              TenantOperationalStatus @default(active)
+  sriEnabled          Boolean                 @default(false)
+  sharedErpEnabled    Boolean                 @default(false)
+  dedicatedErpEnabled Boolean                 @default(false)
+  suspendedAt         DateTime?
+  notes               String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([operatingMode])
+  @@index([status])
+}
+
+model TenantFeatureOverride {
+  id          String        @id @default(cuid())
+  tenantId    String
+  featureKey  FeatureKey
+  enabled     Boolean
+  source      FeatureSource @default(ADMIN)
+  notes       String?
+  createdById String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, featureKey])
+  @@index([tenantId])
+  @@index([featureKey])
+  @@index([source])
 }
 
 model PlanUpgradeRequest {
