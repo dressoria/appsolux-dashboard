@@ -4,6 +4,10 @@ import { getPersistentUserFromSession } from "./persistent-user";
 import { getSessionPayload } from "./session";
 import type { AppsoluxUser } from "@/types/user";
 
+function getSafeErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Unknown auth session error";
+}
+
 async function getCurrentUserFromRealSession(): Promise<AppsoluxUser | null> {
   const session = await getSessionPayload();
 
@@ -16,7 +20,12 @@ async function getCurrentUserFromRealSession(): Promise<AppsoluxUser | null> {
       userId: session.userId,
       tenantId: session.tenantId,
     });
-  } catch {
+  } catch (error) {
+    console.error("[auth] Failed to resolve persistent session user", {
+      userId: session.userId,
+      tenantId: session.tenantId,
+      message: getSafeErrorMessage(error),
+    });
     return null;
   }
 }

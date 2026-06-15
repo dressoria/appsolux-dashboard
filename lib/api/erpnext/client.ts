@@ -89,21 +89,44 @@ function getSafeErpnextMessage(payload: unknown): string | null {
   return null;
 }
 
+function getSafeBaseOrigin(baseUrl: string) {
+  try {
+    return new URL(baseUrl).origin;
+  } catch {
+    return baseUrl;
+  }
+}
+
 export async function erpnextFetch<T>(
   path: string,
   options?: RequestInit
 ): Promise<T> {
   const { baseUrl, apiKey, apiSecret } = getErpnextConfig();
+  const requestUrl = `${baseUrl}${path}`;
+  const safeOrigin = getSafeBaseOrigin(baseUrl);
+  let response: Response;
 
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `token ${apiKey}:${apiSecret}`,
-      ...options?.headers,
-    },
-    cache: "no-store",
-  });
+  try {
+    response = await fetch(requestUrl, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `token ${apiKey}:${apiSecret}`,
+        ...options?.headers,
+      },
+      cache: "no-store",
+    });
+  } catch (error) {
+    console.error("[erpnext] Network request failed", {
+      origin: safeOrigin,
+      path,
+      method: options?.method ?? "GET",
+      message: error instanceof Error ? error.message : "Unknown fetch error",
+    });
+    throw new Error(
+      "No se pudo conectar con ERPNext. Revisa la conectividad de la app, la red Docker y ERPNEXT_BASE_URL."
+    );
+  }
 
   if (!response.ok) {
     let payload: unknown = null;
@@ -122,6 +145,14 @@ export async function erpnextFetch<T>(
       (typeof payload === "string" && payload.trim()
         ? payload
         : `ERPNext request failed: ${response.status}`);
+
+    console.error("[erpnext] Request returned error response", {
+      origin: safeOrigin,
+      path,
+      method: options?.method ?? "GET",
+      status: response.status,
+      message: cleanSafeErpnextMessage(message),
+    });
 
     throw new Error(cleanSafeErpnextMessage(message));
   }
