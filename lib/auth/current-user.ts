@@ -1,6 +1,8 @@
 import "@/lib/security/server-only";
 import { getDevSessionUser } from "./dev-session";
 import { getPersistentUserFromSession } from "./persistent-user";
+import { getAppsoluxAuthProvider, shouldTryCurrentAuth, shouldTrySupabaseAuth } from "./provider";
+import { resolveAppsoluxUserFromSupabase } from "./resolve-appsolux-user-from-supabase";
 import { getSessionPayload } from "./session";
 import type { AppsoluxUser } from "@/types/user";
 
@@ -31,13 +33,27 @@ async function getCurrentUserFromRealSession(): Promise<AppsoluxUser | null> {
 }
 
 export async function getCurrentUser(): Promise<AppsoluxUser | null> {
-  const realUser = await getCurrentUserFromRealSession();
+  const provider = getAppsoluxAuthProvider();
 
-  if (realUser) {
-    return realUser;
+  if (shouldTrySupabaseAuth(provider)) {
+    const supabaseUser = await resolveAppsoluxUserFromSupabase();
+
+    if (supabaseUser) {
+      return supabaseUser;
+    }
   }
 
-  return getDevSessionUser();
+  if (shouldTryCurrentAuth(provider)) {
+    const realUser = await getCurrentUserFromRealSession();
+
+    if (realUser) {
+      return realUser;
+    }
+
+    return getDevSessionUser();
+  }
+
+  return null;
 }
 
 export async function requireCurrentUser(): Promise<AppsoluxUser> {

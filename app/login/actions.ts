@@ -2,9 +2,9 @@
 
 import { redirect } from "next/navigation";
 
-import { getLoginUserByEmail } from "@/lib/auth/persistent-user";
-import { verifyPassword } from "@/lib/auth/password";
-import { setAuthSession } from "@/lib/auth/session";
+import { signInWithCurrentPassword } from "@/lib/auth/current-password-login";
+import { getAppsoluxAuthProvider, shouldTryCurrentAuth, shouldTrySupabaseAuth } from "@/lib/auth/provider";
+import { signInWithSupabasePassword } from "@/lib/auth/supabase-password-login";
 
 function getStringField(formData: FormData, field: string) {
   const value = formData.get(field);
@@ -20,28 +20,33 @@ export async function loginAction(formData: FormData) {
   }
 
   try {
-    const user = await getLoginUserByEmail(email);
+    const provider = getAppsoluxAuthProvider();
 
-    if (!user || !user.passwordHash || user.status !== "active") {
-      redirect("/login?error=credentials");
+    if (shouldTrySupabaseAuth(provider)) {
+      const supabaseResult = await signInWithSupabasePassword({
+        email,
+        password,
+      });
+
+      if (supabaseResult.ok) {
+        redirect(supabaseResult.redirectTo);
+      }
     }
 
-    const passwordMatches = await verifyPassword(password, user.passwordHash);
+    if (shouldTryCurrentAuth(provider)) {
+      const currentResult = await signInWithCurrentPassword({
+        email,
+        password,
+      });
 
-    if (!passwordMatches) {
-      redirect("/login?error=credentials");
+      if (currentResult.ok) {
+        redirect(currentResult.redirectTo);
+      }
+
+      if (currentResult.code === "NO_ACTIVE_MEMBERSHIP") {
+        redirect("/login?error=membership");
+      }
     }
-
-    const membership = user.memberships[0];
-
-    if (!membership) {
-      redirect("/login?error=membership");
-    }
-
-    await setAuthSession({
-      userId: user.id,
-      tenantId: membership.tenantId,
-    });
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;
@@ -50,7 +55,7 @@ export async function loginAction(formData: FormData) {
     redirect("/login?error=login");
   }
 
-  redirect("/workspace");
+  redirect("/login?error=credentials");
 }
 
 function isRedirectError(error: unknown) {

@@ -5,6 +5,7 @@ import type { AppsoluxUser, AppsoluxUserRole } from "@/types/user";
 import type {
   IntegrationProvider,
   MembershipRole,
+  Prisma,
   Tenant,
   TenantIntegration,
   User,
@@ -93,6 +94,24 @@ function mapUser(user: User, membership: MembershipWithTenant): AppsoluxUser {
   };
 }
 
+const loginUserInclude = {
+  memberships: {
+    where: { status: "active" },
+    include: {
+      tenant: {
+        include: {
+          integrations: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  },
+} satisfies Prisma.UserInclude;
+
+export type LoginUserRecord = Prisma.UserGetPayload<{
+  include: typeof loginUserInclude;
+}>;
+
 export async function getPersistentUserFromSession(input: {
   userId: string;
   tenantId: string;
@@ -132,24 +151,38 @@ export async function getLoginUserByEmail(email: string) {
     where: {
       email: email.toLowerCase(),
     },
-    include: {
-      memberships: {
-        where: { status: "active" },
-        include: {
-          tenant: {
-            include: {
-              integrations: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "asc" },
-      },
+    include: loginUserInclude,
+  });
+}
+
+export async function getLoginUserBySupabaseAuthUserId(supabaseAuthUserId: string) {
+  const prisma = getPrismaClient();
+
+  return prisma.user.findUnique({
+    where: {
+      supabaseAuthUserId,
     },
+    include: loginUserInclude,
+  });
+}
+
+export async function linkUserToSupabaseAuthUserId(input: {
+  userId: string;
+  supabaseAuthUserId: string;
+}) {
+  const prisma = getPrismaClient();
+
+  return prisma.user.update({
+    where: { id: input.userId },
+    data: {
+      supabaseAuthUserId: input.supabaseAuthUserId,
+    },
+    include: loginUserInclude,
   });
 }
 
 export function mapLoginUserToAppsoluxUser(
-  user: NonNullable<Awaited<ReturnType<typeof getLoginUserByEmail>>>
+  user: LoginUserRecord
 ) {
   const membership = user.memberships[0];
 

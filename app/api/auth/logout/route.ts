@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { clearAuthSession } from "@/lib/auth/session";
+import { logoutEverywhere } from "@/lib/auth/logout";
 
 export async function POST() {
-  await clearAuthSession();
+  await logoutEverywhere();
 
   return NextResponse.json({
     success: true,

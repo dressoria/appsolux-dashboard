@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
-import { getLoginUserByEmail } from "@/lib/auth/persistent-user";
-import { verifyPassword } from "@/lib/auth/password";
-import { setAuthSession } from "@/lib/auth/session";
+
+import { signInWithCurrentPassword } from "@/lib/auth/current-password-login";
+import {
+  getAppsoluxAuthProvider,
+  shouldTryCurrentAuth,
+  shouldTrySupabaseAuth,
+} from "@/lib/auth/provider";
+import { signInWithSupabasePassword } from "@/lib/auth/supabase-password-login";
 
 function getStringField(body: Record<string, unknown>, field: string) {
   const value = body[field];
@@ -27,75 +32,71 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await getLoginUserByEmail(email);
+    const provider = getAppsoluxAuthProvider();
 
-    if (!user || !user.passwordHash) {
+    if (shouldTrySupabaseAuth(provider)) {
+      const supabaseResult = await signInWithSupabasePassword({
+        email,
+        password,
+      });
+
+      if (supabaseResult.ok) {
+        return NextResponse.json({
+          success: true,
+          data: {
+            redirect_to: supabaseResult.redirectTo,
+          },
+        });
+      }
+    }
+
+    if (shouldTryCurrentAuth(provider)) {
+      const currentResult = await signInWithCurrentPassword({
+        email,
+        password,
+      });
+
+      if (currentResult.ok) {
+        return NextResponse.json({
+          success: true,
+          data: {
+            redirect_to: currentResult.redirectTo,
+          },
+        });
+      }
+
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: "INVALID_CREDENTIALS",
-            message: "Correo o contrasena incorrectos.",
+            code: currentResult.code,
+            message: currentResult.message,
           },
         },
-        { status: 401 }
-      );
-    }
-
-    if (user.status !== "active") {
-      return NextResponse.json(
         {
-          success: false,
-          error: {
-            code: "USER_NOT_ACTIVE",
-            message: "Tu usuario no esta activo.",
-          },
-        },
-        { status: 403 }
+          status:
+            currentResult.code === "INVALID_LOGIN_INPUT"
+              ? 400
+              : currentResult.code === "USER_NOT_ACTIVE" ||
+                  currentResult.code === "NO_ACTIVE_MEMBERSHIP"
+                ? 403
+                : currentResult.code === "INVALID_CREDENTIALS"
+                  ? 401
+                  : 500,
+        }
       );
     }
 
-    const passwordMatches = await verifyPassword(password, user.passwordHash);
-
-    if (!passwordMatches) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "INVALID_CREDENTIALS",
-            message: "Correo o contrasena incorrectos.",
-          },
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: "INVALID_CREDENTIALS",
+          message: "Correo o contrasena incorrectos.",
         },
-        { status: 401 }
-      );
-    }
-
-    const membership = user.memberships[0];
-
-    if (!membership) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "NO_ACTIVE_MEMBERSHIP",
-            message: "Tu usuario no tiene una empresa activa asignada.",
-          },
-        },
-        { status: 403 }
-      );
-    }
-
-    await setAuthSession({
-      userId: user.id,
-      tenantId: membership.tenantId,
-    });
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        redirect_to: "/dashboard",
       },
-    });
+      { status: 401 }
+    );
   } catch {
     return NextResponse.json(
       {
