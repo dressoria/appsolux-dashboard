@@ -99,11 +99,11 @@ export function UpgradeRequestCard({
   return (
     <div className="space-y-4">
       <div className="rounded-md border bg-muted/30 p-4">
-        <p className="font-medium">Solicitud de mejora de plan</p>
+        <p className="font-medium">Solicitud opcional de mejora</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Durante la beta, Appsolux revisara tu solicitud y activara el plan
-          manualmente. Pago en linea proximamente; no hay cobro automatico
-          conectado todavia.
+          Durante esta fase, los modulos avanzados se activan manualmente desde
+          administracion. Este formulario queda como solicitud opcional de
+          seguimiento; no es el flujo principal.
         </p>
 
         {pendingRequest ? (

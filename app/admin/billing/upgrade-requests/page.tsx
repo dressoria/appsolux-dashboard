@@ -51,13 +51,14 @@ export default async function AdminUpgradeRequestsPage() {
     <DashboardShell>
       <div className="space-y-6">
         <div>
-          <p className="text-sm text-muted-foreground">Beta comercial</p>
+          <p className="text-sm text-muted-foreground">Historico comercial</p>
           <h1 className="text-3xl font-semibold tracking-tight">
-            Solicitudes de upgrade
+            Solicitudes antiguas / pendientes
           </h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Aprueba o rechaza solicitudes de Pro/Enterprise. Aprobar cambia el
-            plan del tenant a estado manual; no ejecuta provisioning ni pagos.
+            Este flujo queda como respaldo e historico. Las activaciones
+            actuales de plan, modo y features ya se administran desde el panel
+            principal de tenants.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button asChild variant="outline">

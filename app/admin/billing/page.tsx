@@ -58,18 +58,18 @@ export default async function AdminBillingPage() {
     <DashboardShell>
       <div className="space-y-6">
         <div>
-          <p className="text-sm text-muted-foreground">Beta comercial</p>
+          <p className="text-sm text-muted-foreground">Activaciones internas</p>
           <h1 className="text-3xl font-semibold tracking-tight">
-            Admin billing
+            Planes y activaciones
           </h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Activa planes manualmente durante la beta. No hay pasarela de pagos
-            conectada y esta pantalla no modifica limites o features arbitrarias.
+            Administra plan comercial, modo operativo y features por tenant sin
+            depender del formulario de solicitud de mejora.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button asChild variant="outline">
               <Link href={routes.adminBillingUpgradeRequests}>
-                Ver solicitudes de upgrade ({pendingUpgradeCount} pendientes)
+                Ver solicitudes antiguas ({pendingUpgradeCount} pendientes)
               </Link>
             </Button>
           </div>
@@ -94,18 +94,19 @@ export default async function AdminBillingPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Beta manual</CardTitle>
+              <CardTitle>Control manual</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              Cambios de plan y aprobaciones quedan auditados. Pago en linea se
-              integra en una fase posterior.
+              Cambios de plan, modo y overrides quedan auditados. Upgrade
+              requests siguen visibles como historico o pendiente, pero ya no
+              son el flujo principal.
             </CardContent>
           </Card>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Tenants y suscripciones</CardTitle>
+            <CardTitle>Tenants, modos y activaciones</CardTitle>
           </CardHeader>
           <CardContent>
             <BillingAdminTable tenants={tenants} />
