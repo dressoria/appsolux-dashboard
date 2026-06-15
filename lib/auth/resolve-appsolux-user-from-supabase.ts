@@ -9,7 +9,7 @@ import {
   linkUserToSupabaseAuthUserId,
   mapLoginUserToAppsoluxUser,
 } from "@/lib/auth/persistent-user";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, hasSupabaseSessionCookies } from "@/lib/supabase/server";
 import type { AppsoluxUser } from "@/types/user";
 
 function normalizeEmail(email: string | null | undefined) {
@@ -79,6 +79,14 @@ export async function resolveAppsoluxUserFromSupabaseAuthUser(
 }
 
 export async function resolveAppsoluxUserFromSupabase(): Promise<AppsoluxUser | null> {
+  // Skip the Supabase API round-trip if there are no Supabase session cookies.
+  // This prevents "Auth session missing!" noise on every request for users
+  // authenticated via the current auth system.
+  const hasCookies = await hasSupabaseSessionCookies();
+  if (!hasCookies) {
+    return null;
+  }
+
   const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
@@ -92,9 +100,13 @@ export async function resolveAppsoluxUserFromSupabase(): Promise<AppsoluxUser | 
     } = await supabase.auth.getUser();
 
     if (error) {
-      console.warn("[auth] Failed to resolve Supabase session user", {
-        message: error.message,
-      });
+      // "Auth session missing!" is the expected response when there is no active
+      // Supabase session — it is not an error in dual mode.
+      if (error.message !== "Auth session missing!") {
+        console.warn("[auth] Failed to resolve Supabase session user", {
+          message: error.message,
+        });
+      }
       return null;
     }
 
