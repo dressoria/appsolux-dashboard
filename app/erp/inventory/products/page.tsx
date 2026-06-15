@@ -20,6 +20,23 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
+async function loadResource<T>(loader: () => Promise<T>, fallback: T) {
+  try {
+    return {
+      data: await loader(),
+      error: null as string | null,
+    };
+  } catch (error) {
+    return {
+      data: fallback,
+      error:
+        error instanceof Error
+          ? error.message
+          : "No se pudo conectar con ERPNext.",
+    };
+  }
+}
+
 export default async function ErpInventoryProductsPage() {
   const user = await getCurrentUser();
 
@@ -67,16 +84,22 @@ export default async function ErpInventoryProductsPage() {
     );
   }
 
-  const [items, masters, inventory] = await Promise.all([
-    getErpnextItems().catch(() => []),
-    getErpnextMasters().catch(() => ({
+  const [itemsResult, mastersResult, inventoryResult] = await Promise.all([
+    loadResource(getErpnextItems, []),
+    loadResource(getErpnextMasters, {
       itemGroups: [],
       uoms: [],
       territories: [],
       companies: [],
-    })),
-    getErpnextInventory().catch(() => []),
+    }),
+    loadResource(getErpnextInventory, []),
   ]);
+  const items = itemsResult.data;
+  const masters = mastersResult.data;
+  const inventory = inventoryResult.data;
+  const masterDataWarning = mastersResult.error
+    ? `No se pudieron cargar categorías y unidades. ${mastersResult.error}`
+    : null;
 
   const stockByItemCode = inventory.reduce<Record<string, number>>((acc, row) => {
     acc[row.item_code] = (acc[row.item_code] ?? 0) + (row.actual_qty ?? 0);
@@ -212,7 +235,11 @@ export default async function ErpInventoryProductsPage() {
           </Card>
         </section>
 
-        <CreateItemForm itemGroups={masters.itemGroups} uoms={masters.uoms} />
+        <CreateItemForm
+          itemGroups={masters.itemGroups}
+          uoms={masters.uoms}
+          masterDataWarning={masterDataWarning}
+        />
 
         <Card className="rounded-[28px] border-slate-200 bg-white py-0 shadow-sm shadow-slate-200/60">
           <CardHeader className="pb-4">
@@ -234,6 +261,16 @@ export default async function ErpInventoryProductsPage() {
             </div>
           </CardHeader>
           <CardContent className="pb-6">
+            {itemsResult.error || inventoryResult.error ? (
+              <div className="mb-5 rounded-[24px] border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-800">
+                <p className="font-medium">Algunos datos no se pudieron cargar desde ERPNext.</p>
+                <div className="mt-1 space-y-1 leading-6">
+                  {itemsResult.error ? <p>Productos: {itemsResult.error}</p> : null}
+                  {inventoryResult.error ? <p>Inventario: {inventoryResult.error}</p> : null}
+                </div>
+              </div>
+            ) : null}
+
             {items.length === 0 ? (
               <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50/70 p-8 text-center">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-100 text-blue-600">

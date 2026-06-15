@@ -22,11 +22,13 @@ import type { ErpnextItem, ErpnextItemGroup, ErpnextUom } from "@/types/erpnext"
 type CreateItemFormProps = {
   itemGroups: ErpnextItemGroup[];
   uoms: ErpnextUom[];
+  masterDataWarning?: string | null;
 };
 
-type CreateItemResponse = ApiResponse<{ item: ErpnextItem }>;
-type CreateItemGroupResponse = ApiResponse<{ itemGroup: ErpnextItemGroup }>;
-type CreateUomResponse = ApiResponse<{ uom: ErpnextUom }>;
+type CreateItemResponse = { item: ErpnextItem };
+type CreateItemGroupResponse = { itemGroup: ErpnextItemGroup };
+type CreateUomResponse = { uom: ErpnextUom };
+type ErrorResponse = ApiResponse<Record<string, never>>;
 
 const selectClassName =
   "h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:border-sky-300 focus-visible:ring-4 focus-visible:ring-sky-100 disabled:pointer-events-none disabled:opacity-50";
@@ -138,7 +140,79 @@ function InlineModal({ title, description, onClose, children }: InlineModalProps
   );
 }
 
-export function CreateItemForm({ itemGroups, uoms }: CreateItemFormProps) {
+function getRequestErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) {
+    const message = error.message.trim();
+
+    if (!message) {
+      return fallback;
+    }
+
+    if (message.toLowerCase() === "fetch failed") {
+      return `${fallback} Revisa la conexión con ERPNext o la API interna.`;
+    }
+
+    return message;
+  }
+
+  return fallback;
+}
+
+async function requestJson<T>(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  fallbackMessage: string
+): Promise<T> {
+  let response: Response;
+
+  try {
+    response = await fetch(input, init);
+  } catch (error) {
+    throw new Error(getRequestErrorMessage(error, fallbackMessage));
+  }
+
+  const text = await response.text();
+  let payload: T | ErrorResponse | null = null;
+
+  if (text.trim()) {
+    try {
+      payload = JSON.parse(text) as T | ErrorResponse;
+    } catch {
+      throw new Error(fallbackMessage);
+    }
+  }
+
+  if (!response.ok) {
+    if (
+      payload &&
+      typeof payload === "object" &&
+      "success" in payload &&
+      payload.success === false &&
+      payload.error?.message
+    ) {
+      throw new Error(payload.error.message);
+    }
+
+    throw new Error(fallbackMessage);
+  }
+
+  const successPayload =
+    payload &&
+    typeof payload === "object" &&
+    "success" in payload &&
+    payload.success === true &&
+    "data" in payload
+      ? payload.data
+      : payload;
+
+  return successPayload as T;
+}
+
+export function CreateItemForm({
+  itemGroups,
+  uoms,
+  masterDataWarning,
+}: CreateItemFormProps) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
@@ -172,27 +246,29 @@ export function CreateItemForm({ itemGroups, uoms }: CreateItemFormProps) {
     };
 
     try {
-      const response = await fetch("/api/erpnext/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const result = (await response.json()) as CreateItemResponse;
-
-      if (!result.success) {
-        setIsError(true);
-        setMessage(result.error.message);
-        return;
-      }
+      const result = await requestJson<CreateItemResponse>(
+        "/api/erpnext/items",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+        "No se pudo crear el producto. Revisa la conexión con ERPNext o los datos ingresados."
+      );
 
       event.currentTarget.reset();
       setSelectedItemGroup(localItemGroups[0]?.name ?? "");
       setSelectedUom(localUoms[0]?.name ?? "");
-      setMessage(`Producto creado: ${result.data.item.item_code}`);
+      setMessage(`Producto creado: ${result.item.item_code}`);
       router.refresh();
     } catch (error) {
       setIsError(true);
-      setMessage(error instanceof Error ? error.message : "No se pudo crear el producto");
+      setMessage(
+        getRequestErrorMessage(
+          error,
+          "No se pudo crear el producto. Revisa la conexión con ERPNext o los datos ingresados."
+        )
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -212,28 +288,31 @@ export function CreateItemForm({ itemGroups, uoms }: CreateItemFormProps) {
     };
 
     try {
-      const response = await fetch("/api/erpnext/item-groups", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const result = (await response.json()) as CreateItemGroupResponse;
+      const result = await requestJson<CreateItemGroupResponse>(
+        "/api/erpnext/item-groups",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+        "No se pudo crear la categoría. Revisa la conexión con ERPNext o los datos ingresados."
+      );
 
-      if (!result.success) {
-        setIsError(true);
-        setMessage(result.error.message);
-        return;
-      }
-
-      const nextItemGroups = sortItemGroups([...localItemGroups, result.data.itemGroup]);
+      const nextItemGroups = sortItemGroups([...localItemGroups, result.itemGroup]);
       setLocalItemGroups(nextItemGroups);
-      setSelectedItemGroup(result.data.itemGroup.name);
+      setSelectedItemGroup(result.itemGroup.name);
       setOpenItemGroupModal(false);
-      setMessage(`Categoria creada: ${getItemGroupLabel(result.data.itemGroup)}`);
+      event.currentTarget.reset();
+      setMessage(`Categoria creada: ${getItemGroupLabel(result.itemGroup)}`);
       router.refresh();
     } catch (error) {
       setIsError(true);
-      setMessage(error instanceof Error ? error.message : "No se pudo crear la categoria.");
+      setMessage(
+        getRequestErrorMessage(
+          error,
+          "No se pudo crear la categoría. Revisa la conexión con ERPNext o los datos ingresados."
+        )
+      );
     } finally {
       setIsCreatingItemGroup(false);
     }
@@ -251,28 +330,31 @@ export function CreateItemForm({ itemGroups, uoms }: CreateItemFormProps) {
     };
 
     try {
-      const response = await fetch("/api/erpnext/uoms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const result = (await response.json()) as CreateUomResponse;
+      const result = await requestJson<CreateUomResponse>(
+        "/api/erpnext/uoms",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+        "No se pudo crear la unidad. Revisa la conexión con ERPNext o los datos ingresados."
+      );
 
-      if (!result.success) {
-        setIsError(true);
-        setMessage(result.error.message);
-        return;
-      }
-
-      const nextUoms = [...localUoms, result.data.uom];
+      const nextUoms = [...localUoms, result.uom];
       setLocalUoms(nextUoms);
-      setSelectedUom(result.data.uom.name);
+      setSelectedUom(result.uom.name);
       setOpenUomModal(false);
-      setMessage(`Unidad creada: ${result.data.uom.uom_name ?? result.data.uom.name}`);
+      event.currentTarget.reset();
+      setMessage(`Unidad creada: ${result.uom.uom_name ?? result.uom.name}`);
       router.refresh();
     } catch (error) {
       setIsError(true);
-      setMessage(error instanceof Error ? error.message : "No se pudo crear la unidad.");
+      setMessage(
+        getRequestErrorMessage(
+          error,
+          "No se pudo crear la unidad. Revisa la conexión con ERPNext o los datos ingresados."
+        )
+      );
     } finally {
       setIsCreatingUom(false);
     }
@@ -356,7 +438,14 @@ export function CreateItemForm({ itemGroups, uoms }: CreateItemFormProps) {
             </div>
           </div>
 
-          {!canCreateItem ? (
+          {masterDataWarning ? (
+            <div className="rounded-[24px] border border-rose-200 bg-rose-50/80 p-4 text-sm text-rose-800">
+              <p className="font-medium">No pudimos cargar categorías o unidades desde ERPNext.</p>
+              <p className="mt-1 leading-6">{masterDataWarning}</p>
+            </div>
+          ) : null}
+
+          {!canCreateItem && !masterDataWarning ? (
             <div className="rounded-[24px] border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-800">
               <p className="font-medium">Falta preparar una base minima para crear productos.</p>
               <p className="mt-1 leading-6">
