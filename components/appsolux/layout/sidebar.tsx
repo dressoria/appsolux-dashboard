@@ -1,8 +1,10 @@
 import Link from "next/link";
 import {
+  BarChart3,
   Boxes,
   FileCheck,
   LayoutGrid,
+  type LucideIcon,
   MessageSquareText,
   MessageSquareWarning,
   Settings2,
@@ -10,31 +12,55 @@ import {
   Sparkles,
   WalletCards,
 } from "lucide-react";
+
 import { routes } from "@/config/routes";
+import { isInternalAdmin } from "@/lib/auth/internal-admin";
 import { resolveTenantAppRouting } from "@/lib/core/tenant-app-routing";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { cn } from "@/lib/utils";
 import type { AppsoluxUser } from "@/types/user";
 
+type SidebarItem = {
+  title: string;
+  href: string;
+  icon: LucideIcon;
+};
+
 export async function Sidebar({ user }: { user: AppsoluxUser }) {
   const tenantMode = await getTenantModeState(user.tenant);
   const appRouting = resolveTenantAppRouting(tenantMode);
+  const showInternalAdmin = isInternalAdmin(user);
+  const operationsItems = [
+    { title: "Inventario", href: appRouting.inventory.href, icon: Boxes },
+    { title: "POS / Ventas", href: appRouting.sales.href, icon: ShoppingCart },
+    appRouting.shouldShowReports
+      ? { title: "Reportes", href: appRouting.reports.href, icon: BarChart3 }
+      : null,
+    appRouting.invoicing.isEnabled
+      ? { title: "Facturacion", href: appRouting.invoicing.href, icon: FileCheck }
+      : null,
+    appRouting.shouldShowAdvancedErp
+      ? { title: "ERP Avanzado", href: appRouting.advancedErp.href, icon: Sparkles }
+      : null,
+  ].filter(Boolean) as SidebarItem[];
+  const configurationItems = [
+    appRouting.sriConfiguration.isEnabled
+      ? { title: "Configuracion SRI", href: appRouting.sriConfiguration.href, icon: Settings2 }
+      : null,
+    { title: "Ajustes", href: routes.settings, icon: MessageSquareWarning },
+  ].filter(Boolean) as SidebarItem[];
+  const accountItems = [
+    { title: "Mi Plan", href: routes.billing, icon: WalletCards },
+    showInternalAdmin ? { title: "Admin Billing", href: routes.adminBilling, icon: Sparkles } : null,
+  ].filter(Boolean) as SidebarItem[];
   const navigationGroups = [
     {
       title: "Operacion",
-      items: [
-        { title: "Inventario", href: appRouting.inventoryHref, icon: Boxes },
-        { title: "POS / Ventas", href: appRouting.salesHref, icon: ShoppingCart },
-        { title: "Facturacion", href: routes.sriDocuments, icon: FileCheck },
-        { title: "ERP Avanzado", href: appRouting.erpActionHref, icon: Sparkles },
-      ],
+      items: operationsItems,
     },
     {
       title: "Configuracion",
-      items: [
-        { title: "Configuracion SRI", href: routes.sri, icon: Settings2 },
-        { title: "Ajustes", href: routes.settings, icon: MessageSquareWarning },
-      ],
+      items: configurationItems,
     },
     {
       title: "Comunicacion",
@@ -46,7 +72,7 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
     },
     {
       title: "Cuenta",
-      items: [{ title: "Mi Plan", href: routes.billing, icon: WalletCards }],
+      items: accountItems,
     },
   ];
 
@@ -58,9 +84,9 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
           Panel empresarial
         </h2>
         <p className="mt-1 text-sm text-slate-600">
-          {appRouting.hasActiveErp
-            ? "Operacion ERP, facturacion y canales en una navegacion mas clara."
-            : "Operacion basica, facturacion y canales en una navegacion mas clara."}
+          {tenantMode.shouldUseAdvancedMode
+            ? "Navegacion ajustada al motor ERP activo del tenant."
+            : "Navegacion ajustada al motor Core del tenant."}
         </p>
       </div>
 
@@ -84,7 +110,7 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
             </p>
             {group.items.map((item) => (
               <Link
-                key={item.href}
+                key={`${group.title}-${item.href}-${item.title}`}
                 href={item.href}
                 className={cn(
                   "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"

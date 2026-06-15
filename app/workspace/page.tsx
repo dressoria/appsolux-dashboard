@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  BarChart3,
   Boxes,
   CreditCard,
   FileCheck,
@@ -39,6 +40,12 @@ function getSriSignatureLabel(
   return "No configurada";
 }
 
+function getOperatingModeLabel(mode: Awaited<ReturnType<typeof getTenantModeState>>["effectiveOperatingMode"]) {
+  if (mode === "DEDICATED_ERP") return "ERP dedicado";
+  if (mode === "SHARED_ERP") return "ERP compartido";
+  return "Core";
+}
+
 export default async function WorkspacePage() {
   const user = await getCurrentUser();
 
@@ -58,29 +65,54 @@ export default async function WorkspacePage() {
   ]);
   const appRouting = resolveTenantAppRouting(tenantMode);
 
-  const sriStatusVariant =
+  const sriReadinessVariant =
     sriStatus.readinessLabel === "not_started"
       ? ("pending" as const)
       : sriStatus.readinessLabel === "incomplete"
-      ? ("incomplete" as const)
-      : sriStatus.readinessLabel === "ready_for_testing"
-      ? ("testing" as const)
-      : ("active" as const);
-
-  const sriStatusLabel =
+        ? ("incomplete" as const)
+        : sriStatus.readinessLabel === "ready_for_testing"
+          ? ("testing" as const)
+          : ("active" as const);
+  const sriReadinessLabel =
     sriStatus.readinessLabel === "not_started"
       ? "Pendiente"
       : sriStatus.readinessLabel === "incomplete"
-      ? "Incompleto"
-      : sriStatus.readinessLabel === "ready_for_testing"
-      ? "Listo para pruebas"
-      : "Configurado para produccion";
+        ? "Incompleto"
+        : sriStatus.readinessLabel === "ready_for_testing"
+          ? "Listo para pruebas"
+          : "Configurado para produccion";
   const sriConfigurationComplete =
     sriStatus.profileStatus === "CONFIGURED" &&
     sriStatus.establishmentCount > 0 &&
     sriStatus.issuePointCount > 0 &&
     sriStatus.sequenceCount > 0;
   const sriSignatureLabel = getSriSignatureLabel(sriStatus);
+  const operatingModeLabel = getOperatingModeLabel(tenantMode.effectiveOperatingMode);
+  const invoicingStatusVariant = appRouting.invoicing.isEnabled
+    ? sriReadinessVariant
+    : appRouting.invoicing.statusVariant;
+  const invoicingStatusLabel = appRouting.invoicing.isEnabled
+    ? sriReadinessLabel
+    : appRouting.invoicing.statusLabel;
+  const sriConfigStatusVariant = appRouting.sriConfiguration.isEnabled
+    ? sriReadinessVariant
+    : appRouting.sriConfiguration.statusVariant;
+  const sriConfigStatusLabel = appRouting.sriConfiguration.isEnabled
+    ? sriReadinessLabel
+    : appRouting.sriConfiguration.statusLabel;
+  const quickSriCard = appRouting.invoicing.isEnabled
+    ? {
+        href: appRouting.invoicing.href,
+        title: "Ver facturacion",
+        description: "Seguimiento de comprobantes, estados y revision operativa.",
+        icon: ReceiptText,
+      }
+    : {
+        href: appRouting.sriConfiguration.href,
+        title: "Preparar SRI",
+        description: appRouting.invoicing.helperText,
+        icon: Settings2,
+      };
 
   return (
     <DashboardShell contentClassName="mx-auto max-w-7xl">
@@ -89,29 +121,37 @@ export default async function WorkspacePage() {
           <div className="grid gap-8 px-6 py-8 lg:grid-cols-[1.45fr_0.95fr] lg:px-8">
             <div className="space-y-6">
               <SectionHeader
-                eyebrow="Fase 1"
+                eyebrow="Fase 3"
                 title="Mis Aplicaciones"
-                description="Una vista mas clara para operar tu negocio: inventario, ventas, facturacion y configuracion SRI ahora se entienden como apps separadas."
+                description="El launcher ahora respeta el motor operativo efectivo del tenant para mostrar Core, ERP compartido o ERP dedicado sin rutas rotas."
               />
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard
                   label="Productos"
-                  value={String(basicReports.counts.products)}
-                  helper="Catalogo disponible para venta y control de stock"
+                  value={tenantMode.shouldUseAdvancedMode ? "ERP" : String(basicReports.counts.products)}
+                  helper={
+                    tenantMode.shouldUseAdvancedMode
+                      ? "Catalogo principal administrado desde ERP"
+                      : "Catalogo disponible para venta y control de stock"
+                  }
                 />
                 <MetricCard
                   label="Clientes"
-                  value={String(basicReports.counts.customers)}
-                  helper="Base activa para ventas, cobranza y fidelizacion"
+                  value={tenantMode.shouldUseAdvancedMode ? "ERP" : String(basicReports.counts.customers)}
+                  helper={
+                    tenantMode.shouldUseAdvancedMode
+                      ? "Base comercial centralizada en el motor ERP"
+                      : "Base activa para ventas, cobranza y fidelizacion"
+                  }
                 />
                 <MetricCard
-                  label="Ventas"
-                  value={String(basicReports.counts.receipts)}
-                  helper="Comprobantes internos registrados en la operacion diaria"
+                  label="Motor"
+                  value={operatingModeLabel}
+                  helper={`Plan ${tenantMode.commercialPlan} · Estado ${tenantMode.dedicatedErpDisplayStatus}`}
                 />
                 <MetricCard
                   label="Estado SRI"
-                  value={sriStatusLabel}
+                  value={appRouting.sriConfiguration.isEnabled ? sriReadinessLabel : appRouting.sriConfiguration.statusLabel}
                   helper={`Firma: ${sriSignatureLabel} · Ambiente ${
                     sriStatus.environment === "TEST"
                       ? "Pruebas"
@@ -131,37 +171,37 @@ export default async function WorkspacePage() {
                 <div>
                   <p className="text-sm font-semibold text-slate-900">Operacion recomendada</p>
                   <p className="text-sm text-slate-600">
-                    Facturar deja de sentirse tecnico: vende desde POS o revisa comprobantes desde Facturacion.
+                    Inventario y ventas se abren desde el motor activo del tenant, mientras SRI queda separado para configuracion y facturacion.
                   </p>
                 </div>
               </div>
 
               <div className="mt-6 space-y-3">
                 <QuickActionCard
-                  href={appRouting.inventoryHref}
-                  title="Revisar inventario"
+                  href={appRouting.inventory.href}
+                  title={tenantMode.shouldUseAdvancedMode ? "Revisar inventario ERP" : "Revisar inventario"}
                   description={
-                    appRouting.hasActiveErp
+                    tenantMode.shouldUseAdvancedMode
                       ? "Consulta stock ERP, bodegas, kardex y productos criticos."
-                      : "Consulta stock, productos criticos y movimientos."
+                      : "Consulta stock, productos criticos y movimientos del Core."
                   }
                   icon={Boxes}
                 />
                 <QuickActionCard
-                  href={appRouting.posHref}
-                  title="Abrir POS"
+                  href={appRouting.sales.href}
+                  title="Abrir POS / Ventas"
                   description={
-                    appRouting.hasActiveErp
-                      ? "Registrar ventas y cobrar desde el POS avanzado conectado al ERP."
+                    tenantMode.shouldUseAdvancedMode
+                      ? "Registrar ventas y cobrar desde el flujo avanzado conectado al ERP."
                       : "Registrar ventas y cobrar sin navegar por modulos tecnicos."
                   }
                   icon={ShoppingCart}
                 />
                 <QuickActionCard
-                  href={routes.sriDocuments}
-                  title="Ver facturacion"
-                  description="Seguimiento de comprobantes, estados y revision operativa."
-                  icon={ReceiptText}
+                  href={quickSriCard.href}
+                  title={quickSriCard.title}
+                  description={quickSriCard.description}
+                  icon={quickSriCard.icon}
                 />
               </div>
 
@@ -170,9 +210,8 @@ export default async function WorkspacePage() {
                   Plan activo: {tenantMode.planName}
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-600">
-                  Productos: {basicReports.counts.products}/{tenantMode.limits.products} ·
-                  Clientes: {basicReports.counts.customers}/{tenantMode.limits.customers} ·
-                  Ventas: {basicReports.counts.receipts}/{tenantMode.limits.receipts}
+                  Modo efectivo: {operatingModeLabel} · Productos: {basicReports.counts.products}/{tenantMode.limits.products} ·
+                  Clientes: {basicReports.counts.customers}/{tenantMode.limits.customers}
                 </p>
                 <Button asChild variant="outline" size="sm" className="mt-3">
                   <Link href={routes.billing}>Ver plan</Link>
@@ -186,114 +225,114 @@ export default async function WorkspacePage() {
           <SectionHeader
             eyebrow="Apps principales"
             title="Operacion del dia"
-            description="Priorizamos las apps que el equipo usa todos los dias para vender, controlar stock y dar seguimiento a comprobantes."
+            description="Las apps principales ahora se resuelven por acceso efectivo para evitar enviar al usuario a modulos que no tiene activos."
           />
 
           <div className="grid gap-5 xl:grid-cols-3">
             <AppCard
               icon={Boxes}
               title="Inventario"
-              description={appRouting.inventoryDescription}
-              features={appRouting.inventoryFeatures}
+              description={appRouting.inventory.description}
+              features={appRouting.inventory.features}
               status={
                 <StatusBadge
-                  variant={appRouting.inventoryStatusVariant}
-                  label={appRouting.inventoryStatusLabel}
+                  variant={appRouting.inventory.statusVariant}
+                  label={appRouting.inventory.statusLabel}
                 />
               }
               meta={
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <p className="text-slate-500">Productos</p>
-                    <p className="font-semibold text-slate-900">{basicReports.counts.products}</p>
+                    <p className="text-slate-500">Motor</p>
+                    <p className="font-semibold text-slate-900">{operatingModeLabel}</p>
                   </div>
                   <div>
                     <p className="text-slate-500">
-                      {appRouting.hasActiveErp ? "Base local" : "Stock critico"}
+                      {tenantMode.shouldUseAdvancedMode ? "Operacion" : "Stock critico"}
                     </p>
                     <p className="font-semibold text-slate-900">
-                      {appRouting.hasActiveErp
+                      {tenantMode.shouldUseAdvancedMode
                         ? "ERP"
                         : basicReports.outOfStockProducts.length + basicReports.lowStockProducts.length}
                     </p>
                   </div>
                 </div>
               }
-              href={appRouting.inventoryHref}
+              href={appRouting.inventory.href}
               priority
+              actionLabel={appRouting.inventory.actionLabel}
+              buttonVariant={appRouting.inventory.buttonVariant}
             />
 
             <AppCard
               icon={ShoppingCart}
               title="POS / Ventas"
-              description={appRouting.salesDescription}
-              features={appRouting.salesFeatures}
+              description={appRouting.sales.description}
+              features={appRouting.sales.features}
               status={
                 <StatusBadge
-                  variant={appRouting.salesStatusVariant}
-                  label={appRouting.salesStatusLabel}
+                  variant={appRouting.sales.statusVariant}
+                  label={appRouting.sales.statusLabel}
                 />
               }
               meta={
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <p className="text-slate-500">
-                      {appRouting.hasActiveErp ? "Modo" : "Ventas"}
+                      {tenantMode.shouldUseAdvancedMode ? "Flujo" : "Ventas"}
                     </p>
                     <p className="font-semibold text-slate-900">
-                      {appRouting.hasActiveErp ? "ERP" : basicReports.counts.receipts}
+                      {tenantMode.shouldUseAdvancedMode ? "ERP" : basicReports.counts.receipts}
                     </p>
                   </div>
                   <div>
                     <p className="text-slate-500">
-                      {appRouting.hasActiveErp ? "Cobranza" : "Clientes"}
+                      {tenantMode.shouldUseAdvancedMode ? "Clientes" : "Base"}
                     </p>
                     <p className="font-semibold text-slate-900">
-                      {appRouting.hasActiveErp ? "ERP" : basicReports.counts.customers}
+                      {tenantMode.shouldUseAdvancedMode ? "ERP" : basicReports.counts.customers}
                     </p>
                   </div>
                 </div>
               }
-              href={appRouting.salesHref}
+              href={appRouting.sales.href}
               priority
+              actionLabel={appRouting.sales.actionLabel}
+              buttonVariant={appRouting.sales.buttonVariant}
             />
 
             <AppCard
               icon={FileCheck}
               title="Facturacion"
-              description="Seguimiento de comprobantes y estados operativos, con enfoque en emision electronica Ecuador / SRI sin exponer pasos tecnicos."
-              features={[
-                "Comprobantes y estados",
-                "Autorizadas, pendientes y rechazadas",
-                "Clientes y documentos",
-                "Revision de borradores y firmados",
-                "Atajo a configuracion SRI",
-              ]}
-              status={<StatusBadge variant={sriStatusVariant} label={sriStatusLabel} />}
+              description={appRouting.invoicing.description}
+              features={appRouting.invoicing.features}
+              status={<StatusBadge variant={invoicingStatusVariant} label={invoicingStatusLabel} />}
               meta={
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <p className="text-slate-500">Configuracion</p>
                     <p className="font-semibold text-slate-900">
-                      {sriConfigurationComplete ? "Completa" : "Pendiente"}
+                      {sriConfigurationComplete ? "Completa" : appRouting.invoicing.isEnabled ? "Pendiente" : "No habilitada"}
                     </p>
                   </div>
                   <div>
                     <p className="text-slate-500">Documentos</p>
                     <p className="font-semibold text-slate-900">
-                      {sriStatus.documentStatusCounts.signed > 0
-                        ? `${sriStatus.documentStatusCounts.signed} firmados`
-                        : sriStatus.documentStatusCounts.readyForTesting > 0
-                          ? `${sriStatus.documentStatusCounts.readyForTesting} listos`
-                          : `${sriStatus.documentStatusCounts.draft} borradores`}
+                      {appRouting.invoicing.isEnabled
+                        ? sriStatus.documentStatusCounts.signed > 0
+                          ? `${sriStatus.documentStatusCounts.signed} firmados`
+                          : sriStatus.documentStatusCounts.readyForTesting > 0
+                            ? `${sriStatus.documentStatusCounts.readyForTesting} listos`
+                            : `${sriStatus.documentStatusCounts.draft} borradores`
+                        : "Bloqueada"}
                     </p>
                   </div>
                 </div>
               }
-              href={routes.sriDocuments}
+              href={appRouting.invoicing.href}
               priority
-              buttonVariant={sriStatus.hasProfile ? "outline" : "default"}
-              actionLabel={sriStatus.hasProfile ? "Abrir app" : "Completar configuracion"}
+              buttonVariant={appRouting.invoicing.buttonVariant}
+              actionLabel={appRouting.invoicing.actionLabel}
             />
           </div>
         </section>
@@ -302,74 +341,98 @@ export default async function WorkspacePage() {
           <SectionHeader
             eyebrow="Apps extendidas"
             title="Configuracion y crecimiento"
-            description="Las apps tecnicas siguen disponibles, pero ahora quedan mejor separadas de la operacion diaria."
+            description="Configuracion SRI, ERP avanzado, reportes y comunicacion quedan separados de la operacion diaria, pero siguen visibles cuando aplican."
           />
 
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
             <AppCard
               icon={Settings2}
               title="Configuracion SRI"
-              description="Empresa, RUC, firma electronica, establecimientos, secuenciales y monitoreo tecnico para Ecuador."
-              features={[
-                "Empresa y perfil tributario",
-                "Establecimientos y puntos de emision",
-                "Firma electronica (.p12)",
-                "Ambientes de pruebas y produccion",
-                "Checklist y monitoreo tecnico",
-              ]}
-              status={<StatusBadge variant={sriStatusVariant} label={sriStatusLabel} />}
+              description={appRouting.sriConfiguration.description}
+              features={appRouting.sriConfiguration.features}
+              status={
+                <StatusBadge
+                  variant={sriConfigStatusVariant}
+                  label={sriConfigStatusLabel}
+                />
+              }
               meta={
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <p className="text-slate-500">Firma</p>
-                    <p className="font-semibold text-slate-900">{sriSignatureLabel}</p>
+                    <p className="font-semibold text-slate-900">
+                      {appRouting.sriConfiguration.isEnabled ? sriSignatureLabel : "No habilitada"}
+                    </p>
                   </div>
                   <div>
                     <p className="text-slate-500">Ambiente</p>
                     <p className="font-semibold text-slate-900">
-                      {sriStatus.environment === "TEST"
-                        ? "Pruebas"
-                        : sriStatus.environment === "PRODUCTION"
-                          ? "Produccion"
-                          : "Sin definir"}
+                      {appRouting.sriConfiguration.isEnabled
+                        ? sriStatus.environment === "TEST"
+                          ? "Pruebas"
+                          : sriStatus.environment === "PRODUCTION"
+                            ? "Produccion"
+                            : "Sin definir"
+                        : "Bloqueado"}
                     </p>
                   </div>
                 </div>
               }
-              href={routes.sri}
-              actionLabel={sriStatus.hasProfile ? "Abrir app" : "Configurar"}
-              buttonVariant={sriStatus.hasProfile ? "outline" : "default"}
+              href={appRouting.sriConfiguration.href}
+              actionLabel={appRouting.sriConfiguration.actionLabel}
+              buttonVariant={appRouting.sriConfiguration.buttonVariant}
             />
 
             <AppCard
               icon={CreditCard}
               title="ERP Avanzado"
-              description="Compras, proveedores, contabilidad, finanzas e inventario empresarial para operaciones de mayor complejidad."
-              features={[
-                "Compras y proveedores",
-                "Contabilidad y bancos",
-                "Kardex y valorizacion",
-                "Cuentas por pagar y cobrar",
-                "Reportes financieros",
-              ]}
+              description={appRouting.advancedErp.description}
+              features={appRouting.advancedErp.features}
               status={
-                tenantMode.canRequestDedicatedErp ? (
-                  <StatusBadge
-                    variant={appRouting.erpStatusVariant}
-                    label={appRouting.erpStatusLabel}
-                  />
-                ) : (
-                  <StatusBadge variant="locked" label="Plan Pro" />
-                )
+                <StatusBadge
+                  variant={appRouting.advancedErp.statusVariant}
+                  label={appRouting.advancedErp.statusLabel}
+                />
               }
               meta={
                 <div className="text-xs text-slate-600">
-                  <p className="font-medium text-slate-900">{appRouting.erpStatusLabel}</p>
-                  <p className="mt-1 leading-5">{appRouting.erpHelperText}</p>
+                  <p className="font-medium text-slate-900">{appRouting.advancedErp.statusLabel}</p>
+                  <p className="mt-1 leading-5">{appRouting.advancedErp.helperText}</p>
                 </div>
               }
-              href={appRouting.erpActionHref}
-              actionLabel={appRouting.erpActionLabel}
+              href={appRouting.advancedErp.href}
+              actionLabel={appRouting.advancedErp.actionLabel}
+              buttonVariant={appRouting.advancedErp.buttonVariant}
+            />
+
+            <AppCard
+              icon={BarChart3}
+              title="Reportes"
+              description={appRouting.reports.description}
+              features={appRouting.reports.features}
+              status={
+                <StatusBadge
+                  variant={appRouting.reports.statusVariant}
+                  label={appRouting.reports.statusLabel}
+                />
+              }
+              meta={
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <p className="text-slate-500">Ruta</p>
+                    <p className="font-semibold text-slate-900">
+                      {tenantMode.canAccessAdvancedReports ? "Avanzada" : "Core"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Estado</p>
+                    <p className="font-semibold text-slate-900">{appRouting.reports.statusLabel}</p>
+                  </div>
+                </div>
+              }
+              href={appRouting.reports.href}
+              actionLabel={appRouting.reports.actionLabel}
+              buttonVariant={appRouting.reports.buttonVariant}
             />
 
             <AppCard

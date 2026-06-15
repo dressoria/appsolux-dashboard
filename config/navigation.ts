@@ -17,32 +17,42 @@ export function getDashboardNavigation(appRouting: TenantAppRouting): Navigation
     },
     {
       title: "Inventario",
-      href: appRouting.inventoryHref,
-      description: appRouting.inventoryDescription,
+      href: appRouting.inventory.href,
+      description: appRouting.inventory.description,
     },
     {
       title: "POS / Ventas",
-      href: appRouting.salesHref,
-      description: appRouting.salesDescription,
+      href: appRouting.sales.href,
+      description: appRouting.sales.description,
     },
-    {
-      title: "Facturacion",
-      href: routes.sriDocuments,
-      description:
-        "Comprobantes, estados y seguimiento de facturacion electronica Ecuador / SRI.",
-    },
-    {
-      title: "Configuracion SRI",
-      href: routes.sri,
-      description:
-        "Empresa, RUC, firma, secuenciales, ambiente y monitoreo tecnico del SRI.",
-    },
-    {
-      title: "ERP Avanzado",
-      href: appRouting.erpActionHref,
-      description:
-        "Clientes, inventario, productos, ventas, compras, facturas y contabilidad.",
-    },
+    appRouting.shouldShowReports
+      ? {
+          title: "Reportes",
+          href: appRouting.reports.href,
+          description: appRouting.reports.description,
+        }
+      : null,
+    appRouting.invoicing.isVisible
+      ? {
+          title: "Facturacion",
+          href: appRouting.invoicing.href,
+          description: appRouting.invoicing.description,
+        }
+      : null,
+    appRouting.sriConfiguration.isVisible
+      ? {
+          title: "Configuracion SRI",
+          href: appRouting.sriConfiguration.href,
+          description: appRouting.sriConfiguration.description,
+        }
+      : null,
+    appRouting.shouldShowAdvancedErp
+      ? {
+          title: "ERP Avanzado",
+          href: appRouting.advancedErp.href,
+          description: appRouting.advancedErp.description,
+        }
+      : null,
     {
       title: "Conversaciones",
       href: routes.conversations,
@@ -75,28 +85,105 @@ export function getDashboardNavigation(appRouting: TenantAppRouting): Navigation
       href: routes.settings,
       description: "Empresa, usuarios, permisos, canales, Chatwoot, ERP y seguridad.",
     },
-  ];
+  ].filter(Boolean) as NavigationItem[];
 }
 
-export const dashboardNavigation = getDashboardNavigation({
+export const dashboardNavigation: NavigationItem[] = getDashboardNavigation({
+  inventory: {
+    href: routes.basicStock,
+    description: "Productos, stock y movimientos desde el modo Core.",
+    features: [],
+    statusLabel: "Core activo",
+    statusVariant: "active",
+    actionLabel: "Abrir inventario",
+    buttonVariant: "default",
+    helperText: "",
+    isEnabled: true,
+    isVisible: true,
+  },
+  sales: {
+    href: routes.basicPos,
+    description: "POS, ventas y cobros desde el modo Core.",
+    features: [],
+    statusLabel: "Core activo",
+    statusVariant: "active",
+    actionLabel: "Abrir ventas",
+    buttonVariant: "default",
+    helperText: "",
+    isEnabled: true,
+    isVisible: true,
+  },
+  reports: {
+    href: routes.basicReports,
+    description: "Reportes operativos disponibles en Core.",
+    features: [],
+    statusLabel: "Activo",
+    statusVariant: "active",
+    actionLabel: "Abrir reportes",
+    buttonVariant: "outline",
+    helperText: "",
+    isEnabled: true,
+    isVisible: true,
+  },
+  invoicing: {
+    href: routes.billing,
+    description: "Facturacion disponible solo cuando SRI esta habilitado.",
+    features: [],
+    statusLabel: "Disponible en un plan superior",
+    statusVariant: "locked",
+    actionLabel: "Ver planes",
+    buttonVariant: "outline",
+    helperText: "",
+    isEnabled: false,
+    isVisible: false,
+  },
+  sriConfiguration: {
+    href: routes.billing,
+    description: "Configuracion SRI disponible segun acceso efectivo del tenant.",
+    features: [],
+    statusLabel: "Disponible en un plan superior",
+    statusVariant: "locked",
+    actionLabel: "Ver planes",
+    buttonVariant: "outline",
+    helperText: "",
+    isEnabled: false,
+    isVisible: false,
+  },
+  advancedErp: {
+    href: routes.billing,
+    description: "ERP avanzado disponible segun plan y activacion operativa.",
+    features: [],
+    statusLabel: "Disponible en un plan superior",
+    statusVariant: "locked",
+    actionLabel: "Ver planes",
+    buttonVariant: "outline",
+    helperText: "",
+    isEnabled: false,
+    isVisible: true,
+  },
   inventoryHref: routes.basicStock,
   productsHref: routes.basicProducts,
   stockHref: routes.basicStock,
   movementsHref: routes.basicStock,
-  salesHref: routes.sales,
+  salesHref: routes.basicPos,
   posHref: routes.basicPos,
+  reportsHref: routes.basicReports,
   inventoryDescription: "Productos, stock, movimientos y alertas para la operacion diaria.",
   salesDescription: "Punto de venta, cobros, pedidos, clientes y seguimiento comercial.",
   inventoryFeatures: [],
   salesFeatures: [],
-  inventoryStatusLabel: "Modo basico",
-  inventoryStatusVariant: "pending",
-  salesStatusLabel: "Modo basico",
-  salesStatusVariant: "pending",
-  erpStatusLabel: "Plan Pro",
+  inventoryStatusLabel: "Core activo",
+  inventoryStatusVariant: "active",
+  salesStatusLabel: "Core activo",
+  salesStatusVariant: "active",
+  erpStatusLabel: "Disponible en un plan superior",
   erpStatusVariant: "locked",
-  erpActionHref: routes.erp,
-  erpActionLabel: "Abrir app",
+  erpActionHref: routes.billing,
+  erpActionLabel: "Ver planes",
   erpHelperText: "",
   hasActiveErp: false,
+  shouldShowFacturacion: false,
+  shouldShowSriConfiguration: false,
+  shouldShowAdvancedErp: true,
+  shouldShowReports: true,
 });
