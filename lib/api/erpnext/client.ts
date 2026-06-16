@@ -1,11 +1,27 @@
 import "@/lib/security/server-only";
-import { getRequiredEnv } from "@/lib/security/env";
+import { getOptionalEnv } from "@/lib/security/env";
 
 export function getErpnextConfig() {
+  const baseUrl = getOptionalEnv("ERPNEXT_BASE_URL")?.replace(/\/$/, "");
+  const apiKey = getOptionalEnv("ERPNEXT_API_KEY");
+  const apiSecret = getOptionalEnv("ERPNEXT_API_SECRET");
+
+  if (!baseUrl) {
+    throw new Error(
+      "ERP avanzado no esta disponible porque falta configurar ERPNEXT_BASE_URL."
+    );
+  }
+
+  if (!apiKey || !apiSecret) {
+    throw new Error(
+      "ERP avanzado no esta disponible porque faltan credenciales de ERPNext."
+    );
+  }
+
   return {
-    baseUrl: getRequiredEnv("ERPNEXT_BASE_URL").replace(/\/$/, ""),
-    apiKey: getRequiredEnv("ERPNEXT_API_KEY"),
-    apiSecret: getRequiredEnv("ERPNEXT_API_SECRET"),
+    baseUrl,
+    apiKey,
+    apiSecret,
   };
 }
 

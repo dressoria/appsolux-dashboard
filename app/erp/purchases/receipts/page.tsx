@@ -57,7 +57,7 @@ export default async function ErpPurchasesReceiptsPage() {
   const tenant = await getCurrentTenant(user);
   const tenantMode = await getTenantModeState(tenant);
 
-  if (!tenantMode.erpProvisioning.isRealActive) {
+  if (!tenantMode.canUseAdvancedErp) {
     return (
       <DashboardShell>
         <div className="space-y-6">

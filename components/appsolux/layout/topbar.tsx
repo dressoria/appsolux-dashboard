@@ -19,7 +19,7 @@ export async function Topbar({ user }: { user: AppsoluxUser }) {
       <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
         <ModeSwitcher
           canUseBasic={tenantMode.canUseBasicMode}
-          canUseErp={tenantMode.erpProvisioning.isRealActive}
+          canUseErp={tenantMode.canUseAdvancedErp}
           erpStatusLabel={tenantMode.erpProvisioning.displayStatus}
           basicHref={routes.basic}
           erpHref={routes.erp}

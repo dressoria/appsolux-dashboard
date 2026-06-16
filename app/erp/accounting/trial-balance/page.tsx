@@ -29,7 +29,7 @@ export default async function ErpAccountingTrialBalancePage({ searchParams }: Pr
   );
   const tenant = await getCurrentTenant(user);
   const tenantMode = await getTenantModeState(tenant);
-  if (!tenantMode.erpProvisioning.isRealActive) return (
+  if (!tenantMode.canUseAdvancedErp) return (
     <DashboardShell><Card><CardContent className="p-6 text-sm text-muted-foreground">El ERP dedicado es necesario para ver el balance de comprobacion.</CardContent></Card></DashboardShell>
   );
 

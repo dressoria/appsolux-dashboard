@@ -26,7 +26,7 @@ export default async function ErpAccountingCostCentersPage() {
   const tenant = await getCurrentTenant(user);
   const tenantMode = await getTenantModeState(tenant);
 
-  if (!tenantMode.erpProvisioning.isRealActive) {
+  if (!tenantMode.canUseAdvancedErp) {
     return (
       <DashboardShell>
         <div className="space-y-6">

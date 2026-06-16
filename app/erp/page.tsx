@@ -1,5 +1,6 @@
 ﻿import Link from "next/link";
 import { ErpTabs } from "@/components/appsolux/erp/erp-tabs";
+import { AdvancedErpNotActivatedState } from "@/components/appsolux/erp/advanced-erp-not-activated-state";
 import { ErpDedicatedProvisionCard } from "@/components/appsolux/dashboard/erp-dedicated-provision-card";
 import { AdvancedModeBlockedCard } from "@/components/appsolux/dashboard/advanced-mode-blocked-card";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
@@ -84,7 +85,7 @@ export default async function ErpPage() {
   const tenantMode = await getTenantModeState(tenant);
   const erpProvisioning = tenantMode.erpProvisioning;
 
-  if (!erpProvisioning.isRealActive) {
+  if (!tenantMode.canUseAdvancedErp) {
     return (
       <DashboardShell>
         <div className="space-y-6">
@@ -96,7 +97,7 @@ export default async function ErpPage() {
           </Link>
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">
-              ERP Comercial
+              ERP avanzado no activado
             </h1>
             <p className="mt-2 max-w-3xl text-muted-foreground">
               {getErpBlockedDescription(erpProvisioning)}
@@ -109,6 +110,10 @@ export default async function ErpPage() {
               Empresa: {tenant.name}
             </p>
           </div>
+
+          <AdvancedErpNotActivatedState
+            description="Tu tenant esta operando en modo Core. Mientras el ERP avanzado no este habilitado, esta ruta no cargara datos de ERPNext."
+          />
 
           <ErpDedicatedProvisionCard
             provisioning={erpProvisioning}

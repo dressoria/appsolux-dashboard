@@ -8,6 +8,7 @@ import type {
 
 import { getErpProvisioningState } from "@/lib/core/erp-provisioning-status";
 import { getTenantPlanState } from "@/lib/core/plans";
+import { canUseAdvancedErp } from "@/lib/core/advanced-erp-access";
 import { resolveEffectiveTenantAccessForTenant } from "@/lib/core/tenant-features";
 import type { AppsoluxTenant } from "@/types/tenant";
 
@@ -44,6 +45,7 @@ export type TenantModeState = {
   canAccessAdvancedReports: boolean;
   canAccessSriConfiguration: boolean;
   canAccessSriInvoicing: boolean;
+  canUseAdvancedErp: boolean;
 };
 
 export async function getTenantModeState(tenant: AppsoluxTenant): Promise<TenantModeState> {
@@ -62,7 +64,7 @@ export async function getTenantModeState(tenant: AppsoluxTenant): Promise<Tenant
     effectiveAccess.effectiveOperatingMode === "DEDICATED_ERP";
   const shouldUseBasicMode = !shouldUseAdvancedMode;
 
-  return {
+  const tenantMode = {
     planKey: plan.planKey,
     planName: plan.planName,
     subscriptionStatus: plan.status,
@@ -98,5 +100,10 @@ export async function getTenantModeState(tenant: AppsoluxTenant): Promise<Tenant
     canAccessAdvancedReports: effectiveAccess.features.advanced_reports,
     canAccessSriConfiguration: effectiveAccess.features.sri_configuration,
     canAccessSriInvoicing: effectiveAccess.features.sri_invoicing,
+  };
+
+  return {
+    ...tenantMode,
+    canUseAdvancedErp: canUseAdvancedErp(tenantMode),
   };
 }

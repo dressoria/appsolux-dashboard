@@ -71,7 +71,7 @@ export default async function ErpAccountingAccountsPage() {
   const tenant = await getCurrentTenant(user);
   const tenantMode = await getTenantModeState(tenant);
 
-  if (!tenantMode.erpProvisioning.isRealActive) {
+  if (!tenantMode.canUseAdvancedErp) {
     return (
       <DashboardShell>
         <Card>

@@ -1,6 +1,7 @@
 ﻿import { ErpDedicatedProvisionCard } from "@/components/appsolux/dashboard/erp-dedicated-provision-card";
 import { PosClient } from "@/components/appsolux/pos/pos-client";
 import { AdvancedModeBlockedCard } from "@/components/appsolux/dashboard/advanced-mode-blocked-card";
+import { AdvancedErpNotActivatedState } from "@/components/appsolux/erp/advanced-erp-not-activated-state";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getErpnextCustomers } from "@/lib/api/erpnext/customers";
@@ -79,13 +80,13 @@ export default async function PosPage() {
   const tenantMode = await getTenantModeState(tenant);
   const erpProvisioning = tenantMode.erpProvisioning;
 
-  if (!erpProvisioning.isRealActive) {
+  if (!tenantMode.canUseAdvancedErp) {
     return (
       <DashboardShell>
         <div className="space-y-6">
           <div>
             <p className="text-sm text-muted-foreground">POS</p>
-            <h1 className="text-3xl font-semibold tracking-tight">POS</h1>
+            <h1 className="text-3xl font-semibold tracking-tight">ERP avanzado no activado</h1>
             <p className="mt-2 max-w-3xl text-muted-foreground">
               {getPosBlockedDescription(erpProvisioning)}
             </p>
@@ -93,6 +94,10 @@ export default async function PosPage() {
               Empresa: {tenant.name}
             </p>
           </div>
+
+          <AdvancedErpNotActivatedState
+            description="Tu tenant esta operando en modo Core. El POS avanzado no cargara productos ni inventario ERP hasta que el ERP avanzado este habilitado."
+          />
 
           <ErpDedicatedProvisionCard
             provisioning={erpProvisioning}

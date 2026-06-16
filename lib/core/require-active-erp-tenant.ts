@@ -5,6 +5,7 @@ import type { TenantIntegration } from "@prisma/client";
 
 import { getErpnextCompanies } from "@/lib/api/erpnext/companies";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { canUseAdvancedErp } from "@/lib/core/advanced-erp-access";
 import { getTenantIntegrationByProvider } from "@/lib/core/integrations";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
@@ -66,11 +67,25 @@ export async function requireActiveErpTenantForApi(): Promise<ActiveErpTenantRes
   ]);
   const erpProvisioning = tenantMode.erpProvisioning;
 
+  if (!canUseAdvancedErp(tenantMode)) {
+    return {
+      ok: false,
+      response: apiErrorResponse(
+        409,
+        "ERP_NOT_ENABLED",
+        "ERP avanzado no activado para este tenant."
+      ),
+    };
+  }
+
   if (
-    !erpProvisioning.isRealActive ||
-    erpProvisioning.isSimulated ||
-    erpProvisioning.mode !== "dedicated_site" ||
-    integration?.status !== "active"
+    tenantMode.effectiveOperatingMode === "DEDICATED_ERP" &&
+    (
+      !erpProvisioning.isRealActive ||
+      erpProvisioning.isSimulated ||
+      erpProvisioning.mode !== "dedicated_site" ||
+      integration?.status !== "active"
+    )
   ) {
     return {
       ok: false,

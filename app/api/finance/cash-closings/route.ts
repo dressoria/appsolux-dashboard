@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     const tenant = await getCurrentTenant(user);
     const tenantMode = await getTenantModeState(tenant);
 
-    if (!tenantMode.erpProvisioning.isRealActive) {
+    if (!tenantMode.canUseAdvancedErp) {
       return NextResponse.json(
         {
           success: false,
