@@ -1,5 +1,7 @@
 import "@/lib/security/server-only";
 
+import { cache } from "react";
+
 import type {
   CommercialPlan,
   FeatureKey,
@@ -229,36 +231,32 @@ export function resolveEffectiveTenantAccess(input: {
   } satisfies EffectiveTenantAccess;
 }
 
-export async function getTenantOperationalConfig(tenantId: string) {
+export const getTenantOperationalConfig = cache(async function getTenantOperationalConfig(tenantId: string) {
   const prisma = getPrismaClient() as PrismaClient;
 
   return prisma.tenantOperationalConfig.findUnique({
     where: { tenantId },
   });
-}
+});
 
-export async function getTenantFeatureOverrides(tenantId: string) {
+export const getTenantFeatureOverrides = cache(async function getTenantFeatureOverrides(tenantId: string) {
   const prisma = getPrismaClient() as PrismaClient;
 
   return prisma.tenantFeatureOverride.findMany({
     where: { tenantId },
     orderBy: [{ featureKey: "asc" }],
   });
-}
+});
 
 export async function resolveEffectiveTenantAccessForTenant(input: {
   tenantId: string;
   erpProvisioning?: ErpProvisioningState | null;
   planState?: TenantPlanGateState;
 }) {
-  const prisma = getPrismaClient() as PrismaClient;
   const [subscription, operationalConfig, overrides] = await Promise.all([
     getTenantSubscription(input.tenantId),
-    prisma.tenantOperationalConfig.findUnique({ where: { tenantId: input.tenantId } }),
-    prisma.tenantFeatureOverride.findMany({
-      where: { tenantId: input.tenantId },
-      orderBy: [{ featureKey: "asc" }],
-    }),
+    getTenantOperationalConfig(input.tenantId),
+    getTenantFeatureOverrides(input.tenantId),
   ]);
 
   const fallbackLegacyPlanKey = input.planState?.planKey ?? null;

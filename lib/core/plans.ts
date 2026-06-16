@@ -1,5 +1,7 @@
 import "@/lib/security/server-only";
 
+import { cache } from "react";
+
 import { getPrismaClient } from "@/lib/db/prisma";
 
 export type PlanKey = "free" | "trial" | "pro" | "enterprise";
@@ -217,7 +219,7 @@ export function getPlanFeatures(planKey: string | null | undefined): PlanFeature
   return defaultPlanDefinitions[isPlanKey(planKey) ? planKey : getDefaultPlanKey()].features;
 }
 
-export async function getTenantSubscription(tenantId: string) {
+export const getTenantSubscription = cache(async function getTenantSubscription(tenantId: string) {
   const prisma = getPrismaClient();
 
   return prisma.tenantSubscription.findFirst({
@@ -231,7 +233,7 @@ export async function getTenantSubscription(tenantId: string) {
       startedAt: "desc",
     },
   });
-}
+});
 
 export async function getTenantPlanState(
   tenantId: string

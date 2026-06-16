@@ -16,13 +16,13 @@ function assertDatabaseUrl() {
 export function getPrismaClient() {
   assertDatabaseUrl();
 
-  const client = globalForPrisma.prisma ?? new PrismaClient();
-
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.prisma = client;
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = new PrismaClient({
+      log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+    });
   }
 
-  return client;
+  return globalForPrisma.prisma;
 }
 
 export const prisma = getPrismaClient;

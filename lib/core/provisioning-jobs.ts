@@ -6,7 +6,6 @@ import {
 
 import { getPrismaClient } from "@/lib/db/prisma";
 
-const DEFAULT_ERP_DOMAIN = "erp.appsolux.com";
 const DEFAULT_ERP_INSTANCE = "erp_cluster_01";
 
 export type CreateProvisioningJobInput = {
@@ -44,9 +43,7 @@ export function sanitizeProvisioningSlug(value: string) {
 }
 
 function getErpProvisioningDomain() {
-  return (
-    process.env.ERP_PROVISIONING_DEFAULT_DOMAIN?.trim() || DEFAULT_ERP_DOMAIN
-  );
+  return process.env.ERP_PROVISIONING_DEFAULT_DOMAIN?.trim() || "";
 }
 
 export async function createProvisioningJob(input: CreateProvisioningJobInput) {

@@ -140,7 +140,7 @@ export default function RegisterPage() {
                   id="email"
                   name="email"
                   type="email"
-                  placeholder="andres@appsolux.com"
+                  placeholder="correo@empresa.com"
                   required
                   disabled={isLoading}
                 />
