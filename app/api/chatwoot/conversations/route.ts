@@ -3,6 +3,7 @@ import { getChatwootConversations } from "@/lib/api/chatwoot/conversations";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getTenantIntegrationByProvider } from "@/lib/core/integrations";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { getChatwootServiceConfig } from "@/config/services";
 
 async function hasMissingOperationalAccess(tenantId: string) {
   const integration = await getTenantIntegrationByProvider(tenantId, "chatwoot");
@@ -22,6 +23,19 @@ async function hasMissingOperationalAccess(tenantId: string) {
 }
 
 export async function GET() {
+  if (!getChatwootServiceConfig().enabled) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: "CHATWOOT_SERVICE_DISABLED",
+          message: "El servicio de conversaciones no esta habilitado en esta plataforma.",
+        },
+      },
+      { status: 503 }
+    );
+  }
+
   try {
     const user = await getCurrentUser();
 

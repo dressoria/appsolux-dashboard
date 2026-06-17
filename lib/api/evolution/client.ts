@@ -1,5 +1,6 @@
 import "@/lib/security/server-only";
 import { getRequiredEnv } from "@/lib/security/env";
+import { getEvolutionServiceConfig, ServiceDisabledError } from "@/config/services";
 
 export function getEvolutionConfig() {
   return {
@@ -98,6 +99,10 @@ export async function evolutionFetch<T>(
   path: string,
   options?: RequestInit
 ): Promise<T> {
+  if (!getEvolutionServiceConfig().enabled) {
+    throw new ServiceDisabledError("Evolution API");
+  }
+
   const { baseUrl, apiKey } = getEvolutionConfig();
   const method = getMethod(options);
 

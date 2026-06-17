@@ -4,6 +4,7 @@ import {
   getChatwootBotToken,
   getMaskedToken,
 } from "./config";
+import { getChatwootServiceConfig, ServiceDisabledError } from "@/config/services";
 
 export function getChatwootConfig() {
   const botToken = getChatwootBotToken();
@@ -27,6 +28,10 @@ export async function chatwootFetch<T>(
   path: string,
   options?: RequestInit
 ): Promise<T> {
+  if (!getChatwootServiceConfig().enabled) {
+    throw new ServiceDisabledError("Chatwoot");
+  }
+
   const { baseUrl, apiAccessToken } = getChatwootConfig();
 
   console.info(

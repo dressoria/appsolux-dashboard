@@ -1,5 +1,6 @@
 import "@/lib/security/server-only";
 import { getOptionalEnv, getRequiredEnv } from "@/lib/security/env";
+import { getN8nServiceConfig, ServiceDisabledError } from "@/config/services";
 
 export function getN8nConfig() {
   return {
@@ -14,6 +15,10 @@ export async function n8nWebhookFetch<T>(
   webhookUrl: string,
   payload: unknown
 ): Promise<T> {
+  if (!getN8nServiceConfig().enabled) {
+    throw new ServiceDisabledError("n8n");
+  }
+
   const { webhookSecret } = getN8nConfig();
 
   const response = await fetch(webhookUrl, {

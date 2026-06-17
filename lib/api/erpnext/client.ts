@@ -1,7 +1,12 @@
 import "@/lib/security/server-only";
 import { getOptionalEnv } from "@/lib/security/env";
+import { getErpServiceConfig, ServiceDisabledError } from "@/config/services";
 
 export function getErpnextConfig() {
+  if (!getErpServiceConfig().enabled) {
+    throw new ServiceDisabledError("ERPNext");
+  }
+
   const baseUrl = getOptionalEnv("ERPNEXT_BASE_URL")?.replace(/\/$/, "");
   const apiKey = getOptionalEnv("ERPNEXT_API_KEY");
   const apiSecret = getOptionalEnv("ERPNEXT_API_SECRET");

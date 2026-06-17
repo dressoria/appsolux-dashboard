@@ -9,6 +9,7 @@ import { canUseAdvancedErp } from "@/lib/core/advanced-erp-access";
 import { getTenantIntegrationByProvider } from "@/lib/core/integrations";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { getErpServiceConfig } from "@/config/services";
 import type { ErpProvisioningState } from "@/lib/core/erp-provisioning-status";
 import type { AppsoluxTenant } from "@/types/tenant";
 import type { AppsoluxUser } from "@/types/user";
@@ -51,6 +52,17 @@ function getIntegrationCompany(integration: TenantIntegration | null) {
 }
 
 export async function requireActiveErpTenantForApi(): Promise<ActiveErpTenantResult> {
+  if (!getErpServiceConfig().enabled) {
+    return {
+      ok: false,
+      response: apiErrorResponse(
+        503,
+        "ERP_SERVICE_DISABLED",
+        "El servicio ERP no esta habilitado en esta plataforma."
+      ),
+    };
+  }
+
   const user = await getCurrentUser();
 
   if (!user) {

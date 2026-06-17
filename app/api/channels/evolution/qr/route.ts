@@ -7,6 +7,7 @@ import {
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getTenantIntegrationByProvider } from "@/lib/core/integrations";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { getEvolutionServiceConfig } from "@/config/services";
 
 export async function GET() {
   try {
@@ -44,6 +45,20 @@ export async function GET() {
           },
         },
         { status: 400 }
+      );
+    }
+
+    if (!getEvolutionServiceConfig().enabled) {
+      return NextResponse.json(
+        {
+          success: false,
+          ok: false,
+          error: {
+            code: "EVOLUTION_SERVICE_DISABLED",
+            message: "WhatsApp Evolution no esta habilitado en esta plataforma.",
+          },
+        },
+        { status: 503 }
       );
     }
 

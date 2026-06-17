@@ -4,6 +4,7 @@ import {
   getChatwootPlatformToken,
   getMaskedToken,
 } from "./config";
+import { getChatwootServiceConfig, ServiceDisabledError } from "@/config/services";
 
 type ChatwootPlatformAccountResponse = {
   id: number;
@@ -119,6 +120,10 @@ async function chatwootPlatformFetch<T>(
   path: string,
   options?: RequestInit
 ): Promise<T> {
+  if (!getChatwootServiceConfig().enabled) {
+    throw new ServiceDisabledError("Chatwoot");
+  }
+
   const { baseUrl, platformApiToken } = getChatwootPlatformConfig();
 
   console.info(

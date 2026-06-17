@@ -3,6 +3,14 @@ export type ServiceConfig = {
   baseUrl: string | null;
 };
 
+export class ServiceDisabledError extends Error {
+  readonly code = "SERVICE_DISABLED" as const;
+  constructor(public readonly service: string) {
+    super(`${service} no esta habilitado en esta plataforma.`);
+    this.name = "ServiceDisabledError";
+  }
+}
+
 function readBoolEnv(name: string, fallback = false): boolean {
   const value = process.env[name]?.trim().toLowerCase();
   if (value === "true") return true;
