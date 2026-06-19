@@ -1,9 +1,15 @@
 import "@/lib/security/server-only";
 import { getDevSessionUser } from "./dev-session";
 import { getPersistentUserFromSession } from "./persistent-user";
-import { getAppsoluxAuthProvider, shouldTryCurrentAuth, shouldTrySupabaseAuth } from "./provider";
+import {
+  getAppsoluxAuthProvider,
+  isClerkAuth,
+  shouldTryCurrentAuth,
+  shouldTrySupabaseAuth,
+} from "./provider";
 import { resolveAppsoluxUserFromSupabase } from "./resolve-appsolux-user-from-supabase";
 import { getSessionPayload } from "./session";
+import { getAppUser } from "./require-app-user";
 import type { AppsoluxUser } from "@/types/user";
 
 function getSafeErrorMessage(error: unknown) {
@@ -34,6 +40,10 @@ async function getCurrentUserFromRealSession(): Promise<AppsoluxUser | null> {
 
 export async function getCurrentUser(): Promise<AppsoluxUser | null> {
   const provider = getAppsoluxAuthProvider();
+
+  if (isClerkAuth(provider)) {
+    return getAppUser();
+  }
 
   if (shouldTrySupabaseAuth(provider)) {
     const supabaseUser = await resolveAppsoluxUserFromSupabase();

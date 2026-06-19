@@ -1,15 +1,19 @@
 import "@/lib/security/server-only";
 
-export type AppsoluxAuthProvider = "current" | "dual" | "supabase";
+export type AppsoluxAuthProvider = "current" | "dual" | "supabase" | "clerk";
 
 export function getAppsoluxAuthProvider(): AppsoluxAuthProvider {
   const value = process.env.APPSOLUX_AUTH_PROVIDER?.trim().toLowerCase();
 
-  if (value === "dual" || value === "supabase") {
+  if (value === "dual" || value === "supabase" || value === "clerk") {
     return value;
   }
 
   return "current";
+}
+
+export function isClerkAuth(provider = getAppsoluxAuthProvider()) {
+  return provider === "clerk";
 }
 
 export function shouldTrySupabaseAuth(provider = getAppsoluxAuthProvider()) {

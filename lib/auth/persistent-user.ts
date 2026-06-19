@@ -94,7 +94,7 @@ function mapUser(user: User, membership: MembershipWithTenant): AppsoluxUser {
   };
 }
 
-const loginUserInclude = {
+export const loginUserInclude = {
   memberships: {
     where: { status: "active" },
     include: {
