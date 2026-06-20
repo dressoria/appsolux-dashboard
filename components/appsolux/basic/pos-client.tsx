@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   FileCheck2,
   ReceiptText,
+  Trash2,
   UserPlus,
   X,
 } from "lucide-react";
@@ -105,6 +106,9 @@ export function BasicPosClient({
   const [isLoading, setIsLoading] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
 
+  // Raw string values for cart quantity inputs — allows temporary empty/partial state while typing
+  const [cartInputs, setCartInputs] = useState<Record<string, string>>({});
+
   // Transfer fields (UI-only — no DB field available without migration)
   const [transferBank, setTransferBank] = useState("");
   const [transferRef, setTransferRef] = useState("");
@@ -150,26 +154,43 @@ export function BasicPosClient({
           setError(`Stock insuficiente para ${product.name}.`);
           return current;
         }
+        const newQty = existing.quantity + 1;
+        setCartInputs((prev) => ({ ...prev, [productId]: String(newQty) }));
         return current.map((item) =>
-          item.productId === productId ? { ...item, quantity: item.quantity + 1 } : item
+          item.productId === productId ? { ...item, quantity: newQty } : item
         );
       }
+      setCartInputs((prev) => ({ ...prev, [productId]: "1" }));
       return [...current, { productId, quantity: 1 }];
     });
   }
 
-  function updateQuantity(productId: string, quantity: number) {
-    if (quantity <= 0) {
-      setCart((current) => current.filter((item) => item.productId !== productId));
-      return;
-    }
+  // Called only onBlur — normalizes the raw string and commits to cart
+  function commitQuantity(productId: string) {
+    const raw = cartInputs[productId] ?? "";
     const product = productById.get(productId);
-    const safeQuantity = product ? Math.min(quantity, product.stock) : quantity;
+    const parsed = parseInt(raw, 10);
+    const safe =
+      !Number.isFinite(parsed) || parsed < 1
+        ? 1
+        : product
+          ? Math.min(parsed, product.stock)
+          : parsed;
+    setCartInputs((prev) => ({ ...prev, [productId]: String(safe) }));
     setCart((current) =>
       current.map((item) =>
-        item.productId === productId ? { ...item, quantity: safeQuantity } : item
+        item.productId === productId ? { ...item, quantity: safe } : item
       )
     );
+  }
+
+  function removeFromCart(productId: string) {
+    setCart((current) => current.filter((item) => item.productId !== productId));
+    setCartInputs((prev) => {
+      const next = { ...prev };
+      delete next[productId];
+      return next;
+    });
   }
 
   async function submitSale() {
@@ -212,6 +233,7 @@ export function BasicPosClient({
       }
 
       setCart([]);
+      setCartInputs({});
       setCustomerId("");
       setPaidAmount("");
       setTransferBank("");
@@ -276,6 +298,7 @@ export function BasicPosClient({
     setLastSale(null);
     setLastOutput(null);
     setShowReceipt(false);
+    setCartInputs({});
     setError("");
   }
 
@@ -485,21 +508,31 @@ export function BasicPosClient({
           <div className="space-y-2">
             {cart.map((item) => {
               const product = productById.get(item.productId);
+              const rawValue = cartInputs[item.productId] ?? String(item.quantity);
               return (
-                <div key={item.productId} className="grid grid-cols-[1fr_80px] gap-2">
+                <div key={item.productId} className="grid grid-cols-[1fr_80px_32px] items-center gap-2">
                   <div>
                     <p className="text-sm text-slate-900">{product?.name}</p>
                     <p className="text-xs text-slate-500">Max {product?.stock ?? 0}</p>
                   </div>
                   <Input
                     type="number"
-                    min="0"
+                    min="1"
                     max={product?.stock ?? undefined}
-                    value={item.quantity}
+                    value={rawValue}
                     onChange={(event) =>
-                      updateQuantity(item.productId, Number(event.target.value))
+                      setCartInputs((prev) => ({ ...prev, [item.productId]: event.target.value }))
                     }
+                    onBlur={() => commitQuantity(item.productId)}
                   />
+                  <button
+                    type="button"
+                    onClick={() => removeFromCart(item.productId)}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
+                    title="Eliminar del carrito"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               );
             })}

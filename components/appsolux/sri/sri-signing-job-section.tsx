@@ -151,13 +151,9 @@ export function SriSigningJobSection({ documentId, documentStatus, readiness }: 
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
-        <p className="font-semibold">Firma por worker separado</p>
-        <p className="mt-0.5">
-          La solicitud crea un job en cola y un worker separado procesa la firma XAdES-BES.
-          Next.js no firma directamente ni expone el certificado al navegador.
-        </p>
-      </div>
+      <p className="text-xs text-slate-500">
+        La firma XAdES-BES se procesa mediante worker separado. El certificado no se expone al navegador.
+      </p>
 
       {documentStatus === "READY_FOR_TESTING" && readiness?.canRequestSigning && (
         <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
@@ -173,7 +169,13 @@ export function SriSigningJobSection({ documentId, documentStatus, readiness }: 
 
       {documentStatus === "READY_FOR_TESTING" && !readiness?.canRequestSigning && signatureOnlyReasons.length > 0 && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          <p className="font-semibold">Falta completar firma electrónica</p>
+          <p className="font-semibold">
+            {signatureOnlyReasons.some((r) => r.includes("certificado"))
+              ? "Falta cargar el certificado de firma electronica"
+              : signatureOnlyReasons.some((r) => r.includes("contrase"))
+                ? "Falta la contrasena del certificado"
+                : "La firma electronica no esta lista para pruebas"}
+          </p>
           <ul className="mt-1 space-y-1 text-xs">
             {signatureOnlyReasons.map((reason) => (
               <li key={reason}>- {reason}</li>
