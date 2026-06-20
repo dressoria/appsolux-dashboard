@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
@@ -291,31 +290,6 @@ export function BasicPosClient({
 
       <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
         <div className="space-y-4">
-          <div className="rounded-[28px] border border-sky-100 bg-linear-to-br from-sky-50 via-white to-slate-50 px-5 py-5">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="space-y-1">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
-                  Checkout
-                </p>
-                <h3 className="text-2xl font-semibold tracking-tight text-slate-900">
-                  Vende, cobra y elige la salida final
-                </h3>
-                <p className="max-w-2xl text-sm leading-6 text-slate-600">
-                  La venta siempre registra historial y descuenta inventario. Al final decides si
-                  entregas un recibo interno o si arrancas la factura electronica SRI.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button asChild variant="outline" size="sm">
-                  <Link href={routes.basicSales}>Ver ventas</Link>
-                </Button>
-                <Button asChild variant="outline" size="sm">
-                  <Link href={routes.sriDocuments}>Facturas SRI</Link>
-                </Button>
-              </div>
-            </div>
-          </div>
-
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <Label className="text-sm font-medium text-slate-900">Productos</Label>

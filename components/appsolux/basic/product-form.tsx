@@ -47,52 +47,138 @@ export function ProductForm({ disabled = false }: { disabled?: boolean }) {
       router.refresh();
     } catch (requestError) {
       setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No se pudo crear producto."
+        requestError instanceof Error ? requestError.message : "No se pudo crear producto."
       );
     } finally {
       setIsLoading(false);
     }
   }
 
+  const fieldDisabled = isLoading || disabled;
+
   return (
-    <form onSubmit={handleSubmit} className="grid gap-3 md:grid-cols-2">
-      <div className="space-y-2">
-        <Label htmlFor="name">Producto</Label>
-        <Input id="name" name="name" required disabled={isLoading || disabled} />
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Información principal */}
+      <div>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Información principal
+        </p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="name">Nombre del producto</Label>
+            <Input
+              id="name"
+              name="name"
+              placeholder="Ej. Camisa talla M"
+              required
+              disabled={fieldDisabled}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="price">Precio de venta</Label>
+            <Input
+              id="price"
+              name="price"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              required
+              disabled={fieldDisabled}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="cost">
+              Costo{" "}
+              <span className="text-slate-400 font-normal">(opcional)</span>
+            </Label>
+            <Input
+              id="cost"
+              name="cost"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              disabled={fieldDisabled}
+            />
+          </div>
+        </div>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="price">Precio</Label>
-        <Input id="price" name="price" type="number" step="0.01" min="0" required disabled={isLoading || disabled} />
+
+      {/* Inventario */}
+      <div>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Inventario
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="stock">Stock inicial</Label>
+            <Input
+              id="stock"
+              name="stock"
+              type="number"
+              min="0"
+              defaultValue="0"
+              disabled={fieldDisabled}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="minStock">
+              Stock mínimo{" "}
+              <span className="text-slate-400 font-normal">(alerta)</span>
+            </Label>
+            <Input
+              id="minStock"
+              name="minStock"
+              type="number"
+              min="0"
+              placeholder="Ej. 5"
+              disabled={fieldDisabled}
+            />
+          </div>
+        </div>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="cost">Costo</Label>
-        <Input id="cost" name="cost" type="number" step="0.01" min="0" disabled={isLoading || disabled} />
+
+      {/* Catálogo */}
+      <div>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Catálogo
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="barcode">
+              Código de barras{" "}
+              <span className="text-slate-400 font-normal">(opcional)</span>
+            </Label>
+            <Input
+              id="barcode"
+              name="barcode"
+              placeholder="Ej. 7501000000000"
+              disabled={fieldDisabled}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="expiresAt">
+              Fecha de vencimiento{" "}
+              <span className="text-slate-400 font-normal">(opcional)</span>
+            </Label>
+            <Input
+              id="expiresAt"
+              name="expiresAt"
+              type="date"
+              disabled={fieldDisabled}
+            />
+          </div>
+        </div>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="stock">Stock</Label>
-        <Input id="stock" name="stock" type="number" min="0" defaultValue="0" disabled={isLoading || disabled} />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="minStock">Stock minimo</Label>
-        <Input id="minStock" name="minStock" type="number" min="0" disabled={isLoading || disabled} />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="barcode">Codigo de barras</Label>
-        <Input id="barcode" name="barcode" disabled={isLoading || disabled} />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="expiresAt">Vence</Label>
-        <Input id="expiresAt" name="expiresAt" type="date" disabled={isLoading || disabled} />
-      </div>
-      <div className="flex items-end">
-        <Button type="submit" disabled={isLoading || disabled}>
+
+      <div className="flex items-center gap-3 pt-1">
+        <Button type="submit" disabled={fieldDisabled} className="bg-[#004080] hover:bg-[#003060]">
           {isLoading ? "Guardando..." : "Crear producto"}
         </Button>
+        {message && <p className="text-sm text-emerald-600">{message}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
-      {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
     </form>
   );
 }

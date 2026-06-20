@@ -224,7 +224,9 @@ export default async function SalesPage() {
             <Card className="rounded-[24px] border-slate-200 bg-white shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base text-slate-900">
-                  Plan: {plan.planName}
+                  {plan.isFreeLike
+                    ? "Modo Básico · Motor Appsolux Core"
+                    : plan.planName}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm text-slate-500">
@@ -265,18 +267,28 @@ export default async function SalesPage() {
             </Card>
           </div>
 
-          {/* ERP upsell */}
-          {plan.canRequestDedicatedErp && (
+          {/* ERP upsell — siempre visible en modo básico */}
+          {plan.isFreeLike && (
             <Card className="rounded-[24px] border-blue-100 bg-gradient-to-br from-blue-50 to-white shadow-sm">
               <CardHeader>
-                <CardTitle className="text-base text-[#004080]">ERP Avanzado disponible</CardTitle>
+                <CardTitle className="text-base text-[#004080]">
+                  Funciones avanzadas con ERP
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-slate-500">
-                  Cotizaciones, cuentas por cobrar, contabilidad y reportes financieros avanzados.
+                  Múltiples bodegas, kardex, lotes, series, cotizaciones, cuentas por cobrar y
+                  contabilidad automática.
                 </p>
-                <Button asChild variant="outline" className="border-[#004080]/30 text-[#004080] hover:bg-[#004080]/5">
-                  <Link href={routes.erp}>Abrir ERP</Link>
+                <p className="text-xs text-slate-400">
+                  El motor básico cubre ventas diarias. ERP activa la gestión empresarial completa.
+                </p>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="border-[#004080]/30 text-[#004080] hover:bg-[#004080]/5"
+                >
+                  <Link href={routes.erp}>Conocer ERP avanzado</Link>
                 </Button>
               </CardContent>
             </Card>
