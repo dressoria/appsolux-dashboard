@@ -53,3 +53,6 @@ env.*
 next-env.d.ts
 
 .claude/
+
+# clerk configuration (can include secrets)
+/.clerk/
