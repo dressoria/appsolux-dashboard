@@ -9,7 +9,6 @@ import { ReportsEmptyState } from "@/components/appsolux/reports/reports-empty-s
 import { ReportsSummary } from "@/components/appsolux/reports/reports-summary";
 import { SimpleBarChart } from "@/components/appsolux/reports/simple-bar-chart";
 import { TopProductsTable } from "@/components/appsolux/reports/top-products-table";
-import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -315,12 +314,28 @@ function SuppliersTable({ suppliers }: { suppliers: SupplierPayableReportItem[] 
   );
 }
 
+function ReportsPageContent({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <div className="border-b border-slate-200 bg-white px-8 py-5">
+        <h1 className="text-xl font-bold tracking-tight text-[#004080]">Reportes</h1>
+        <p className="mt-0.5 text-sm text-slate-500">
+          Ventas, clientes, inventario y exportaciones gerenciales.
+        </p>
+      </div>
+      <main className="flex-1 overflow-auto p-8">
+        <div className="mx-auto max-w-6xl">{children}</div>
+      </main>
+    </>
+  );
+}
+
 export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const user = await getCurrentUser();
 
   if (!user) {
     return (
-      <DashboardShell>
+      <ReportsPageContent>
         <div className="space-y-2">
           <h1 className="text-3xl font-semibold tracking-tight">
             Sesion requerida
@@ -329,7 +344,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             Inicia sesion para ver reportes.
           </p>
         </div>
-      </DashboardShell>
+      </ReportsPageContent>
     );
   }
 
@@ -339,7 +354,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
 
   if (!tenantMode.canUseAdvancedErp) {
     return (
-      <DashboardShell>
+      <ReportsPageContent>
         <div className="space-y-6">
           <div>
             <p className="text-sm text-muted-foreground">Reportes gerenciales</p>
@@ -371,7 +386,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             canRequestDedicatedErp={tenantMode.canRequestDedicatedErp}
           />
         </div>
-      </DashboardShell>
+      </ReportsPageContent>
     );
   }
 
@@ -442,7 +457,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   };
 
   return (
-    <DashboardShell>
+    <ReportsPageContent>
       <div className="space-y-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -976,6 +991,6 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           </Card>
         </section>
       </div>
-    </DashboardShell>
+    </ReportsPageContent>
   );
 }

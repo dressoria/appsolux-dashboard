@@ -5,7 +5,7 @@ export function WorkspaceLauncherHeader({ tenantName }: { tenantName: string }) 
         Fase 3
       </p>
       <h1 className="text-3xl font-bold tracking-tight text-[#004080] sm:text-4xl">
-        Bienvenido a tu Espacio de Trabajo
+        Bienvenido
       </h1>
       <p className="mx-auto max-w-sm text-base leading-7 text-slate-500">
         Selecciona el servicio con el que deseas trabajar hoy.
