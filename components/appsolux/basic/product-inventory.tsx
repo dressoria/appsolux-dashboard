@@ -42,6 +42,8 @@ export function ProductInventory({ products }: { products: Product[] }) {
   const router = useRouter();
   const [editingId, setEditingId] = useState("");
   const [adjustingId, setAdjustingId] = useState("");
+  const [deleteConfirmId, setDeleteConfirmId] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -98,6 +100,30 @@ export function ProductInventory({ products }: { products: Product[] }) {
     }
   }
 
+  async function deleteProduct(productId: string) {
+    setIsDeleting(true);
+    setMessage("");
+    setError("");
+
+    try {
+      const response = await fetch(`/api/basic/products/${productId}`, { method: "DELETE" });
+      const result = (await response.json()) as { ok?: boolean; message?: string };
+
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message ?? "No se pudo eliminar.");
+      }
+
+      setDeleteConfirmId("");
+      setMessage("Producto eliminado.");
+      router.refresh();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "No se pudo eliminar.");
+      setDeleteConfirmId("");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   return (
     <div className="space-y-3">
       {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
@@ -107,6 +133,7 @@ export function ProductInventory({ products }: { products: Product[] }) {
         const status = stockStatus(product);
         const isEditing = editingId === product.id;
         const isAdjusting = adjustingId === product.id;
+        const isConfirmingDelete = deleteConfirmId === product.id;
 
         return (
           <div key={product.id} className="space-y-3 rounded-md border p-3 text-sm">
@@ -127,14 +154,69 @@ export function ProductInventory({ products }: { products: Product[] }) {
                 <span className={`rounded-full border px-2 py-1 text-xs ${status.className}`}>
                   {status.label}
                 </span>
-                <Button type="button" variant="outline" onClick={() => setEditingId(isEditing ? "" : product.id)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setEditingId(isEditing ? "" : product.id);
+                    setAdjustingId("");
+                    setDeleteConfirmId("");
+                  }}
+                >
                   Editar
                 </Button>
-                <Button type="button" variant="outline" onClick={() => setAdjustingId(isAdjusting ? "" : product.id)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setAdjustingId(isAdjusting ? "" : product.id);
+                    setEditingId("");
+                    setDeleteConfirmId("");
+                  }}
+                >
                   Ajustar stock
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                  onClick={() => {
+                    setDeleteConfirmId(isConfirmingDelete ? "" : product.id);
+                    setEditingId("");
+                    setAdjustingId("");
+                  }}
+                >
+                  Eliminar
                 </Button>
               </div>
             </div>
+
+            {isConfirmingDelete ? (
+              <div className="flex flex-wrap items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5">
+                <p className="text-xs text-red-700">
+                  ¿Eliminar <strong>{product.name}</strong>? Esta acción no se puede deshacer.
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-7 border-red-300 px-3 text-xs text-red-700 hover:bg-red-100"
+                    disabled={isDeleting}
+                    onClick={() => deleteProduct(product.id)}
+                  >
+                    {isDeleting ? "Eliminando..." : "Confirmar eliminación"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-7 px-3 text-xs"
+                    onClick={() => setDeleteConfirmId("")}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : null}
 
             {isEditing ? (
               <form onSubmit={(event) => updateProduct(event, product.id)} className="grid gap-3 md:grid-cols-5">

@@ -25,7 +25,7 @@ export function BasicModuleShell({
 }: BasicModuleShellProps) {
   return (
     <>
-      <div className="border-b border-slate-200 bg-white px-8 py-5">
+      <div className="border-b border-slate-200 bg-white px-8 py-5 print:hidden">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold tracking-tight text-[#004080]">{title}</h1>

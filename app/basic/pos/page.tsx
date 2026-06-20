@@ -10,6 +10,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { listCustomers, listProducts } from "@/lib/core/lightweight-pos";
 import { getTenantPlanState } from "@/lib/core/plans";
+import { getSriModuleStatus } from "@/lib/core/sri";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 type BasicPosPageProps = {
@@ -72,10 +73,17 @@ export default async function BasicPosPage({ searchParams }: BasicPosPageProps) 
     );
   }
 
-  const [products, customers] = await Promise.all([
+  const [products, customers, sriStatus] = await Promise.all([
     listProducts(tenant.id),
     listCustomers(tenant.id),
+    getSriModuleStatus(tenant.id),
   ]);
+
+  const hasSriConfig =
+    sriStatus.hasProfile &&
+    sriStatus.establishmentCount > 0 &&
+    sriStatus.issuePointCount > 0 &&
+    sriStatus.sequenceCount > 0;
 
   let initialCustomerId = "";
   const rawCustomerId = resolvedParams.customerId ?? "";
@@ -99,6 +107,7 @@ export default async function BasicPosPage({ searchParams }: BasicPosPageProps) 
         <BillingWarehouseSelector />
         <BasicPosClient
           tenantName={tenant.name}
+          hasSriConfig={hasSriConfig}
           initialCustomerId={initialCustomerId}
           products={products.map((product) => ({
             id: product.id,

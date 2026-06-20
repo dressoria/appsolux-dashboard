@@ -15,11 +15,12 @@ export function ProductForm({ disabled = false }: { disabled?: boolean }) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formElement = event.currentTarget; // capture before any awaits — React nullifies currentTarget after async gaps
     setIsLoading(true);
     setMessage("");
     setError("");
 
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const payload = {
       name: String(form.get("name") ?? ""),
       price: Number(form.get("price") ?? 0),
@@ -42,7 +43,7 @@ export function ProductForm({ disabled = false }: { disabled?: boolean }) {
         throw new Error(result.message ?? "No se pudo crear producto.");
       }
 
-      event.currentTarget.reset();
+      formElement.reset();
       setMessage("Producto creado.");
       router.refresh();
     } catch (requestError) {
