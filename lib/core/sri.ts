@@ -127,6 +127,8 @@ export async function upsertSriProfile(
     legalName: string;
     tradeName?: string | null;
     ruc: string;
+    dirMatriz?: string | null;
+    contribuyenteRimpe?: string | null;
     accountingRequired: boolean;
     specialTaxpayerNumber?: string | null;
     withholdingAgentResolution?: string | null;

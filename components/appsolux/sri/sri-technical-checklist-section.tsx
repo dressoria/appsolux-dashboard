@@ -147,9 +147,13 @@ export function SriTechnicalChecklistSection({ documentId, documentStatus }: Pro
   }[result.status];
 
   const statusLabel = {
-    READY: "Listo — el comprobante puede marcarse como listo para pruebas.",
-    WARNING: "Listo con advertencias — puede continuar, pero revisa los puntos marcados con !",
-    BLOCKED: "Bloqueado — resuelve los errores antes de continuar.",
+    READY: documentStatus === "DRAFT"
+      ? "Listo — el comprobante puede marcarse como listo para pruebas."
+      : "Verificacion tecnica OK — el comprobante puede firmarse.",
+    WARNING: documentStatus === "DRAFT"
+      ? "Listo con advertencias — puede continuar, pero revisa los puntos marcados con !"
+      : "Advertencias — pueden continuar, pero revisa los puntos marcados con !",
+    BLOCKED: "Bloqueado — resuelve los errores antes de firmar.",
   }[result.status];
 
   return (

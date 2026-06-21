@@ -318,8 +318,8 @@ function getSignatureReadinessReasons(params: {
     reasons.push("Falta contraseña cifrada");
   }
 
-  if (!sigConfig || sigConfig.status !== "READY_FOR_TESTING") {
-    reasons.push("Firma electrónica no está lista para pruebas");
+  if (sigConfig?.status === "EXPIRED") {
+    reasons.push("El certificado de firma está vencido");
   }
 
   return Array.from(new Set(reasons));

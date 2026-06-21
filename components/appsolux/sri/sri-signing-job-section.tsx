@@ -170,17 +170,25 @@ export function SriSigningJobSection({ documentId, documentStatus, readiness }: 
       {documentStatus === "READY_FOR_TESTING" && !readiness?.canRequestSigning && signatureOnlyReasons.length > 0 && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
           <p className="font-semibold">
-            {signatureOnlyReasons.some((r) => r.includes("certificado"))
-              ? "Falta cargar el certificado de firma electronica"
+            {signatureOnlyReasons.some((r) => r.includes("vencido"))
+              ? "El certificado de firma electronica esta vencido"
               : signatureOnlyReasons.some((r) => r.includes("contrase"))
-                ? "Falta la contrasena del certificado"
-                : "La firma electronica no esta lista para pruebas"}
+                ? "Falta la contrasena cifrada del certificado"
+                : signatureOnlyReasons.some((r) => r.includes("certificado"))
+                  ? "Falta cargar el certificado de firma electronica"
+                  : "Completa la configuracion de firma electronica"}
           </p>
           <ul className="mt-1 space-y-1 text-xs">
             {signatureOnlyReasons.map((reason) => (
               <li key={reason}>- {reason}</li>
             ))}
           </ul>
+          <Link
+            href="/sri/signature"
+            className="mt-2 inline-block text-xs underline underline-offset-4"
+          >
+            Ir a configuracion de firma →
+          </Link>
         </div>
       )}
 
@@ -226,6 +234,13 @@ export function SriSigningJobSection({ documentId, documentStatus, readiness }: 
               )}
             </div>
           </div>
+        </div>
+      ) : documentStatus === "READY_FOR_TESTING" && readiness?.canRequestSigning ? (
+        <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+          <p className="font-semibold">Firma electronica configurada</p>
+          <p className="mt-0.5 text-xs">
+            Este comprobante aun no ha sido firmado. Presiona el boton para solicitar la firma.
+          </p>
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">No hay solicitud de firma para este comprobante.</p>

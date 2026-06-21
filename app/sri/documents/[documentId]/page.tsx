@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download, FileCheck2, FileText } from "lucide-react";
 
 import {
   FacturationStatusBadge,
@@ -158,6 +158,8 @@ function computeNextAction(params: {
   submissionError: string | null;
   canRequestSigning: boolean;
   missingSignatureReasons: string[];
+  checklistHasBlockers: boolean;
+  checklistHasWarnings: boolean;
 }): NextAction {
   const {
     docStatus,
@@ -166,6 +168,8 @@ function computeNextAction(params: {
     submissionError,
     canRequestSigning,
     missingSignatureReasons,
+    checklistHasBlockers,
+    checklistHasWarnings,
   } = params;
 
   if (docStatus === "AUTHORIZED") {
@@ -226,15 +230,35 @@ function computeNextAction(params: {
 
   if (docStatus === "READY_FOR_TESTING") {
     if (canRequestSigning) {
+      if (checklistHasWarnings) {
+        return {
+          variant: "warning",
+          title: "Listo para firmar con advertencias",
+          description:
+            "Puedes solicitar la firma. Revisa las advertencias si necesitas corregir datos del cliente. Abre la seccion 'Firma electronica' para continuar.",
+        };
+      }
       return {
-        variant: "info",
+        variant: "success",
         title: "Listo para firmar",
         description:
-          "La firma electronica esta configurada. Este comprobante aun no ha sido firmado. Abre la seccion 'Firma electronica' y presiona 'Solicitar firma'.",
+          "El comprobante tiene la informacion necesaria. Abre la seccion 'Firma electronica' y presiona 'Solicitar firma'.",
       };
     }
+
+    if (checklistHasBlockers) {
+      return {
+        variant: "error",
+        title: "Faltan datos obligatorios",
+        description:
+          "Hay errores bloqueantes en el checklist tecnico. Abre 'Verificacion tecnica' para ver y resolver los errores antes de firmar.",
+      };
+    }
+
     const certMissing = missingSignatureReasons.some((r) => r.includes("certificado"));
     const passwordMissing = missingSignatureReasons.some((r) => r.includes("contrase"));
+    const expiredCert = missingSignatureReasons.some((r) => r.includes("vencido"));
+
     if (certMissing) {
       return {
         variant: "warning",
@@ -255,11 +279,23 @@ function computeNextAction(params: {
         actionLabel: "Completar configuracion",
       };
     }
+    if (expiredCert) {
+      return {
+        variant: "error",
+        title: "Certificado de firma vencido",
+        description:
+          "El certificado de firma electronica esta vencido. Carga un certificado valido para continuar.",
+        actionHref: "/sri/signature",
+        actionLabel: "Actualizar certificado",
+      };
+    }
     return {
       variant: "warning",
-      title: "Hay errores en el checklist tecnico",
+      title: "Firma electronica no lista",
       description:
-        "Abre la seccion 'Verificacion tecnica' para ver y resolver los errores antes de firmar.",
+        "Completa la configuracion de firma electronica en SRI → Firma antes de firmar.",
+      actionHref: "/sri/signature",
+      actionLabel: "Configurar firma",
     };
   }
 
@@ -384,6 +420,8 @@ export default async function SriDocumentDetailPage({ params }: Props) {
     submissionError: latestSubmissionJob?.errorMessage ?? null,
     canRequestSigning: signingReadiness?.canRequestSigning ?? false,
     missingSignatureReasons: signingReadiness?.missingSignatureReasons ?? [],
+    checklistHasBlockers: (signingReadiness?.blockingErrors.length ?? 0) > 0,
+    checklistHasWarnings: (signingReadiness?.warnings.length ?? 0) > 0,
   });
 
   const flowStatus =
@@ -480,26 +518,33 @@ export default async function SriDocumentDetailPage({ params }: Props) {
                 <Link href={`/basic/sales/${doc.sourceId}`}>Ver venta</Link>
               </Button>
             )}
-            <Button
-              disabled
-              variant="outline"
-              size="sm"
-              title={
-                doc.status === "SIGNED"
-                  ? "Usa la seccion 'Envio SRI pruebas'"
-                  : "Primero firma el comprobante"
-              }
-            >
-              Enviar al SRI
-            </Button>
-            <Button
-              disabled
-              variant="outline"
-              size="sm"
-              title="RIDE disponible tras autorizacion SRI"
-            >
-              RIDE
-            </Button>
+            {/* XML Firmado — disponible si el documento fue firmado */}
+            {(doc.status === "SIGNED" || doc.status === "SENT" || doc.status === "AUTHORIZED") && (
+              <Button asChild variant="outline" size="sm">
+                <a href={`/api/sri/documents/${doc.id}/download-signed-xml`} download>
+                  <Download className="mr-1 h-4 w-4" />
+                  XML firmado
+                </a>
+              </Button>
+            )}
+            {/* XML Autorizado — solo si fue autorizado por el SRI */}
+            {doc.status === "AUTHORIZED" && (
+              <Button asChild variant="outline" size="sm">
+                <a href={`/api/sri/documents/${doc.id}/download-authorized-xml`} download>
+                  <FileCheck2 className="mr-1 h-4 w-4" />
+                  XML autorizado
+                </a>
+              </Button>
+            )}
+            {/* RIDE/PDF — solo si autorizado */}
+            {doc.status === "AUTHORIZED" && (
+              <Button asChild size="sm">
+                <a href={`/api/sri/documents/${doc.id}/download-ride`} download>
+                  <FileText className="mr-1 h-4 w-4" />
+                  RIDE / PDF
+                </a>
+              </Button>
+            )}
           </div>
         </div>
 
@@ -597,13 +642,78 @@ export default async function SriDocumentDetailPage({ params }: Props) {
           )}
         </div>
 
-        {/* 3. Stepper de progreso */}
+        {/* 3. Panel de autorización SRI — solo cuando está autorizado */}
+        {doc.status === "AUTHORIZED" && latestSubmissionJob && (
+          <div className="rounded-[24px] border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-emerald-600">
+              Autorización SRI
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="space-y-1">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-500">
+                  Número de autorización
+                </p>
+                <p className="break-all font-mono text-sm font-semibold text-emerald-900">
+                  {latestSubmissionJob.sriAuthorizationNumber ?? "—"}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-500">
+                  Fecha de autorización
+                </p>
+                <p className="text-sm font-semibold text-emerald-900">
+                  {latestSubmissionJob.authorizedAt
+                    ? new Date(latestSubmissionJob.authorizedAt).toLocaleString("es-EC", {
+                        timeZone: "America/Guayaquil",
+                      })
+                    : "—"}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-500">
+                  Ambiente
+                </p>
+                <p className="text-sm font-semibold text-emerald-900">
+                  {doc.environment === "TEST" ? "Pruebas (TEST)" : "Producción"}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-emerald-200 pt-4">
+              <a
+                href={`/api/sri/documents/${doc.id}/download-signed-xml`}
+                download
+                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-800 shadow-sm hover:bg-emerald-50"
+              >
+                <Download className="h-3.5 w-3.5" />
+                XML firmado
+              </a>
+              <a
+                href={`/api/sri/documents/${doc.id}/download-authorized-xml`}
+                download
+                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-800 shadow-sm hover:bg-emerald-50"
+              >
+                <FileCheck2 className="h-3.5 w-3.5" />
+                XML autorizado
+              </a>
+              <a
+                href={`/api/sri/documents/${doc.id}/download-ride`}
+                download
+                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-emerald-700"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Descargar RIDE / PDF
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* 4. Stepper de progreso */}
         <SriDocumentStepper step={stepIndex} isRejected={isRejected} />
 
-        {/* 4. Siguiente accion */}
+        {/* 5. Siguiente accion */}
         <NextActionCard action={nextAction} />
 
-        {/* 5. Detalle de items */}
+        {/* 6. Detalle de items */}
         <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
           <p className="mb-4 text-sm font-medium text-slate-800">Detalle de items</p>
           <div className="overflow-x-auto">
@@ -663,7 +773,7 @@ export default async function SriDocumentDetailPage({ params }: Props) {
           </div>
         </div>
 
-        {/* 6. Secciones colapsables */}
+        {/* 7. Secciones colapsables */}
 
         {showChecklist && (
           <SriDocumentCollapsible
@@ -725,9 +835,6 @@ export default async function SriDocumentDetailPage({ params }: Props) {
           </SriDocumentCollapsible>
         )}
 
-        <p className="text-center text-xs text-slate-400">
-          Produccion SRI y RIDE/PDF oficial permanecen pendientes para la siguiente fase.
-        </p>
       </div>
     </SriModuleShell>
   );

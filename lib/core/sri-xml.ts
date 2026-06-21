@@ -10,6 +10,8 @@ export type SriXmlPreviewParams = {
     ruc: string;
     environment: "TEST" | "PRODUCTION";
     accountingRequired: boolean;
+    contribuyenteRimpe?: string | null;
+    dirMatriz?: string | null;
   };
   establishment: {
     code: string;
@@ -95,10 +97,10 @@ function resolveIdentificacion(identification: string | null): {
 }
 
 function resolveIvaCodigoPorcentaje(taxRate: number): string {
-  if (taxRate === 0) return "0";
-  if (taxRate === 5) return "5";
-  if (taxRate === 12) return "2";
-  if (taxRate === 15) return "5"; // 15% 2024 Ecuador
+  if (taxRate === 0) return "0";  // IVA 0%
+  if (taxRate === 5) return "5";  // IVA 5% (bienes específicos)
+  if (taxRate === 12) return "2"; // IVA 12% (tarifa histórica)
+  if (taxRate === 15) return "4"; // IVA 15% (tarifa vigente desde abril 2024)
   return "2";
 }
 
@@ -269,9 +271,14 @@ export function buildUnsignedSriInvoiceXmlPreview(
     }
   }
 
+  const dirMatriz = xmlEscape(params.profile.dirMatriz ?? params.establishment.address);
+  const contribuyenteRimpeXml = params.profile.contribuyenteRimpe
+    ? `\n    <contribuyenteRimpe>${xmlEscape(params.profile.contribuyenteRimpe)}</contribuyenteRimpe>`
+    : "";
+
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <!-- XML PRELIMINAR — NO FIRMADO — SIN VALIDEZ TRIBUTARIA -->
-<factura id="comprobante" version="2.1.0">
+<factura id="comprobante" version="1.1.0">
   <infoTributaria>
     <ambiente>${ambiente}</ambiente>
     <tipoEmision>1</tipoEmision>
@@ -283,12 +290,12 @@ export function buildUnsignedSriInvoiceXmlPreview(
     <estab>${xmlEscape(params.establishment.code)}</estab>
     <ptoEmi>${xmlEscape(params.issuePoint.code)}</ptoEmi>
     <secuencial>${pad(params.sequentialNumber, 9)}</secuencial>
-    <dirMatriz>${xmlEscape(params.establishment.address)}</dirMatriz>
+    <dirMatriz>${dirMatriz}</dirMatriz>
   </infoTributaria>
   <infoFactura>
     <fechaEmision>${fechaEmision}</fechaEmision>
     <dirEstablecimiento>${xmlEscape(params.establishment.address)}</dirEstablecimiento>
-    <obligadoContabilidad>${params.profile.accountingRequired ? "SI" : "NO"}</obligadoContabilidad>
+    <obligadoContabilidad>${params.profile.accountingRequired ? "SI" : "NO"}</obligadoContabilidad>${contribuyenteRimpeXml}
     <tipoIdentificacionComprador>${tipoIdComprador}</tipoIdentificacionComprador>
     <razonSocialComprador>${xmlEscape(params.document.customerName)}</razonSocialComprador>
     <identificacionComprador>${xmlEscape(idComprador)}</identificacionComprador>
@@ -300,6 +307,14 @@ ${taxGroupsXml}
     <propina>0.00</propina>
     <importeTotal>${dec(params.document.grandTotal)}</importeTotal>
     <moneda>DOLAR</moneda>
+    <pagos>
+      <pago>
+        <formaPago>01</formaPago>
+        <total>${dec(params.document.grandTotal)}</total>
+        <plazo>0</plazo>
+        <unidadTiempo>dias</unidadTiempo>
+      </pago>
+    </pagos>
   </infoFactura>
   <detalles>
 ${linesXml}

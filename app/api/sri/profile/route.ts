@@ -45,6 +45,8 @@ export async function POST(req: NextRequest) {
     legalName,
     tradeName: typeof data.tradeName === "string" && data.tradeName.trim() ? data.tradeName.trim() : null,
     ruc,
+    dirMatriz: typeof data.dirMatriz === "string" && data.dirMatriz.trim() ? data.dirMatriz.trim() : null,
+    contribuyenteRimpe: typeof data.contribuyenteRimpe === "string" && data.contribuyenteRimpe.trim() ? data.contribuyenteRimpe.trim() : null,
     accountingRequired: data.accountingRequired === true || data.accountingRequired === "true",
     specialTaxpayerNumber: typeof data.specialTaxpayerNumber === "string" && data.specialTaxpayerNumber.trim() ? data.specialTaxpayerNumber.trim() : null,
     withholdingAgentResolution: typeof data.withholdingAgentResolution === "string" && data.withholdingAgentResolution.trim() ? data.withholdingAgentResolution.trim() : null,

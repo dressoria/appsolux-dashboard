@@ -657,6 +657,8 @@ model SriTaxpayerProfile {
   legalName                  String
   tradeName                  String?
   ruc                        String
+  dirMatriz                  String?
+  contribuyenteRimpe         String?
   environment                SriEnvironment  @default(TEST)
   accountingRequired         Boolean         @default(false)
   specialTaxpayerNumber      String?
@@ -776,6 +778,7 @@ model SriDocument {
   sequenceId             String?
   sequentialNumber       Int?
   accessKey              String?
+  ridePdfStorageKey      String?
   customerName           String
   customerIdentification String?
   customerEmail          String?
@@ -858,6 +861,7 @@ model SriSubmissionJob {
   sriAuthorizationNumber String?
   sriAccessKey           String?
   sriResponseRaw         Json?
+  authorizedXmlStorageKey String?
   errorCode              String?
   errorMessage           String?
   createdAt              DateTime               @default(now())

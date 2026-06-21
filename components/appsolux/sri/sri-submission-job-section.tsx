@@ -159,7 +159,7 @@ export function SriSubmissionJobSection({ documentId, documentStatus }: Props) {
   return (
     <div className="space-y-4">
       <div className="rounded-md border border-cyan-200 bg-cyan-50 p-3 text-xs text-cyan-900">
-        Este paso usa solo el ambiente de pruebas del SRI. No envia a produccion y no genera RIDE todavia.
+        El comprobante se envia al SRI segun el ambiente configurado en el perfil del tenant. Una vez autorizado, el RIDE/PDF estara disponible para descarga.
       </div>
 
       {documentStatus === "REJECTED" && (
@@ -216,7 +216,7 @@ export function SriSubmissionJobSection({ documentId, documentStatus }: Props) {
               )}
               {job.status === "AUTHORIZED" && (
                 <p className="text-xs text-emerald-700 font-medium">
-                  Autorizado por SRI. El RIDE/PDF final sigue pendiente en una fase posterior.
+                  Comprobante autorizado por el SRI. Usa los botones de descarga para obtener el XML autorizado y el RIDE/PDF.
                 </p>
               )}
               {job.status === "REJECTED" && (
