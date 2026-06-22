@@ -167,9 +167,9 @@ function buildFilename(doc: {
 }): string {
   if (doc.sequentialNumber != null) {
     const num = `${doc.establishment.code}-${doc.issuePoint.code}-${formatSequentialNumber(doc.sequentialNumber)}`;
-    return `factura-${num}-ride.pdf`;
+    return `ride-${num}.pdf`;
   }
-  return `factura-${doc.accessKey ?? "ride"}.pdf`;
+  return `ride-${doc.accessKey ?? "pdf"}.pdf`;
 }
 
 function pdfResponse(buffer: Buffer, filename: string): Response {

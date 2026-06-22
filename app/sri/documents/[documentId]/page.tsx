@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { ArrowLeft, Download, FileCheck2, FileText } from "lucide-react";
 
 import { SriDownloadButton } from "@/components/appsolux/sri/sri-download-button";
@@ -13,7 +14,6 @@ import { SriSubmissionJobSection } from "@/components/appsolux/sri/sri-submissio
 import { SriTechnicalChecklistSection } from "@/components/appsolux/sri/sri-technical-checklist-section";
 import { SriXmlPreviewSection } from "@/components/appsolux/sri/sri-xml-preview-section";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import {
@@ -385,25 +385,13 @@ export default async function SriDocumentDetailPage({ params }: Props) {
     ]);
 
   if (!doc) {
-    return (
-      <SriModuleShell
-        title="Comprobante no encontrado"
-        description=""
-        activeHref={routes.sriDocuments}
-      >
-        <Card>
-          <CardContent className="p-6 text-sm text-muted-foreground">
-            El comprobante no existe o no pertenece a esta cuenta.
-          </CardContent>
-        </Card>
-      </SriModuleShell>
-    );
+    notFound();
   }
 
   const typeLabel = SRI_DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType;
   const displayNumber = buildDisplayNumber(
-    doc.establishment.code,
-    doc.issuePoint.code,
+    doc.establishment?.code ?? "???",
+    doc.issuePoint?.code ?? "???",
     doc.sequentialNumber
   );
   const isRejected = doc.status === "REJECTED";
