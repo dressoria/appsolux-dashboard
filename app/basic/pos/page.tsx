@@ -107,6 +107,7 @@ export default async function BasicPosPage({ searchParams }: BasicPosPageProps) 
         <BillingWarehouseSelector />
         <BasicPosClient
           tenantName={tenant.name}
+          currentUserName={user.name}
           hasSriConfig={hasSriConfig}
           initialCustomerId={initialCustomerId}
           products={products.map((product) => ({
@@ -120,6 +121,9 @@ export default async function BasicPosPage({ searchParams }: BasicPosPageProps) 
           customers={customers.map((customer) => ({
             id: customer.id,
             name: customer.name,
+            phone: customer.phone,
+            email: customer.email,
+            address: customer.address,
           }))}
         />
       </div>

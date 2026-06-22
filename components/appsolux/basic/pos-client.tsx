@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -22,6 +22,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/config/routes";
 
+const SRI_PAYMENT_OPTIONS = [
+  { code: "01", label: "Sin utilización del sistema financiero (efectivo)" },
+  { code: "16", label: "Tarjeta de débito" },
+  { code: "17", label: "Dinero electrónico" },
+  { code: "18", label: "Tarjeta prepago" },
+  { code: "19", label: "Tarjeta de crédito" },
+  { code: "20", label: "Otros con utilización del sistema financiero" },
+  { code: "21", label: "Endoso de títulos" },
+] as const;
+
+function defaultSriCode(method: string): string {
+  switch (method) {
+    case "cash": return "01";
+    case "transfer": return "20";
+    case "card": return "19";
+    default: return "01";
+  }
+}
+
 type Product = {
   id: string;
   name: string;
@@ -34,6 +53,9 @@ type Product = {
 type Customer = {
   id: string;
   name: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
 };
 
 type CartItem = {
@@ -88,12 +110,14 @@ function money(value: number) {
 
 export function BasicPosClient({
   tenantName,
+  currentUserName,
   products,
   customers: initialCustomers,
   initialCustomerId,
   hasSriConfig = false,
 }: {
   tenantName: string;
+  currentUserName?: string;
   products: Product[];
   customers: Customer[];
   initialCustomerId?: string;
@@ -117,11 +141,23 @@ export function BasicPosClient({
 
   const [cartInputs, setCartInputs] = useState<Record<string, string>>({});
   const [discountInputs, setDiscountInputs] = useState<Record<string, string>>({});
+  const [discountPctInputs, setDiscountPctInputs] = useState<Record<string, string>>({});
+  const [lineNotes, setLineNotes] = useState<Record<string, string>>({});
 
   const [transferBank, setTransferBank] = useState("");
   const [transferRef, setTransferRef] = useState("");
 
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+
+  // Invoice editor customer fields (editable overrides)
+  const [invoiceCustomerName, setInvoiceCustomerName] = useState("Consumidor Final");
+  const [invoiceCustomerIdentification, setInvoiceCustomerIdentification] = useState("9999999999999");
+  const [invoiceCustomerPhone, setInvoiceCustomerPhone] = useState("");
+  const [invoiceCustomerEmail, setInvoiceCustomerEmail] = useState("");
+  const [invoiceCustomerAddress, setInvoiceCustomerAddress] = useState("");
+  const [invoiceCustomerNotes, setInvoiceCustomerNotes] = useState("");
+
+  const [sriPaymentCode, setSriPaymentCode] = useState("01");
 
   const [showComprobanteTip, setShowComprobanteTip] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
@@ -135,6 +171,26 @@ export function BasicPosClient({
   const tipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const productById = new Map(products.map((p) => [p.id, p]));
+
+  // Sync invoice customer fields when selection changes
+  useEffect(() => {
+    if (!customerId) {
+      setInvoiceCustomerName("Consumidor Final");
+      setInvoiceCustomerIdentification("9999999999999");
+      setInvoiceCustomerPhone("");
+      setInvoiceCustomerEmail("");
+      setInvoiceCustomerAddress("");
+    } else {
+      const found = customers.find((c) => c.id === customerId);
+      if (found) {
+        setInvoiceCustomerName(found.name);
+        setInvoiceCustomerIdentification("");
+        setInvoiceCustomerPhone(found.phone ?? "");
+        setInvoiceCustomerEmail(found.email ?? "");
+        setInvoiceCustomerAddress(found.address ?? "");
+      }
+    }
+  }, [customerId, customers]);
 
   function calcLine(item: CartItem) {
     const product = productById.get(item.productId);
@@ -188,6 +244,10 @@ export function BasicPosClient({
 
   const creditWithoutCustomer = paymentMethod === "credit" && !customerId;
 
+  const paidNum = paidAmount ? Number(paidAmount) : (paymentMethod === "credit" ? 0 : cartTotals.total);
+  const saldo = paymentMethod === "credit" ? cartTotals.total : Math.max(0, cartTotals.total - paidNum);
+  const vuelto = paymentMethod !== "credit" && paidNum > cartTotals.total ? paidNum - cartTotals.total : 0;
+
   function showTip() {
     if (tipTimerRef.current) clearTimeout(tipTimerRef.current);
     tipTimerRef.current = setTimeout(() => setShowComprobanteTip(true), 400);
@@ -220,12 +280,17 @@ export function BasicPosClient({
         }
         const newQty = existing.quantity + 1;
         setCartInputs((prev) => ({ ...prev, [productId]: String(newQty) }));
+        // recalculate pct display after qty change
+        const gross = toNumber(product.price) * newQty;
+        const pct = gross > 0 ? (existing.discountAmount / gross) * 100 : 0;
+        setDiscountPctInputs((prev) => ({ ...prev, [productId]: pct.toFixed(1) }));
         return current.map((item) =>
           item.productId === productId ? { ...item, quantity: newQty } : item
         );
       }
       setCartInputs((prev) => ({ ...prev, [productId]: "1" }));
       setDiscountInputs((prev) => ({ ...prev, [productId]: "0" }));
+      setDiscountPctInputs((prev) => ({ ...prev, [productId]: "0.0" }));
       return [...current, { productId, quantity: 1, discountAmount: 0 }];
     });
   }
@@ -241,11 +306,19 @@ export function BasicPosClient({
           ? Math.min(parsed, product.stock)
           : parsed;
     setCartInputs((prev) => ({ ...prev, [productId]: String(safe) }));
-    setCart((current) =>
-      current.map((item) =>
+    setCart((current) => {
+      const updated = current.map((item) =>
         item.productId === productId ? { ...item, quantity: safe } : item
-      )
-    );
+      );
+      // recalculate pct after qty change
+      const cartItem = updated.find((i) => i.productId === productId);
+      if (product && cartItem) {
+        const gross = toNumber(product.price) * safe;
+        const pct = gross > 0 ? (cartItem.discountAmount / gross) * 100 : 0;
+        setDiscountPctInputs((prev) => ({ ...prev, [productId]: pct.toFixed(1) }));
+      }
+      return updated;
+    });
   }
 
   function commitDiscount(productId: string) {
@@ -258,6 +331,11 @@ export function BasicPosClient({
       product && cartItem ? toNumber(product.price) * cartItem.quantity : safe;
     const clamped = Math.min(safe, maxDiscount);
     setDiscountInputs((prev) => ({ ...prev, [productId]: clamped.toFixed(2) }));
+    if (product && cartItem) {
+      const gross = toNumber(product.price) * cartItem.quantity;
+      const pct = gross > 0 ? (clamped / gross) * 100 : 0;
+      setDiscountPctInputs((prev) => ({ ...prev, [productId]: pct.toFixed(1) }));
+    }
     setCart((current) =>
       current.map((item) =>
         item.productId === productId ? { ...item, discountAmount: clamped } : item
@@ -265,18 +343,30 @@ export function BasicPosClient({
     );
   }
 
+  function commitDiscountPct(productId: string) {
+    const raw = discountPctInputs[productId] ?? "0";
+    const pct = parseFloat(raw);
+    const safePct = !Number.isFinite(pct) || pct < 0 ? 0 : Math.min(pct, 100);
+    const product = productById.get(productId);
+    const cartItem = cart.find((i) => i.productId === productId);
+    if (!product || !cartItem) return;
+    const gross = toNumber(product.price) * cartItem.quantity;
+    const discountAmt = Math.round(gross * safePct) / 100;
+    setDiscountPctInputs((prev) => ({ ...prev, [productId]: safePct.toFixed(1) }));
+    setDiscountInputs((prev) => ({ ...prev, [productId]: discountAmt.toFixed(2) }));
+    setCart((current) =>
+      current.map((item) =>
+        item.productId === productId ? { ...item, discountAmount: discountAmt } : item
+      )
+    );
+  }
+
   function removeFromCart(productId: string) {
     setCart((current) => current.filter((item) => item.productId !== productId));
-    setCartInputs((prev) => {
-      const next = { ...prev };
-      delete next[productId];
-      return next;
-    });
-    setDiscountInputs((prev) => {
-      const next = { ...prev };
-      delete next[productId];
-      return next;
-    });
+    setCartInputs((prev) => { const n = { ...prev }; delete n[productId]; return n; });
+    setDiscountInputs((prev) => { const n = { ...prev }; delete n[productId]; return n; });
+    setDiscountPctInputs((prev) => { const n = { ...prev }; delete n[productId]; return n; });
+    setLineNotes((prev) => { const n = { ...prev }; delete n[productId]; return n; });
   }
 
   async function submitSale() {
@@ -324,6 +414,8 @@ export function BasicPosClient({
       setCart([]);
       setCartInputs({});
       setDiscountInputs({});
+      setDiscountPctInputs({});
+      setLineNotes({});
       setCustomerId("");
       setPaidAmount("");
       setTransferBank("");
@@ -387,6 +479,9 @@ export function BasicPosClient({
     setShowReceipt(false);
     setShowInvoiceEditor(false);
     setCartInputs({});
+    setDiscountInputs({});
+    setDiscountPctInputs({});
+    setLineNotes({});
     setError("");
   }
 
@@ -398,7 +493,7 @@ export function BasicPosClient({
     year: "numeric",
   });
 
-  // Shared: invoice line table (used inside the editor modal)
+  // Expanded line table used inside the invoice editor modal
   function InvoiceLineTable() {
     if (cart.length === 0) {
       return (
@@ -411,16 +506,19 @@ export function BasicPosClient({
     }
     return (
       <div className="overflow-x-auto rounded-xl border border-slate-200">
-        <table className="w-full min-w-[580px] text-sm">
+        <table className="w-full min-w-[860px] text-sm">
           <thead className="bg-slate-50">
-            <tr className="border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            <tr className="border-b border-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              <th className="w-20 px-3 py-3 text-left">Código</th>
               <th className="px-4 py-3 text-left">Producto</th>
-              <th className="w-20 px-3 py-3 text-right">Cant.</th>
-              <th className="w-24 px-3 py-3 text-right">P. unit.</th>
-              <th className="w-24 px-3 py-3 text-right">Desc.</th>
-              <th className="w-16 px-3 py-3 text-right">IVA %</th>
-              <th className="w-20 px-3 py-3 text-right">IVA $</th>
-              <th className="w-24 px-3 py-3 text-right">Total</th>
+              <th className="w-28 px-3 py-3 text-left">Observación</th>
+              <th className="w-16 px-3 py-3 text-right">Cant.</th>
+              <th className="w-22 px-3 py-3 text-right">P. unit.</th>
+              <th className="w-14 px-3 py-3 text-right">IVA%</th>
+              <th className="w-18 px-3 py-3 text-right">Desc.%</th>
+              <th className="w-22 px-3 py-3 text-right">Desc.$</th>
+              <th className="w-18 px-3 py-3 text-right">IVA$</th>
+              <th className="w-22 px-3 py-3 text-right">Total</th>
               <th className="w-8 px-2 py-3" />
             </tr>
           </thead>
@@ -430,13 +528,26 @@ export function BasicPosClient({
               const line = calcLine(item);
               return (
                 <tr key={item.productId} className="align-middle transition hover:bg-slate-50/50">
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-slate-800">{product?.name}</p>
+                  <td className="px-3 py-2.5 text-[11px] text-slate-400 font-mono">
+                    {product?.barcode ?? "—"}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <p className="font-medium text-slate-800 leading-tight">{product?.name}</p>
                     {line.taxRate === 0 && (
-                      <p className="text-[11px] text-slate-400">Sin IVA</p>
+                      <p className="text-[10px] text-slate-400">Sin IVA</p>
                     )}
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-2.5">
+                    <Input
+                      value={lineNotes[item.productId] ?? ""}
+                      onChange={(e) =>
+                        setLineNotes((prev) => ({ ...prev, [item.productId]: e.target.value }))
+                      }
+                      placeholder="Obs."
+                      className="h-7 w-full text-xs rounded-lg border-slate-200"
+                    />
+                  </td>
+                  <td className="px-3 py-2.5">
                     <Input
                       type="number"
                       min="1"
@@ -446,38 +557,57 @@ export function BasicPosClient({
                         setCartInputs((prev) => ({ ...prev, [item.productId]: e.target.value }))
                       }
                       onBlur={() => commitQuantity(item.productId)}
-                      className="h-8 w-16 text-right text-xs"
+                      className="h-7 w-14 text-right text-xs rounded-lg"
                     />
                   </td>
-                  <td className="px-3 py-3 text-right text-slate-600">
+                  <td className="px-3 py-2.5 text-right text-slate-600 text-xs">
                     {money(toNumber(product?.price ?? 0))}
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-2.5 text-right text-slate-500 text-xs">
+                    {line.taxRate}%
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={discountPctInputs[item.productId] ?? "0.0"}
+                      onChange={(e) =>
+                        setDiscountPctInputs((prev) => ({ ...prev, [item.productId]: e.target.value }))
+                      }
+                      onBlur={() => commitDiscountPct(item.productId)}
+                      className="h-7 w-16 text-right text-xs rounded-lg"
+                      placeholder="0.0"
+                    />
+                  </td>
+                  <td className="px-3 py-2.5">
                     <Input
                       type="number"
                       min="0"
                       step="0.01"
-                      value={discountInputs[item.productId] ?? "0"}
+                      value={discountInputs[item.productId] ?? "0.00"}
                       onChange={(e) =>
                         setDiscountInputs((prev) => ({ ...prev, [item.productId]: e.target.value }))
                       }
                       onBlur={() => commitDiscount(item.productId)}
-                      className="h-8 w-20 text-right text-xs"
+                      className="h-7 w-20 text-right text-xs rounded-lg"
                       placeholder="0.00"
                     />
                   </td>
-                  <td className="px-3 py-3 text-right text-slate-500">{line.taxRate}%</td>
-                  <td className="px-3 py-3 text-right text-slate-600">{money(line.tax)}</td>
-                  <td className="px-3 py-3 text-right font-semibold text-slate-900">
+                  <td className="px-3 py-2.5 text-right text-slate-600 text-xs">
+                    {money(line.tax)}
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-semibold text-slate-900 text-xs">
                     {money(line.total)}
                   </td>
-                  <td className="px-2 py-3">
+                  <td className="px-2 py-2.5">
                     <button
                       type="button"
                       onClick={() => removeFromCart(item.productId)}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-300 hover:bg-red-50 hover:text-red-500"
+                      className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-300 hover:bg-red-50 hover:text-red-500"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-3 w-3" />
                     </button>
                   </td>
                 </tr>
@@ -492,7 +622,7 @@ export function BasicPosClient({
   return (
     <div className="space-y-4">
 
-      {/* New customer modal */}
+      {/* ── New customer modal ─────────────────────────────────────────────── */}
       {showNewCustomer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
           <div className="w-full max-w-sm rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl">
@@ -569,256 +699,460 @@ export function BasicPosClient({
         </div>
       )}
 
-      {/* Professional invoice editor modal */}
+      {/* ── Professional invoice editor modal ──────────────────────────────── */}
       {showInvoiceEditor && (
-        <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-6">
-          <div className="mb-8 w-full max-w-5xl rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="fixed inset-0 z-40 overflow-y-auto bg-black/50">
+          <div className="flex min-h-full items-start justify-center p-4 pt-6">
+            <div className="mb-8 w-full max-w-6xl rounded-2xl border border-slate-200 bg-white shadow-2xl">
 
-            {/* Modal header */}
-            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-4">
-              <div>
-                <h2 className="text-base font-semibold text-slate-900">
-                  {outputMode === "sri_invoice"
-                    ? "Factura electrónica SRI"
-                    : "Recibo interno de venta"}
-                </h2>
-                <p className="mt-0.5 text-xs text-slate-400">{todayStr}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowInvoiceEditor(false)}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Modal body */}
-            <div className="grid gap-0 lg:grid-cols-[1fr_300px]">
-
-              {/* Left: tipo + cliente + productos */}
-              <div className="space-y-5 p-6">
-
-                {/* Comprobante type toggle */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-medium text-slate-400">Tipo:</span>
-                  <button
-                    type="button"
-                    onClick={() => setOutputMode("internal_receipt")}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium transition",
-                      outputMode === "internal_receipt"
-                        ? "border-[#004080] bg-blue-50 text-[#004080]"
-                        : "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700"
-                    )}
-                  >
-                    <ReceiptText className="h-3.5 w-3.5" />
-                    Recibo interno
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => hasSriConfig && setOutputMode("sri_invoice")}
-                    disabled={!hasSriConfig}
-                    title={!hasSriConfig ? "Configura el módulo SRI primero" : undefined}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm font-medium transition",
+              {/* Modal header */}
+              <div className="flex items-start justify-between border-b border-slate-100 px-6 py-4">
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-base font-semibold text-slate-900">
+                      {outputMode === "sri_invoice"
+                        ? "Factura electrónica SRI"
+                        : "Recibo interno de venta"}
+                    </h2>
+                    <span className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
                       outputMode === "sri_invoice"
-                        ? "border-[#004080] bg-blue-50 text-[#004080]"
-                        : hasSriConfig
-                          ? "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700"
-                          : "cursor-not-allowed border-slate-100 text-slate-300"
-                    )}
-                  >
-                    <FileCheck2 className="h-3.5 w-3.5" />
-                    Factura SRI
-                    {!hasSriConfig && (
-                      <span className="ml-1 text-[10px]">(sin config.)</span>
-                    )}
-                  </button>
-                </div>
-
-                {/* Cliente */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium text-slate-800">Cliente</Label>
-                    <button
-                      type="button"
-                      onClick={() => setShowNewCustomer(true)}
-                      className="flex items-center gap-1 text-xs text-[#004080] hover:text-[#003060]"
-                    >
-                      <UserPlus className="h-3 w-3" />
-                      Nuevo cliente
-                    </button>
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-slate-100 text-slate-500"
+                    )}>
+                      {outputMode === "sri_invoice" ? "SRI" : "Interno"}
+                    </span>
                   </div>
-                  <select
-                    value={customerId}
-                    onChange={(e) => setCustomerId(e.target.value)}
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
-                  >
-                    <option value="">Consumidor final</option>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                  <p className="mt-0.5 text-xs text-slate-400">{todayStr}</p>
                 </div>
-
-                {/* Products */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium text-slate-800">Productos</Label>
-
-                  {/* Product search to add */}
-                  <div className="relative">
-                    <Input
-                      value={invoiceSearch}
-                      onChange={(e) => setInvoiceSearch(e.target.value)}
-                      placeholder="Buscar y agregar producto..."
-                      className="rounded-xl border-slate-200 bg-slate-50 text-sm"
-                    />
-                    {filteredInvoiceProducts.length > 0 && (
-                      <div className="absolute left-0 right-0 top-full z-10 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-                        {filteredInvoiceProducts.map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => {
-                              addProduct(p.id);
-                              setInvoiceSearch("");
-                            }}
-                            disabled={p.stock <= 0}
-                            className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-slate-50 disabled:opacity-40"
-                          >
-                            <span className="font-medium text-slate-800">{p.name}</span>
-                            <span className="shrink-0 text-slate-500">
-                              {money(toNumber(p.price))} · stock {p.stock}
-                              {toNumber(p.taxRate) > 0 && ` · IVA ${p.taxRate}%`}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <InvoiceLineTable />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowInvoiceEditor(false)}
+                  className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
 
-              {/* Right: totals + payment + actions */}
-              <div className="space-y-4 border-t border-slate-100 p-6 lg:border-l lg:border-t-0">
+              {/* Modal body */}
+              <div className="grid lg:grid-cols-[1fr_288px]">
 
-                {/* Totals card */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-sm">
-                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                    Resumen
-                  </p>
+                {/* ── Left column: document data + customer + products ─── */}
+                <div className="space-y-6 p-6">
 
-                  {Object.entries(subtotalByRate)
-                    .sort(([a], [b]) => Number(a) - Number(b))
-                    .map(([rate, base]) => (
-                      <div key={rate} className="flex justify-between text-slate-600">
-                        <span>Base IVA {rate}%</span>
-                        <span>{money(base)}</span>
+                  {/* Tipo de comprobante */}
+                  <div>
+                    <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      Tipo de comprobante
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setOutputMode("internal_receipt")}
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition",
+                          outputMode === "internal_receipt"
+                            ? "border-[#004080] bg-blue-50 text-[#004080]"
+                            : "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                        )}
+                      >
+                        <ReceiptText className="h-3.5 w-3.5" />
+                        Recibo interno
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => hasSriConfig && setOutputMode("sri_invoice")}
+                        disabled={!hasSriConfig}
+                        title={!hasSriConfig ? "Configura el módulo SRI primero" : undefined}
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition",
+                          outputMode === "sri_invoice"
+                            ? "border-[#004080] bg-blue-50 text-[#004080]"
+                            : hasSriConfig
+                              ? "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                              : "cursor-not-allowed border-slate-100 text-slate-300"
+                        )}
+                      >
+                        <FileCheck2 className="h-3.5 w-3.5" />
+                        Factura SRI
+                        {!hasSriConfig && (
+                          <span className="ml-1 text-[10px]">(sin config.)</span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Datos del documento */}
+                  <div>
+                    <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      Datos del documento
+                    </h3>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">Fecha</Label>
+                        <Input
+                          value={todayStr}
+                          readOnly
+                          className="rounded-lg bg-slate-50 text-sm text-slate-700"
+                        />
                       </div>
-                    ))}
-
-                  {hasDiscount && (
-                    <div className="flex justify-between text-slate-600">
-                      <span>Descuento</span>
-                      <span className="text-red-600">-{money(cartTotals.discountTotal)}</span>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">Cajero / Vendedor</Label>
+                        <Input
+                          value={currentUserName ?? "—"}
+                          readOnly
+                          className="rounded-lg bg-slate-50 text-sm text-slate-700"
+                        />
+                      </div>
+                      <div className="space-y-1 sm:col-span-2">
+                        <Label className="text-xs text-slate-500">Forma de pago (SRI)</Label>
+                        <select
+                          value={sriPaymentCode}
+                          onChange={(e) => setSriPaymentCode(e.target.value)}
+                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700"
+                        >
+                          {SRI_PAYMENT_OPTIONS.map((o) => (
+                            <option key={o.code} value={o.code}>
+                              {o.code} – {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1 sm:col-span-2">
+                        <Label className="text-xs text-slate-500">
+                          N. Guía de remisión{" "}
+                          <span className="text-slate-400">(opcional)</span>
+                        </Label>
+                        <div className="flex items-center gap-1.5">
+                          <Input
+                            disabled
+                            placeholder="000"
+                            className="w-14 rounded-lg bg-slate-50 text-center text-sm opacity-50"
+                          />
+                          <span className="text-slate-400">-</span>
+                          <Input
+                            disabled
+                            placeholder="000"
+                            className="w-14 rounded-lg bg-slate-50 text-center text-sm opacity-50"
+                          />
+                          <span className="text-slate-400">-</span>
+                          <Input
+                            disabled
+                            placeholder="000000000"
+                            className="flex-1 rounded-lg bg-slate-50 text-center text-sm opacity-50"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="modal-reimburse"
+                          disabled
+                          className="cursor-not-allowed opacity-40"
+                          title="Disponible con ERP"
+                        />
+                        <Label
+                          htmlFor="modal-reimburse"
+                          className="cursor-not-allowed text-xs text-slate-400"
+                          title="Disponible con ERP"
+                        >
+                          Factura por reembolso
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="modal-export"
+                          disabled
+                          className="cursor-not-allowed opacity-40"
+                          title="Disponible con ERP"
+                        />
+                        <Label
+                          htmlFor="modal-export"
+                          className="cursor-not-allowed text-xs text-slate-400"
+                          title="Disponible con ERP"
+                        >
+                          Factura de exportación
+                        </Label>
+                      </div>
                     </div>
-                  )}
+                  </div>
 
-                  {hasIva && (
-                    <div className="flex justify-between text-slate-600">
-                      <span>IVA</span>
-                      <span>{money(cartTotals.taxTotal)}</span>
+                  {/* Datos del cliente */}
+                  <div>
+                    <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      Datos del cliente
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-slate-500">Seleccionar cliente</Label>
+                        <button
+                          type="button"
+                          onClick={() => setShowNewCustomer(true)}
+                          className="flex items-center gap-1 text-xs text-[#004080] hover:text-[#003060]"
+                        >
+                          <UserPlus className="h-3 w-3" />
+                          Nuevo cliente
+                        </button>
+                      </div>
+                      <select
+                        value={customerId}
+                        onChange={(e) => setCustomerId(e.target.value)}
+                        className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                      >
+                        <option value="">Consumidor Final</option>
+                        {customers.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-slate-500">Nombre / Razón social</Label>
+                          <Input
+                            value={invoiceCustomerName}
+                            onChange={(e) => setInvoiceCustomerName(e.target.value)}
+                            placeholder="Consumidor Final"
+                            className="rounded-lg text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-slate-500">Cédula / RUC / Pasaporte</Label>
+                          <Input
+                            value={invoiceCustomerIdentification}
+                            onChange={(e) => setInvoiceCustomerIdentification(e.target.value)}
+                            placeholder="9999999999999"
+                            className="rounded-lg text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-slate-500">Teléfono</Label>
+                          <Input
+                            value={invoiceCustomerPhone}
+                            onChange={(e) => setInvoiceCustomerPhone(e.target.value)}
+                            placeholder="0999000000"
+                            className="rounded-lg text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-slate-500">Correo electrónico</Label>
+                          <Input
+                            type="email"
+                            value={invoiceCustomerEmail}
+                            onChange={(e) => setInvoiceCustomerEmail(e.target.value)}
+                            placeholder="correo@ejemplo.com"
+                            className="rounded-lg text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <Label className="text-xs text-slate-500">Dirección</Label>
+                          <Input
+                            value={invoiceCustomerAddress}
+                            onChange={(e) => setInvoiceCustomerAddress(e.target.value)}
+                            placeholder="Dirección del cliente"
+                            className="rounded-lg text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <Label className="text-xs text-slate-500">Observaciones</Label>
+                          <Input
+                            value={invoiceCustomerNotes}
+                            onChange={(e) => setInvoiceCustomerNotes(e.target.value)}
+                            placeholder="Información adicional para la factura"
+                            className="rounded-lg text-sm"
+                          />
+                        </div>
+                      </div>
                     </div>
-                  )}
+                  </div>
 
-                  <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-semibold text-slate-900">
-                    <span>Total</span>
-                    <span>{money(cartTotals.total)}</span>
+                  {/* Productos */}
+                  <div>
+                    <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      Productos
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="relative">
+                        <Input
+                          value={invoiceSearch}
+                          onChange={(e) => setInvoiceSearch(e.target.value)}
+                          placeholder="Buscar y agregar producto por nombre o código..."
+                          className="rounded-xl border-slate-200 bg-slate-50 text-sm"
+                        />
+                        {filteredInvoiceProducts.length > 0 && (
+                          <div className="absolute left-0 right-0 top-full z-10 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+                            {filteredInvoiceProducts.map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => {
+                                  addProduct(p.id);
+                                  setInvoiceSearch("");
+                                }}
+                                disabled={p.stock <= 0}
+                                className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-slate-50 disabled:opacity-40"
+                              >
+                                <span className="font-medium text-slate-800">{p.name}</span>
+                                <span className="shrink-0 text-xs text-slate-500">
+                                  {money(toNumber(p.price))} · stock {p.stock}
+                                  {toNumber(p.taxRate) > 0 && ` · IVA ${p.taxRate}%`}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <InvoiceLineTable />
+                    </div>
                   </div>
                 </div>
 
-                {/* Payment method */}
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium text-slate-800">Forma de pago</Label>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
-                  >
-                    <option value="cash">Efectivo</option>
-                    <option value="transfer">Transferencia</option>
-                    <option value="card">Tarjeta</option>
-                    <option value="credit">Fiado / Crédito</option>
-                  </select>
-                </div>
+                {/* ── Right column: totals + payment + actions ────────── */}
+                <div className="flex flex-col gap-4 border-t border-slate-100 p-6 lg:border-l lg:border-t-0">
 
-                {/* Paid amount */}
-                {paymentMethod !== "credit" && (
+                  {/* Resumen detallado */}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-sm">
+                    <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      Resumen
+                    </p>
+
+                    {Object.entries(subtotalByRate)
+                      .sort(([a], [b]) => Number(a) - Number(b))
+                      .map(([rate, base]) => (
+                        <div key={rate} className="flex justify-between text-slate-600">
+                          <span>Base IVA {rate}%</span>
+                          <span>{money(base)}</span>
+                        </div>
+                      ))}
+
+                    {hasDiscount && (
+                      <div className="flex justify-between text-slate-600">
+                        <span>Descuento</span>
+                        <span className="text-red-600">-{money(cartTotals.discountTotal)}</span>
+                      </div>
+                    )}
+
+                    {hasIva && (
+                      <div className="flex justify-between text-slate-600">
+                        <span>IVA</span>
+                        <span>{money(cartTotals.taxTotal)}</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between border-t border-slate-200 pt-2 font-semibold text-slate-900">
+                      <span>Total factura</span>
+                      <span className="text-base">{money(cartTotals.total)}</span>
+                    </div>
+                  </div>
+
+                  {/* Forma de pago */}
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-medium text-slate-800">Monto pagado</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={paidAmount}
-                      placeholder={cartTotals.total.toFixed(2)}
-                      onChange={(e) => setPaidAmount(e.target.value)}
-                      className="rounded-xl"
-                    />
-                    {paidAmount && Number(paidAmount) > cartTotals.total && (
-                      <p className="text-xs text-slate-500">
-                        Vuelto: {money(Number(paidAmount) - cartTotals.total)}
-                      </p>
+                    <Label className="text-xs font-medium text-slate-700">Forma de pago</Label>
+                    <select
+                      value={paymentMethod}
+                      onChange={(e) => {
+                        setPaymentMethod(e.target.value);
+                        setSriPaymentCode(defaultSriCode(e.target.value));
+                      }}
+                      className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    >
+                      <option value="cash">Efectivo</option>
+                      <option value="transfer">Transferencia</option>
+                      <option value="card">Tarjeta</option>
+                      <option value="credit">Fiado / Crédito</option>
+                    </select>
+                  </div>
+
+                  {/* Monto pagado */}
+                  {paymentMethod !== "credit" && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-slate-700">Monto pagado</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={paidAmount}
+                        placeholder={cartTotals.total.toFixed(2)}
+                        onChange={(e) => setPaidAmount(e.target.value)}
+                        className="rounded-xl"
+                      />
+                    </div>
+                  )}
+
+                  {/* Saldo / Vuelto */}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-1.5 text-sm">
+                    <div className="flex justify-between text-slate-600">
+                      <span>Monto pagado</span>
+                      <span>{money(paidNum)}</span>
+                    </div>
+                    {vuelto > 0 ? (
+                      <div className="flex justify-between font-medium text-emerald-700">
+                        <span>Vuelto</span>
+                        <span>{money(vuelto)}</span>
+                      </div>
+                    ) : (
+                      <div className={cn(
+                        "flex justify-between font-medium",
+                        saldo > 0 ? "text-amber-700" : "text-emerald-700"
+                      )}>
+                        <span>Saldo pendiente</span>
+                        <span>{money(saldo)}</span>
+                      </div>
                     )}
                   </div>
-                )}
 
-                {paymentMethod === "credit" && (
-                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                    El saldo quedará pendiente en la cuenta del cliente.
-                  </p>
-                )}
+                  {paymentMethod === "credit" && (
+                    <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                      El saldo quedará pendiente en la cuenta del cliente.
+                    </p>
+                  )}
 
-                {creditWithoutCustomer && (
-                  <p className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                    <AlertCircle className="h-3 w-3 shrink-0" />
-                    Selecciona un cliente para usar crédito.
-                  </p>
-                )}
+                  {creditWithoutCustomer && (
+                    <p className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      Selecciona un cliente para usar crédito.
+                    </p>
+                  )}
 
-                {error && (
-                  <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-destructive">
-                    {error}
-                  </p>
-                )}
+                  {error && (
+                    <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-destructive">
+                      {error}
+                    </p>
+                  )}
 
-                {/* Actions */}
-                <div className="space-y-2 pt-1">
-                  <Button
-                    type="button"
-                    onClick={submitSale}
-                    disabled={isLoading || cart.length === 0 || creditWithoutCustomer}
-                    className="w-full bg-[#004080] hover:bg-[#003060]"
-                  >
-                    {isLoading
-                      ? "Finalizando..."
-                      : outputMode === "sri_invoice"
-                        ? "Emitir factura SRI"
-                        : "Finalizar venta"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowInvoiceEditor(false)}
-                    className="w-full"
-                  >
-                    Cerrar
-                  </Button>
+                  {/* Actions */}
+                  <div className="mt-auto space-y-2 pt-2">
+                    <Button
+                      type="button"
+                      onClick={submitSale}
+                      disabled={isLoading || cart.length === 0 || creditWithoutCustomer}
+                      className="w-full bg-[#004080] hover:bg-[#003060]"
+                    >
+                      {isLoading
+                        ? "Procesando..."
+                        : outputMode === "sri_invoice"
+                          ? "Emitir factura SRI"
+                          : "Finalizar venta"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled
+                      title="Próximamente: guardar como borrador"
+                      className="w-full cursor-not-allowed opacity-50"
+                    >
+                      Guardar borrador
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setShowInvoiceEditor(false)}
+                      className="w-full text-slate-500"
+                    >
+                      Cerrar
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -826,7 +1160,7 @@ export function BasicPosClient({
         </div>
       )}
 
-      {/* Compact success strip */}
+      {/* ── Compact success strip ───────────────────────────────────────────── */}
       {lastOutput && lastSale ? (
         <div className="space-y-3 rounded-[22px] border border-emerald-200 bg-emerald-50 px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -884,7 +1218,7 @@ export function BasicPosClient({
         </div>
       ) : null}
 
-      {/* POS grid */}
+      {/* ── POS grid ────────────────────────────────────────────────────────── */}
       <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
 
         {/* Left: product search + grid */}
@@ -1062,7 +1396,10 @@ export function BasicPosClient({
             <select
               id="paymentMethod"
               value={paymentMethod}
-              onChange={(event) => setPaymentMethod(event.target.value)}
+              onChange={(event) => {
+                setPaymentMethod(event.target.value);
+                setSriPaymentCode(defaultSriCode(event.target.value));
+              }}
               className="h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm"
             >
               <option value="cash">Efectivo</option>
@@ -1122,35 +1459,42 @@ export function BasicPosClient({
             ) : null}
           </div>
 
-          {/* Sale output mode */}
+          {/* Sale output mode + tooltip */}
           <div className="space-y-2">
             <div className="flex items-center gap-1.5">
               <Label className="text-sm font-medium text-slate-900">Comprobante</Label>
-              <button
-                type="button"
-                onMouseEnter={showTip}
-                onMouseLeave={hideTip}
-                onFocus={showTip}
-                onBlur={hideTip}
-                onClick={handleTipClick}
-                className="relative flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 text-[10px] text-slate-400 hover:border-slate-300 hover:text-slate-600"
-                aria-label="Información sobre tipos de comprobante"
-              >
-                ?
-              </button>
-            </div>
-            {showComprobanteTip && (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 space-y-1.5">
-                <p>
-                  <span className="font-medium text-slate-800">Recibo interno:</span>{" "}
-                  Registra la venta, descuenta inventario y genera un recibo operativo sin enviarlo al SRI.
-                </p>
-                <p>
-                  <span className="font-medium text-slate-800">Factura SRI:</span>{" "}
-                  Registra la venta, descuenta inventario y emite una factura electrónica autorizada por el SRI.
-                </p>
+              <div className="relative">
+                <button
+                  type="button"
+                  onMouseEnter={showTip}
+                  onMouseLeave={hideTip}
+                  onFocus={showTip}
+                  onBlur={hideTip}
+                  onClick={handleTipClick}
+                  className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 text-[10px] text-slate-400 hover:border-slate-300 hover:text-slate-600"
+                  aria-label="Información sobre tipos de comprobante"
+                >
+                  ?
+                </button>
+                {showComprobanteTip && (
+                  <div className="absolute bottom-full left-0 z-50 mb-2 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-lg space-y-1.5">
+                    <div
+                      className="absolute -bottom-1.5 left-2 h-3 w-3 rotate-45 border-b border-r border-slate-200 bg-white"
+                      aria-hidden
+                    />
+                    <p className="text-xs text-slate-600">
+                      <span className="font-medium text-slate-800">Recibo interno: </span>
+                      Registra la venta, descuenta inventario y genera un recibo operativo sin enviarlo al SRI.
+                    </p>
+                    <p className="text-xs text-slate-600">
+                      <span className="font-medium text-slate-800">Factura SRI: </span>
+                      Registra la venta, descuenta inventario y emite una factura electrónica autorizada por el SRI.
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
+
             <div className="flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
               <button
                 type="button"
