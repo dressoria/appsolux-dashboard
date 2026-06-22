@@ -60,6 +60,7 @@ export async function POST(request: Request) {
       expiresAt: getString(body, "expiresAt")
         ? new Date(getString(body, "expiresAt"))
         : undefined,
+      taxRate: getNumber(body, "taxRate"),
     });
 
     return NextResponse.json({ ok: true, product });

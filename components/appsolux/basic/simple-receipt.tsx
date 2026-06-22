@@ -2,19 +2,27 @@
 
 import { Button } from "@/components/ui/button";
 
+type ReceiptItem = {
+  quantity: number;
+  price: string;
+  discountAmount?: string;
+  taxRate?: string;
+  taxAmount?: string;
+  total: string;
+  product: { name: string };
+};
+
 type ReceiptSale = {
   id: string;
   createdAt: string | Date;
   total: string;
+  subtotal?: string;
+  taxTotal?: string;
+  discountTotal?: string;
   status: string;
   paymentStatus: string;
   customer?: { name: string } | null;
-  items: Array<{
-    quantity: number;
-    price: string;
-    total: string;
-    product: { name: string };
-  }>;
+  items: ReceiptItem[];
   payments: Array<{
     method: string;
     amount: string;
@@ -70,6 +78,13 @@ export function SimpleReceipt({
   );
   const pending = Math.max(Number(sale.total) - paid, 0);
 
+  const subtotal = Number(sale.subtotal ?? sale.total);
+  const taxTotal = Number(sale.taxTotal ?? 0);
+  const discountTotal = Number(sale.discountTotal ?? 0);
+  const hasIva = taxTotal > 0;
+  const hasDiscount = discountTotal > 0;
+  const showBreakdown = hasIva || hasDiscount;
+
   return (
     <>
       {/* Oculta todo excepto el recibo al imprimir */}
@@ -122,33 +137,74 @@ export function SimpleReceipt({
         </div>
 
         <div className="space-y-2">
-          <div className="grid grid-cols-[1fr_70px_90px] border-b pb-2 text-xs font-medium text-muted-foreground">
+          <div className="grid grid-cols-[1fr_50px_80px_70px_90px] border-b pb-2 text-xs font-medium text-muted-foreground">
             <span>Producto</span>
             <span className="text-right">Cant.</span>
+            <span className="text-right">P. unit.</span>
+            <span className="text-right">IVA</span>
             <span className="text-right">Total</span>
           </div>
-          {sale.items.map((item, index) => (
-            <div
-              key={`${item.product.name}-${index}`}
-              className="grid grid-cols-[1fr_70px_90px] gap-3 border-b pb-2"
-            >
-              <div>
-                <p className="font-medium">{item.product.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatMoney(item.price)} c/u
-                </p>
+          {sale.items.map((item, index) => {
+            const taxRate = Number(item.taxRate ?? 0);
+            const discountAmt = Number(item.discountAmount ?? 0);
+            return (
+              <div
+                key={`${item.product.name}-${index}`}
+                className="border-b pb-2"
+              >
+                <div className="grid grid-cols-[1fr_50px_80px_70px_90px] gap-1">
+                  <div>
+                    <p className="font-medium">{item.product.name}</p>
+                    {discountAmt > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Desc. -{formatMoney(discountAmt)}
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-right">{item.quantity}</p>
+                  <p className="text-right text-muted-foreground">
+                    {formatMoney(item.price)}
+                  </p>
+                  <p className="text-right text-muted-foreground">
+                    {taxRate > 0 ? `${taxRate}%` : "—"}
+                  </p>
+                  <p className="text-right">{formatMoney(item.total)}</p>
+                </div>
               </div>
-              <p className="text-right">{item.quantity}</p>
-              <p className="text-right">{formatMoney(item.total)}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="space-y-1 text-right">
-          <p>
-            Total:{" "}
-            <span className="font-semibold">{formatMoney(sale.total)}</span>
-          </p>
+          {showBreakdown ? (
+            <>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Subtotal</span>
+                <span>{formatMoney(subtotal)}</span>
+              </div>
+              {hasDiscount && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Descuento</span>
+                  <span>-{formatMoney(discountTotal)}</span>
+                </div>
+              )}
+              {hasIva && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>IVA</span>
+                  <span>{formatMoney(taxTotal)}</span>
+                </div>
+              )}
+              <div className="flex justify-between border-t pt-1 font-semibold">
+                <span>Total</span>
+                <span>{formatMoney(sale.total)}</span>
+              </div>
+            </>
+          ) : (
+            <p>
+              Total:{" "}
+              <span className="font-semibold">{formatMoney(sale.total)}</span>
+            </p>
+          )}
           <p className="text-muted-foreground">Pagado: {formatMoney(paid)}</p>
           {pending > 0 ? (
             <p className="text-amber-700">

@@ -19,6 +19,7 @@ type CreateProductInput = {
   minStock?: number;
   barcode?: string;
   expiresAt?: Date;
+  taxRate?: number;
 };
 
 type UpdateProductInput = Partial<Omit<CreateProductInput, "tenantId">> & {
@@ -54,6 +55,7 @@ export type CreateSaleInput = {
   items: Array<{
     productId: string;
     quantity: number;
+    discountAmount?: number;
   }>;
 };
 
@@ -160,6 +162,7 @@ export async function createProduct(input: CreateProductInput) {
       minStock: input.minStock,
       barcode: input.barcode?.trim() || undefined,
       expiresAt: input.expiresAt,
+      taxRate: new Prisma.Decimal(input.taxRate ?? 0),
     },
   });
 }
@@ -214,6 +217,11 @@ export async function updateProduct(input: UpdateProductInput) {
 
   if (input.expiresAt !== undefined) {
     data.expiresAt = input.expiresAt;
+  }
+
+  if (input.taxRate !== undefined) {
+    assertPositiveMoney(input.taxRate, "La tasa de IVA");
+    data.taxRate = new Prisma.Decimal(input.taxRate);
   }
 
   return prisma.lightweightProduct.update({
@@ -476,7 +484,10 @@ export async function createSale(input: CreateSaleInput) {
       }
     }
 
-    let total = new Prisma.Decimal(0);
+    let subtotal = new Prisma.Decimal(0);
+    let taxTotal = new Prisma.Decimal(0);
+    let discountTotal = new Prisma.Decimal(0);
+
     const saleItems = input.items.map((item) => {
       const product = productById.get(item.productId);
 
@@ -488,16 +499,31 @@ export async function createSale(input: CreateSaleInput) {
         throw new Error(`Stock insuficiente para ${product.name}.`);
       }
 
-      const itemTotal = product.price.mul(item.quantity);
-      total = total.add(itemTotal);
+      const grossAmount = product.price.mul(item.quantity);
+      const discountAmount = new Prisma.Decimal(
+        Math.max(0, Math.min(item.discountAmount ?? 0, Number(grossAmount)))
+      );
+      const lineSubtotal = grossAmount.sub(discountAmount);
+      const taxRate = product.taxRate;
+      const taxAmount = lineSubtotal.mul(taxRate).div(100).toDecimalPlaces(2);
+      const lineTotal = lineSubtotal.add(taxAmount);
+
+      subtotal = subtotal.add(lineSubtotal);
+      taxTotal = taxTotal.add(taxAmount);
+      discountTotal = discountTotal.add(discountAmount);
 
       return {
         product,
         quantity: item.quantity,
         price: product.price,
-        total: itemTotal,
+        discountAmount,
+        taxRate,
+        taxAmount,
+        total: lineTotal,
       };
     });
+
+    const total = subtotal.add(taxTotal);
 
     const requestedPaidAmount =
       input.paymentMethod === "credit" ? 0 : input.paidAmount ?? Number(total);
@@ -520,6 +546,9 @@ export async function createSale(input: CreateSaleInput) {
         tenantId: input.tenantId,
         customerId: input.customerId,
         status,
+        subtotal,
+        taxTotal,
+        discountTotal,
         total,
         paymentStatus,
         items: {
@@ -527,6 +556,9 @@ export async function createSale(input: CreateSaleInput) {
             productId: item.product.id,
             quantity: item.quantity,
             price: item.price,
+            discountAmount: item.discountAmount,
+            taxRate: item.taxRate,
+            taxAmount: item.taxAmount,
             total: item.total,
           })),
         },

@@ -6,6 +6,8 @@ import { FormEvent, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   FileCheck2,
   ReceiptText,
   Trash2,
@@ -27,6 +29,7 @@ type Product = {
   price: string;
   stock: number;
   barcode?: string | null;
+  taxRate: string;
 };
 
 type Customer = {
@@ -37,18 +40,25 @@ type Customer = {
 type CartItem = {
   productId: string;
   quantity: number;
+  discountAmount: number;
 };
 
 type SaleResponse = {
   id: string;
   createdAt: string;
   total: string;
+  subtotal: string;
+  taxTotal: string;
+  discountTotal: string;
   status: string;
   paymentStatus: string;
   customer?: { name: string } | null;
   items: Array<{
     quantity: number;
     price: string;
+    discountAmount: string;
+    taxRate: string;
+    taxAmount: string;
     total: string;
     product: { name: string };
   }>;
@@ -74,6 +84,10 @@ type SaleOutputResult = {
 
 function toNumber(value: string | number) {
   return typeof value === "number" ? value : Number(value ?? 0);
+}
+
+function money(value: number) {
+  return `$${value.toFixed(2)}`;
 }
 
 export function BasicPosClient({
@@ -103,18 +117,21 @@ export function BasicPosClient({
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
 
-  // Raw string values for cart quantity inputs — allows temporary empty/partial state while typing
+  // Raw string values for cart quantity inputs
   const [cartInputs, setCartInputs] = useState<Record<string, string>>({});
+  // Raw string values for discount inputs
+  const [discountInputs, setDiscountInputs] = useState<Record<string, string>>({});
 
-  // Transfer fields (UI-only — no DB field available without migration)
+  // Transfer fields (UI-only)
   const [transferBank, setTransferBank] = useState("");
   const [transferRef, setTransferRef] = useState("");
 
-  // Customer state — mutable so new customers can be added from the modal
+  // Customer state
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
 
-  // Quick-create customer modal
+  // Modals / tooltips
   const [showComprobanteTip, setShowComprobanteTip] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
@@ -125,10 +142,33 @@ export function BasicPosClient({
   const [newCustomerError, setNewCustomerError] = useState("");
 
   const productById = new Map(products.map((p) => [p.id, p]));
-  const total = cart.reduce((sum, item) => {
+
+  // Per-line calculated values
+  function calcLine(item: CartItem) {
     const product = productById.get(item.productId);
-    return sum + toNumber(product?.price ?? 0) * item.quantity;
-  }, 0);
+    if (!product) return { gross: 0, discount: 0, subtotal: 0, tax: 0, total: 0, taxRate: 0 };
+    const gross = toNumber(product.price) * item.quantity;
+    const discount = Math.max(0, Math.min(item.discountAmount, gross));
+    const sub = gross - discount;
+    const taxRate = toNumber(product.taxRate);
+    const tax = Math.round(sub * taxRate) / 100;
+    return { gross, discount, subtotal: sub, tax, total: sub + tax, taxRate };
+  }
+
+  // Cart totals
+  const cartTotals = cart.reduce(
+    (acc, item) => {
+      const line = calcLine(item);
+      return {
+        subtotal: acc.subtotal + line.subtotal,
+        taxTotal: acc.taxTotal + line.tax,
+        discountTotal: acc.discountTotal + line.discount,
+        total: acc.total + line.total,
+      };
+    },
+    { subtotal: 0, taxTotal: 0, discountTotal: 0, total: 0 }
+  );
+
   const filteredProducts = products.filter((product) => {
     const term = search.trim().toLowerCase();
     if (!term) return true;
@@ -160,11 +200,11 @@ export function BasicPosClient({
         );
       }
       setCartInputs((prev) => ({ ...prev, [productId]: "1" }));
-      return [...current, { productId, quantity: 1 }];
+      setDiscountInputs((prev) => ({ ...prev, [productId]: "0" }));
+      return [...current, { productId, quantity: 1, discountAmount: 0 }];
     });
   }
 
-  // Called only onBlur — normalizes the raw string and commits to cart
   function commitQuantity(productId: string) {
     const raw = cartInputs[productId] ?? "";
     const product = productById.get(productId);
@@ -183,9 +223,32 @@ export function BasicPosClient({
     );
   }
 
+  function commitDiscount(productId: string) {
+    const raw = discountInputs[productId] ?? "0";
+    const parsed = parseFloat(raw);
+    const safe = !Number.isFinite(parsed) || parsed < 0 ? 0 : parsed;
+    const product = productById.get(productId);
+    const cartItem = cart.find((i) => i.productId === productId);
+    const maxDiscount = product && cartItem
+      ? toNumber(product.price) * cartItem.quantity
+      : safe;
+    const clamped = Math.min(safe, maxDiscount);
+    setDiscountInputs((prev) => ({ ...prev, [productId]: clamped.toFixed(2) }));
+    setCart((current) =>
+      current.map((item) =>
+        item.productId === productId ? { ...item, discountAmount: clamped } : item
+      )
+    );
+  }
+
   function removeFromCart(productId: string) {
     setCart((current) => current.filter((item) => item.productId !== productId));
     setCartInputs((prev) => {
+      const next = { ...prev };
+      delete next[productId];
+      return next;
+    });
+    setDiscountInputs((prev) => {
       const next = { ...prev };
       delete next[productId];
       return next;
@@ -215,9 +278,13 @@ export function BasicPosClient({
           customerId,
           paymentMethod,
           paidAmount:
-            paymentMethod === "credit" ? 0 : paidAmount ? Number(paidAmount) : total,
+            paymentMethod === "credit" ? 0 : paidAmount ? Number(paidAmount) : cartTotals.total,
           outputMode,
-          items: cart,
+          items: cart.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            discountAmount: item.discountAmount,
+          })),
         }),
       });
       const result = (await response.json()) as {
@@ -233,11 +300,13 @@ export function BasicPosClient({
 
       setCart([]);
       setCartInputs({});
+      setDiscountInputs({});
       setCustomerId("");
       setPaidAmount("");
       setTransferBank("");
       setTransferRef("");
       setShowReceipt(false);
+      setShowDetail(false);
       setLastSale(result.sale ?? null);
       setLastOutput(result.output ?? null);
       router.refresh();
@@ -297,9 +366,13 @@ export function BasicPosClient({
     setLastSale(null);
     setLastOutput(null);
     setShowReceipt(false);
+    setShowDetail(false);
     setCartInputs({});
     setError("");
   }
+
+  const hasIva = cartTotals.taxTotal > 0;
+  const hasDiscount = cartTotals.discountTotal > 0;
 
   return (
     <div className="space-y-4">
@@ -443,7 +516,7 @@ export function BasicPosClient({
         </div>
       ) : null}
 
-      {/* POS grid — always visible so user can start next sale immediately */}
+      {/* POS grid */}
       <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
 
         {/* Left: product search + grid */}
@@ -477,8 +550,13 @@ export function BasicPosClient({
                   <div>
                     <span className="block font-medium text-slate-900">{product.name}</span>
                     <span className="text-slate-500">
-                      ${toNumber(product.price).toFixed(2)} · stock {product.stock}
+                      {money(toNumber(product.price))} · stock {product.stock}
                     </span>
+                    {toNumber(product.taxRate) > 0 && (
+                      <span className="block text-xs text-slate-400">
+                        IVA {product.taxRate}%
+                      </span>
+                    )}
                   </div>
                   <SaleStatusBadge
                     label={product.stock > 0 ? "Disponible" : "Agotado"}
@@ -498,44 +576,193 @@ export function BasicPosClient({
         {/* Right: cart + checkout */}
         <div className="space-y-4 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
 
-          {/* Cart */}
-          <div>
-            <p className="text-sm font-medium text-slate-900">Carrito</p>
-            <p className="text-xs text-slate-500">Total: ${total.toFixed(2)}</p>
+          {/* Cart header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-900">Carrito</p>
+              {hasIva || hasDiscount ? (
+                <p className="text-xs text-slate-500">
+                  {hasDiscount && `Desc. ${money(cartTotals.discountTotal)} · `}
+                  {hasIva && `IVA ${money(cartTotals.taxTotal)} · `}
+                  Total {money(cartTotals.total)}
+                </p>
+              ) : (
+                <p className="text-xs text-slate-500">Total: {money(cartTotals.total)}</p>
+              )}
+            </div>
+            {cart.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowDetail((v) => !v)}
+                className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700"
+              >
+                {showDetail ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                {showDetail ? "Ocultar detalle" : "Ver detalle"}
+              </button>
+            )}
           </div>
 
-          <div className="space-y-2">
-            {cart.map((item) => {
-              const product = productById.get(item.productId);
-              const rawValue = cartInputs[item.productId] ?? String(item.quantity);
-              return (
-                <div key={item.productId} className="grid grid-cols-[1fr_80px_32px] items-center gap-2">
-                  <div>
-                    <p className="text-sm text-slate-900">{product?.name}</p>
-                    <p className="text-xs text-slate-500">Max {product?.stock ?? 0}</p>
-                  </div>
-                  <Input
-                    type="number"
-                    min="1"
-                    max={product?.stock ?? undefined}
-                    value={rawValue}
-                    onChange={(event) =>
-                      setCartInputs((prev) => ({ ...prev, [item.productId]: event.target.value }))
-                    }
-                    onBlur={() => commitQuantity(item.productId)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeFromCart(item.productId)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
-                    title="Eliminar del carrito"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+          {/* Detail panel — editable pre-invoice view */}
+          {showDetail && cart.length > 0 && (
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 space-y-3 text-xs">
+              <p className="font-semibold text-slate-700 text-xs uppercase tracking-wide">
+                Detalle del comprobante
+              </p>
+              <p className="text-slate-500">
+                Cliente: {customers.find((c) => c.id === customerId)?.name ?? "Consumidor final"}
+              </p>
+
+              {/* Line table */}
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[480px] text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-500">
+                      <th className="pb-1.5 text-left font-medium">Producto</th>
+                      <th className="pb-1.5 text-right font-medium w-16">Cant.</th>
+                      <th className="pb-1.5 text-right font-medium w-20">P. unit.</th>
+                      <th className="pb-1.5 text-right font-medium w-20">Desc.</th>
+                      <th className="pb-1.5 text-right font-medium w-16">IVA %</th>
+                      <th className="pb-1.5 text-right font-medium w-20">IVA $</th>
+                      <th className="pb-1.5 text-right font-medium w-20">Total</th>
+                      <th className="pb-1.5 w-8" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {cart.map((item) => {
+                      const product = productById.get(item.productId);
+                      const line = calcLine(item);
+                      return (
+                        <tr key={item.productId} className="align-middle">
+                          <td className="py-2 pr-2 font-medium text-slate-800">
+                            {product?.name}
+                          </td>
+                          {/* Quantity */}
+                          <td className="py-2 pr-1">
+                            <Input
+                              type="number"
+                              min="1"
+                              max={product?.stock ?? undefined}
+                              value={cartInputs[item.productId] ?? String(item.quantity)}
+                              onChange={(e) =>
+                                setCartInputs((prev) => ({ ...prev, [item.productId]: e.target.value }))
+                              }
+                              onBlur={() => commitQuantity(item.productId)}
+                              className="h-7 w-14 text-right text-xs"
+                            />
+                          </td>
+                          {/* Unit price */}
+                          <td className="py-2 pr-1 text-right text-slate-600">
+                            {money(toNumber(product?.price ?? 0))}
+                          </td>
+                          {/* Discount */}
+                          <td className="py-2 pr-1">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={discountInputs[item.productId] ?? "0"}
+                              onChange={(e) =>
+                                setDiscountInputs((prev) => ({ ...prev, [item.productId]: e.target.value }))
+                              }
+                              onBlur={() => commitDiscount(item.productId)}
+                              className="h-7 w-20 text-right text-xs"
+                              placeholder="0.00"
+                            />
+                          </td>
+                          {/* IVA % */}
+                          <td className="py-2 pr-1 text-right text-slate-500">
+                            {line.taxRate}%
+                          </td>
+                          {/* IVA $ */}
+                          <td className="py-2 pr-1 text-right text-slate-600">
+                            {money(line.tax)}
+                          </td>
+                          {/* Total */}
+                          <td className="py-2 pr-1 text-right font-semibold text-slate-800">
+                            {money(line.total)}
+                          </td>
+                          <td className="py-2">
+                            <button
+                              type="button"
+                              onClick={() => removeFromCart(item.productId)}
+                              className="flex h-6 w-6 items-center justify-center rounded text-slate-300 hover:bg-red-50 hover:text-red-500"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Totals */}
+              <div className="border-t border-slate-200 pt-2 space-y-1 text-right">
+                <div className="flex justify-between text-slate-500">
+                  <span>Subtotal (base imponible)</span>
+                  <span>{money(cartTotals.subtotal)}</span>
                 </div>
-              );
-            })}
-          </div>
+                {hasDiscount && (
+                  <div className="flex justify-between text-slate-500">
+                    <span>Descuento total</span>
+                    <span>-{money(cartTotals.discountTotal)}</span>
+                  </div>
+                )}
+                {hasIva && (
+                  <div className="flex justify-between text-slate-500">
+                    <span>IVA total</span>
+                    <span>{money(cartTotals.taxTotal)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-semibold text-slate-900 text-sm pt-1 border-t border-slate-200">
+                  <span>Total</span>
+                  <span>{money(cartTotals.total)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Compact cart rows — visible when detail is hidden */}
+          {!showDetail && (
+            <div className="space-y-2">
+              {cart.map((item) => {
+                const product = productById.get(item.productId);
+                const rawValue = cartInputs[item.productId] ?? String(item.quantity);
+                const line = calcLine(item);
+                return (
+                  <div key={item.productId} className="grid grid-cols-[1fr_80px_32px] items-center gap-2">
+                    <div>
+                      <p className="text-sm text-slate-900">{product?.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {money(toNumber(product?.price ?? 0))}
+                        {line.taxRate > 0 && ` · IVA ${line.taxRate}%`}
+                        {item.discountAmount > 0 && ` · Desc. ${money(item.discountAmount)}`}
+                      </p>
+                    </div>
+                    <Input
+                      type="number"
+                      min="1"
+                      max={product?.stock ?? undefined}
+                      value={rawValue}
+                      onChange={(event) =>
+                        setCartInputs((prev) => ({ ...prev, [item.productId]: event.target.value }))
+                      }
+                      onBlur={() => commitQuantity(item.productId)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeFromCart(item.productId)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
+                      title="Eliminar del carrito"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Customer selector + quick-create */}
           <div className="space-y-2">
@@ -593,7 +820,7 @@ export function BasicPosClient({
             </select>
           </div>
 
-          {/* Transfer fields — UI reference only, no DB field available */}
+          {/* Transfer fields */}
           {paymentMethod === "transfer" && (
             <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
               <p className="text-xs font-medium text-slate-600">Datos de transferencia</p>
@@ -632,7 +859,7 @@ export function BasicPosClient({
               step="0.01"
               min="0"
               value={paidAmount}
-              placeholder={total.toFixed(2)}
+              placeholder={cartTotals.total.toFixed(2)}
               onChange={(event) => setPaidAmount(event.target.value)}
               disabled={paymentMethod === "credit"}
             />
@@ -643,7 +870,7 @@ export function BasicPosClient({
             ) : null}
           </div>
 
-          {/* Sale output mode — selector compacto */}
+          {/* Sale output mode */}
           <div className="space-y-2">
             <div className="flex items-center gap-1.5">
               <Label className="text-sm font-medium text-slate-900">Comprobante</Label>

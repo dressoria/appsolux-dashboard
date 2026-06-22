@@ -513,22 +513,26 @@ export async function createDraftSriDocumentFromBasicSale({
   const lines = sale.items.map((item) => {
     const qty = item.quantity;
     const unitPrice = Number(item.price);
-    const lineSubtotal = qty * unitPrice;
-    // Basic POS has no IVA tracking — tax rate is 0 explicitly
+    const discountAmount = Number(item.discountAmount ?? 0);
+    const lineSubtotal = qty * unitPrice - discountAmount;
+    const taxRate = Number(item.taxRate ?? 0);
+    const taxAmount = Math.round(lineSubtotal * taxRate) / 100;
     return {
       itemName: item.product.name,
       itemCode: item.product.barcode ?? null,
       quantity: new Prisma.Decimal(qty),
       unitPrice: new Prisma.Decimal(unitPrice),
-      discountAmount: new Prisma.Decimal(0),
+      discountAmount: new Prisma.Decimal(discountAmount),
       subtotal: new Prisma.Decimal(lineSubtotal),
-      taxRate: new Prisma.Decimal(0),
-      taxAmount: new Prisma.Decimal(0),
-      total: new Prisma.Decimal(lineSubtotal),
+      taxRate: new Prisma.Decimal(taxRate),
+      taxAmount: new Prisma.Decimal(taxAmount),
+      total: new Prisma.Decimal(lineSubtotal + taxAmount),
     };
   });
 
-  const subtotal = lines.reduce((acc, l) => acc + Number(l.subtotal), 0);
+  const sriSubtotal = lines.reduce((acc, l) => acc + Number(l.subtotal), 0);
+  const sriTaxTotal = lines.reduce((acc, l) => acc + Number(l.taxAmount), 0);
+  const sriDiscountTotal = lines.reduce((acc, l) => acc + Number(l.discountAmount), 0);
 
   const document = await prisma.sriDocument.create({
     data: {
@@ -544,10 +548,10 @@ export async function createDraftSriDocumentFromBasicSale({
       customerIdentification: null,
       customerEmail: sale.customer?.email ?? null,
       customerPhone: sale.customer?.phone ?? null,
-      subtotal: new Prisma.Decimal(subtotal),
-      taxTotal: new Prisma.Decimal(0),
-      discountTotal: new Prisma.Decimal(0),
-      grandTotal: new Prisma.Decimal(subtotal),
+      subtotal: new Prisma.Decimal(sriSubtotal),
+      taxTotal: new Prisma.Decimal(sriTaxTotal),
+      discountTotal: new Prisma.Decimal(sriDiscountTotal),
+      grandTotal: new Prisma.Decimal(sriSubtotal + sriTaxTotal),
       lines: { create: lines },
     },
     select: { id: true },

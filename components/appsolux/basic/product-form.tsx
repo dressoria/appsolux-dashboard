@@ -29,6 +29,7 @@ export function ProductForm({ disabled = false }: { disabled?: boolean }) {
       minStock: form.get("minStock") ? Number(form.get("minStock")) : undefined,
       barcode: String(form.get("barcode") ?? ""),
       expiresAt: String(form.get("expiresAt") ?? ""),
+      taxRate: Number(form.get("taxRate") ?? 0),
     };
 
     try {
@@ -103,6 +104,25 @@ export function ProductForm({ disabled = false }: { disabled?: boolean }) {
               disabled={fieldDisabled}
             />
           </div>
+        </div>
+
+        {/* IVA por producto */}
+        <div className="mt-3 space-y-1.5">
+          <Label htmlFor="taxRate">IVA del producto</Label>
+          <select
+            id="taxRate"
+            name="taxRate"
+            defaultValue="0"
+            disabled={fieldDisabled}
+            className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm sm:max-w-[200px]"
+          >
+            <option value="0">0% — Exento / no gravado</option>
+            <option value="8">8% — Tarifa reducida</option>
+            <option value="15">15% — Tarifa general</option>
+          </select>
+          <p className="text-xs text-slate-400">
+            Se aplica al calcular totales de venta y factura SRI.
+          </p>
         </div>
       </div>
 

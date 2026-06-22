@@ -28,6 +28,10 @@ function readItems(value: unknown) {
         typeof row.quantity === "number"
           ? row.quantity
           : Number(row.quantity ?? 0),
+      discountAmount:
+        typeof row.discountAmount === "number"
+          ? row.discountAmount
+          : Number(row.discountAmount ?? 0),
     };
   });
 }

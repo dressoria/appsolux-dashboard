@@ -95,6 +95,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       minStock: getNumber(body, "minStock"),
       barcode: getString(body, "barcode"),
       expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+      taxRate: getNumber(body, "taxRate"),
     });
 
     return NextResponse.json({ ok: true, product });

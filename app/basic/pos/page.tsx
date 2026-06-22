@@ -115,6 +115,7 @@ export default async function BasicPosPage({ searchParams }: BasicPosPageProps) 
             price: product.price.toString(),
             stock: product.stock,
             barcode: product.barcode,
+            taxRate: product.taxRate.toString(),
           }))}
           customers={customers.map((customer) => ({
             id: customer.id,
