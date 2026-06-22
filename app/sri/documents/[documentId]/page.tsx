@@ -177,7 +177,7 @@ function computeNextAction(params: {
       variant: "success",
       title: "Autorizado por el SRI",
       description:
-        "El comprobante fue autorizado en ambiente de pruebas. La siguiente fase sera generar el RIDE/PDF oficial.",
+        "El comprobante esta autorizado. Descarga el RIDE/PDF o los XML desde el panel de autorizacion.",
     };
   }
 
@@ -194,9 +194,9 @@ function computeNextAction(params: {
   if (docStatus === "SENT") {
     return {
       variant: "info",
-      title: "Enviado al SRI",
+      title: "Recibido por el SRI",
       description:
-        "El XML fue recibido por el SRI y esta pendiente de autorizacion. El worker consultara el resultado.",
+        "El SRI recibio el comprobante y esta procesando la autorizacion. El resultado llegara automaticamente.",
     };
   }
 
@@ -205,7 +205,7 @@ function computeNextAction(params: {
       variant: "success",
       title: "Comprobante firmado",
       description:
-        "El XML esta firmado correctamente. Abre la seccion 'Envio SRI pruebas' para enviar al web service.",
+        "El XML esta firmado correctamente. El sistema enviara el comprobante al SRI automaticamente.",
     };
   }
 
@@ -215,7 +215,7 @@ function computeNextAction(params: {
       title: "La firma fallo",
       description:
         latestJobError ??
-        "Abre la seccion 'Firma electronica' para ver el detalle del error y reintentar.",
+        "Hubo un error al firmar el comprobante. Abre la seccion 'Firma electronica' para ver el detalle.",
     };
   }
 
@@ -224,7 +224,7 @@ function computeNextAction(params: {
       variant: "info",
       title: "Firma en proceso",
       description:
-        "El worker esta procesando la firma XAdES-BES. Actualiza la pagina para ver el resultado.",
+        "El sistema esta procesando la firma del comprobante. Actualiza la pagina en unos segundos.",
     };
   }
 
@@ -235,14 +235,14 @@ function computeNextAction(params: {
           variant: "warning",
           title: "Listo para firmar con advertencias",
           description:
-            "Puedes solicitar la firma. Revisa las advertencias si necesitas corregir datos del cliente. Abre la seccion 'Firma electronica' para continuar.",
+            "Puedes solicitar la firma. Revisa las advertencias si necesitas corregir datos del cliente.",
         };
       }
       return {
         variant: "success",
         title: "Listo para firmar",
         description:
-          "El comprobante tiene la informacion necesaria. Abre la seccion 'Firma electronica' y presiona 'Solicitar firma'.",
+          "El comprobante tiene la informacion necesaria. Solicita la firma desde la seccion 'Firma electronica'.",
       };
     }
 
@@ -507,15 +507,19 @@ export default async function SriDocumentDetailPage({ params }: Props) {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline" size="sm">
-              <Link href={routes.sriDocuments}>
-                <ArrowLeft className="mr-1 h-4 w-4" />
-                Volver
-              </Link>
-            </Button>
-            {doc.sourceType === "BASIC_SALE" && doc.sourceId && (
+            {doc.sourceType === "BASIC_SALE" && doc.sourceId ? (
               <Button asChild variant="outline" size="sm">
-                <Link href={`/basic/sales/${doc.sourceId}`}>Ver venta</Link>
+                <Link href={`/basic/sales/${doc.sourceId}`}>
+                  <ArrowLeft className="mr-1 h-4 w-4" />
+                  Ver venta
+                </Link>
+              </Button>
+            ) : (
+              <Button asChild variant="outline" size="sm">
+                <Link href={routes.sriDocuments}>
+                  <ArrowLeft className="mr-1 h-4 w-4" />
+                  Volver
+                </Link>
               </Button>
             )}
             {/* XML Firmado — disponible si el documento fue firmado */}
@@ -824,7 +828,7 @@ export default async function SriDocumentDetailPage({ params }: Props) {
 
         {showSubmission && (
           <SriDocumentCollapsible
-            title="Envio SRI pruebas"
+            title={`Envio al SRI${doc.environment === "PRODUCTION" ? " (Produccion)" : " (Pruebas)"}`}
             badge={submissionBadge.text}
             badgeClass={submissionBadge.cls}
           >

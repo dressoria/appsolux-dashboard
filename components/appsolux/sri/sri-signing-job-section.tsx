@@ -224,7 +224,7 @@ export function SriSigningJobSection({ documentId, documentStatus, readiness }: 
               )}
               {job.status === "SUCCEEDED" && (
                 <p className="text-xs text-emerald-700 font-medium">
-                  XML firmado por worker. Pendiente de envio al SRI en la proxima fase.
+                  XML firmado correctamente. El comprobante sera enviado al SRI automaticamente.
                 </p>
               )}
               {job.status === "FAILED" && (
@@ -298,7 +298,7 @@ export function SriSigningJobSection({ documentId, documentStatus, readiness }: 
       )}
 
       <p className="text-xs text-muted-foreground">
-        Envio al SRI, autorizacion oficial y RIDE permaneceran pendientes hasta la siguiente fase.
+        El sistema procesara el envio al SRI y la autorizacion automaticamente.
       </p>
     </div>
   );

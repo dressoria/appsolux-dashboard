@@ -12,12 +12,10 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 import { SimpleReceipt } from "@/components/appsolux/basic/simple-receipt";
-import {
-  CheckoutModeCard,
-  SaleStatusBadge,
-} from "@/components/appsolux/basic/sales-ui";
+import { SaleStatusBadge } from "@/components/appsolux/basic/sales-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -644,59 +642,63 @@ export function BasicPosClient({
             ) : null}
           </div>
 
-          {/* Sale output mode */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <Label className="text-sm font-medium text-slate-900">Salida de la venta</Label>
-              <SaleStatusBadge
-                label={outputMode === "sri_invoice" ? "Factura SRI" : "Recibo interno"}
-                variant={outputMode === "sri_invoice" ? "info" : "success"}
-              />
-            </div>
-            <div className="grid gap-3">
-              <CheckoutModeCard
-                title="Generar recibo interno"
-                description="Confirma la venta, descuenta inventario y entrega un recibo operativo sin enviarlo al SRI."
-                selected={outputMode === "internal_receipt"}
-                icon={ReceiptText}
-                status="Rápido"
-                onSelect={() => setOutputMode("internal_receipt")}
-              />
-              <CheckoutModeCard
-                title="Emitir factura electrónica SRI"
-                description="Usa la misma venta como origen y arranca el flujo SRI sin mostrar pasos técnicos al usuario."
-                selected={outputMode === "sri_invoice"}
-                icon={FileCheck2}
-                status="Con SRI"
-                onSelect={() => setOutputMode("sri_invoice")}
-              />
+          {/* Sale output mode — selector compacto */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-slate-900">Comprobante</Label>
+            <div className="flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
+              <button
+                type="button"
+                onClick={() => setOutputMode("internal_receipt")}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition",
+                  outputMode === "internal_receipt"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                <ReceiptText className="h-4 w-4 shrink-0" />
+                Recibo interno
+              </button>
+              <button
+                type="button"
+                onClick={() => hasSriConfig && setOutputMode("sri_invoice")}
+                disabled={!hasSriConfig}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition",
+                  outputMode === "sri_invoice"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : hasSriConfig
+                      ? "text-slate-500 hover:text-slate-700"
+                      : "cursor-not-allowed text-slate-300"
+                )}
+              >
+                <FileCheck2 className="h-4 w-4 shrink-0" />
+                Factura SRI
+              </button>
             </div>
 
-            {/* SRI not configured warning */}
-            {sriNotReady && (
+            {!hasSriConfig && (
+              <p className="text-xs text-slate-500">
+                Para emitir facturas SRI,{" "}
+                <Link href={routes.sri} className="underline text-[#004080] hover:text-[#003060]">
+                  configura el módulo SRI
+                </Link>
+                .
+              </p>
+            )}
+
+            {sriNotReady && outputMode === "sri_invoice" && (
               <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
                 <p className="flex items-center gap-1.5 text-xs font-medium text-amber-800">
                   <AlertCircle className="h-3 w-3 shrink-0" />
-                  Falta configurar SRI para emitir factura electrónica.
-                </p>
-                <p className="text-xs text-amber-700">
-                  Configura empresa, RUC, firma, establecimiento y secuencial antes de emitir.
+                  Falta completar la configuración SRI.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    asChild
-                    size="sm"
-                    variant="outline"
-                    className="border-amber-300 text-amber-800 hover:bg-amber-100"
-                  >
-                    <Link href={routes.sri}>Configurar SRI</Link>
+                  <Button asChild size="sm" variant="outline" className="border-amber-300 text-amber-800 hover:bg-amber-100">
+                    <Link href={routes.sri}>Completar SRI</Link>
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setOutputMode("internal_receipt")}
-                  >
-                    Usar recibo interno
+                  <Button size="sm" variant="outline" onClick={() => setOutputMode("internal_receipt")}>
+                    Usar recibo
                   </Button>
                 </div>
               </div>
@@ -712,31 +714,9 @@ export function BasicPosClient({
             {isLoading
               ? "Finalizando..."
               : outputMode === "sri_invoice"
-                ? "Finalizar venta con factura SRI"
-                : "Finalizar venta con recibo"}
+                ? "Emitir factura SRI"
+                : "Finalizar venta"}
           </Button>
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-            <div className="flex items-start gap-3">
-              <div className="rounded-2xl bg-sky-100 p-2.5 text-sky-700">
-                {outputMode === "sri_invoice" ? (
-                  <FileCheck2 className="h-5 w-5" />
-                ) : (
-                  <ReceiptText className="h-5 w-5" />
-                )}
-              </div>
-              <div className="space-y-1 text-sm">
-                <p className="font-medium text-slate-900">
-                  {outputMode === "sri_invoice"
-                    ? "La venta descuenta inventario y prepara la factura SRI."
-                    : "La venta descuenta inventario y genera un recibo interno."}
-                </p>
-                <p className="text-slate-600">
-                  En ambos casos se registra la venta, el historial y la trazabilidad del cliente.
-                </p>
-              </div>
-            </div>
-          </div>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
         </div>
