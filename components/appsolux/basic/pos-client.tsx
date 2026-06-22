@@ -115,6 +115,7 @@ export function BasicPosClient({
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
 
   // Quick-create customer modal
+  const [showComprobanteTip, setShowComprobanteTip] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
@@ -644,7 +645,23 @@ export function BasicPosClient({
 
           {/* Sale output mode — selector compacto */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-slate-900">Comprobante</Label>
+            <div className="flex items-center gap-1.5">
+              <Label className="text-sm font-medium text-slate-900">Comprobante</Label>
+              <button
+                type="button"
+                onClick={() => setShowComprobanteTip((v) => !v)}
+                className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 text-[10px] text-slate-400 hover:border-slate-300 hover:text-slate-600"
+                aria-label="Información sobre tipos de comprobante"
+              >
+                ?
+              </button>
+            </div>
+            {showComprobanteTip && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 space-y-1.5">
+                <p><span className="font-medium text-slate-800">Recibo interno:</span> Registra la venta, descuenta inventario y genera un recibo operativo sin enviarlo al SRI.</p>
+                <p><span className="font-medium text-slate-800">Factura SRI:</span> Registra la venta, descuenta inventario y genera una factura electrónica SRI automáticamente.</p>
+              </div>
+            )}
             <div className="flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
               <button
                 type="button"

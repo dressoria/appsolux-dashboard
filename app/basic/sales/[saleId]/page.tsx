@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Download, FileCheck2, FileText } from "lucide-react";
 
 import { BasicModuleShell } from "@/components/appsolux/basic/basic-module-shell";
 import { SaleDetailActions } from "@/components/appsolux/basic/sale-detail-actions";
@@ -144,26 +145,79 @@ export default async function BasicSaleDetailPage({
                 </Button>
               </div>
             ) : existingDraft ? (
-              <div className="space-y-2">
-                <p className="text-emerald-700 font-medium">
-                  {existingDraft.status === "SIGNED"
-                    ? "Documento SRI firmado"
-                    : existingDraft.status === "READY_FOR_TESTING"
-                      ? "Documento SRI listo para pruebas"
-                      : "Borrador SRI creado"}
-                </p>
-                <p className="text-muted-foreground">
-                  Ya existe un documento SRI asociado a esta venta. Puedes continuar el flujo desde su detalle.
-                </p>
-                <Button asChild variant="outline" size="sm">
-                  <Link href={`/sri/documents/${existingDraft.id}`}>Abrir documento SRI</Link>
-                </Button>
+              <div className="space-y-3">
+                {existingDraft.status === "AUTHORIZED" ? (
+                  <>
+                    <p className="font-medium text-emerald-700">Factura autorizada por el SRI</p>
+                    {existingDraft.submissionJobs[0]?.sriAuthorizationNumber && (
+                      <p className="font-mono text-xs text-slate-600 break-all">
+                        N° {existingDraft.submissionJobs[0].sriAuthorizationNumber}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/sri/documents/${existingDraft.id}`}>Ver factura</Link>
+                      </Button>
+                      <a
+                        href={`/api/sri/documents/${existingDraft.id}/download-signed-xml`}
+                        download
+                        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        XML firmado
+                      </a>
+                      <a
+                        href={`/api/sri/documents/${existingDraft.id}/download-authorized-xml`}
+                        download
+                        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        <FileCheck2 className="h-3.5 w-3.5" />
+                        XML autorizado
+                      </a>
+                      <a
+                        href={`/api/sri/documents/${existingDraft.id}/download-ride`}
+                        download
+                        className="inline-flex items-center gap-1.5 rounded-md border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        RIDE / PDF
+                      </a>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium text-slate-700">
+                      {existingDraft.status === "SIGNED" || existingDraft.status === "SENT"
+                        ? "Factura SRI en proceso"
+                        : existingDraft.status === "REJECTED"
+                          ? "Factura SRI rechazada"
+                          : "Factura SRI en preparación"}
+                    </p>
+                    <p className="text-muted-foreground">
+                      El sistema procesara este comprobante automaticamente.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/sri/documents/${existingDraft.id}`}>Ver factura SRI</Link>
+                      </Button>
+                      {(existingDraft.status === "SIGNED" || existingDraft.status === "SENT") && (
+                        <a
+                          href={`/api/sri/documents/${existingDraft.id}/download-signed-xml`}
+                          download
+                          className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          XML firmado
+                        </a>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
                 <p className="text-muted-foreground">
-                  Prepara un borrador interno de factura electronica desde esta venta.
-                  No se emite nada todavia — es solo un registro preparatorio.
+                  Genera una factura electronica SRI desde esta venta.
                 </p>
                 <CreateSriDraftFromSaleButton saleId={sale.id} />
               </div>

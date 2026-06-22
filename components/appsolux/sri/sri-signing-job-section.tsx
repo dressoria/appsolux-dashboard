@@ -32,11 +32,11 @@ type Props = {
 };
 
 const JOB_STATUS_LABELS: Record<JobStatus, string> = {
-  QUEUED: "En cola",
-  RUNNING: "Procesando",
-  SUCCEEDED: "Worker completado",
-  FAILED: "Fallida",
-  CANCELLED: "Cancelada",
+  QUEUED: "En cola de firma",
+  RUNNING: "Firmando...",
+  SUCCEEDED: "Firmado",
+  FAILED: "Error en firma",
+  CANCELLED: "Cancelado",
 };
 
 const JOB_STATUS_COLORS: Record<JobStatus, string> = {
@@ -151,9 +151,6 @@ export function SriSigningJobSection({ documentId, documentStatus, readiness }: 
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-slate-500">
-        La firma XAdES-BES se procesa mediante worker separado. El certificado no se expone al navegador.
-      </p>
 
       {documentStatus === "READY_FOR_TESTING" && readiness?.canRequestSigning && (
         <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
@@ -224,13 +221,18 @@ export function SriSigningJobSection({ documentId, documentStatus, readiness }: 
               )}
               {job.status === "SUCCEEDED" && (
                 <p className="text-xs text-emerald-700 font-medium">
-                  XML firmado correctamente. El comprobante sera enviado al SRI automaticamente.
+                  El sistema procesara el envio al SRI automaticamente.
                 </p>
               )}
               {job.status === "FAILED" && (
-                <p className="text-xs text-destructive font-medium">
-                  La firma fallo. Revisa el error y vuelve a solicitar el proceso cuando corresponda.
-                </p>
+                <details className="mt-1">
+                  <summary className="cursor-pointer text-xs text-destructive hover:text-red-700">
+                    Ver detalle del error
+                  </summary>
+                  <p className="mt-1 text-xs text-destructive">
+                    Revisa el error y solicita nuevamente la firma cuando corresponda.
+                  </p>
+                </details>
               )}
             </div>
           </div>

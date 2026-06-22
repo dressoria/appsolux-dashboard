@@ -222,7 +222,7 @@ export function SriSubmissionJobSection({ documentId, documentStatus }: Props) {
 
               {job.status === "FAILED" && (
                 <p className="text-xs text-destructive font-medium">
-                  El envio fallo. Puedes reintentarlo manualmente.
+                  No se pudo completar el envio al SRI.
                 </p>
               )}
 
@@ -270,18 +270,6 @@ export function SriSubmissionJobSection({ documentId, documentStatus }: Props) {
 
       {/* Botones de accion */}
       <div className="flex flex-wrap gap-2">
-        {/* Reintentar: solo para FAILED/CANCELLED o cuando no hay job */}
-        {documentStatus === "SIGNED" && canRetry && job && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void handleCreateSubmissionJob()}
-            disabled={requesting}
-          >
-            {requesting ? "Solicitando..." : "Reintentar envio"}
-          </Button>
-        )}
-
         {/* Actualizar: cuando esta en proceso */}
         {isInProgress && (
           <Button
@@ -297,6 +285,23 @@ export function SriSubmissionJobSection({ documentId, documentStatus }: Props) {
           </Button>
         )}
       </div>
+
+      {/* Acciones avanzadas — solo visible para administradores */}
+      {documentStatus === "SIGNED" && canRetry && job && (
+        <details className="text-xs text-slate-500">
+          <summary className="cursor-pointer hover:text-slate-700">Acciones avanzadas</summary>
+          <div className="mt-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void handleCreateSubmissionJob()}
+              disabled={requesting}
+            >
+              {requesting ? "Solicitando..." : "Reintentar envio"}
+            </Button>
+          </div>
+        </details>
+      )}
 
     </div>
   );

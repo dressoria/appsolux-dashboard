@@ -148,7 +148,7 @@ export function SriTechnicalChecklistSection({ documentId, documentStatus }: Pro
 
   const statusLabel = {
     READY: documentStatus === "DRAFT"
-      ? "Listo — el comprobante puede marcarse como listo para pruebas."
+      ? "Listo — el comprobante puede prepararse para firma."
       : "Verificacion tecnica OK — el comprobante puede firmarse.",
     WARNING: documentStatus === "DRAFT"
       ? "Listo con advertencias — puede continuar, pero revisa los puntos marcados con !"
@@ -230,7 +230,7 @@ export function SriTechnicalChecklistSection({ documentId, documentStatus }: Pro
             disabled={!canMarkReady || marking}
             variant={canMarkReady ? "default" : "outline"}
           >
-            {marking ? "Marcando..." : "Marcar listo para pruebas"}
+            {marking ? "Preparando..." : "Preparar para firma"}
           </Button>
           {!canMarkReady && result.blockingIssues.length > 0 && (
             <p className="text-xs text-muted-foreground">
@@ -243,7 +243,7 @@ export function SriTechnicalChecklistSection({ documentId, documentStatus }: Pro
 
       {documentStatus === "READY_FOR_TESTING" && (
         <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
-          Este comprobante esta marcado como listo para pruebas. Ya puede solicitar firma, pero todavia no esta autorizado por el SRI.
+          Comprobante listo para firma. El sistema lo procesara automaticamente.
         </p>
       )}
     </div>

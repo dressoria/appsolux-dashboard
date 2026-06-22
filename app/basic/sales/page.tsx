@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { listSales } from "@/lib/core/lightweight-pos";
 import { getTenantPlanState } from "@/lib/core/plans";
+import { getSriDocumentsForSales } from "@/lib/core/sri";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 type BasicSalesPageProps = {
@@ -69,6 +70,11 @@ export default async function BasicSalesPage({
     listSales(tenant.id),
   ]);
   const activeSales = allSales.filter((sale) => sale.status !== "canceled");
+
+  const sriDocuments = await getSriDocumentsForSales(
+    tenant.id,
+    sales.map((s) => s.id)
+  );
 
   const statusHref = (key: string) => {
     const params = new URLSearchParams();
@@ -148,6 +154,7 @@ export default async function BasicSalesPage({
                     amount: payment.amount.toString(),
                   })),
                 }))}
+                sriDocuments={sriDocuments}
               />
             )}
           </CardContent>

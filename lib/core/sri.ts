@@ -406,8 +406,55 @@ export async function getSriDraftForSale(tenantId: string, saleId: string) {
   const prisma = getPrismaClient();
   return prisma.sriDocument.findFirst({
     where: { tenantId, sourceType: "BASIC_SALE", sourceId: saleId },
-    select: { id: true, status: true },
+    select: {
+      id: true,
+      status: true,
+      accessKey: true,
+      environment: true,
+      submissionJobs: {
+        where: { status: "AUTHORIZED" },
+        select: { sriAuthorizationNumber: true, authorizedAt: true },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+    },
   });
+}
+
+export async function getSriDocumentsForSales(
+  tenantId: string,
+  saleIds: string[]
+): Promise<Record<string, { id: string; status: string; environment: string; sriAuthorizationNumber: string | null }>> {
+  if (saleIds.length === 0) return {};
+  const prisma = getPrismaClient();
+  const docs = await prisma.sriDocument.findMany({
+    where: { tenantId, sourceType: "BASIC_SALE", sourceId: { in: saleIds } },
+    select: {
+      id: true,
+      sourceId: true,
+      status: true,
+      environment: true,
+      submissionJobs: {
+        where: { status: "AUTHORIZED" },
+        select: { sriAuthorizationNumber: true },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+    },
+  });
+  return Object.fromEntries(
+    docs
+      .filter((d) => d.sourceId)
+      .map((d) => [
+        d.sourceId!,
+        {
+          id: d.id,
+          status: d.status,
+          environment: d.environment,
+          sriAuthorizationNumber: d.submissionJobs[0]?.sriAuthorizationNumber ?? null,
+        },
+      ])
+  );
 }
 
 export async function createDraftSriDocumentFromBasicSale({

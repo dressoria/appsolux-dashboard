@@ -46,20 +46,15 @@ function buildDisplayNumber(
 
 const STEPPER_STEPS = [
   "Preparado",
-  "Listo para firma",
-  "Firma solicitada",
   "Firmado",
   "Enviado al SRI",
   "Autorizado",
 ] as const;
 
 function getStepIndex(docStatus: string, latestJobStatus: string | null): number {
-  if (docStatus === "AUTHORIZED") return 5;
-  if (docStatus === "SENT") return 4;
-  if (docStatus === "SIGNED") return 3;
-  if ((latestJobStatus === "SUCCEEDED") && docStatus !== "SIGNED") return 3;
-  if (latestJobStatus === "QUEUED" || latestJobStatus === "RUNNING") return 2;
-  if (docStatus === "READY_FOR_TESTING") return 1;
+  if (docStatus === "AUTHORIZED") return 3;
+  if (docStatus === "SENT") return 2;
+  if (docStatus === "SIGNED" || latestJobStatus === "SUCCEEDED") return 1;
   return 0;
 }
 
@@ -212,10 +207,10 @@ function computeNextAction(params: {
   if (latestJobStatus === "FAILED") {
     return {
       variant: "error",
-      title: "La firma fallo",
+      title: "Error en la firma",
       description:
         latestJobError ??
-        "Hubo un error al firmar el comprobante. Abre la seccion 'Firma electronica' para ver el detalle.",
+        "Hubo un error al procesar la firma. Revisa la seccion de firma electronica para ver el detalle.",
     };
   }
 
@@ -242,7 +237,7 @@ function computeNextAction(params: {
         variant: "success",
         title: "Listo para firmar",
         description:
-          "El comprobante tiene la informacion necesaria. Solicita la firma desde la seccion 'Firma electronica'.",
+          "El comprobante esta completo. El sistema procesara este comprobante automaticamente.",
       };
     }
 
@@ -251,7 +246,7 @@ function computeNextAction(params: {
         variant: "error",
         title: "Faltan datos obligatorios",
         description:
-          "Hay errores bloqueantes en el checklist tecnico. Abre 'Verificacion tecnica' para ver y resolver los errores antes de firmar.",
+          "Hay errores en la verificacion tecnica. Revisa la seccion de verificacion para resolver los errores antes de firmar.",
       };
     }
 
@@ -304,7 +299,7 @@ function computeNextAction(params: {
     variant: "neutral",
     title: "Comprobante en borrador",
     description:
-      "Verifica los datos, revisa el checklist tecnico y marca como listo para pruebas.",
+      "Verifica los datos, revisa la verificacion tecnica y prepara el comprobante para firma.",
   };
 }
 
@@ -508,17 +503,22 @@ export default async function SriDocumentDetailPage({ params }: Props) {
           </div>
           <div className="flex flex-wrap gap-2">
             {doc.sourceType === "BASIC_SALE" && doc.sourceId ? (
-              <Button asChild variant="outline" size="sm">
-                <Link href={`/basic/sales/${doc.sourceId}`}>
-                  <ArrowLeft className="mr-1 h-4 w-4" />
-                  Ver venta
-                </Link>
-              </Button>
+              <>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/basic/sales/${doc.sourceId}`}>
+                    <ArrowLeft className="mr-1 h-4 w-4" />
+                    Ver venta
+                  </Link>
+                </Button>
+                <Button asChild variant="ghost" size="sm">
+                  <Link href={routes.basicSales}>Ventas</Link>
+                </Button>
+              </>
             ) : (
               <Button asChild variant="outline" size="sm">
                 <Link href={routes.sriDocuments}>
                   <ArrowLeft className="mr-1 h-4 w-4" />
-                  Volver
+                  Volver a SRI
                 </Link>
               </Button>
             )}
@@ -828,7 +828,7 @@ export default async function SriDocumentDetailPage({ params }: Props) {
 
         {showSubmission && (
           <SriDocumentCollapsible
-            title={`Envio al SRI${doc.environment === "PRODUCTION" ? " (Produccion)" : " (Pruebas)"}`}
+            title={`Envio al SRI${doc.environment === "PRODUCTION" ? " · Produccion" : " · Pruebas"}`}
             badge={submissionBadge.text}
             badgeClass={submissionBadge.cls}
           >
