@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ArrowLeft, Download, FileCheck2, FileText } from "lucide-react";
 
+import { SriDownloadButton } from "@/components/appsolux/sri/sri-download-button";
+
 import {
   FacturationStatusBadge,
 } from "@/components/appsolux/sri/facturation-ui";
@@ -524,30 +526,30 @@ export default async function SriDocumentDetailPage({ params }: Props) {
             )}
             {/* XML Firmado — disponible si el documento fue firmado */}
             {(doc.status === "SIGNED" || doc.status === "SENT" || doc.status === "AUTHORIZED") && (
-              <Button asChild variant="outline" size="sm">
-                <a href={`/api/sri/documents/${doc.id}/download-signed-xml`} download>
-                  <Download className="mr-1 h-4 w-4" />
-                  XML firmado
-                </a>
-              </Button>
+              <SriDownloadButton
+                href={`/api/sri/documents/${doc.id}/download-signed-xml`}
+                label="XML firmado"
+                icon={Download}
+                className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-sm hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-60"
+              />
             )}
             {/* XML Autorizado — solo si fue autorizado por el SRI */}
             {doc.status === "AUTHORIZED" && (
-              <Button asChild variant="outline" size="sm">
-                <a href={`/api/sri/documents/${doc.id}/download-authorized-xml`} download>
-                  <FileCheck2 className="mr-1 h-4 w-4" />
-                  XML autorizado
-                </a>
-              </Button>
+              <SriDownloadButton
+                href={`/api/sri/documents/${doc.id}/download-authorized-xml`}
+                label="XML autorizado"
+                icon={FileCheck2}
+                className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-sm hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-60"
+              />
             )}
             {/* RIDE/PDF — solo si autorizado */}
             {doc.status === "AUTHORIZED" && (
-              <Button asChild size="sm">
-                <a href={`/api/sri/documents/${doc.id}/download-ride`} download>
-                  <FileText className="mr-1 h-4 w-4" />
-                  RIDE / PDF
-                </a>
-              </Button>
+              <SriDownloadButton
+                href={`/api/sri/documents/${doc.id}/download-ride`}
+                label="RIDE / PDF"
+                icon={FileText}
+                className="inline-flex items-center gap-1.5 rounded-md bg-[#004080] px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-[#003366] disabled:cursor-not-allowed disabled:opacity-60"
+              />
             )}
           </div>
         </div>
@@ -683,30 +685,24 @@ export default async function SriDocumentDetailPage({ params }: Props) {
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-2 border-t border-emerald-200 pt-4">
-              <a
+              <SriDownloadButton
                 href={`/api/sri/documents/${doc.id}/download-signed-xml`}
-                download
-                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-800 shadow-sm hover:bg-emerald-50"
-              >
-                <Download className="h-3.5 w-3.5" />
-                XML firmado
-              </a>
-              <a
+                label="XML firmado"
+                icon={Download}
+                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-800 shadow-sm hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+              />
+              <SriDownloadButton
                 href={`/api/sri/documents/${doc.id}/download-authorized-xml`}
-                download
-                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-800 shadow-sm hover:bg-emerald-50"
-              >
-                <FileCheck2 className="h-3.5 w-3.5" />
-                XML autorizado
-              </a>
-              <a
+                label="XML autorizado"
+                icon={FileCheck2}
+                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-800 shadow-sm hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+              />
+              <SriDownloadButton
                 href={`/api/sri/documents/${doc.id}/download-ride`}
-                download
-                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-emerald-700"
-              >
-                <FileText className="h-3.5 w-3.5" />
-                Descargar RIDE / PDF
-              </a>
+                label="Descargar RIDE / PDF"
+                icon={FileText}
+                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              />
             </div>
           </div>
         )}

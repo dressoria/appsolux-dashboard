@@ -9,7 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   FileCheck2,
-  LayoutDashboard,
+  Lock,
   Package,
   ReceiptText,
   Settings,
@@ -18,20 +18,65 @@ import {
   Users,
   Wallet,
   Archive,
+  type LucideIcon,
 } from "lucide-react";
 
-const NAV_ITEMS = [
-  { icon: LayoutDashboard, label: "Inicio", href: "/sales", exact: true },
-  { icon: ShoppingCart, label: "Nueva venta", href: "/basic/pos", exact: false },
-  { icon: ReceiptText, label: "Ventas", href: "/basic/sales", exact: false },
-  { icon: Users, label: "Clientes", href: "/basic/customers", exact: false },
-  { icon: Package, label: "Productos", href: "/basic/products", exact: false },
-  { icon: Archive, label: "Inventario", href: "/basic/stock", exact: false },
-  { icon: FileCheck2, label: "Comprobantes", href: "/sri/documents", exact: false },
-  { icon: Wallet, label: "Caja / Pagos", href: "/basic/cash", exact: false },
-  { icon: BarChart3, label: "Reportes", href: "/reports", exact: false },
-  { icon: Shield, label: "SRI", href: "/sri", exact: true },
-  { icon: Settings, label: "Configuración", href: "/settings", exact: false },
+type NavLink = {
+  kind: "link";
+  icon: LucideIcon;
+  label: string;
+  href: string;
+  exact: boolean;
+};
+
+type NavLocked = {
+  kind: "locked";
+  icon: LucideIcon;
+  label: string;
+};
+
+type NavItem = NavLink | NavLocked;
+
+type NavGroup = {
+  section: string;
+  items: NavItem[];
+};
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    section: "Ventas",
+    items: [
+      { kind: "link", icon: ShoppingCart, label: "Facturar", href: "/basic/pos", exact: false },
+      { kind: "link", icon: ReceiptText, label: "Documentos", href: "/basic/sales", exact: false },
+      { kind: "link", icon: FileCheck2, label: "Comprobantes SRI", href: "/sri/documents", exact: false },
+      { kind: "locked", icon: Lock, label: "Órdenes de venta" },
+      { kind: "locked", icon: Lock, label: "Proformas" },
+    ],
+  },
+  {
+    section: "Compras",
+    items: [
+      { kind: "locked", icon: Lock, label: "Documentos compras" },
+      { kind: "locked", icon: Lock, label: "Registrar compra" },
+    ],
+  },
+  {
+    section: "Gestión",
+    items: [
+      { kind: "link", icon: Users, label: "Clientes", href: "/basic/customers", exact: false },
+      { kind: "link", icon: Package, label: "Productos", href: "/basic/products", exact: false },
+      { kind: "link", icon: Archive, label: "Inventario", href: "/basic/stock", exact: false },
+      { kind: "link", icon: Wallet, label: "Caja / Pagos", href: "/basic/cash", exact: false },
+      { kind: "link", icon: BarChart3, label: "Reportes", href: "/reports", exact: false },
+    ],
+  },
+  {
+    section: "Sistema",
+    items: [
+      { kind: "link", icon: Shield, label: "SRI", href: "/sri", exact: true },
+      { kind: "link", icon: Settings, label: "Configuración", href: "/settings", exact: false },
+    ],
+  },
 ];
 
 export function BillingModuleSidebar() {
@@ -50,6 +95,12 @@ export function BillingModuleSidebar() {
     try {
       localStorage.setItem("billing-sidebar-collapsed", String(next));
     } catch {}
+  }
+
+  function isActive(item: NavLink): boolean {
+    return item.exact
+      ? pathname === item.href
+      : pathname === item.href || pathname.startsWith(item.href + "/");
   }
 
   return (
@@ -86,35 +137,67 @@ export function BillingModuleSidebar() {
         </button>
       </div>
 
-      {/* Nav items */}
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2 pt-3">
-        {NAV_ITEMS.map(({ icon: Icon, label, href, exact }) => {
-          const isActive = exact
-            ? pathname === href
-            : pathname === href || pathname.startsWith(href + "/");
+      {/* Nav groups */}
+      <nav className="flex flex-1 flex-col overflow-y-auto p-2 pt-3">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.section} className="mb-1">
+            {/* Section header — hidden when collapsed */}
+            {!collapsed && (
+              <p className="mb-0.5 px-3 pt-2 pb-0.5 text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                {group.section}
+              </p>
+            )}
 
-          return (
-            <Link
-              key={href}
-              href={href}
-              title={collapsed ? label : undefined}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${
-                collapsed ? "justify-center" : ""
-              } ${
-                isActive
-                  ? "bg-[#004080]/10 font-medium text-[#004080]"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
-            >
-              <Icon
-                className={`h-4 w-4 shrink-0 ${
-                  isActive ? "text-[#004080]" : "text-slate-400"
-                }`}
-              />
-              {!collapsed && <span>{label}</span>}
-            </Link>
-          );
-        })}
+            <div className="flex flex-col gap-0.5">
+              {group.items.map((item) => {
+                if (item.kind === "locked") {
+                  return (
+                    <div
+                      key={item.label}
+                      title={collapsed ? `${item.label} · Disponible con plan ERP` : "Disponible con plan ERP"}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-2 cursor-not-allowed select-none opacity-45 ${
+                        collapsed ? "justify-center" : ""
+                      }`}
+                    >
+                      <item.icon className="h-3.5 w-3.5 shrink-0 text-slate-300" />
+                      {!collapsed && (
+                        <>
+                          <span className="text-sm text-slate-400">{item.label}</span>
+                          <span className="ml-auto shrink-0 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-slate-400">
+                            ERP
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  );
+                }
+
+                const active = isActive(item);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    title={collapsed ? item.label : undefined}
+                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${
+                      collapsed ? "justify-center" : ""
+                    } ${
+                      active
+                        ? "bg-[#004080]/10 font-medium text-[#004080]"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                    }`}
+                  >
+                    <item.icon
+                      className={`h-4 w-4 shrink-0 ${
+                        active ? "text-[#004080]" : "text-slate-400"
+                      }`}
+                    />
+                    {!collapsed && <span>{item.label}</span>}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Back to workspace */}

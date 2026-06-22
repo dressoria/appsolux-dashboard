@@ -5,6 +5,7 @@ import { BasicModuleShell } from "@/components/appsolux/basic/basic-module-shell
 import { SaleDetailActions } from "@/components/appsolux/basic/sale-detail-actions";
 import { SimpleReceipt } from "@/components/appsolux/basic/simple-receipt";
 import { CreateSriDraftFromSaleButton } from "@/components/appsolux/sri/create-sri-draft-from-sale-button";
+import { SriDownloadButton } from "@/components/appsolux/sri/sri-download-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/config/routes";
@@ -85,8 +86,8 @@ export default async function BasicSaleDetailPage({
 
   return (
     <BasicModuleShell
-      title="Detalle de venta"
-      description="Recibo simple, pagos, saldo pendiente y acciones de la venta."
+      title="Venta"
+      description="Recibo, pagos, saldo y comprobante electrónico asociado."
       activeHref={routes.basicSales}
     >
       <SaleDetailActions
@@ -158,30 +159,24 @@ export default async function BasicSaleDetailPage({
                       <Button asChild variant="outline" size="sm">
                         <Link href={`/sri/documents/${existingDraft.id}`}>Ver factura</Link>
                       </Button>
-                      <a
+                      <SriDownloadButton
                         href={`/api/sri/documents/${existingDraft.id}/download-signed-xml`}
-                        download
-                        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        XML firmado
-                      </a>
-                      <a
+                        label="XML firmado"
+                        icon={Download}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      />
+                      <SriDownloadButton
                         href={`/api/sri/documents/${existingDraft.id}/download-authorized-xml`}
-                        download
-                        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        <FileCheck2 className="h-3.5 w-3.5" />
-                        XML autorizado
-                      </a>
-                      <a
+                        label="XML autorizado"
+                        icon={FileCheck2}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      />
+                      <SriDownloadButton
                         href={`/api/sri/documents/${existingDraft.id}/download-ride`}
-                        download
-                        className="inline-flex items-center gap-1.5 rounded-md border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
-                      >
-                        <FileText className="h-3.5 w-3.5" />
-                        RIDE / PDF
-                      </a>
+                        label="RIDE / PDF"
+                        icon={FileText}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      />
                     </div>
                   </>
                 ) : (
@@ -201,14 +196,12 @@ export default async function BasicSaleDetailPage({
                         <Link href={`/sri/documents/${existingDraft.id}`}>Ver factura SRI</Link>
                       </Button>
                       {(existingDraft.status === "SIGNED" || existingDraft.status === "SENT") && (
-                        <a
+                        <SriDownloadButton
                           href={`/api/sri/documents/${existingDraft.id}/download-signed-xml`}
-                          download
-                          className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                          XML firmado
-                        </a>
+                          label="XML firmado"
+                          icon={Download}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        />
                       )}
                     </div>
                   </>

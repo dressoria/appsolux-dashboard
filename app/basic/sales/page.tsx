@@ -3,7 +3,6 @@ import Link from "next/link";
 import { BasicModuleShell } from "@/components/appsolux/basic/basic-module-shell";
 import { SalesList } from "@/components/appsolux/basic/sales-list";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getPrismaClient } from "@/lib/db/prisma";
@@ -86,79 +85,65 @@ export default async function BasicSalesPage({
 
   return (
     <BasicModuleShell
-      title="Ventas"
-      description="Historial de recibos, fiados, pagos parciales y cancelaciones."
+      title="Documentos de venta"
+      description="Recibos internos y facturas SRI · busca, filtra y descarga directamente."
       activeHref={routes.basicSales}
     >
-      <div className="space-y-6">
-        <p className="text-sm text-muted-foreground">
-          {activeSales.length} / {plan.limits.receipts} ventas o recibos del plan.
-        </p>
-
-        {filteredCustomerName && (
-          <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-4 py-2 text-sm">
-            <span>
-              Mostrando ventas de <span className="font-semibold">{filteredCustomerName}</span>
-            </span>
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/basic/sales">Ver todas</Link>
-            </Button>
-          </div>
-        )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Recibos recientes</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              {[
-                ["all", "Todas"],
-                ["paid", "Pagadas"],
-                ["pending", "Pendientes/fiadas"],
-                ["canceled", "Canceladas"],
-              ].map(([key, label]) => (
-                <Button
-                  key={key}
-                  asChild
-                  variant={status === key ? "default" : "outline"}
-                >
-                  <Link href={statusHref(key ?? "")}>
-                    {label}
-                  </Link>
-                </Button>
-              ))}
+      <div className="space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">
+            {activeSales.length} / {plan.limits.receipts} ventas activas del plan.
+          </p>
+          {filteredCustomerName && (
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-1.5 text-sm">
+              <span>
+                Cliente: <span className="font-semibold">{filteredCustomerName}</span>
+              </span>
+              <Button asChild variant="ghost" size="sm" className="h-auto py-0">
+                <Link href="/basic/sales">×</Link>
+              </Button>
             </div>
+          )}
+        </div>
 
-            {sales.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                {filteredCustomerName
-                  ? "Este cliente aún no tiene ventas registradas."
-                  : "No hay ventas para mostrar."}
-              </p>
-            ) : (
-              <SalesList
-                sales={sales.map((sale) => ({
-                  id: sale.id,
-                  createdAt: sale.createdAt,
-                  total: sale.total.toString(),
-                  status: sale.status,
-                  paymentStatus: sale.paymentStatus,
-                  customer: sale.customer ? { name: sale.customer.name } : null,
-                  items: sale.items.map((item) => ({
-                    quantity: item.quantity,
-                    product: { name: item.product.name },
-                  })),
-                  payments: sale.payments.map((payment) => ({
-                    method: payment.method,
-                    amount: payment.amount.toString(),
-                  })),
-                }))}
-                sriDocuments={sriDocuments}
-              />
-            )}
-          </CardContent>
-        </Card>
+        {/* Estado filter — server-side */}
+        <div className="flex flex-wrap gap-2">
+          {[
+            ["all", "Todas"],
+            ["paid", "Pagadas"],
+            ["pending", "Pendientes / Fiadas"],
+            ["canceled", "Canceladas"],
+          ].map(([key, label]) => (
+            <Button
+              key={key}
+              asChild
+              size="sm"
+              variant={status === key ? "default" : "outline"}
+            >
+              <Link href={statusHref(key ?? "")}>{label}</Link>
+            </Button>
+          ))}
+        </div>
+
+        <SalesList
+          sales={sales.map((sale) => ({
+            id: sale.id,
+            createdAt: sale.createdAt,
+            total: sale.total.toString(),
+            status: sale.status,
+            paymentStatus: sale.paymentStatus,
+            customer: sale.customer ? { name: sale.customer.name } : null,
+            items: sale.items.map((item) => ({
+              quantity: item.quantity,
+              product: { name: item.product.name },
+            })),
+            payments: sale.payments.map((payment) => ({
+              method: payment.method,
+              amount: payment.amount.toString(),
+            })),
+          }))}
+          sriDocuments={sriDocuments}
+        />
       </div>
     </BasicModuleShell>
   );
