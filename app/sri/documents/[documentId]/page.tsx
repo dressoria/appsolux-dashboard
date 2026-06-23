@@ -412,8 +412,8 @@ export default async function SriDocumentDetailPage({ params }: Props) {
     submissionError: latestSubmissionJob?.errorMessage ?? null,
     canRequestSigning: signingReadiness?.canRequestSigning ?? false,
     missingSignatureReasons: signingReadiness?.missingSignatureReasons ?? [],
-    checklistHasBlockers: (signingReadiness?.blockingErrors.length ?? 0) > 0,
-    checklistHasWarnings: (signingReadiness?.warnings.length ?? 0) > 0,
+    checklistHasBlockers: (signingReadiness?.blockingErrors?.length ?? 0) > 0,
+    checklistHasWarnings: (signingReadiness?.warnings?.length ?? 0) > 0,
   });
 
   const flowStatus =

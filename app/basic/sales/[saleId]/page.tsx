@@ -53,7 +53,7 @@ export default async function BasicSaleDetailPage({
   }
 
   const existingDraft = sale.status !== "canceled"
-    ? await getSriDraftForSale(tenant.id, sale.id)
+    ? await getSriDraftForSale(tenant.id, sale.id).catch(() => null)
     : null;
 
   const paid = sale.payments.reduce(
@@ -106,7 +106,7 @@ export default async function BasicSaleDetailPage({
             quantity: item.quantity,
             price: item.price.toString(),
             total: item.total.toString(),
-            product: { name: item.product.name },
+            product: { name: item.product?.name ?? "Producto eliminado" },
           })),
           payments: sale.payments.map((payment) => ({
             method: payment.method,
