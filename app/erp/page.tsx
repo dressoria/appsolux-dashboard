@@ -342,6 +342,7 @@ export default async function ErpPage() {
   const moduleMap = {
     operacion: [
       { label: "POS / Ventas", href: routes.pos, status: "Disponible" },
+      { label: "Facturador rapido", href: routes.erpQuickInvoice, status: "Disponible" },
       { label: "Clientes", href: routes.erpCustomers, status: "Disponible" },
       { label: "Productos", href: routes.erpInventoryProducts, status: "Disponible" },
       { label: "Inventario", href: routes.erpInventory, status: "Disponible" },
@@ -516,6 +517,7 @@ export default async function ErpPage() {
               {[
                 { label: "Abrir POS", href: routes.pos },
                 { label: "Nueva venta", href: routes.pos },
+                { label: "Facturador rapido", href: routes.erpQuickInvoice },
                 { label: "Nuevo producto", href: routes.erpInventoryProducts },
                 { label: "Nuevo cliente", href: routes.erpCustomers },
                 { label: "Registrar compra", href: routes.erpPurchasesDocuments },

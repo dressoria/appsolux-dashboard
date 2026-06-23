@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { CreateItemForm } from "@/components/appsolux/erp/create-item-form";
+import { ProductPricingManager } from "@/components/appsolux/erp/product-pricing-manager";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ import { getErpnextInventory } from "@/lib/api/erpnext/inventory";
 import { getErpnextItems } from "@/lib/api/erpnext/items";
 import { getErpnextMasters } from "@/lib/api/erpnext/masters";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getErpProductPricingMap } from "@/lib/core/erp-pricing";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
@@ -95,6 +97,10 @@ export default async function ErpInventoryProductsPage() {
     loadResource(getErpnextInventory, []),
   ]);
   const items = itemsResult.data;
+  const pricingMap = await getErpProductPricingMap(
+    tenant.id,
+    items.map((item) => item.item_code)
+  );
   const masters = mastersResult.data;
   const inventory = inventoryResult.data;
   const masterDataWarning = mastersResult.error
@@ -240,6 +246,8 @@ export default async function ErpInventoryProductsPage() {
           uoms={masters.uoms}
           masterDataWarning={masterDataWarning}
         />
+
+        <ProductPricingManager items={items} pricingMap={pricingMap} />
 
         <Card className="rounded-[28px] border-slate-200 bg-white py-0 shadow-sm shadow-slate-200/60">
           <CardHeader className="pb-4">

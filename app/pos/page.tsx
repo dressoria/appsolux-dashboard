@@ -12,6 +12,7 @@ import { getErpnextModesOfPayment } from "@/lib/api/erpnext/modes-of-payment";
 import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { canManageSettings } from "@/lib/auth/permissions";
+import { getErpProductPricingMap } from "@/lib/core/erp-pricing";
 import { getErpProvisioningState } from "@/lib/core/erp-provisioning-status";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
@@ -161,6 +162,10 @@ export default async function PosPage() {
   const usableWarehouses = warehousesResult.data.filter(
     (warehouse) => warehouse.disabled !== 1 && warehouse.is_group !== 1
   );
+  const pricingMap = await getErpProductPricingMap(
+    tenant.id,
+    itemsResult.data.map((item) => item.item_code)
+  );
   const resourceErrors = [
     { label: "Productos", message: itemsResult.error },
     { label: "Inventario", message: inventoryResult.error },
@@ -178,6 +183,7 @@ export default async function PosPage() {
       <div className="space-y-6">
         <PosClient
           items={itemsResult.data}
+          pricingMap={pricingMap}
           inventory={inventoryResult.data}
           customers={customersResult.data}
           warehouses={usableWarehouses}

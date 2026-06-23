@@ -5,6 +5,7 @@ import {
   BookOpen,
   Building2,
   CreditCard,
+  FileText,
   FileCheck,
   FolderTree,
   LayoutGrid,
@@ -42,6 +43,7 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
   const operationsItems = isBusinessSuiteActive
     ? ([
         { title: "POS / Ventas", href: routes.pos, icon: ShoppingCart },
+        { title: "Facturador rapido", href: routes.erpQuickInvoice, icon: FileText },
         { title: "Clientes", href: routes.erpCustomers, icon: Users },
         { title: "Productos", href: routes.erpInventoryProducts, icon: Package },
         { title: "Inventario", href: routes.erpInventory, icon: Boxes },

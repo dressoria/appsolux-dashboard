@@ -259,6 +259,20 @@ enum SriSubmissionJobStatus {
   CANCELLED
 }
 
+enum ErpPriceChannel {
+  RETAIL
+  WHOLESALE
+  DISTRIBUTOR
+  MANUAL
+}
+
+enum QuickInvoiceDraftStatus {
+  ANALYZED
+  DRAFT_CREATED
+  CONFIRMED
+  CANCELLED
+}
+
 model User {
   id                 String     @id @default(cuid())
   name               String
@@ -319,6 +333,8 @@ model Tenant {
   operationalConfig         TenantOperationalConfig?
   featureOverrides          TenantFeatureOverride[]
   businessSuiteActivationJobs BusinessSuiteActivationJob[]
+  erpProductPricings          ErpProductPricing[]
+  quickInvoiceDrafts          QuickInvoiceDraft[]
 }
 
 model Plan {
@@ -723,6 +739,56 @@ model CashClosing {
   @@index([tenantId, date])
   @@index([createdByUserId])
   @@index([status])
+}
+
+model ErpProductPricing {
+  id               String   @id @default(cuid())
+  tenantId         String
+  itemCode         String
+  itemName         String?
+  retailPrice      Decimal  @db.Decimal(12, 2)
+  wholesalePrice   Decimal? @db.Decimal(12, 2)
+  distributorPrice Decimal? @db.Decimal(12, 2)
+  notes            String?
+  createdByUserId  String?
+  updatedByUserId  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, itemCode])
+  @@index([tenantId])
+  @@index([itemCode])
+}
+
+model QuickInvoiceDraft {
+  id              String                 @id @default(cuid())
+  tenantId        String
+  createdByUserId String?
+  status          QuickInvoiceDraftStatus @default(ANALYZED)
+  rawMessage      String
+  parsedData      Json
+  warnings        Json?
+  salesOrderName  String?
+  salesInvoiceName String?
+  customerName    String?
+  customerTaxId   String?
+  customerPhone   String?
+  customerAddress String?
+  companyName     String?
+  priceChannel    ErpPriceChannel?
+  totalAmount     Decimal?               @db.Decimal(12, 2)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([createdByUserId])
+  @@index([status])
+  @@index([salesOrderName])
+  @@index([salesInvoiceName])
 }
 
 model SriTaxpayerProfile {

@@ -14,6 +14,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/config/routes";
+import {
+  formatPriceChannelNote,
+  priceChannelLabels,
+  resolvePriceForChannel,
+} from "@/lib/core/price-channels";
 import type { ApiResponse } from "@/types/api";
 import type {
   ErpnextBin,
@@ -25,6 +30,7 @@ import type {
   PosCartItem,
   PosCheckoutResult,
 } from "@/types/erpnext";
+import type { PriceChannel, ProductPricingRecord } from "@/types/quick-invoice";
 
 type PosTenant = {
   id: string;
@@ -34,6 +40,7 @@ type PosTenant = {
 
 type PosClientProps = {
   items: ErpnextItem[];
+  pricingMap: Record<string, ProductPricingRecord>;
   inventory: ErpnextBin[];
   customers: ErpnextCustomer[];
   warehouses: ErpnextWarehouse[];
@@ -89,6 +96,7 @@ function getStockByItemAndWarehouse(inventory: ErpnextBin[]) {
 
 export function PosClient({
   items,
+  pricingMap,
   inventory,
   customers,
   warehouses,
@@ -109,6 +117,7 @@ export function PosClient({
       modeOfPayment.enabled !== false && modeOfPayment.enabled !== 0
   );
   const [search, setSearch] = useState("");
+  const [priceChannel, setPriceChannel] = useState<PriceChannel>("RETAIL");
   const [customer, setCustomer] = useState(
     activeCustomers.length === 1 ? activeCustomers[0]?.name ?? "" : ""
   );
@@ -127,6 +136,7 @@ export function PosClient({
   const [referenceNo, setReferenceNo] = useState("");
   const [referenceDate, setReferenceDate] = useState("");
   const [note, setNote] = useState("");
+  const [manualPriceReason, setManualPriceReason] = useState("");
   const [cart, setCart] = useState<PosCartItem[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [createdOrderName, setCreatedOrderName] = useState<string | null>(null);
@@ -158,20 +168,24 @@ export function PosClient({
     (sum, item) => sum + item.qty * item.rate,
     0
   );
+  const hasManualPricing = cart.some((item) => item.price_channel === "MANUAL");
+  const canUseManualPricing = !hasManualPricing || manualPriceReason.trim().length > 0;
   const checkoutPaidAmount = paidAmount.trim() ? Number(paidAmount) : total;
   const canCreateOrder = Boolean(
     customer.trim() &&
       company.trim() &&
       warehouse.trim() &&
       cart.length > 0 &&
-      cart.every((item) => item.qty > 0 && item.rate >= 0)
+      cart.every((item) => item.qty > 0 && item.rate > 0) &&
+      canUseManualPricing
   );
   const canCheckout = Boolean(
     canCreateOrder &&
       modeOfPayment.trim() &&
       Number.isFinite(checkoutPaidAmount) &&
       checkoutPaidAmount > 0 &&
-      enabledModesOfPayment.length > 0
+      enabledModesOfPayment.length > 0 &&
+      canUseManualPricing
   );
 
   function getWarehouseStock(itemCode: string) {
@@ -187,6 +201,10 @@ export function PosClient({
     setIsError(false);
     setCreatedOrderName(null);
     setCheckoutResult(null);
+    const pricing = pricingMap[item.item_code];
+    const rate = resolvePriceForChannel(pricing, priceChannel) ?? 0;
+    const normalRate = resolvePriceForChannel(pricing, "RETAIL");
+
     setCart((currentCart) => {
       const existingItem = currentCart.find(
         (cartItem) => cartItem.item_code === item.item_code
@@ -207,7 +225,10 @@ export function PosClient({
           item_name: item.item_name,
           stock_uom: item.stock_uom,
           qty: 1,
-          rate: 0,
+          rate,
+          price_channel: priceChannel,
+          normal_rate: normalRate,
+          manual_price_reason: null,
         },
       ];
     });
@@ -220,8 +241,46 @@ export function PosClient({
   ) {
     setCart((currentCart) =>
       currentCart.map((item) =>
-        item.item_code === itemCode ? { ...item, [field]: value } : item
+        item.item_code === itemCode
+          ? {
+              ...item,
+              [field]: value,
+              ...(field === "rate"
+                ? {
+                    price_channel: "MANUAL" as const,
+                    manual_price_reason:
+                      item.manual_price_reason || "Precio ajustado en POS",
+                  }
+                : {}),
+            }
+          : item
       )
+    );
+  }
+
+  function updateCartItemChannel(itemCode: string, channel: PriceChannel) {
+    setCart((currentCart) =>
+      currentCart.map((item) => {
+        if (item.item_code !== itemCode) {
+          return item;
+        }
+
+        const pricing = pricingMap[item.item_code];
+        const nextRate =
+          channel === "MANUAL"
+            ? item.rate
+            : resolvePriceForChannel(pricing, channel) ?? item.rate;
+        const normalRate = resolvePriceForChannel(pricing, "RETAIL");
+
+        return {
+          ...item,
+          rate: nextRate,
+          price_channel: channel,
+          normal_rate: normalRate,
+          manual_price_reason:
+            channel === "MANUAL" ? item.manual_price_reason || "Precio manual" : null,
+        };
+      })
     );
   }
 
@@ -238,6 +297,25 @@ export function PosClient({
     setCreatedOrderName(null);
     setCheckoutResult(null);
 
+    const noteWithPricing = [
+      note.trim(),
+      `Canal general: ${priceChannelLabels[priceChannel]}`,
+      hasManualPricing
+        ? `Precios manuales: ${manualPriceReason.trim() || "Ajustados manualmente en POS"}`
+        : null,
+      ...cart.map((item) =>
+        `${item.item_name}: ${formatPriceChannelNote({
+          channel: item.price_channel ?? priceChannel,
+          manualReason:
+            item.price_channel === "MANUAL"
+              ? item.manual_price_reason || manualPriceReason
+              : undefined,
+        })}`
+      ),
+    ]
+      .filter(Boolean)
+      .join("\n");
+
     try {
       const response = await fetch("/api/erpnext/sales-orders", {
         method: "POST",
@@ -246,7 +324,7 @@ export function PosClient({
           customer,
           company,
           warehouse,
-          note,
+          note: noteWithPricing,
           items: cart.map((item) => ({
             item_code: item.item_code,
             qty: item.qty,
@@ -270,6 +348,7 @@ export function PosClient({
       setReferenceNo("");
       setReferenceDate("");
       setNote("");
+      setManualPriceReason("");
     } catch (error) {
       setIsError(true);
       setMessage(
@@ -287,6 +366,25 @@ export function PosClient({
     setCreatedOrderName(null);
     setCheckoutResult(null);
 
+    const noteWithPricing = [
+      note.trim(),
+      `Canal general: ${priceChannelLabels[priceChannel]}`,
+      hasManualPricing
+        ? `Precios manuales: ${manualPriceReason.trim() || "Ajustados manualmente en POS"}`
+        : null,
+      ...cart.map((item) =>
+        `${item.item_name}: ${formatPriceChannelNote({
+          channel: item.price_channel ?? priceChannel,
+          manualReason:
+            item.price_channel === "MANUAL"
+              ? item.manual_price_reason || manualPriceReason
+              : undefined,
+        })}`
+      ),
+    ]
+      .filter(Boolean)
+      .join("\n");
+
     try {
       const response = await fetch("/api/erpnext/pos/checkout", {
         method: "POST",
@@ -297,7 +395,7 @@ export function PosClient({
           warehouse,
           mode_of_payment: modeOfPayment,
           paid_amount: checkoutPaidAmount,
-          note,
+          note: noteWithPricing,
           reference_no: referenceNo,
           reference_date: referenceDate,
           items: cart.map((item) => ({
@@ -323,6 +421,7 @@ export function PosClient({
       setReferenceNo("");
       setReferenceDate("");
       setNote("");
+      setManualPriceReason("");
       router.refresh();
     } catch (error) {
       setIsError(true);
@@ -344,6 +443,7 @@ export function PosClient({
     setReferenceNo("");
     setReferenceDate("");
     setNote("");
+    setManualPriceReason("");
   }
 
   return (
@@ -364,6 +464,9 @@ export function PosClient({
             <Link href={routes.posOrders}>Ver pedidos POS</Link>
           </Button>
           <Button asChild variant="outline">
+            <Link href={routes.erpQuickInvoice}>Facturador rapido</Link>
+          </Button>
+          <Button asChild variant="outline">
             <Link href={routes.posInvoices}>Ver facturas y cobros</Link>
           </Button>
           <Button asChild variant="outline">
@@ -379,6 +482,9 @@ export function PosClient({
             actualiza inventario automaticamente.
           </p>
           <p>Si aun no cobraste, guarda como pedido pendiente.</p>
+          <p>
+            Canal actual: <span className="font-medium">{priceChannelLabels[priceChannel]}</span>.
+          </p>
         </CardContent>
       </Card>
 
@@ -396,6 +502,43 @@ export function PosClient({
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Buscar por nombre o codigo"
             />
+
+            <div className="space-y-2">
+              <Label htmlFor="pos_price_channel">Canal de precio</Label>
+              <select
+                id="pos_price_channel"
+                className={selectClassName}
+                value={priceChannel}
+                onChange={(event) => {
+                  const nextChannel = event.target.value as PriceChannel;
+                  setPriceChannel(nextChannel);
+                  setCart((currentCart) =>
+                    currentCart.map((cartItem) => {
+                      if (cartItem.price_channel === "MANUAL") {
+                        return cartItem;
+                      }
+
+                      const pricing = pricingMap[cartItem.item_code];
+                      const nextRate =
+                        resolvePriceForChannel(pricing, nextChannel) ?? cartItem.rate;
+
+                      return {
+                        ...cartItem,
+                        rate: nextRate,
+                        price_channel: nextChannel,
+                        normal_rate: resolvePriceForChannel(pricing, "RETAIL"),
+                      };
+                    })
+                  );
+                }}
+              >
+                {Object.entries(priceChannelLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {activeItems.length === 0 ? (
               <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
@@ -425,6 +568,20 @@ export function PosClient({
                           <h3 className="font-medium">{item.item_name}</h3>
                           <p className="text-xs text-muted-foreground">
                             Unidad: {item.stock_uom ?? "-"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Precio {priceChannelLabels[priceChannel]}:{" "}
+                            {resolvePriceForChannel(
+                              pricingMap[item.item_code],
+                              priceChannel
+                            ) != null
+                              ? formatMoney(
+                                  resolvePriceForChannel(
+                                    pricingMap[item.item_code],
+                                    priceChannel
+                                  ) ?? 0
+                                )
+                              : "Sin configurar"}
                           </p>
                         </div>
                         <Button
@@ -563,6 +720,23 @@ export function PosClient({
               </p>
             </div>
 
+            {hasManualPricing ? (
+              <div className="space-y-2">
+                <Label htmlFor="pos_manual_price_reason">
+                  Motivo del precio manual
+                </Label>
+                <Input
+                  id="pos_manual_price_reason"
+                  value={manualPriceReason}
+                  onChange={(event) => setManualPriceReason(event.target.value)}
+                  placeholder="Ej. descuento autorizado, promo, convenio"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Los precios manuales quedan registrados en la nota del pedido/factura.
+                </p>
+              </div>
+            ) : null}
+
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="font-medium">Carrito</h2>
@@ -636,6 +810,45 @@ export function PosClient({
                               )
                             }
                           />
+                        </div>
+                      </div>
+                      <div className="mt-3 grid gap-2 md:grid-cols-2">
+                        <div className="space-y-1">
+                          <Label htmlFor={`channel_${cartItem.item_code}`}>
+                            Canal aplicado
+                          </Label>
+                          <select
+                            id={`channel_${cartItem.item_code}`}
+                            className={selectClassName}
+                            value={cartItem.price_channel ?? priceChannel}
+                            onChange={(event) =>
+                              updateCartItemChannel(
+                                cartItem.item_code,
+                                event.target.value as PriceChannel
+                              )
+                            }
+                          >
+                            {Object.entries(priceChannelLabels).map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                          Precio base:{" "}
+                          {cartItem.normal_rate != null
+                            ? formatMoney(cartItem.normal_rate)
+                            : "Sin precio"}
+                          {cartItem.normal_rate != null &&
+                          cartItem.rate < cartItem.normal_rate ? (
+                            <span className="block text-emerald-700">
+                              Descuento implicito:{" "}
+                              {formatMoney(
+                                (cartItem.normal_rate - cartItem.rate) * cartItem.qty
+                              )}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                       <p className="mt-2 text-right text-sm font-medium">
@@ -715,6 +928,11 @@ export function PosClient({
                   <Button asChild className="mt-2" size="sm" variant="outline">
                     <Link href={`${routes.settings}`}>Ir a Ajustes &gt; Pagos</Link>
                   </Button>
+                ) : null}
+                {isError && hasManualPricing && !canUseManualPricing ? (
+                  <p className="mt-1">
+                    Agrega un motivo para los precios manuales antes de continuar.
+                  </p>
                 ) : null}
                 {createdOrderName ? (
                   <p className="mt-1 font-medium">Pedido: {createdOrderName}</p>

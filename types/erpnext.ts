@@ -293,6 +293,9 @@ export type PosCartItem = {
   stock_uom?: string;
   qty: number;
   rate: number;
+  price_channel?: "RETAIL" | "WHOLESALE" | "DISTRIBUTOR" | "MANUAL";
+  normal_rate?: number | null;
+  manual_price_reason?: string | null;
 };
 
 export type PosCheckoutItemInput = {
