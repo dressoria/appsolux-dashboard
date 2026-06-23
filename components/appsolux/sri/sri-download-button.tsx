@@ -1,24 +1,44 @@
 "use client";
 
 import { useState } from "react";
+import {
+  Download,
+  FileCheck2,
+  FileText,
+  ReceiptText,
+} from "lucide-react";
+
+export type SriDownloadButtonIcon =
+  | "download"
+  | "file-check"
+  | "file-text"
+  | "receipt";
 
 type SriDownloadButtonProps = {
   href: string;
   label: string;
   className?: string;
-  icon?: React.ComponentType<{ className?: string }>;
+  icon?: SriDownloadButtonIcon;
   suggestedFilename?: string;
 };
+
+const ICON_MAP = {
+  download: Download,
+  "file-check": FileCheck2,
+  "file-text": FileText,
+  receipt: ReceiptText,
+} satisfies Record<SriDownloadButtonIcon, React.ComponentType<{ className?: string }>>;
 
 export function SriDownloadButton({
   href,
   label,
   className = "",
-  icon: Icon,
+  icon,
   suggestedFilename,
 }: SriDownloadButtonProps) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const Icon = icon ? ICON_MAP[icon] : null;
 
   async function handleClick() {
     if (loading) return;
@@ -71,7 +91,7 @@ export function SriDownloadButton({
         disabled={loading}
         className={className}
       >
-        {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
+        {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" /> : null}
         {loading ? "Descargando…" : label}
       </button>
       {errorMsg && (

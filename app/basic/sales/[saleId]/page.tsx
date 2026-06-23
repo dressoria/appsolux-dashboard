@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Download, FileCheck2, FileText } from "lucide-react";
 
 import { BasicModuleShell } from "@/components/appsolux/basic/basic-module-shell";
 import { SaleDetailActions } from "@/components/appsolux/basic/sale-detail-actions";
@@ -158,19 +157,19 @@ export default async function BasicSaleDetailPage({
                       <SriDownloadButton
                         href={`/api/sri/documents/${existingDraft.id}/download-signed-xml`}
                         label="XML firmado"
-                        icon={Download}
+                        icon="download"
                         className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                       />
                       <SriDownloadButton
                         href={`/api/sri/documents/${existingDraft.id}/download-authorized-xml`}
                         label="XML autorizado"
-                        icon={FileCheck2}
+                        icon="file-check"
                         className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                       />
                       <SriDownloadButton
                         href={`/api/sri/documents/${existingDraft.id}/download-ride`}
                         label="RIDE / PDF"
-                        icon={FileText}
+                        icon="file-text"
                         className="inline-flex items-center gap-1.5 rounded-md border border-emerald-600 bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                       />
                     </div>
@@ -195,7 +194,7 @@ export default async function BasicSaleDetailPage({
                         <SriDownloadButton
                           href={`/api/sri/documents/${existingDraft.id}/download-signed-xml`}
                           label="XML firmado"
-                          icon={Download}
+                          icon="download"
                           className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                         />
                       )}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Download, FileCheck2, FileText, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 
 import { SriDownloadButton } from "@/components/appsolux/sri/sri-download-button";
@@ -341,7 +341,7 @@ export function SalesList({
                     <SriDownloadButton
                       href={`/api/basic/sales/${sale.id}/download-receipt`}
                       label="Recibo PDF"
-                      icon={FileText}
+                      icon="receipt"
                       className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   )}
@@ -371,7 +371,7 @@ export function SalesList({
                     <SriDownloadButton
                       href={`/api/sri/documents/${sri.id}/download-signed-xml`}
                       label="XML firmado"
-                      icon={Download}
+                      icon="download"
                       className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                     {sri.status === "AUTHORIZED" && (
@@ -379,13 +379,13 @@ export function SalesList({
                         <SriDownloadButton
                           href={`/api/sri/documents/${sri.id}/download-authorized-xml`}
                           label="XML autorizado"
-                          icon={FileCheck2}
+                          icon="file-check"
                           className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                         />
                         <SriDownloadButton
                           href={`/api/sri/documents/${sri.id}/download-ride`}
                           label="RIDE / PDF"
-                          icon={FileText}
+                          icon="file-text"
                           className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                         />
                       </>
