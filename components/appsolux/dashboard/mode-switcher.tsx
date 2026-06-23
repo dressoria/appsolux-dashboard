@@ -42,6 +42,8 @@ export function ModeSwitcher({
   const pathname = usePathname();
   const currentMode = getCurrentMode(pathname);
   const erpTarget = canUseErp ? erpHref : upgradeHref;
+  const basicLabel = canUseErp ? "Historial Basico" : "Basico";
+  const erpLabel = canUseErp ? "Gestion Empresarial" : "Activar Gestion";
 
   return (
     <div
@@ -59,21 +61,23 @@ export function ModeSwitcher({
           currentMode !== "basic" && "text-muted-foreground"
         )}
       >
-        {canUseBasic ? <Link href={basicHref}>Basico</Link> : <span>Basico</span>}
+        {canUseBasic ? <Link href={basicHref}>{basicLabel}</Link> : <span>{basicLabel}</span>}
       </Button>
       <Button
         asChild
         size="sm"
         variant={currentMode === "erp" ? "default" : "ghost"}
-        title={canUseErp ? "ERP avanzado activo" : "ERP avanzado requiere activacion"}
+        title={
+          canUseErp
+            ? "Gestion Empresarial activa"
+            : "Gestion Empresarial requiere activacion"
+        }
         className={cn(
           "h-7 px-2 text-xs",
           currentMode !== "erp" && "text-muted-foreground"
         )}
       >
-        <Link href={erpTarget}>
-          {canUseErp ? "ERP Avanzado" : "Activar ERP"}
-        </Link>
+        <Link href={erpTarget}>{erpLabel}</Link>
       </Button>
       {!canUseErp ? (
         <span className="hidden px-2 text-[11px] text-muted-foreground xl:inline">

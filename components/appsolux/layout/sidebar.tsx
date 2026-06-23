@@ -2,14 +2,22 @@ import Link from "next/link";
 import {
   BarChart3,
   Boxes,
+  BookOpen,
+  Building2,
+  CreditCard,
   FileCheck,
+  FolderTree,
   LayoutGrid,
   type LucideIcon,
   MessageSquareText,
   MessageSquareWarning,
+  Package,
+  Receipt,
   Settings2,
   ShoppingCart,
   Sparkles,
+  Users,
+  Warehouse,
   WalletCards,
 } from "lucide-react";
 
@@ -30,25 +38,51 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
   const tenantMode = await getTenantModeState(user.tenant);
   const appRouting = resolveTenantAppRouting(tenantMode);
   const showInternalAdmin = isInternalAdmin(user);
-  const operationsItems = [
-    { title: "Inventario", href: appRouting.inventory.href, icon: Boxes },
-    { title: "POS / Ventas", href: appRouting.sales.href, icon: ShoppingCart },
-    appRouting.shouldShowReports
-      ? { title: "Reportes", href: appRouting.reports.href, icon: BarChart3 }
-      : null,
-    appRouting.invoicing.isEnabled
-      ? { title: "Facturacion", href: appRouting.invoicing.href, icon: FileCheck }
-      : null,
-    appRouting.shouldShowAdvancedErp
-      ? { title: "Gestion Empresarial", href: appRouting.advancedErp.href, icon: Sparkles }
-      : null,
-  ].filter(Boolean) as SidebarItem[];
-  const configurationItems = [
-    appRouting.sriConfiguration.isEnabled
-      ? { title: "Configuracion SRI", href: appRouting.sriConfiguration.href, icon: Settings2 }
-      : null,
-    { title: "Ajustes", href: routes.settings, icon: MessageSquareWarning },
-  ].filter(Boolean) as SidebarItem[];
+  const isBusinessSuiteActive = tenantMode.businessSuiteStatus === "active";
+  const operationsItems = isBusinessSuiteActive
+    ? ([
+        { title: "POS / Ventas", href: routes.pos, icon: ShoppingCart },
+        { title: "Clientes", href: routes.erpCustomers, icon: Users },
+        { title: "Productos", href: routes.erpInventoryProducts, icon: Package },
+        { title: "Inventario", href: routes.erpInventory, icon: Boxes },
+        { title: "Compras", href: routes.erpPurchases, icon: FolderTree },
+        { title: "Caja y bancos", href: routes.erpFinance, icon: CreditCard },
+        appRouting.shouldShowReports
+          ? { title: "Reportes", href: routes.reports, icon: BarChart3 }
+          : null,
+      ].filter(Boolean) as SidebarItem[])
+    : ([
+        { title: "Inventario", href: appRouting.inventory.href, icon: Boxes },
+        { title: "POS / Ventas", href: appRouting.sales.href, icon: ShoppingCart },
+        appRouting.shouldShowReports
+          ? { title: "Reportes", href: appRouting.reports.href, icon: BarChart3 }
+          : null,
+        appRouting.invoicing.isEnabled
+          ? { title: "Facturacion", href: appRouting.invoicing.href, icon: FileCheck }
+          : null,
+        appRouting.shouldShowAdvancedErp
+          ? { title: "Gestion Empresarial", href: appRouting.advancedErp.href, icon: Sparkles }
+          : null,
+      ].filter(Boolean) as SidebarItem[]);
+  const configurationItems = isBusinessSuiteActive
+    ? ([
+        { title: "Gestion Empresarial", href: routes.erp, icon: Sparkles },
+        { title: "Empresa y ajustes", href: routes.settings, icon: Building2 },
+        { title: "Bodegas", href: routes.erpInventoryWarehouses, icon: Warehouse },
+        { title: "Categorias", href: routes.erpInventoryCategories, icon: FolderTree },
+        { title: "Unidades", href: routes.erpInventoryUnits, icon: Package },
+        { title: "Metodos de pago", href: routes.erpFinancePaymentMethods, icon: CreditCard },
+        appRouting.sriConfiguration.isEnabled
+          ? { title: "Configuracion SRI", href: appRouting.sriConfiguration.href, icon: Settings2 }
+          : null,
+        { title: "Historial Basico", href: routes.basic, icon: MessageSquareWarning },
+      ].filter(Boolean) as SidebarItem[])
+    : ([
+        appRouting.sriConfiguration.isEnabled
+          ? { title: "Configuracion SRI", href: appRouting.sriConfiguration.href, icon: Settings2 }
+          : null,
+        { title: "Ajustes", href: routes.settings, icon: MessageSquareWarning },
+      ].filter(Boolean) as SidebarItem[]);
   const accountItems = [
     { title: "Mi Plan", href: routes.billing, icon: WalletCards },
     showInternalAdmin ? { title: "Admin Billing", href: routes.adminBilling, icon: Sparkles } : null,
@@ -62,6 +96,44 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
       title: "Configuracion",
       items: configurationItems,
     },
+    ...(isBusinessSuiteActive
+      ? [
+          {
+            title: "Fiscal",
+            items: [
+              { title: "SRI Ecuador", href: routes.erpFiscalEcuador, icon: Receipt },
+              {
+                title: "Documentos electronicos",
+                href: routes.erpFiscalDocuments,
+                icon: FileCheck,
+              },
+            ],
+          },
+          {
+            title: "Contabilidad",
+            items: [
+              { title: "Plan de cuentas", href: routes.erpAccountingAccounts, icon: BookOpen },
+              { title: "Libro diario", href: routes.erpAccountingJournal, icon: BookOpen },
+              { title: "Libro mayor", href: routes.erpAccountingGeneralLedger, icon: BookOpen },
+              {
+                title: "Estado de resultados",
+                href: routes.erpAccountingProfitAndLoss,
+                icon: BarChart3,
+              },
+              {
+                title: "Balance general",
+                href: routes.erpAccountingBalanceSheet,
+                icon: BarChart3,
+              },
+              {
+                title: "Balance de comprobacion",
+                href: routes.erpAccountingTrialBalance,
+                icon: BarChart3,
+              },
+            ],
+          },
+        ]
+      : []),
     {
       title: "Comunicacion",
       items: [
@@ -85,7 +157,7 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
         </h2>
         <p className="mt-1 text-sm text-slate-600">
           {tenantMode.shouldUseAdvancedMode
-            ? "Navegacion ajustada a la suite empresarial activa del tenant."
+            ? "Gestion Empresarial es el motor principal. El modo Basico queda como historial protegido."
             : "Navegacion ajustada al motor Core del tenant."}
         </p>
       </div>

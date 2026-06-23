@@ -20,9 +20,16 @@ import { getBasicReports } from "@/lib/core/lightweight-pos";
 import { getSriModuleStatus, getSriDocuments } from "@/lib/core/sri";
 import { getTenantPlanState } from "@/lib/core/plans";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
+import { redirect } from "next/navigation";
 
 export default async function SalesPage() {
   const { user, tenant } = await requireDashboardSession();
+  const tenantMode = await getTenantModeState(tenant);
+
+  if (tenantMode.canUseAdvancedErp) {
+    redirect(routes.pos);
+  }
 
   const prisma = getPrismaClient();
   const startOfMonth = new Date();

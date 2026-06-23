@@ -52,7 +52,7 @@ function getPosBlockedDescription(
     return erpProvisioning.displayStatus;
   }
   if (erpProvisioning.status === "not_configured") {
-    return "El punto de venta necesita productos, bodegas, clientes, metodos de pago e inventario desde ERP. Solicita primero el ERP dedicado.";
+    return "El punto de venta necesita productos, bodegas, clientes, metodos de pago e inventario desde Gestion Empresarial. Solicita primero un Sistema Dedicado.";
   }
 
   return erpProvisioning.displayStatus;
@@ -86,7 +86,7 @@ export default async function PosPage() {
         <div className="space-y-6">
           <div>
             <p className="text-sm text-muted-foreground">POS</p>
-            <h1 className="text-3xl font-semibold tracking-tight">ERP avanzado no activado</h1>
+            <h1 className="text-3xl font-semibold tracking-tight">Gestion Empresarial no activada</h1>
             <p className="mt-2 max-w-3xl text-muted-foreground">
               {getPosBlockedDescription(erpProvisioning)}
             </p>
@@ -96,7 +96,7 @@ export default async function PosPage() {
           </div>
 
           <AdvancedErpNotActivatedState
-            description="Tu tenant esta operando en modo Core. El POS avanzado no cargara productos ni inventario ERP hasta que el ERP avanzado este habilitado."
+            description="Tu tenant esta operando en modo Core. El punto de venta principal de Gestion Empresarial no cargara productos ni inventario hasta que la suite este habilitada."
           />
 
           <ErpDedicatedProvisionCard
@@ -113,22 +113,22 @@ export default async function PosPage() {
               {erpProvisioning.isSimulated ? (
                 <p>
                   El worker ejecuto el dry-run correctamente. El POS no cargara
-                  productos ni intentara vender hasta que el sitio ERPNext real
-                  este activo.
+                  productos ni intentara vender hasta que la instancia operativa
+                  este activa.
                 </p>
               ) : erpProvisioning.isPending || erpProvisioning.isFailed ? (
                 <p>{erpProvisioning.displayStatus}</p>
               ) : (
                 <p>
-                  El POS no cargara productos ni intentara vender hasta que el ERP
-                  este activo para este tenant.
+                  El POS no cargara productos ni intentara vender hasta que
+                  Gestion Empresarial este activa para este tenant.
                 </p>
               )}
             </CardContent>
           </Card>
 
           <AdvancedModeBlockedCard
-            title="POS basico disponible"
+            title="Historial basico disponible"
             erpProvisioning={erpProvisioning}
             canRequestDedicatedErp={tenantMode.canRequestDedicatedErp}
           />

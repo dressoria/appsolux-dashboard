@@ -8,10 +8,27 @@ import { Button } from "@/components/ui/button";
 import { routes } from "@/config/routes";
 import { isClerkAuth } from "@/lib/auth/provider";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 
 export default async function WorkspacePage() {
   const { user } = await requireDashboardSession();
   const clerkActive = isClerkAuth();
+  const tenantMode = await getTenantModeState(user.tenant);
+  const operationsCard = tenantMode.canUseAdvancedErp
+    ? {
+        title: "Gestion Empresarial",
+        description:
+          "Opera ventas, inventario, compras, caja y reportes desde tu modo principal.",
+        detail: "Operacion · POS · Inventario · Reportes",
+        href: routes.erp,
+      }
+    : {
+        title: "Facturacion",
+        description:
+          "Gestiona ventas, clientes, inventario, comprobantes y reportes financieros.",
+        detail: "Ventas · Inventario · SRI · Reportes",
+        href: routes.sales,
+      };
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-100 via-white to-sky-50">
@@ -32,10 +49,10 @@ export default async function WorkspacePage() {
           <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-3">
             <WorkspaceServiceCard
               icon={ReceiptText}
-              title="Facturación"
-              description="Gestiona ventas, clientes, inventario, comprobantes y reportes financieros."
-              detail="Ventas · Inventario · SRI · Reportes"
-              href={routes.sales}
+              title={operationsCard.title}
+              description={operationsCard.description}
+              detail={operationsCard.detail}
+              href={operationsCard.href}
             />
             <WorkspaceServiceCard
               icon={MessageCircle}
