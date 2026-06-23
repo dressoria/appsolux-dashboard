@@ -42,15 +42,13 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Prisma: schema for migrate deploy + native engine binary
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+# Full production dependencies for maintenance scripts and Prisma CLI.
+# Copying node_modules wholesale avoids missing transitive runtime deps like
+# `effect` required by @prisma/config when running `npx prisma migrate deploy`.
+COPY --from=builder /app/node_modules ./node_modules
 
-# Prisma CLI for migrate deploy. Copy the full package + .bin symlinks/assets so
-# wasm helpers like prisma_schema_build_bg.wasm resolve correctly at runtime.
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/.bin ./node_modules/.bin
+# Prisma schema and generated client/runtime assets used by migrate/client.
+COPY --from=builder /app/prisma ./prisma
 
 # PDFKit: font metrics (.afm) loaded at runtime via __dirname — not traced by nft
 COPY --from=builder /app/node_modules/pdfkit/js/data ./node_modules/pdfkit/js/data
