@@ -15,24 +15,24 @@ CREATE TYPE "BusinessSuiteActivationJobStatus" AS ENUM ('queued', 'running', 'su
 
 -- AlterTable
 ALTER TABLE "TenantSubscription"
-ADD COLUMN "billingMode" "TenantBillingMode" NOT NULL DEFAULT 'manual';
+ADD COLUMN "billingMode" "TenantBillingMode" NOT NULL DEFAULT 'manual'::"TenantBillingMode";
 
 -- AlterTable
 ALTER TABLE "TenantOperationalConfig"
-ADD COLUMN "businessSuiteStatus" "BusinessSuiteStatus" NOT NULL DEFAULT 'locked';
+ADD COLUMN "businessSuiteStatus" "BusinessSuiteStatus" NOT NULL DEFAULT 'locked'::"BusinessSuiteStatus";
 
 -- Backfill
 UPDATE "TenantSubscription"
-SET "billingMode" = 'trial'
+SET "billingMode" = 'trial'::"TenantBillingMode"
 WHERE "status" = 'trialing';
 
 UPDATE "TenantOperationalConfig"
 SET "businessSuiteStatus" = CASE
-  WHEN "status" IN ('suspended', 'disabled') THEN 'suspended'
-  WHEN "operatingMode" = 'SHARED_ERP' AND "sharedErpEnabled" = true THEN 'active'
-  WHEN "operatingMode" = 'SHARED_ERP' THEN 'pending_migration'
-  WHEN "operatingMode" = 'DEDICATED_ERP' AND "dedicatedErpEnabled" = true THEN 'migrating'
-  ELSE 'locked'
+  WHEN "status" IN ('suspended', 'disabled') THEN 'suspended'::"BusinessSuiteStatus"
+  WHEN "operatingMode" = 'SHARED_ERP' AND "sharedErpEnabled" = true THEN 'active'::"BusinessSuiteStatus"
+  WHEN "operatingMode" = 'SHARED_ERP' THEN 'pending_migration'::"BusinessSuiteStatus"
+  WHEN "operatingMode" = 'DEDICATED_ERP' AND "dedicatedErpEnabled" = true THEN 'migrating'::"BusinessSuiteStatus"
+  ELSE 'locked'::"BusinessSuiteStatus"
 END;
 
 -- CreateTable
