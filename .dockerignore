@@ -28,7 +28,6 @@ logs/
 # Dev-only files
 coverage/
 .claude/
-scripts/
 
 # Docker compose files (not needed inside image)
 docker-compose*.yml

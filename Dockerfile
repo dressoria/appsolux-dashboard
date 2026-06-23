@@ -36,6 +36,7 @@ RUN addgroup --system --gid 1001 nodejs \
 
 # Static assets
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/scripts ./scripts
 
 # Standalone output (includes server.js + traced node_modules)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
@@ -46,9 +47,10 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
-# Prisma CLI for migrate deploy (run as separate step before container start)
+# Prisma CLI for migrate deploy. Copy the full package + .bin symlinks/assets so
+# wasm helpers like prisma_schema_build_bg.wasm resolve correctly at runtime.
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+COPY --from=builder /app/node_modules/.bin ./node_modules/.bin
 
 # PDFKit: font metrics (.afm) loaded at runtime via __dirname — not traced by nft
 COPY --from=builder /app/node_modules/pdfkit/js/data ./node_modules/pdfkit/js/data
