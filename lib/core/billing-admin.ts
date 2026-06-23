@@ -225,8 +225,30 @@ function readLatestActivationJobSummary(value: Prisma.JsonValue | null) {
     record.counts && typeof record.counts === "object" && !Array.isArray(record.counts)
       ? (record.counts as Record<string, unknown>)
       : null;
+  const invalidData =
+    record.invalidData &&
+    typeof record.invalidData === "object" &&
+    !Array.isArray(record.invalidData)
+      ? (record.invalidData as Record<string, unknown>)
+      : null;
+  const conflicts =
+    record.conflicts &&
+    typeof record.conflicts === "object" &&
+    !Array.isArray(record.conflicts)
+      ? (record.conflicts as Record<string, unknown>)
+      : null;
   const warnings = Array.isArray(record.warnings)
     ? record.warnings.filter((warning): warning is string => typeof warning === "string")
+    : [];
+  const activationBlockers = Array.isArray(record.activationBlockers)
+    ? record.activationBlockers.filter(
+        (warning): warning is string => typeof warning === "string"
+      )
+    : [];
+  const strongWarnings = Array.isArray(record.strongWarnings)
+    ? record.strongWarnings.filter(
+        (warning): warning is string => typeof warning === "string"
+      )
     : [];
 
   return {
@@ -296,10 +318,57 @@ function readLatestActivationJobSummary(value: Prisma.JsonValue | null) {
               : undefined,
         }
       : undefined,
+    invalidData: invalidData
+      ? {
+          productsWithoutBarcode:
+            typeof invalidData.productsWithoutBarcode === "number"
+              ? invalidData.productsWithoutBarcode
+              : undefined,
+          productsWithNegativeStock:
+            typeof invalidData.productsWithNegativeStock === "number"
+              ? invalidData.productsWithNegativeStock
+              : undefined,
+          productsWithNonPositivePrice:
+            typeof invalidData.productsWithNonPositivePrice === "number"
+              ? invalidData.productsWithNonPositivePrice
+              : undefined,
+          customersWithoutContact:
+            typeof invalidData.customersWithoutContact === "number"
+              ? invalidData.customersWithoutContact
+              : undefined,
+          customersMissingIdentificationForBusinessSuite:
+            typeof invalidData.customersMissingIdentificationForBusinessSuite ===
+            "number"
+              ? invalidData.customersMissingIdentificationForBusinessSuite
+              : undefined,
+          salesWithoutItems:
+            typeof invalidData.salesWithoutItems === "number"
+              ? invalidData.salesWithoutItems
+              : undefined,
+        }
+      : undefined,
+    conflicts: conflicts
+      ? {
+          duplicateBarcodes:
+            typeof conflicts.duplicateBarcodes === "number"
+              ? conflicts.duplicateBarcodes
+              : undefined,
+        }
+      : undefined,
+    activationBlockers,
+    strongWarnings,
+    requiresExplicitWarningAcknowledgement:
+      typeof record.requiresExplicitWarningAcknowledgement === "boolean"
+        ? record.requiresExplicitWarningAcknowledgement
+        : undefined,
     warnings,
     readyForReview:
       typeof record.readyForReview === "boolean"
         ? record.readyForReview
+        : undefined,
+    readyForActivation:
+      typeof record.readyForActivation === "boolean"
+        ? record.readyForActivation
         : undefined,
   };
 }
@@ -834,6 +903,133 @@ export async function createBusinessSuiteActivationDryRun(input: {
     return {
       job,
       summary,
+    };
+  });
+}
+
+export async function completeBusinessSuiteMigration(input: {
+  actorUserId: string;
+  tenantId: string;
+  businessSuiteMode: Extract<BusinessSuiteAccessMode, "shared" | "dedicated">;
+  allowWarnings?: boolean;
+}) {
+  const prisma = getPrismaClient();
+  const summary = await buildBusinessSuiteDryRunSummary({
+    tenantId: input.tenantId,
+    businessSuiteMode: input.businessSuiteMode,
+  });
+
+  if (!summary.readyForReview) {
+    throw new Error(
+      `La migracion tiene bloqueos operativos: ${summary.activationBlockers.join(" ")}`
+    );
+  }
+
+  if (
+    summary.requiresExplicitWarningAcknowledgement &&
+    input.allowWarnings !== true
+  ) {
+    throw new Error(
+      "La migracion requiere confirmacion explicita por advertencias fuertes."
+    );
+  }
+
+  const status: BusinessSuiteActivationJobStatus = "succeeded";
+  const operatingMode = mapBusinessSuiteModeToOperatingMode(
+    input.businessSuiteMode
+  );
+
+  return prisma.$transaction(async (tx) => {
+    const tenant = await tx.tenant.findUnique({
+      where: { id: input.tenantId },
+      select: { id: true, name: true, slug: true },
+    });
+
+    if (!tenant) {
+      throw new Error("Tenant no encontrado.");
+    }
+
+    const currentOperationalConfig = await tx.tenantOperationalConfig.findUnique({
+      where: { tenantId: input.tenantId },
+    });
+
+    if (!currentOperationalConfig) {
+      throw new Error(
+        "La configuracion operativa del tenant no existe. Prepara primero la activacion interna."
+      );
+    }
+
+    if (currentOperationalConfig.businessSuiteStatus === "active") {
+      throw new Error("Gestion Empresarial ya esta activa para este tenant.");
+    }
+
+    if (currentOperationalConfig.businessSuiteStatus !== "pending_migration") {
+      throw new Error(
+        "El tenant debe estar en pending_migration antes de activar la migracion operativa."
+      );
+    }
+
+    const job = await tx.businessSuiteActivationJob.create({
+      data: {
+        tenantId: input.tenantId,
+        requestedByUserId: input.actorUserId,
+        sourceMode: summary.businessSuite.sourceMode,
+        targetMode: summary.businessSuite.targetMode,
+        businessSuiteMode: input.businessSuiteMode,
+        status,
+        dryRun: false,
+        summary: summary as Prisma.InputJsonValue,
+        startedAt: new Date(),
+        finishedAt: new Date(),
+      },
+    });
+
+    const operationalConfig = await tx.tenantOperationalConfig.update({
+      where: { tenantId: input.tenantId },
+      data: {
+        operatingMode,
+        status: "active",
+        businessSuiteStatus: "active",
+        sharedErpEnabled: input.businessSuiteMode === "shared",
+        dedicatedErpEnabled: input.businessSuiteMode === "dedicated",
+        notes: cleanOptionalText(
+          [
+            currentOperationalConfig.notes,
+            `Migracion operativa controlada completada para Gestion Empresarial (${input.businessSuiteMode}).`,
+          ]
+            .filter(Boolean)
+            .join(" | ")
+        ),
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        tenantId: input.tenantId,
+        userId: input.actorUserId,
+        action: "business_suite.migration_completed",
+        entityType: "BusinessSuiteActivationJob",
+        entityId: job.id,
+        metadata: {
+          tenantSlug: tenant.slug,
+          tenantName: tenant.name,
+          businessSuiteMode: input.businessSuiteMode,
+          allowWarnings: input.allowWarnings === true,
+          activationBlockers: summary.activationBlockers,
+          strongWarnings: summary.strongWarnings,
+          previousBusinessSuiteStatus:
+            currentOperationalConfig.businessSuiteStatus,
+          nextBusinessSuiteStatus: operationalConfig.businessSuiteStatus,
+          preservedSriHistory: summary.counts.sriAuthorizedDocuments,
+          preservedSalesHistory: summary.counts.salesHistory,
+        },
+      },
+    });
+
+    return {
+      job,
+      summary,
+      operationalConfig,
     };
   });
 }

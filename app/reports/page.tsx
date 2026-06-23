@@ -119,7 +119,7 @@ function getReportsBlockedDescription(
     return erpProvisioning.displayStatus;
   }
   if (erpProvisioning.status === "not_configured") {
-    return "Los reportes necesitan ventas, pagos e inventario desde ERP. Solicita primero el ERP dedicado para este tenant.";
+    return "Los reportes necesitan ventas, pagos e inventario desde Gestion Empresarial. Solicita primero un Sistema Dedicado para este tenant.";
   }
 
   return erpProvisioning.displayStatus;

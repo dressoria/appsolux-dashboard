@@ -12,6 +12,7 @@
     "prisma:studio": "prisma studio",
     "seed:auth": "node scripts/seed-auth.mjs",
     "maintenance:activate-business-suite": "node scripts/maintenance/activate-business-suite.mjs",
+    "maintenance:business-suite-migration": "node scripts/maintenance/business-suite-migration.mjs",
     "maintenance:mark-vitabell-erp-real": "node scripts/maintenance/mark-vitabell-erp-real.mjs",
     "maintenance:ensure-plans": "node scripts/maintenance/ensure-plans.mjs"
   },

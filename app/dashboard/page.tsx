@@ -108,7 +108,7 @@ export default async function DashboardPage() {
           </h1>
           <p className="mt-2 text-muted-foreground">
             Tu entorno esta preparado. Desde aqui eliges entre modo basico Core
-            DB y modo avanzado con ERP dedicado.
+            DB y modo avanzado con Sistema Dedicado.
           </p>
         </div>
 
@@ -133,7 +133,7 @@ export default async function DashboardPage() {
                 Estado: {tenantMode.subscriptionStatus}
               </p>
               <p className="text-xs text-muted-foreground">
-                ERP dedicado:{" "}
+                Sistema Dedicado:{" "}
                 {tenantMode.canRequestDedicatedErp ? "incluido" : "no incluido"}
               </p>
             </CardContent>
@@ -164,7 +164,7 @@ export default async function DashboardPage() {
             provisioning={erpProvisioning}
             canManage={canManage}
             canRequestDedicatedErp={tenantMode.canRequestDedicatedErp}
-            blockedPlanMessage="Tu plan actual trabaja en modo basico. Mejora tu plan para solicitar ERP dedicado."
+            blockedPlanMessage="Tu plan actual trabaja en modo basico. Mejora tu plan para solicitar Sistema Dedicado."
           />
         </div>
 
@@ -172,25 +172,25 @@ export default async function DashboardPage() {
           <CardHeader>
             <CardTitle>
               {tenantMode.shouldUseAdvancedMode
-                ? "ERP dedicado activo"
+                ? "Sistema Dedicado activo"
                 : erpProvisioning.isPending
-                  ? "ERP en preparacion"
+                  ? "Sistema Dedicado en preparacion"
                   : erpProvisioning.isSimulated
-                    ? "ERP validado en simulacion"
+                    ? "Sistema validado en simulacion"
                     : "Estas usando Appsolux Basico"}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
               {tenantMode.shouldUseAdvancedMode
-                ? "Tu tenant ya puede operar en el modo avanzado conectado al ERP dedicado."
+                ? "Tu tenant ya puede operar en el modo avanzado conectado al Sistema Dedicado."
                 : erpProvisioning.isPending
-                  ? "Puedes seguir vendiendo en el modo basico mientras el worker externo prepara el ERP dedicado."
+                  ? "Puedes seguir vendiendo en el modo basico mientras el worker externo prepara el Sistema Dedicado."
                   : pendingUpgrade
                     ? "Tu solicitud de mejora esta en revision. Mientras tanto, puedes seguir operando en Appsolux Basico."
                   : tenantMode.isFreeLike
                     ? "El modo basico incluido te permite vender, cobrar, manejar clientes, fiados, caja y stock en Core DB."
-                    : "Tu plan permite ERP dedicado. Puedes solicitarlo y seguir usando el modo basico mientras se prepara."}
+                    : "Tu plan permite Sistema Dedicado. Puedes solicitarlo y seguir usando el modo basico mientras se prepara."}
             </p>
             <div className="flex flex-wrap gap-2">
               {tenantMode.shouldUseAdvancedMode ? (
@@ -227,7 +227,7 @@ export default async function DashboardPage() {
                       {pendingUpgrade
                         ? "Ver solicitud"
                         : tenantMode.canRequestDedicatedErp
-                        ? "Solicitar ERP dedicado"
+                        ? "Solicitar Sistema Dedicado"
                         : "Mejorar plan"}
                     </Link>
                   </Button>
@@ -251,8 +251,8 @@ export default async function DashboardPage() {
             tenantMode.subscriptionStatus === "canceled" ? (
               <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
                 Tu plan esta {tenantMode.subscriptionStatus}. Puedes seguir
-                operando el modo basico, pero las nuevas activaciones de ERP
-                dedicado estan bloqueadas durante este estado.
+                operando el modo basico, pero las nuevas activaciones de Sistema
+                Dedicado estan bloqueadas durante este estado.
               </p>
             ) : null}
           </CardContent>

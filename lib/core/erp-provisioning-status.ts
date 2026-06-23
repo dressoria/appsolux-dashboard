@@ -120,7 +120,7 @@ export async function getErpProvisioningState(
         desiredCompanyName: companyName,
         expectedSiteName: siteName,
         latestJobId: jobId,
-        displayStatus: "ERP validado en simulación",
+        displayStatus: "Sistema validado en simulacion",
         mode: "dedicated_site",
       };
     }
@@ -145,8 +145,8 @@ export async function getErpProvisioningState(
       expectedSiteName: siteName,
       latestJobId: jobId,
       displayStatus: isRealActive
-        ? "ERP real activo"
-        : "ERP pendiente de activar",
+        ? "Sistema dedicado activo"
+        : "Sistema dedicado pendiente de activar",
       mode: "dedicated_site",
     };
   }
@@ -162,7 +162,7 @@ export async function getErpProvisioningState(
       canStartProvisioning: false,
       desiredCompanyName: tenant.erpnext_company_id,
       expectedSiteName: undefined,
-      displayStatus: "ERP activo",
+      displayStatus: "Sistema activo",
       mode: "legacy_or_demo",
     };
   }
@@ -178,7 +178,7 @@ export async function getErpProvisioningState(
       canStartProvisioning: true,
       desiredCompanyName: tenant.erpnext_company_id,
       expectedSiteName: undefined,
-      displayStatus: "ERP legacy no habilitado para beta",
+      displayStatus: "Sistema legacy no habilitado para beta",
       mode: "legacy_or_demo",
     };
   }
@@ -208,7 +208,7 @@ export async function getErpProvisioningState(
       expectedSiteName: siteName,
       latestJobId: latestJob.id,
       lastError: integration?.lastError ?? latestJob.lastError ?? undefined,
-      displayStatus: "ERP en preparación",
+      displayStatus: "Sistema dedicado en preparacion",
       mode: "dedicated_site",
     };
   }
@@ -333,7 +333,9 @@ export async function getErpProvisioningState(
         readConfigString(integration.config, "latestJobId") ?? latestJob?.id,
       lastError: integration.lastError ?? undefined,
       displayStatus:
-        uiStatus === "queued" ? "ERP en preparación" : "ERP pendiente de activar",
+        uiStatus === "queued"
+          ? "Sistema Dedicado en preparacion"
+          : "Sistema Dedicado pendiente de activar",
       mode: "dedicated_site",
     };
   }
@@ -346,7 +348,7 @@ export async function getErpProvisioningState(
     isPending: false,
     isFailed: false,
     canStartProvisioning: true,
-    displayStatus: "ERP no solicitado",
+    displayStatus: "Sistema dedicado no solicitado",
     mode: "none",
   };
 }

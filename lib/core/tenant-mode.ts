@@ -120,8 +120,8 @@ export async function getTenantModeState(tenant: AppsoluxTenant): Promise<Tenant
     shouldUseBasicMode,
     shouldUseAdvancedMode,
     upgradeCtaLabel: plan.canRequestDedicatedErp
-      ? "Solicitar ERP dedicado"
-      : "Mejorar plan para activar ERP dedicado",
+      ? "Solicitar Sistema Dedicado"
+      : "Mejorar plan para activar Sistema Dedicado",
     upgradeCtaHref: "/billing",
     commercialPlan: effectiveAccess.commercialPlan,
     publicPlan,

@@ -36,7 +36,7 @@ type ProvisionResponse = {
 
 function getStatusDescription(state: ErpProvisioningState) {
   if (state.mode === "legacy_or_demo" && state.isRealActive) {
-    return "ERP activo: este tenant tiene acceso a un ERPNext compartido o de demostracion.";
+    return "Sistema activo: este tenant tiene acceso a Gestion Empresarial compartida o de demostracion.";
   }
   if (state.isRealActive) {
     return "ERP real activo: tu empresa ya puede usar inventario, POS y reportes conectados al ERP.";
@@ -45,7 +45,7 @@ function getStatusDescription(state: ErpProvisioningState) {
     return "La validacion tecnica termino, pero ERP/POS/Reportes seguiran bloqueados hasta completar el provisioning real.";
   }
   if (state.isPending) {
-    return "ERP en preparacion: la solicitud ya fue creada y un worker externo preparara el sitio ERPNext dedicado.";
+    return "Sistema Dedicado en preparacion: la solicitud ya fue creada y un worker externo preparara la instancia dedicada.";
   }
   if (state.isFailed) {
     return "Error preparando ERP: la ultima preparacion fallo. Puedes volver a poner el ERP en cola.";
@@ -54,7 +54,7 @@ function getStatusDescription(state: ErpProvisioningState) {
     return "El ERP está deshabilitado para este tenant.";
   }
   if (state.status === "not_configured") {
-    return "ERP no solicitado: activa un ERPNext dedicado para este tenant. Appsolux solo crea el job; la VM lo ejecutará después.";
+    return "Sistema dedicado no solicitado: solicita una instancia dedicada para este tenant. Appsolux solo crea el job; la VM lo ejecutara despues.";
   }
   return "Estado desconocido.";
 }
@@ -78,7 +78,7 @@ export function ErpDedicatedProvisionCard({
 
   async function handleProvision() {
     setIsLoading(true);
-    setMessage("Poniendo ERP dedicado en cola...");
+    setMessage("Poniendo Sistema Dedicado en cola...");
     setError("");
 
     try {
@@ -89,16 +89,16 @@ export function ErpDedicatedProvisionCard({
       const result = (await response.json()) as ProvisionResponse;
 
       if (!response.ok || !result.ok) {
-        throw new Error(result.message ?? "No pudimos preparar el ERP dedicado.");
+        throw new Error(result.message ?? "No pudimos preparar el Sistema Dedicado.");
       }
 
-      setMessage(result.message ?? "ERP dedicado en cola de preparación.");
+      setMessage(result.message ?? "Sistema Dedicado en cola de preparacion.");
       router.refresh();
     } catch (requestError) {
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "No pudimos preparar el ERP dedicado."
+          : "No pudimos preparar el Sistema Dedicado."
       );
       setMessage("");
     } finally {
@@ -109,7 +109,7 @@ export function ErpDedicatedProvisionCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>ERP dedicado</CardTitle>
+        <CardTitle>Sistema Dedicado</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="space-y-1">
@@ -144,20 +144,20 @@ export function ErpDedicatedProvisionCard({
             onClick={handleProvision}
             disabled={isLoading}
           >
-            {isLoading ? "Preparando..." : "Solicitar ERP dedicado"}
+            {isLoading ? "Preparando..." : "Solicitar Sistema Dedicado"}
           </Button>
         ) : null}
 
         {!canRequestDedicatedErp && !provisioning.isRealActive ? (
           <p className="text-xs text-muted-foreground">
             {blockedPlanMessage ??
-              "Tu plan actual no incluye ERP dedicado. Mejora tu plan para activarlo."}
+              "Tu plan actual no incluye Sistema Dedicado. Mejora tu plan para activarlo."}
           </p>
         ) : null}
 
         {!canManage && !provisioning.isRealActive && !provisioning.isSimulated ? (
           <p className="text-xs text-muted-foreground">
-            Pide a un owner o admin activar el ERP dedicado.
+            Pide a un owner o admin activar el Sistema Dedicado.
           </p>
         ) : null}
 

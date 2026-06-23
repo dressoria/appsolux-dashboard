@@ -49,7 +49,7 @@ function getSubscriptionNotice(status: string) {
   }
 
   if (status === "past_due") {
-    return "Tu suscripcion esta vencida. Las nuevas activaciones de ERP dedicado estan bloqueadas hasta regularizar el plan.";
+    return "Tu suscripcion esta vencida. Las nuevas activaciones de Sistema Dedicado estan bloqueadas hasta regularizar el plan.";
   }
 
   if (status === "canceled") {
@@ -108,7 +108,7 @@ export default async function BillingPage() {
           <p className="text-sm text-muted-foreground">Appsolux</p>
           <h1 className="text-3xl font-semibold tracking-tight">Mi plan</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Controla tu plan, limites y activacion de ERP dedicado. Durante la
+            Controla tu plan, limites y activacion de Sistema Dedicado. Durante la
             beta, la activacion se realiza manualmente por Appsolux.
           </p>
         </div>
@@ -161,7 +161,7 @@ export default async function BillingPage() {
                 Periodo: {formatDate(tenantMode.currentPeriodEndsAt)}
               </p>
               <p className="text-xs text-muted-foreground">
-                ERP dedicado:{" "}
+                Sistema Dedicado:{" "}
                 {tenantMode.canRequestDedicatedErp ? "incluido" : "no incluido"}
               </p>
             </CardContent>
@@ -195,7 +195,7 @@ export default async function BillingPage() {
                 {formatFeature(tenantMode.features.advanced_reports)}
               </p>
               <p>
-                ERP dedicado: {formatFeature(tenantMode.features.dedicated_erp)}
+                Sistema Dedicado: {formatFeature(tenantMode.features.dedicated_erp)}
               </p>
               <p>SRI: {formatFeature(tenantMode.features.sri)}</p>
               <p>
@@ -217,7 +217,7 @@ export default async function BillingPage() {
                   {plan.limits.products} productos · {plan.limits.customers} clientes
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  ERP dedicado:{" "}
+                  Sistema Dedicado:{" "}
                   {plan.features.dedicated_erp === true ? "incluido" : "no incluido"}
                 </p>
               </div>
@@ -241,23 +241,23 @@ export default async function BillingPage() {
           <CardHeader>
             <CardTitle>
               {erpProvisioning.isRealActive
-                ? "ERP dedicado activo"
+                ? "Sistema Dedicado activo"
                 : erpProvisioning.isPending
-                  ? "ERP en preparacion"
+                  ? "Sistema Dedicado en preparacion"
                   : tenantMode.canRequestDedicatedErp
-                    ? "Solicitar ERP dedicado"
+                    ? "Solicitar Sistema Dedicado"
                     : "Mejora tu plan"}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
               {erpProvisioning.isRealActive
-                ? "Tu ERP dedicado ya esta activo. Puedes operar en el modo avanzado y mantener el modo basico como respaldo."
+                ? "Tu Sistema Dedicado ya esta activo. Puedes operar en el modo avanzado y mantener el modo basico como respaldo."
                 : erpProvisioning.isPending
-                  ? "El ERP dedicado esta en preparacion. Puedes seguir vendiendo en Appsolux Basico mientras termina."
+                  ? "El Sistema Dedicado esta en preparacion. Puedes seguir vendiendo en Appsolux Basico mientras termina."
                   : tenantMode.canRequestDedicatedErp
-                    ? "Tu plan permite solicitar un ERPNext dedicado para inventario avanzado, POS completo y reportes conectados."
-                    : "Tu plan actual usa el modo basico de Appsolux Core DB. Solicita activacion Pro para habilitar ERP dedicado, inventario avanzado, POS completo y reportes."}
+                    ? "Tu plan permite solicitar una instancia dedicada para este tenant con inventario avanzado, POS completo y reportes conectados."
+                    : "Tu plan actual usa el modo basico de Appsolux Core DB. Solicita activacion Pro para habilitar Sistema Dedicado, inventario avanzado, POS completo y reportes."}
             </p>
             <div className="flex flex-wrap gap-2">
               <Button asChild variant={tenantMode.canRequestDedicatedErp ? "outline" : "default"}>
@@ -295,7 +295,7 @@ export default async function BillingPage() {
           provisioning={erpProvisioning}
           canManage={canManageSettings(user)}
           canRequestDedicatedErp={tenantMode.canRequestDedicatedErp}
-          blockedPlanMessage="Free/trial no crea ERP dedicado. Mejora tu plan para activar inventario avanzado, POS completo y reportes."
+          blockedPlanMessage="Free/trial no crea Sistema Dedicado. Mejora tu plan para activar inventario avanzado, POS completo y reportes."
         />
       </div>
     </DashboardShell>

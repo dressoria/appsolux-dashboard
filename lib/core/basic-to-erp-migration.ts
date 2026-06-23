@@ -31,8 +31,12 @@ export type BasicToBusinessSuiteSummary = {
   conflicts: {
     duplicateBarcodes: number;
   };
+  activationBlockers: string[];
+  strongWarnings: string[];
+  requiresExplicitWarningAcknowledgement: boolean;
   warnings: string[];
   readyForReview: boolean;
+  readyForActivation: boolean;
 };
 
 export async function getBasicMigrationSummary(
@@ -156,11 +160,35 @@ export async function getBasicMigrationSummary(
       ? "Hay historial SRI y debe preservarse sin reescritura ni reproceso."
       : null,
   ].filter((warning): warning is string => Boolean(warning));
-  const hasBlockingIssues =
-    productsWithNegativeStock > 0 ||
-    productsWithNonPositivePrice > 0 ||
-    salesWithoutItems > 0 ||
-    duplicateBarcodes > 0;
+  const activationBlockers = [
+    productsWithNegativeStock > 0
+      ? "Hay productos con stock negativo."
+      : null,
+    productsWithNonPositivePrice > 0
+      ? "Hay productos con precio no positivo."
+      : null,
+    salesWithoutItems > 0 ? "Hay ventas historicas sin items." : null,
+    duplicateBarcodes > 0 ? "Hay codigos de barras duplicados." : null,
+  ].filter((warning): warning is string => Boolean(warning));
+  const strongWarnings = [
+    openCreditSales > 0
+      ? "Hay ventas a credito abiertas."
+      : null,
+    sriAuthorizedDocuments > 0
+      ? "Existe historial SRI autorizado protegido."
+      : null,
+    productsWithoutBarcode > 0
+      ? "Hay productos sin codigo de barras."
+      : null,
+    customersWithoutContact > 0
+      ? "Hay clientes sin telefono ni email."
+      : null,
+    customersMissingIdentificationForBusinessSuite > 0
+      ? "Los clientes requieren identificacion fiscal antes de operar plenamente en Gestion Empresarial."
+      : null,
+  ].filter((warning): warning is string => Boolean(warning));
+  const hasBlockingIssues = activationBlockers.length > 0;
+  const requiresExplicitWarningAcknowledgement = strongWarnings.length > 0;
 
   return {
     sourceMode: "basic",
@@ -191,7 +219,12 @@ export async function getBasicMigrationSummary(
     conflicts: {
       duplicateBarcodes,
     },
+    activationBlockers,
+    strongWarnings,
+    requiresExplicitWarningAcknowledgement,
     warnings,
     readyForReview: !hasBlockingIssues,
+    readyForActivation:
+      !hasBlockingIssues && !requiresExplicitWarningAcknowledgement,
   };
 }
