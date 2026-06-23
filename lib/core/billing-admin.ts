@@ -205,6 +205,22 @@ function readLatestActivationJobSummary(value: Prisma.JsonValue | null) {
   }
 
   const record = value as Record<string, unknown>;
+  const tenant =
+    record.tenant && typeof record.tenant === "object" && !Array.isArray(record.tenant)
+      ? (record.tenant as Record<string, unknown>)
+      : null;
+  const subscription =
+    record.subscription &&
+    typeof record.subscription === "object" &&
+    !Array.isArray(record.subscription)
+      ? (record.subscription as Record<string, unknown>)
+      : null;
+  const businessSuite =
+    record.businessSuite &&
+    typeof record.businessSuite === "object" &&
+    !Array.isArray(record.businessSuite)
+      ? (record.businessSuite as Record<string, unknown>)
+      : null;
   const counts =
     record.counts && typeof record.counts === "object" && !Array.isArray(record.counts)
       ? (record.counts as Record<string, unknown>)
@@ -214,16 +230,70 @@ function readLatestActivationJobSummary(value: Prisma.JsonValue | null) {
     : [];
 
   return {
+    tenant: tenant
+      ? {
+          name: typeof tenant.name === "string" ? tenant.name : undefined,
+          slug: typeof tenant.slug === "string" ? tenant.slug : undefined,
+        }
+      : undefined,
+    subscription: subscription
+      ? {
+          planKey:
+            typeof subscription.planKey === "string"
+              ? subscription.planKey
+              : undefined,
+          planName:
+            typeof subscription.planName === "string"
+              ? subscription.planName
+              : undefined,
+          status:
+            typeof subscription.status === "string"
+              ? subscription.status
+              : undefined,
+          billingMode:
+            typeof subscription.billingMode === "string"
+              ? subscription.billingMode
+              : undefined,
+        }
+      : undefined,
+    businessSuite: businessSuite
+      ? {
+          mode:
+            typeof businessSuite.mode === "string"
+              ? businessSuite.mode
+              : undefined,
+          sourceMode:
+            typeof businessSuite.sourceMode === "string"
+              ? businessSuite.sourceMode
+              : undefined,
+          targetMode:
+            typeof businessSuite.targetMode === "string"
+              ? businessSuite.targetMode
+              : undefined,
+        }
+      : undefined,
     counts: counts
       ? {
           products:
             typeof counts.products === "number" ? counts.products : undefined,
           customers:
             typeof counts.customers === "number" ? counts.customers : undefined,
+          stockMovements:
+            typeof counts.stockMovements === "number"
+              ? counts.stockMovements
+              : undefined,
           salesHistory:
             typeof counts.salesHistory === "number" ? counts.salesHistory : undefined,
+          openCreditSales:
+            typeof counts.openCreditSales === "number"
+              ? counts.openCreditSales
+              : undefined,
           sriDocuments:
             typeof counts.sriDocuments === "number" ? counts.sriDocuments : undefined,
+          sriAuthorizedDocuments:
+            typeof counts.sriAuthorizedDocuments === "number"
+              ? counts.sriAuthorizedDocuments
+              : undefined,
         }
       : undefined,
     warnings,
@@ -231,6 +301,63 @@ function readLatestActivationJobSummary(value: Prisma.JsonValue | null) {
       typeof record.readyForReview === "boolean"
         ? record.readyForReview
         : undefined,
+  };
+}
+
+async function buildBusinessSuiteDryRunSummary(input: {
+  tenantId: string;
+  businessSuiteMode: Extract<BusinessSuiteAccessMode, "shared" | "dedicated">;
+}) {
+  const prisma = getPrismaClient();
+  const [tenant, planState, summary] = await Promise.all([
+    prisma.tenant.findUnique({
+      where: { id: input.tenantId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+      },
+    }),
+    getTenantPlanState(input.tenantId),
+    getBasicMigrationSummary({
+      tenantId: input.tenantId,
+      targetMode:
+        input.businessSuiteMode === "dedicated"
+          ? "business_dedicated"
+          : "business_shared",
+    }),
+  ]);
+
+  if (!tenant) {
+    throw new Error("Tenant no encontrado.");
+  }
+
+  const targetMode: BusinessSuitePlanMode =
+    input.businessSuiteMode === "dedicated"
+      ? "business_dedicated"
+      : "business_shared";
+
+  return {
+    tenant: {
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+    },
+    subscription: {
+      planKey: planState.planKey,
+      planName: planState.planName,
+      status: planState.status,
+      billingMode: normalizeBillingMode({
+        billingMode: planState.subscription?.billingMode,
+        subscriptionStatus: planState.status,
+      }),
+    },
+    businessSuite: {
+      mode: input.businessSuiteMode,
+      sourceMode: "basic" as const,
+      targetMode,
+    },
+    ...summary,
   };
 }
 
@@ -656,12 +783,9 @@ export async function createBusinessSuiteActivationDryRun(input: {
   businessSuiteMode: Extract<BusinessSuiteAccessMode, "shared" | "dedicated">;
 }) {
   const prisma = getPrismaClient();
-  const summary = await getBasicMigrationSummary({
+  const summary = await buildBusinessSuiteDryRunSummary({
     tenantId: input.tenantId,
-    targetMode:
-      input.businessSuiteMode === "dedicated"
-        ? "business_dedicated"
-        : "business_shared",
+    businessSuiteMode: input.businessSuiteMode,
   });
   const status: BusinessSuiteActivationJobStatus = summary.readyForReview
     ? "succeeded"
@@ -681,8 +805,8 @@ export async function createBusinessSuiteActivationDryRun(input: {
       data: {
         tenantId: input.tenantId,
         requestedByUserId: input.actorUserId,
-        sourceMode: "basic",
-        targetMode: resolveTargetPublicPlan(input.businessSuiteMode),
+        sourceMode: summary.businessSuite.sourceMode,
+        targetMode: summary.businessSuite.targetMode,
         businessSuiteMode: input.businessSuiteMode,
         status,
         dryRun: true,

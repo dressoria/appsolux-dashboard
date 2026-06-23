@@ -89,11 +89,29 @@ type TenantBillingRow = {
     status: "queued" | "running" | "succeeded" | "failed" | "needs_review";
     dryRun: boolean;
     summary: {
+      tenant?: {
+        name?: string;
+        slug?: string;
+      };
+      subscription?: {
+        planKey?: string;
+        planName?: string;
+        status?: string;
+        billingMode?: string;
+      };
+      businessSuite?: {
+        mode?: string;
+        sourceMode?: string;
+        targetMode?: string;
+      };
       counts?: {
         products?: number;
         customers?: number;
+        stockMovements?: number;
         salesHistory?: number;
+        openCreditSales?: number;
         sriDocuments?: number;
+        sriAuthorizedDocuments?: number;
       };
       warnings?: string[];
       readyForReview?: boolean;
@@ -777,11 +795,22 @@ export function BillingAdminTable({
                         Ultimo dry-run: {tenant.latestActivationJob.status}
                       </p>
                       <p>
+                        Plan: {tenant.latestActivationJob.summary?.subscription?.planName ?? tenant.planName} ·
+                        Cobro: {tenant.latestActivationJob.summary?.subscription?.billingMode ?? tenant.billingMode} ·
+                        Destino: {tenant.latestActivationJob.summary?.businessSuite?.targetMode ?? tenant.publicPlan}
+                      </p>
+                      <p>
                         Productos: {tenant.latestActivationJob.summary?.counts?.products ?? 0} ·
                         Clientes: {tenant.latestActivationJob.summary?.counts?.customers ?? 0} ·
+                        Movs.: {tenant.latestActivationJob.summary?.counts?.stockMovements ?? 0} ·
                         Ventas: {tenant.latestActivationJob.summary?.counts?.salesHistory ?? 0} ·
                         SRI: {tenant.latestActivationJob.summary?.counts?.sriDocuments ?? 0}
                       </p>
+                      {(tenant.latestActivationJob.summary?.warnings?.length ?? 0) > 0 ? (
+                        <p>
+                          Advertencias: {tenant.latestActivationJob.summary?.warnings?.length}
+                        </p>
+                      ) : null}
                       <p>
                         Listo para revision:{" "}
                         {tenant.latestActivationJob.summary?.readyForReview ? "Si" : "No"}

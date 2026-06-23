@@ -18,6 +18,7 @@ import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { routes } from "@/config/routes";
 import type { ErpnextMasters } from "@/types/erpnext";
+import type { TenantModeState } from "@/lib/core/tenant-mode";
 
 type LoadResult<T> = {
   data: T;
@@ -45,8 +46,17 @@ async function loadErpResource<T>(
 }
 
 function getErpBlockedDescription(
+  tenantMode: TenantModeState,
   erpProvisioning: Awaited<ReturnType<typeof getErpProvisioningState>>
 ) {
+  if (tenantMode.businessSuiteStatus === "pending_migration") {
+    return "Gestion Empresarial esta preparada para este tenant, pero aun no se activa la migracion operativa. El modo Basico sigue siendo la fuente activa y el historial SRI queda protegido.";
+  }
+
+  if (tenantMode.businessSuiteStatus === "migrating") {
+    return "Gestion Empresarial esta en migracion controlada. Todavia no se habilita como motor principal hasta completar las validaciones operativas.";
+  }
+
   if (erpProvisioning.isSimulated) {
     return "La validacion tecnica termino, pero la suite empresarial seguira bloqueada hasta completar el provisioning real.";
   }
@@ -97,10 +107,13 @@ export default async function ErpPage() {
           </Link>
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">
-              Gestion Empresarial no activada
+              {tenantMode.businessSuiteStatus === "pending_migration" ||
+              tenantMode.businessSuiteStatus === "migrating"
+                ? "Gestion Empresarial pendiente"
+                : "Gestion Empresarial bloqueada"}
             </h1>
             <p className="mt-2 max-w-3xl text-muted-foreground">
-              {getErpBlockedDescription(erpProvisioning)}
+              {getErpBlockedDescription(tenantMode, erpProvisioning)}
             </p>
             <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
               El historial del modo Basico y SRI sigue protegido mientras esta
@@ -112,7 +125,12 @@ export default async function ErpPage() {
           </div>
 
           <AdvancedErpNotActivatedState
-            description="Tu tenant esta operando en modo Core. Mientras Gestion Empresarial no este habilitada, esta ruta no cargara datos operativos externos."
+            description={
+              tenantMode.businessSuiteStatus === "pending_migration" ||
+              tenantMode.businessSuiteStatus === "migrating"
+                ? "La suite esta en estado pendiente. Antes de activarla por completo, el tenant sigue operando en Core para evitar migraciones destructivas."
+                : "Tu tenant esta operando en modo Core. Mientras Gestion Empresarial no este habilitada, esta ruta no cargara datos operativos externos."
+            }
           />
 
           <ErpDedicatedProvisionCard
@@ -130,7 +148,7 @@ export default async function ErpPage() {
                 <>
                   <p>
                     El worker ejecuto el script en modo dry-run. No se creo
-                    ningun sitio ERPNext real.
+                    ninguna instancia real de la suite empresarial.
                   </p>
                   <p>
                     Productos, bodegas, clientes, inventario y movimientos
@@ -148,7 +166,7 @@ export default async function ErpPage() {
                   </p>
                   <p>
                     Esto evita errores en tenants reales que aun no tienen un sitio
-                    ERPNext dedicado.
+                    dedicado listo para operar.
                   </p>
                 </>
               )}
