@@ -8,13 +8,23 @@ type RideAdditionalField = {
 type RidePayment = {
   code: string;
   label: string;
+  amount: string;
+};
+
+type RideDetailAdditional = {
+  name: string;
+  value: string;
 };
 
 type RideDetail = {
   code: string;
+  auxiliaryCode: string;
   quantity: string;
   description: string;
+  detailAdditional: RideDetailAdditional[];
   unitPrice: string;
+  subsidio: string;
+  precioSinSubsidio: string;
   discount: string;
   subtotalExcludingTax: string;
 };
@@ -66,6 +76,8 @@ export type ParsedAuthorizedSriInvoice = {
     subtotalSinImpuestos: string;
     totalDescuento: string;
     ice: string;
+    irbpnr: string;
+    propina: string;
     iva: RideTaxSummary[];
     importeTotal: string;
   };
@@ -91,10 +103,6 @@ function decodeXmlEntities(value: string) {
     .replace(/&apos;/g, "'")
     .replace(/&amp;/g, "&")
     .trim();
-}
-
-function stripNamespace(tag: string) {
-  return tag.replace(/^[^:]+:/, "");
 }
 
 function findFirstTag(xml: string, tagName: string) {
@@ -159,15 +167,45 @@ export function parseAuthorizedSriInvoiceXml(xml: string): ParsedAuthorizedSriIn
   const ambienteCode = findFirstTag(infoTributaria, "ambiente");
   const tipoEmisionCode = findFirstTag(infoTributaria, "tipoEmision");
 
+  // ── Details ────────────────────────────────────────────────────────────────
+
   const detailBlocks = findAllBlocks(documentXml, "detalle");
-  const details = detailBlocks.map((detailXml) => ({
-    code: findFirstTag(detailXml, "codigoPrincipal") || "N/A",
-    quantity: findFirstTag(detailXml, "cantidad") || "0",
-    description: findFirstTag(detailXml, "descripcion") || "N/A",
-    unitPrice: normalizeAmount(findFirstTag(detailXml, "precioUnitario")),
-    discount: normalizeAmount(findFirstTag(detailXml, "descuento")),
-    subtotalExcludingTax: normalizeAmount(findFirstTag(detailXml, "precioTotalSinImpuesto")),
-  }));
+  const details: RideDetail[] = detailBlocks.map((detailXml) => {
+    // Parse detail additional fields from <detallesAdicionales>
+    const detAdicionalMatches = Array.from(
+      detailXml.matchAll(/<([\w.-]+:)?detAdicional\b([^>]*)>([\s\S]*?)<\/([\w.-]+:)?detAdicional>/gi)
+    );
+    const detailAdditional: RideDetailAdditional[] = detAdicionalMatches.map((m) => {
+      const attrs = m[2] ?? "";
+      const name = attrs.match(/\bnombre="([^"]+)"/i)?.[1] ?? "";
+      return {
+        name: decodeXmlEntities(name),
+        value: decodeXmlEntities(m[3] ?? ""),
+      };
+    });
+
+    const unitPrice = normalizeAmount(findFirstTag(detailXml, "precioUnitario"));
+    const subsidio = normalizeAmount(findFirstTag(detailXml, "subsidio"));
+    // precioSinSubsidio = unitPrice when no subsidy
+    const precioSinSubsidio = normalizeAmount(
+      findFirstTag(detailXml, "precioSinSubsidio") || unitPrice
+    );
+
+    return {
+      code: findFirstTag(detailXml, "codigoPrincipal") || "N/A",
+      auxiliaryCode: findFirstTag(detailXml, "codigoAuxiliar"),
+      quantity: findFirstTag(detailXml, "cantidad") || "0",
+      description: findFirstTag(detailXml, "descripcion") || "N/A",
+      detailAdditional,
+      unitPrice,
+      subsidio,
+      precioSinSubsidio,
+      discount: normalizeAmount(findFirstTag(detailXml, "descuento")),
+      subtotalExcludingTax: normalizeAmount(findFirstTag(detailXml, "precioTotalSinImpuesto")),
+    };
+  });
+
+  // ── Additional fields ──────────────────────────────────────────────────────
 
   const additionalFieldBlocks = Array.from(
     documentXml.matchAll(/<([\w.-]+:)?campoAdicional\b([^>]*)>([\s\S]*?)<\/([\w.-]+:)?campoAdicional>/gi)
@@ -181,14 +219,22 @@ export function parseAuthorizedSriInvoiceXml(xml: string): ParsedAuthorizedSriIn
     };
   });
 
+  // ── Payments ───────────────────────────────────────────────────────────────
+
   const paymentBlocks = findAllBlocks(documentXml, "pago");
-  const payments = paymentBlocks
-    .map((paymentXml) => findFirstTag(paymentXml, "formaPago"))
-    .filter(Boolean)
-    .map((code) => ({
-      code,
-      label: PAYMENT_METHOD_LABELS[code] ?? code,
-    }));
+  const payments: RidePayment[] = paymentBlocks
+    .map((paymentXml) => {
+      const code = findFirstTag(paymentXml, "formaPago");
+      if (!code) return null;
+      return {
+        code,
+        label: PAYMENT_METHOD_LABELS[code] ?? code,
+        amount: normalizeAmount(findFirstTag(paymentXml, "total")),
+      };
+    })
+    .filter((p): p is RidePayment => p !== null);
+
+  // ── Tax totals ─────────────────────────────────────────────────────────────
 
   const taxBlocks = findAllBlocks(documentXml, "totalImpuesto");
   const subtotalTaxed: RideTaxSummary[] = [];
@@ -197,6 +243,7 @@ export function parseAuthorizedSriInvoiceXml(xml: string): ParsedAuthorizedSriIn
   let subtotalNoObjetoIva = "0.00";
   let subtotalExentoIva = "0.00";
   let ice = "0.00";
+  let irbpnr = "0.00";
 
   for (const taxXml of taxBlocks) {
     const codigo = findFirstTag(taxXml, "codigo");
@@ -210,18 +257,30 @@ export function parseAuthorizedSriInvoiceXml(xml: string): ParsedAuthorizedSriIn
       continue;
     }
 
+    if (codigo === "5") {
+      irbpnr = valor;
+      continue;
+    }
+
     const label = getTaxBucketLabel(codigoPorcentaje, tarifa);
 
     if (label === "SUBTOTAL 0%") subtotalZero = baseImponible;
     if (label === "SUBTOTAL NO OBJETO DE IVA") subtotalNoObjetoIva = baseImponible;
     if (label === "SUBTOTAL EXENTO DE IVA") subtotalExentoIva = baseImponible;
-    if (label.startsWith("SUBTOTAL ") && label !== "SUBTOTAL 0%" && label !== "SUBTOTAL NO OBJETO DE IVA" && label !== "SUBTOTAL EXENTO DE IVA") {
+    if (
+      label.startsWith("SUBTOTAL ") &&
+      label !== "SUBTOTAL 0%" &&
+      label !== "SUBTOTAL NO OBJETO DE IVA" &&
+      label !== "SUBTOTAL EXENTO DE IVA"
+    ) {
       subtotalTaxed.push({ label, baseAmount: baseImponible, value: valor });
     }
 
     if (codigo === "2") {
       iva.push({
-        label: Number(tarifa) > 0 ? `IVA ${Number.isInteger(Number(tarifa)) ? Number(tarifa) : tarifa}%` : "IVA 0%",
+        label: Number(tarifa) > 0
+          ? `IVA ${Number.isInteger(Number(tarifa)) ? Number(tarifa) : tarifa}%`
+          : "IVA 0%",
         baseAmount: baseImponible,
         value: valor,
       });
@@ -278,6 +337,8 @@ export function parseAuthorizedSriInvoiceXml(xml: string): ParsedAuthorizedSriIn
       subtotalSinImpuestos: normalizeAmount(findFirstTag(infoFactura, "totalSinImpuestos")),
       totalDescuento: normalizeAmount(findFirstTag(infoFactura, "totalDescuento")),
       ice,
+      irbpnr,
+      propina: normalizeAmount(findFirstTag(infoFactura, "propina")),
       iva,
       importeTotal: normalizeAmount(findFirstTag(infoFactura, "importeTotal")),
     },

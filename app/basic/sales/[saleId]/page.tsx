@@ -44,8 +44,8 @@ export default async function BasicSaleDetailPage({
   const { saleId } = await params;
 
   const [sale, sriStatus] = await Promise.all([
-    getSaleById(tenant.id, saleId),
-    getSriModuleStatus(tenant.id),
+    getSaleById(tenant.id, saleId).catch(() => null),
+    getSriModuleStatus(tenant.id).catch(() => null),
   ]);
 
   if (!sale) {
@@ -63,15 +63,15 @@ export default async function BasicSaleDetailPage({
   const pending = Math.max(Number(sale.total) - paid, 0);
 
   const sriReady =
-    sriStatus.hasProfile &&
-    sriStatus.establishmentCount > 0 &&
-    sriStatus.issuePointCount > 0 &&
-    sriStatus.sequenceCount > 0;
+    (sriStatus?.hasProfile ?? false) &&
+    (sriStatus?.establishmentCount ?? 0) > 0 &&
+    (sriStatus?.issuePointCount ?? 0) > 0 &&
+    (sriStatus?.sequenceCount ?? 0) > 0;
 
   const sriConfigLink =
-    sriStatus.establishmentCount === 0
+    (sriStatus?.establishmentCount ?? 0) === 0
       ? routes.sriEstablishments
-      : sriStatus.issuePointCount === 0
+      : (sriStatus?.issuePointCount ?? 0) === 0
         ? routes.sriIssuePoints
         : routes.sriSequences;
 
@@ -122,7 +122,7 @@ export default async function BasicSaleDetailPage({
             <CardTitle>Facturacion Electronica SRI</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            {!sriStatus.hasProfile ? (
+            {!(sriStatus?.hasProfile) ? (
               <div className="space-y-2">
                 <p className="text-muted-foreground">
                   Configura Facturacion SRI antes de preparar comprobantes.

@@ -378,7 +378,7 @@ export default async function SriDocumentDetailPage({ params }: Props) {
   const tenant = await getCurrentTenant(user);
   const { documentId } = await params;
 
-  const doc = await getSriDocumentById(tenant.id, documentId);
+  const doc = await getSriDocumentById(tenant.id, documentId).catch(() => null);
 
   if (!doc) {
     notFound();

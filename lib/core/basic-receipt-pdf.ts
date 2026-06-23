@@ -1,8 +1,10 @@
 import "@/lib/security/server-only";
 
-import PDFDocument from "pdfkit";
+import { PDFDocument, PDFPage, StandardFonts, rgb } from "pdf-lib";
+import type { RGB } from "pdf-lib";
+import type { PDFFont } from "pdf-lib";
 
-import { applyPdfKitFont } from "@/lib/core/pdfkit-fonts";
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 type ReceiptPdfItem = {
   quantity: number;
@@ -33,185 +35,234 @@ export type ReceiptPdfData = {
   payments: ReceiptPdfPayment[];
 };
 
-function money(value: number) {
+// ── Colors ────────────────────────────────────────────────────────────────────
+
+const C = {
+  blue:   rgb(0.0, 0.25, 0.50),
+  white:  rgb(1, 1, 1),
+  border: rgb(0.80, 0.82, 0.87),
+  text:   rgb(0.07, 0.10, 0.14),
+  muted:  rgb(0.38, 0.44, 0.52),
+  rowOdd: rgb(0.97, 0.98, 0.99),
+  hdrBg:  rgb(0.0, 0.25, 0.50),
+};
+
+// ── Coordinate helpers ────────────────────────────────────────────────────────
+
+function pdfY(H: number, fromTop: number): number {
+  return H - fromTop;
+}
+
+function drawRect(
+  page: PDFPage, H: number,
+  x: number, fromTop: number, w: number, h: number,
+  fill?: RGB, borderColor?: RGB, borderWidth = 0.5
+) {
+  page.drawRectangle({
+    x, y: pdfY(H, fromTop + h), width: w, height: h,
+    color: fill,
+    borderColor: borderColor ?? C.border,
+    borderWidth: fill && !borderColor ? 0 : borderWidth,
+  });
+}
+
+function drawLine(
+  page: PDFPage, H: number,
+  x1: number, x2: number, fromTop: number,
+  color: RGB = C.border, thickness = 0.5
+) {
+  page.drawLine({
+    start: { x: x1, y: pdfY(H, fromTop) },
+    end:   { x: x2, y: pdfY(H, fromTop) },
+    thickness, color,
+  });
+}
+
+function drawText(
+  page: PDFPage, H: number,
+  text: string, x: number, fromTop: number,
+  size: number, font: PDFFont, color: RGB = C.text, maxWidth?: number
+) {
+  let t = text;
+  if (maxWidth !== undefined && maxWidth > 0) {
+    while (t.length > 1 && font.widthOfTextAtSize(t, size) > maxWidth) t = t.slice(0, -1);
+    if (t.length < text.length) t = t.slice(0, -1) + "…";
+  }
+  page.drawText(t, {
+    x, y: pdfY(H, fromTop + size * 0.72),
+    size, font, color,
+  });
+}
+
+function drawTextRight(
+  page: PDFPage, H: number,
+  text: string, rightX: number, fromTop: number,
+  size: number, font: PDFFont, color: RGB = C.text
+) {
+  const tw = font.widthOfTextAtSize(text, size);
+  page.drawText(text, {
+    x: rightX - tw, y: pdfY(H, fromTop + size * 0.72),
+    size, font, color,
+  });
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function money(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
-function paymentMethodLabel(method: string) {
+function paymentLabel(method: string): string {
   const labels: Record<string, string> = {
     cash: "Efectivo",
     transfer: "Transferencia",
     card: "Tarjeta",
-    credit: "Credito / Fiado",
+    credit: "Crédito / Fiado",
   };
-
   return labels[method] ?? method;
 }
 
+// ── Generator ─────────────────────────────────────────────────────────────────
+
 export async function generateBasicReceiptPdf(data: ReceiptPdfData): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    const doc = new PDFDocument({
-      size: "A4",
-      margins: { top: 42, bottom: 42, left: 40, right: 40 },
-      info: {
-        Title: `Recibo ${data.saleId}`,
-        Author: data.tenantName,
-        Creator: "Appsolux",
-      },
-    });
+  const pdfDoc = await PDFDocument.create();
+  pdfDoc.setTitle(`Recibo ${data.saleId}`);
+  pdfDoc.setCreator("Appsolux");
 
-    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-    doc.on("error", reject);
+  const page = pdfDoc.addPage([595.28, 841.89]); // A4
+  const W = page.getWidth();
+  const H = page.getHeight();
 
-    const pageWidth = doc.page.width - 80;
-    const leftX = 40;
-    const shortSaleId = data.saleId.slice(-8);
-    const paid = data.payments.reduce((sum, payment) => sum + payment.amount, 0);
-    const pending = Math.max(data.total - paid, 0);
+  const fontR = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontB = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    doc.fillColor("#004080").fontSize(18);
-    applyPdfKitFont(doc, "bold");
-    doc.text(data.tenantName, leftX, 42, { width: pageWidth });
+  const ML = 40;
+  const UW = W - ML * 2;
+  const shortId = data.saleId.slice(-8);
+  const paid = data.payments.reduce((s, p) => s + p.amount, 0);
+  const pending = Math.max(data.total - paid, 0);
 
-    doc.fillColor("#0f172a").fontSize(11);
-    applyPdfKitFont(doc, "bold");
-    doc.text("Recibo interno", leftX, doc.y + 6);
+  let Y = 42;
 
-    doc.fillColor("#475569").fontSize(9);
-    applyPdfKitFont(doc);
-    doc.text(`Venta interna: ${shortSaleId}`, leftX, doc.y + 2);
-    doc.text(
-      `Fecha: ${data.createdAt.toLocaleString("es-EC", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })}`,
-      leftX,
-      doc.y + 2
-    );
+  // ── Header ──
 
-    doc.roundedRect(leftX, 118, pageWidth, 78, 10).fillAndStroke("#f8fafc", "#e2e8f0");
-    doc.fillColor("#0f172a").fontSize(10);
-    applyPdfKitFont(doc, "bold");
-    doc.text("Cliente", leftX + 14, 132);
-    applyPdfKitFont(doc);
-    doc.text(data.customerName, leftX + 14, 148);
-    applyPdfKitFont(doc, "bold");
-    doc.text("Estado", leftX + 240, 132);
-    applyPdfKitFont(doc);
-    doc.text(`${data.status} · ${data.paymentStatus}`, leftX + 240, 148, { width: 220 });
+  drawText(page, H, data.tenantName, ML, Y, 18, fontB, C.blue, UW);
+  Y += 24;
 
-    const tableY = 220;
-    const colWidths = [220, 50, 80, 60, 90];
-    const headers = ["Producto", "Cant.", "P. Unit.", "IVA", "Total"];
-    const colX = [leftX, leftX + 220, leftX + 270, leftX + 350, leftX + 410];
+  drawText(page, H, "Recibo interno", ML, Y, 11, fontB, C.text);
+  Y += 14;
+  drawText(page, H, `Recibo #${shortId}`, ML, Y, 8.5, fontR, C.muted);
+  Y += 11;
+  drawText(page, H, `Fecha: ${data.createdAt.toLocaleString("es-EC", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  })}`, ML, Y, 8.5, fontR, C.muted);
+  Y += 16;
 
-    doc.rect(leftX, tableY, pageWidth, 18).fill("#004080");
-    headers.forEach((header, index) => {
-      doc.fillColor("#ffffff").fontSize(8);
-      applyPdfKitFont(doc, "bold");
-      doc.text(header, colX[index]! + 4, tableY + 5, {
-        width: colWidths[index]! - 8,
-        align: index === 0 ? "left" : "right",
-      });
-    });
+  // ── Customer card ──
 
-    let rowY = tableY + 18;
-    data.items.forEach((item, index) => {
-      const rowHeight = item.discountAmount > 0 ? 28 : 20;
+  const cardH = 52;
+  drawRect(page, H, ML, Y, UW, cardH, rgb(0.97, 0.98, 1.0), C.border);
+  const half = Math.floor(UW / 2);
 
-      doc.rect(leftX, rowY, pageWidth, rowHeight).fillAndStroke(
-        index % 2 === 0 ? "#ffffff" : "#f8fafc",
-        "#e2e8f0"
-      );
+  drawText(page, H, "Cliente", ML + 12, Y + 10, 8, fontB, C.blue);
+  drawText(page, H, data.customerName, ML + 12, Y + 22, 9, fontR, C.text, half - 16);
 
-      doc.fillColor("#0f172a").fontSize(8.5);
-      applyPdfKitFont(doc, "bold");
-      doc.text(item.productName, colX[0]! + 4, rowY + 5, { width: colWidths[0]! - 8 });
+  drawText(page, H, "Estado", ML + half + 12, Y + 10, 8, fontB, C.blue);
+  drawText(page, H, `${data.status} · ${data.paymentStatus}`, ML + half + 12, Y + 22, 8.5, fontR, C.text, half - 16);
 
-      if (item.discountAmount > 0) {
-        doc.fillColor("#64748b").fontSize(7.5);
-        applyPdfKitFont(doc);
-        doc.text(`Desc. ${money(item.discountAmount)}`, colX[0]! + 4, rowY + 15);
-      }
+  if (data.payments.length > 0) {
+    const pmtStr = data.payments.map(p => `${paymentLabel(p.method)} ${money(p.amount)}`).join("  ·  ");
+    drawText(page, H, pmtStr, ML + 12, Y + 38, 7.5, fontR, C.muted, UW - 24);
+  }
 
-      doc.fillColor("#334155").fontSize(8);
-      applyPdfKitFont(doc);
-      doc.text(String(item.quantity), colX[1]! + 4, rowY + 5, {
-        width: colWidths[1]! - 8,
-        align: "right",
-      });
-      doc.text(money(item.price), colX[2]! + 4, rowY + 5, {
-        width: colWidths[2]! - 8,
-        align: "right",
-      });
-      doc.text(item.taxRate > 0 ? `${item.taxRate}%` : "-", colX[3]! + 4, rowY + 5, {
-        width: colWidths[3]! - 8,
-        align: "right",
-      });
-      doc.text(money(item.total), colX[4]! + 4, rowY + 5, {
-        width: colWidths[4]! - 8,
-        align: "right",
-      });
+  Y += cardH + 16;
 
-      rowY += rowHeight;
-    });
+  // ── Table ──
 
-    let summaryY = rowY + 14;
-    const summaryLeft = leftX + pageWidth - 210;
+  const colW = [220, 48, 80, 58, 90];
+  const colX = [ML, ML + 220, ML + 268, ML + 348, ML + 406];
+  const hdrH = 18;
 
-    const summaryRows = [
-      ["Subtotal", money(data.subtotal)],
-      ["Descuento", money(data.discountTotal)],
-      ["IVA", money(data.taxTotal)],
-      ["Total", money(data.total)],
-      ["Pagado", money(paid)],
-    ];
+  drawRect(page, H, ML, Y, UW, hdrH, C.hdrBg, C.hdrBg, 0);
+  const headers = ["Producto", "Cant.", "P. Unit.", "IVA", "Total"];
+  for (let i = 0; i < headers.length; i++) {
+    const align = i === 0 ? "left" : "right";
+    if (align === "left") {
+      drawText(page, H, headers[i]!, colX[i]! + 4, Y + 4, 8, fontB, C.white);
+    } else {
+      drawTextRight(page, H, headers[i]!, colX[i]! + colW[i]! - 4, Y + 4, 8, fontB, C.white);
+    }
+  }
+  Y += hdrH;
 
-    summaryRows.forEach(([label, value], index) => {
-      const isTotal = label === "Total";
-      const isLast = index === summaryRows.length - 1;
+  for (let i = 0; i < data.items.length; i++) {
+    const item = data.items[i]!;
+    const hasDiscount = item.discountAmount > 0;
+    const rowH = hasDiscount ? 28 : 20;
+    const bg = i % 2 === 1 ? C.rowOdd : C.white;
 
-      doc.fillColor(isTotal ? "#0f172a" : "#64748b").fontSize(isTotal ? 10 : 9);
-      applyPdfKitFont(doc, isTotal ? "bold" : "regular");
-      doc.text(label, summaryLeft, summaryY, { width: 90, align: "right" });
-      doc.text(value, summaryLeft + 104, summaryY, { width: 90, align: "right" });
-      summaryY += isLast ? 18 : 14;
-    });
+    drawRect(page, H, ML, Y, UW, rowH, bg, C.border);
 
-    if (pending > 0) {
-      doc.fillColor("#b45309").fontSize(9);
-      applyPdfKitFont(doc, "bold");
-      doc.text(`Saldo pendiente: ${money(pending)}`, summaryLeft, summaryY, {
-        width: 194,
-        align: "right",
-      });
-      summaryY += 18;
+    drawText(page, H, item.productName, colX[0]! + 4, Y + 5, 8.5, fontB, C.text, colW[0]! - 8);
+    if (hasDiscount) {
+      drawText(page, H, `Desc. ${money(item.discountAmount)}`, colX[0]! + 4, Y + 16, 7, fontR, C.muted, colW[0]! - 8);
     }
 
-    if (data.payments.length > 0) {
-      const paymentsLabel = data.payments
-        .map((payment) => `${paymentMethodLabel(payment.method)} ${money(payment.amount)}`)
-        .join(" · ");
+    drawTextRight(page, H, String(item.quantity), colX[1]! + colW[1]! - 4, Y + 5, 8, fontR, C.text);
+    drawTextRight(page, H, money(item.price), colX[2]! + colW[2]! - 4, Y + 5, 8, fontR, C.muted);
+    drawTextRight(page, H, item.taxRate > 0 ? `${item.taxRate}%` : "—", colX[3]! + colW[3]! - 4, Y + 5, 8, fontR, C.muted);
+    drawTextRight(page, H, money(item.total), colX[4]! + colW[4]! - 4, Y + 5, 8, fontR, C.text);
 
-      doc.fillColor("#475569").fontSize(8.5);
-      applyPdfKitFont(doc);
-      doc.text(`Pagos: ${paymentsLabel}`, leftX, summaryY + 8, { width: pageWidth });
-    }
+    Y += rowH;
+  }
 
-    doc.fillColor("#64748b").fontSize(8);
-    applyPdfKitFont(doc);
-    doc.text(
-      "Recibo interno generado por Appsolux. No corresponde a un comprobante tributario SRI.",
-      leftX,
-      doc.page.height - 54,
-      { width: pageWidth, align: "center" }
-    );
+  Y += 12;
 
-    doc.end();
-  });
+  // ── Totals ──
+
+  const sumX = ML + UW - 210;
+  const valX = ML + UW - 4;
+
+  const hasIva = data.taxTotal > 0;
+  const hasDisc = data.discountTotal > 0;
+
+  if (hasDisc || hasIva) {
+    drawText(page, H, "Subtotal", sumX, Y, 9, fontR, C.muted, 100);
+    drawTextRight(page, H, money(data.subtotal), valX, Y, 9, fontR, C.muted);
+    Y += 12;
+  }
+  if (hasDisc) {
+    drawText(page, H, "Descuento", sumX, Y, 9, fontR, C.muted, 100);
+    drawTextRight(page, H, `-${money(data.discountTotal)}`, valX, Y, 9, fontR, C.muted);
+    Y += 12;
+  }
+  if (hasIva) {
+    drawText(page, H, "IVA", sumX, Y, 9, fontR, C.muted, 100);
+    drawTextRight(page, H, money(data.taxTotal), valX, Y, 9, fontR, C.muted);
+    Y += 12;
+  }
+
+  drawLine(page, H, sumX, ML + UW, Y, C.border);
+  Y += 5;
+  drawText(page, H, "TOTAL", sumX, Y, 11, fontB, C.text, 100);
+  drawTextRight(page, H, money(data.total), valX, Y, 11, fontB, C.text);
+  Y += 15;
+
+  drawText(page, H, `Pagado: ${money(paid)}`, sumX, Y, 9, fontR, C.muted, 100);
+  Y += 12;
+
+  if (pending > 0) {
+    drawText(page, H, `Saldo pendiente: ${money(pending)}`, sumX, Y, 9, fontB, rgb(0.63, 0.32, 0.05), 150);
+    Y += 12;
+  }
+
+  // ── Footer note ──
+
+  drawLine(page, H, ML, ML + UW, H - 42, C.border);
+  drawText(page, H, "Recibo interno generado por Appsolux. No corresponde a un comprobante tributario SRI.",
+    ML, H - 36, 7, fontR, C.muted, UW);
+
+  const pdfBytes = await pdfDoc.save();
+  return Buffer.from(pdfBytes);
 }
