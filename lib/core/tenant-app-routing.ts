@@ -76,27 +76,29 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
     ? createEntry({
         href: routes.erpInventory,
         description:
-          "Inventario ERP como fuente principal: productos, stock por bodega, kardex y control operativo avanzado.",
+          "Inventario empresarial como fuente principal: productos, stock por bodega, kardex y control operativo avanzado.",
         features: [
-          "Productos ERP",
+          "Productos empresariales",
           "Stock por bodega",
           "Kardex y movimientos",
           "Ajustes y transferencias",
           "Inventario conectado al flujo comercial",
         ],
         statusLabel:
-          tenantMode.effectiveOperatingMode === "DEDICATED_ERP" ? "ERP dedicado activo" : "ERP compartido activo",
+          tenantMode.effectiveOperatingMode === "DEDICATED_ERP"
+            ? "Gestion dedicada activa"
+            : "Gestion compartida activa",
         statusVariant: "active",
-        actionLabel: "Abrir inventario ERP",
+        actionLabel: "Abrir inventario empresarial",
         buttonVariant: "default",
-        helperText: "Tu operacion principal de inventario vive en el ERP.",
+        helperText: "Tu operacion principal de inventario vive en la suite empresarial.",
         isEnabled: true,
         isVisible: true,
       })
     : createEntry({
         href: tenantMode.canAccessBasicInventory ? routes.basicStock : routes.billing,
         description:
-          "Inventario Core para productos, stock simple y movimientos diarios sin depender del ERP avanzado.",
+          "Inventario Core para productos, stock simple y movimientos diarios sin depender de Gestion Empresarial.",
         features: [
           "Catalogo basico de productos",
           "Control de stock simple",
@@ -119,15 +121,15 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
     ? createEntry({
         href: routes.pos,
         description:
-          "POS y ventas avanzadas integradas con ERP para pedidos, cobros y seguimiento comercial desde un solo flujo.",
+          "POS y ventas avanzadas integradas con Gestion Empresarial para pedidos, cobros y seguimiento comercial desde un solo flujo.",
         features: [
           "POS avanzado",
-          "Ventas conectadas al ERP",
+          "Ventas conectadas a la suite",
           "Cobros y pagos",
           "Clientes empresariales",
           "Operacion enlazada con inventario",
         ],
-        statusLabel: "ERP activo",
+        statusLabel: "Gestion Empresarial activa",
         statusVariant: "active",
         actionLabel: "Abrir POS",
         buttonVariant: "default",
@@ -161,7 +163,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
     ? createEntry({
         href: routes.reports,
         description:
-          "Reportes avanzados para ventas, stock, compras y seguimiento financiero sobre el flujo ERP.",
+          "Reportes avanzados para ventas, stock, compras y seguimiento financiero sobre el flujo empresarial.",
         features: [
           "Reportes comerciales",
           "Indicadores de inventario",
@@ -287,19 +289,19 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
     advancedErp = createEntry({
       href: routes.erp,
       description:
-        "Motor empresarial dedicado para operaciones de mayor complejidad, compras, inventario y crecimiento financiero.",
+        "Gestion Empresarial dedicada para operaciones de mayor complejidad, compras, inventario y crecimiento financiero.",
       features: [
-        "Inventario ERP",
+        "Inventario empresarial",
         "Compras y proveedores",
         "Kardex y bodegas",
         "Reportes avanzados",
         "Entorno dedicado por tenant",
       ],
-      statusLabel: "ERP dedicado activo",
+      statusLabel: "Gestion dedicada activa",
       statusVariant: "active",
-      actionLabel: "Abrir ERP",
+      actionLabel: "Abrir Gestion Empresarial",
       buttonVariant: "default",
-      helperText: "El ERP dedicado ya esta operativo para este tenant.",
+      helperText: "La suite dedicada ya esta operativa para este tenant.",
       isEnabled: true,
       isVisible: true,
     });
@@ -307,19 +309,19 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
     advancedErp = createEntry({
       href: routes.erp,
       description:
-        "Motor ERP compartido para inventario, compras y reportes avanzados sin requerir una instancia dedicada.",
+        "Gestion Empresarial compartida para inventario, compras y reportes avanzados sin requerir una instancia dedicada.",
       features: [
-        "Inventario ERP compartido",
+        "Inventario compartido",
         "POS avanzado",
         "Compras y proveedores",
         "Bodegas y kardex",
         "Reportes avanzados",
       ],
-      statusLabel: "ERP compartido activo",
+      statusLabel: "Gestion compartida activa",
       statusVariant: "active",
-      actionLabel: "Abrir ERP",
+      actionLabel: "Abrir Gestion Empresarial",
       buttonVariant: "default",
-      helperText: "El tenant ya opera en el motor ERP compartido.",
+      helperText: "El tenant ya opera en la suite compartida.",
       isEnabled: true,
       isVisible: true,
     });
@@ -327,7 +329,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
     advancedErp = createEntry({
       href: routes.billing,
       description:
-        "ERP dedicado en preparacion. Mientras termina la activacion, la operacion sigue en Core con un fallback seguro.",
+        "Gestion Empresarial dedicada en preparacion. Mientras termina la activacion, la operacion sigue en Core con un fallback seguro.",
       features: [
         "Provisioning dedicado",
         "Seguimiento de activacion",
@@ -335,11 +337,11 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
         "Cambio automatico al estar listo",
         "Continuidad operativa en Core",
       ],
-      statusLabel: "ERP dedicado pendiente",
+      statusLabel: "Gestion dedicada pendiente",
       statusVariant: "pending",
       actionLabel: "Ver estado",
       buttonVariant: "outline",
-      helperText: "El ERP dedicado aun no esta listo; el tenant sigue operando en Core por ahora.",
+      helperText: "La suite dedicada aun no esta lista; el tenant sigue operando en Core por ahora.",
       isEnabled: false,
       isVisible: true,
     });
@@ -347,7 +349,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
     advancedErp = createEntry({
       href: routes.billing,
       description:
-        "ERP avanzado incluido por plan o configuracion, pendiente de activacion operativa para usar inventario y ventas avanzadas.",
+        "Gestion Empresarial incluida por plan o configuracion, pendiente de activacion operativa para usar inventario y ventas avanzadas.",
       features: [
         "Inventario avanzado",
         "Compras",
@@ -359,7 +361,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
       statusVariant: "pending",
       actionLabel: "Revisar activacion",
       buttonVariant: "outline",
-      helperText: "Este tenant tiene acceso potencial al ERP, pero aun no opera ahi.",
+      helperText: "Este tenant tiene acceso potencial a la suite, pero aun no opera ahi.",
       isEnabled: false,
       isVisible: true,
     });
@@ -367,7 +369,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
     advancedErp = createEntry({
       href: routes.billing,
       description:
-        "ERP avanzado para compras, inventario complejo, bodegas, kardex y reportes de mayor profundidad.",
+        "Gestion Empresarial para compras, inventario complejo, bodegas, kardex y reportes de mayor profundidad.",
       features: [
         "Inventario avanzado",
         "Compras y proveedores",
@@ -379,7 +381,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
       statusVariant: "locked",
       actionLabel: "Ver planes",
       buttonVariant: "outline",
-      helperText: "Este tenant opera en Core y no tiene acceso al ERP avanzado.",
+      helperText: "Este tenant opera en Core y no tiene acceso a Gestion Empresarial.",
       isEnabled: false,
       isVisible: true,
     });

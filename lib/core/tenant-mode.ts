@@ -1,11 +1,21 @@
 import "@/lib/security/server-only";
 
 import type {
+  BusinessSuiteAccessMode,
+  BusinessSuitePlanMode,
+  BusinessSuiteStatus,
   CommercialPlan,
   OperatingMode,
+  TenantBillingMode,
   TenantOperationalStatus,
 } from "../../node_modules/.prisma/client";
 
+import {
+  derivePublicPlan,
+  mapOperatingModeToBusinessSuiteMode,
+  normalizeBillingMode,
+  resolveBusinessSuiteStatus,
+} from "@/lib/core/business-suite";
 import { getErpProvisioningState } from "@/lib/core/erp-provisioning-status";
 import { getTenantPlanState } from "@/lib/core/plans";
 import { canUseAdvancedErp } from "@/lib/core/advanced-erp-access";
@@ -16,6 +26,7 @@ export type TenantModeState = {
   planKey: "free" | "trial" | "pro" | "enterprise";
   planName: string;
   subscriptionStatus: "active" | "trialing" | "past_due" | "canceled" | "manual";
+  billingMode: TenantBillingMode;
   trialEndsAt?: Date | null;
   currentPeriodEndsAt?: Date | null;
   limits: Awaited<ReturnType<typeof getTenantPlanState>>["limits"];
@@ -33,6 +44,9 @@ export type TenantModeState = {
   upgradeCtaLabel: string;
   upgradeCtaHref: string;
   commercialPlan: CommercialPlan;
+  publicPlan: BusinessSuitePlanMode;
+  businessSuiteMode: BusinessSuiteAccessMode;
+  businessSuiteStatus: BusinessSuiteStatus;
   configuredOperatingMode: OperatingMode;
   effectiveOperatingMode: OperatingMode;
   operationalStatus: TenantOperationalStatus;
@@ -63,11 +77,34 @@ export async function getTenantModeState(tenant: AppsoluxTenant): Promise<Tenant
     effectiveAccess.effectiveOperatingMode === "SHARED_ERP" ||
     effectiveAccess.effectiveOperatingMode === "DEDICATED_ERP";
   const shouldUseBasicMode = !shouldUseAdvancedMode;
+  const billingMode = normalizeBillingMode({
+    billingMode: plan.subscription?.billingMode,
+    subscriptionStatus: plan.status,
+  });
+  const businessSuiteStatus = resolveBusinessSuiteStatus({
+    configuredOperatingMode: effectiveAccess.configuredOperatingMode,
+    operationalStatus: effectiveAccess.operationalStatus,
+    configuredStatus: effectiveAccess.operationalConfig?.businessSuiteStatus,
+    sharedErpEnabled: effectiveAccess.operationalConfig?.sharedErpEnabled ?? false,
+    dedicatedErpEnabled: effectiveAccess.operationalConfig?.dedicatedErpEnabled ?? false,
+    hasRealDedicatedErp: hasDedicatedErp,
+  });
+  const publicPlan = derivePublicPlan({
+    configuredOperatingMode: effectiveAccess.configuredOperatingMode,
+    effectiveOperatingMode: effectiveAccess.effectiveOperatingMode,
+    canRequestDedicatedErp: plan.canRequestDedicatedErp,
+  });
+  const businessSuiteMode = mapOperatingModeToBusinessSuiteMode(
+    shouldUseAdvancedMode
+      ? effectiveAccess.effectiveOperatingMode
+      : effectiveAccess.configuredOperatingMode
+  );
 
   const tenantMode = {
     planKey: plan.planKey,
     planName: plan.planName,
     subscriptionStatus: plan.status,
+    billingMode,
     trialEndsAt: plan.trialEndsAt,
     currentPeriodEndsAt: plan.currentPeriodEndsAt,
     limits: plan.limits,
@@ -87,6 +124,9 @@ export async function getTenantModeState(tenant: AppsoluxTenant): Promise<Tenant
       : "Mejorar plan para activar ERP dedicado",
     upgradeCtaHref: "/billing",
     commercialPlan: effectiveAccess.commercialPlan,
+    publicPlan,
+    businessSuiteMode,
+    businessSuiteStatus,
     configuredOperatingMode: effectiveAccess.configuredOperatingMode,
     effectiveOperatingMode: effectiveAccess.effectiveOperatingMode,
     operationalStatus: effectiveAccess.operationalStatus,

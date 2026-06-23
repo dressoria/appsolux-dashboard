@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { assertInternalAdmin } from "@/lib/auth/internal-admin";
 import {
+  isBusinessSuiteStatusValue,
   isOperatingModeValue,
   isTenantOperationalStatusValue,
   updateTenantOperationalConfig,
@@ -41,6 +42,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     const body = (await request.json()) as Record<string, unknown>;
     const operatingMode = body.operatingMode;
     const status = body.status;
+    const businessSuiteStatus = body.businessSuiteStatus;
 
     if (!isOperatingModeValue(operatingMode)) {
       return NextResponse.json(
@@ -56,11 +58,19 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
+    if (!isBusinessSuiteStatusValue(businessSuiteStatus)) {
+      return NextResponse.json(
+        { ok: false, message: "Estado de Gestion Empresarial invalido." },
+        { status: 400 }
+      );
+    }
+
     const config = await updateTenantOperationalConfig({
       actorUserId: user.id,
       tenantId,
       operatingMode,
       status,
+      businessSuiteStatus,
       sriEnabled: readBoolean(body, "sriEnabled"),
       sharedErpEnabled: readBoolean(body, "sharedErpEnabled"),
       dedicatedErpEnabled: readBoolean(body, "dedicatedErpEnabled"),

@@ -1,13 +1,29 @@
 import "@/lib/security/server-only";
 
-import { Prisma, TenantSubscriptionStatus } from "@prisma/client";
+import {
+  Prisma,
+  TenantBillingMode,
+  TenantSubscriptionStatus,
+} from "@prisma/client";
 import type {
+  BusinessSuiteAccessMode,
+  BusinessSuiteActivationJobStatus,
+  BusinessSuitePlanMode,
+  BusinessSuiteStatus,
   FeatureKey,
   OperatingMode,
   TenantOperationalStatus,
 } from "../../node_modules/.prisma/client";
 
+import {
+  derivePublicPlan,
+  mapBusinessSuiteModeToOperatingMode,
+  mapOperatingModeToBusinessSuiteMode,
+  normalizeBillingMode,
+  resolveBusinessSuiteStatus,
+} from "@/lib/core/business-suite";
 import { getPrismaClient } from "@/lib/db/prisma";
+import { getBasicMigrationSummary } from "@/lib/core/basic-to-erp-migration";
 import {
   allTenantFeatureKeys,
   mapLegacyPlanKeyToCommercialPlan,
@@ -34,9 +50,32 @@ export const manualBillingStatuses = [
   "canceled",
   "manual",
 ] as const;
+export const billingModes = ["stripe", "manual", "internal", "trial"] as const;
+export const businessSuiteStatuses = [
+  "locked",
+  "pending_migration",
+  "migrating",
+  "active",
+  "failed",
+  "suspended",
+] as const;
+export const businessSuiteAccessModes = ["none", "shared", "dedicated"] as const;
+export const businessSuitePlanModes = [
+  "basic",
+  "business_shared",
+  "business_dedicated",
+] as const;
+export const businessSuiteActivationJobStatuses = [
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "needs_review",
+] as const;
 
 export type ManualBillingPlanKey = (typeof manualBillingPlanKeys)[number];
 export type ManualBillingStatus = (typeof manualBillingStatuses)[number];
+export type ManualBillingMode = (typeof billingModes)[number];
 export const operationalModes = ["CORE", "SHARED_ERP", "DEDICATED_ERP"] as const;
 export const operationalStatuses = [
   "active",
@@ -58,6 +97,20 @@ export function isManualBillingStatus(
   value: unknown
 ): value is ManualBillingStatus {
   return typeof value === "string" && manualBillingStatuses.includes(value as ManualBillingStatus);
+}
+
+export function isTenantBillingModeValue(value: unknown): value is TenantBillingMode {
+  return typeof value === "string" && billingModes.includes(value as ManualBillingMode);
+}
+
+export function isBusinessSuiteStatusValue(value: unknown): value is BusinessSuiteStatus {
+  return typeof value === "string" && businessSuiteStatuses.includes(value as BusinessSuiteStatus);
+}
+
+export function isBusinessSuiteAccessModeValue(
+  value: unknown
+): value is BusinessSuiteAccessMode {
+  return typeof value === "string" && businessSuiteAccessModes.includes(value as BusinessSuiteAccessMode);
 }
 
 export function isOperatingModeValue(value: unknown): value is OperatingMode {
@@ -119,12 +172,85 @@ function asAppTenant(input: {
   };
 }
 
+function getFallbackOperationalConfig(): TenantOperationalConfigRecord {
+  return {
+    operatingMode: "CORE",
+    status: "active",
+    businessSuiteStatus: "locked",
+    sriEnabled: false,
+    sharedErpEnabled: false,
+    dedicatedErpEnabled: false,
+    suspendedAt: null,
+    notes: null,
+  };
+}
+
+function resolveTargetPublicPlan(
+  businessSuiteMode: BusinessSuiteAccessMode
+): BusinessSuitePlanMode {
+  if (businessSuiteMode === "dedicated") {
+    return "business_dedicated";
+  }
+
+  if (businessSuiteMode === "shared") {
+    return "business_shared";
+  }
+
+  return "basic";
+}
+
+function readLatestActivationJobSummary(value: Prisma.JsonValue | null) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const counts =
+    record.counts && typeof record.counts === "object" && !Array.isArray(record.counts)
+      ? (record.counts as Record<string, unknown>)
+      : null;
+  const warnings = Array.isArray(record.warnings)
+    ? record.warnings.filter((warning): warning is string => typeof warning === "string")
+    : [];
+
+  return {
+    counts: counts
+      ? {
+          products:
+            typeof counts.products === "number" ? counts.products : undefined,
+          customers:
+            typeof counts.customers === "number" ? counts.customers : undefined,
+          salesHistory:
+            typeof counts.salesHistory === "number" ? counts.salesHistory : undefined,
+          sriDocuments:
+            typeof counts.sriDocuments === "number" ? counts.sriDocuments : undefined,
+        }
+      : undefined,
+    warnings,
+    readyForReview:
+      typeof record.readyForReview === "boolean"
+        ? record.readyForReview
+        : undefined,
+  };
+}
+
 export async function listTenantBillingStates() {
   const prisma = getPrismaClient();
   const tenants = await prisma.tenant.findMany({
     include: {
       integrations: true,
       operationalConfig: true,
+      subscriptions: {
+        include: {
+          plan: true,
+        },
+        orderBy: [{ startedAt: "desc" }],
+        take: 1,
+      },
+      businessSuiteActivationJobs: {
+        orderBy: [{ createdAt: "desc" }],
+        take: 1,
+      },
       featureOverrides: {
         orderBy: [{ featureKey: "asc" }],
       },
@@ -144,15 +270,7 @@ export async function listTenantBillingStates() {
         getErpProvisioningState(asAppTenant(tenant)),
       ]);
       const commercialPlan = mapLegacyPlanKeyToCommercialPlan(plan.planKey);
-      const fallbackOperationalConfig: TenantOperationalConfigRecord = {
-        operatingMode: "CORE",
-        status: "active",
-        sriEnabled: false,
-        sharedErpEnabled: false,
-        dedicatedErpEnabled: false,
-        suspendedAt: null,
-        notes: null,
-      };
+      const fallbackOperationalConfig = getFallbackOperationalConfig();
       const operationalConfig =
         (tenant.operationalConfig as TenantOperationalConfigRecord | null) ??
         fallbackOperationalConfig;
@@ -163,6 +281,30 @@ export async function listTenantBillingStates() {
         overrides: tenant.featureOverrides as TenantFeatureOverrideRecord[],
         erpProvisioning: erp,
       });
+      const subscription = tenant.subscriptions[0] ?? plan.subscription;
+      const billingMode = normalizeBillingMode({
+        billingMode: subscription?.billingMode,
+        subscriptionStatus: plan.status,
+      });
+      const businessSuiteStatus = resolveBusinessSuiteStatus({
+        configuredOperatingMode: effectiveAccess.configuredOperatingMode,
+        operationalStatus: effectiveAccess.operationalStatus,
+        configuredStatus: operationalConfig.businessSuiteStatus,
+        sharedErpEnabled: operationalConfig.sharedErpEnabled,
+        dedicatedErpEnabled: operationalConfig.dedicatedErpEnabled,
+        hasRealDedicatedErp: Boolean(erp.isRealActive),
+      });
+      const publicPlan = derivePublicPlan({
+        configuredOperatingMode: effectiveAccess.configuredOperatingMode,
+        effectiveOperatingMode: effectiveAccess.effectiveOperatingMode,
+        canRequestDedicatedErp: plan.canRequestDedicatedErp,
+      });
+      const businessSuiteMode = mapOperatingModeToBusinessSuiteMode(
+        effectiveAccess.effectiveOperatingMode === "CORE"
+          ? effectiveAccess.configuredOperatingMode
+          : effectiveAccess.effectiveOperatingMode
+      );
+      const latestActivationJob = tenant.businessSuiteActivationJobs[0] ?? null;
 
       return {
         tenantId: tenant.id,
@@ -172,10 +314,14 @@ export async function listTenantBillingStates() {
         planKey: plan.planKey,
         planName: plan.planName,
         status: plan.status,
+        billingMode,
         trialEndsAt: plan.trialEndsAt,
         currentPeriodEndsAt: plan.currentPeriodEndsAt,
         canRequestDedicatedErp: plan.canRequestDedicatedErp,
         commercialPlan,
+        publicPlan,
+        businessSuiteMode,
+        businessSuiteStatus,
         operationalConfig,
         configuredOperatingMode: effectiveAccess.configuredOperatingMode,
         effectiveOperatingMode: effectiveAccess.effectiveOperatingMode,
@@ -191,6 +337,14 @@ export async function listTenantBillingStates() {
         sriEnabled: operationalConfig.sriEnabled,
         sharedErpEnabled: operationalConfig.sharedErpEnabled,
         dedicatedErpEnabled: operationalConfig.dedicatedErpEnabled,
+        latestActivationJob: latestActivationJob
+          ? {
+              ...latestActivationJob,
+              summary: readLatestActivationJobSummary(
+                latestActivationJob.summary as Prisma.JsonValue | null
+              ),
+            }
+          : null,
       };
     })
   );
@@ -201,6 +355,7 @@ export async function setTenantPlanManually(input: {
   tenantId: string;
   planKey: PlanKey;
   status: TenantSubscriptionStatus;
+  billingMode?: TenantBillingMode;
   trialEndsAt?: Date | null;
   currentPeriodEndsAt?: Date | null;
 }) {
@@ -226,6 +381,7 @@ export async function setTenantPlanManually(input: {
           data: {
             planId: plan.id,
             status: input.status,
+            billingMode: input.billingMode ?? current.billingMode,
             trialEndsAt: input.trialEndsAt,
             currentPeriodEndsAt: input.currentPeriodEndsAt,
           },
@@ -236,6 +392,7 @@ export async function setTenantPlanManually(input: {
             tenantId: input.tenantId,
             planId: plan.id,
             status: input.status,
+            billingMode: input.billingMode ?? "manual",
             trialEndsAt: input.trialEndsAt,
             currentPeriodEndsAt: input.currentPeriodEndsAt,
           },
@@ -259,6 +416,8 @@ export async function setTenantPlanManually(input: {
           nextPlanKey: input.planKey,
           previousStatus: current?.status ?? null,
           nextStatus: input.status,
+          previousBillingMode: current?.billingMode ?? null,
+          nextBillingMode: input.billingMode ?? current?.billingMode ?? "manual",
           trialEndsAt: input.trialEndsAt?.toISOString() ?? null,
           currentPeriodEndsAt: input.currentPeriodEndsAt?.toISOString() ?? null,
         },
@@ -274,6 +433,7 @@ export async function updateTenantOperationalConfig(input: {
   tenantId: string;
   operatingMode: OperatingMode;
   status: TenantOperationalStatus;
+  businessSuiteStatus: BusinessSuiteStatus;
   sriEnabled: boolean;
   sharedErpEnabled: boolean;
   dedicatedErpEnabled: boolean;
@@ -318,6 +478,7 @@ export async function updateTenantOperationalConfig(input: {
         tenantId: input.tenantId,
         operatingMode: input.operatingMode,
         status: input.status,
+        businessSuiteStatus: input.businessSuiteStatus,
         sriEnabled: input.sriEnabled,
         sharedErpEnabled: normalizedFlags.sharedErpEnabled,
         dedicatedErpEnabled: normalizedFlags.dedicatedErpEnabled,
@@ -328,6 +489,7 @@ export async function updateTenantOperationalConfig(input: {
       update: {
         operatingMode: input.operatingMode,
         status: input.status,
+        businessSuiteStatus: input.businessSuiteStatus,
         sriEnabled: input.sriEnabled,
         sharedErpEnabled: normalizedFlags.sharedErpEnabled,
         dedicatedErpEnabled: normalizedFlags.dedicatedErpEnabled,
@@ -351,6 +513,7 @@ export async function updateTenantOperationalConfig(input: {
             ? {
                 operatingMode: current.operatingMode,
                 status: current.status,
+                businessSuiteStatus: current.businessSuiteStatus,
                 sriEnabled: current.sriEnabled,
                 sharedErpEnabled: current.sharedErpEnabled,
                 dedicatedErpEnabled: current.dedicatedErpEnabled,
@@ -360,6 +523,7 @@ export async function updateTenantOperationalConfig(input: {
           next: {
             operatingMode: config.operatingMode,
             status: config.status,
+            businessSuiteStatus: config.businessSuiteStatus,
             sriEnabled: config.sriEnabled,
             sharedErpEnabled: config.sharedErpEnabled,
             dedicatedErpEnabled: config.dedicatedErpEnabled,
@@ -370,6 +534,183 @@ export async function updateTenantOperationalConfig(input: {
     });
 
     return config;
+  });
+}
+
+export async function activateBusinessSuiteInternally(input: {
+  actorUserId: string;
+  tenantId: string;
+  businessSuiteMode: Extract<BusinessSuiteAccessMode, "shared" | "dedicated">;
+}) {
+  const prisma = getPrismaClient();
+  const operatingMode = mapBusinessSuiteModeToOperatingMode(input.businessSuiteMode);
+  const planKey: PlanKey =
+    input.businessSuiteMode === "dedicated" ? "enterprise" : "pro";
+
+  return prisma.$transaction(async (tx) => {
+    const tenant = await tx.tenant.findUnique({
+      where: { id: input.tenantId },
+      select: { id: true, planKey: true },
+    });
+
+    if (!tenant) {
+      throw new Error("Tenant no encontrado.");
+    }
+
+    const plan = await tx.plan.findUnique({
+      where: { key: planKey },
+    });
+
+    if (!plan) {
+      throw new Error("Plan no encontrado. Ejecuta maintenance:ensure-plans.");
+    }
+
+    const currentSubscription = await tx.tenantSubscription.findFirst({
+      where: { tenantId: input.tenantId },
+      orderBy: { startedAt: "desc" },
+    });
+    const previousOperationalConfig = await tx.tenantOperationalConfig.findUnique({
+      where: { tenantId: input.tenantId },
+    });
+
+    const subscription = currentSubscription
+      ? await tx.tenantSubscription.update({
+          where: { id: currentSubscription.id },
+          data: {
+            planId: plan.id,
+            status: "active",
+            billingMode: "internal",
+          },
+        })
+      : await tx.tenantSubscription.create({
+          data: {
+            tenantId: input.tenantId,
+            planId: plan.id,
+            status: "active",
+            billingMode: "internal",
+          },
+        });
+
+    await tx.tenant.update({
+      where: { id: input.tenantId },
+      data: { planKey },
+    });
+
+    const operationalConfig = await tx.tenantOperationalConfig.upsert({
+      where: { tenantId: input.tenantId },
+      create: {
+        tenantId: input.tenantId,
+        operatingMode,
+        status: "active",
+        businessSuiteStatus: "pending_migration",
+        sriEnabled: previousOperationalConfig?.sriEnabled ?? false,
+        sharedErpEnabled: input.businessSuiteMode === "shared",
+        dedicatedErpEnabled: input.businessSuiteMode === "dedicated",
+        notes: cleanOptionalText(
+          `Activacion interna preparada para Gestion Empresarial (${input.businessSuiteMode}).`
+        ),
+      },
+      update: {
+        operatingMode,
+        status: "active",
+        businessSuiteStatus: "pending_migration",
+        sharedErpEnabled: input.businessSuiteMode === "shared",
+        dedicatedErpEnabled: input.businessSuiteMode === "dedicated",
+        notes: cleanOptionalText(
+          `Activacion interna preparada para Gestion Empresarial (${input.businessSuiteMode}).`
+        ),
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        tenantId: input.tenantId,
+        userId: input.actorUserId,
+        action: "business_suite.internal_activation_prepared",
+        entityType: "Tenant",
+        entityId: input.tenantId,
+        metadata: {
+          previousPlanKey: tenant.planKey ?? null,
+          nextPlanKey: planKey,
+          previousBillingMode: currentSubscription?.billingMode ?? null,
+          nextBillingMode: subscription.billingMode,
+          businessSuiteMode: input.businessSuiteMode,
+          previousBusinessSuiteStatus:
+            previousOperationalConfig?.businessSuiteStatus ?? null,
+          nextBusinessSuiteStatus: operationalConfig.businessSuiteStatus,
+        },
+      },
+    });
+
+    return {
+      subscription,
+      operationalConfig,
+      publicPlan: resolveTargetPublicPlan(input.businessSuiteMode),
+    };
+  });
+}
+
+export async function createBusinessSuiteActivationDryRun(input: {
+  actorUserId: string;
+  tenantId: string;
+  businessSuiteMode: Extract<BusinessSuiteAccessMode, "shared" | "dedicated">;
+}) {
+  const prisma = getPrismaClient();
+  const summary = await getBasicMigrationSummary({
+    tenantId: input.tenantId,
+    targetMode:
+      input.businessSuiteMode === "dedicated"
+        ? "business_dedicated"
+        : "business_shared",
+  });
+  const status: BusinessSuiteActivationJobStatus = summary.readyForReview
+    ? "succeeded"
+    : "needs_review";
+
+  return prisma.$transaction(async (tx) => {
+    const tenant = await tx.tenant.findUnique({
+      where: { id: input.tenantId },
+      select: { id: true },
+    });
+
+    if (!tenant) {
+      throw new Error("Tenant no encontrado.");
+    }
+
+    const job = await tx.businessSuiteActivationJob.create({
+      data: {
+        tenantId: input.tenantId,
+        requestedByUserId: input.actorUserId,
+        sourceMode: "basic",
+        targetMode: resolveTargetPublicPlan(input.businessSuiteMode),
+        businessSuiteMode: input.businessSuiteMode,
+        status,
+        dryRun: true,
+        summary: summary as Prisma.InputJsonValue,
+        startedAt: new Date(),
+        finishedAt: new Date(),
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        tenantId: input.tenantId,
+        userId: input.actorUserId,
+        action: "business_suite.dry_run_created",
+        entityType: "BusinessSuiteActivationJob",
+        entityId: job.id,
+        metadata: {
+          businessSuiteMode: input.businessSuiteMode,
+          status,
+          dryRun: true,
+        },
+      },
+    });
+
+    return {
+      job,
+      summary,
+    };
   });
 }
 

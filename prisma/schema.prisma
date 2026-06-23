@@ -83,6 +83,13 @@ enum TenantSubscriptionStatus {
   manual
 }
 
+enum TenantBillingMode {
+  stripe
+  manual
+  internal
+  trial
+}
+
 enum PlanUpgradeRequestStatus {
   pending
   approved
@@ -136,6 +143,35 @@ enum TenantOperationalStatus {
   pending_setup
   suspended
   disabled
+}
+
+enum BusinessSuiteStatus {
+  locked
+  pending_migration
+  migrating
+  active
+  failed
+  suspended
+}
+
+enum BusinessSuitePlanMode {
+  basic
+  business_shared
+  business_dedicated
+}
+
+enum BusinessSuiteAccessMode {
+  none
+  shared
+  dedicated
+}
+
+enum BusinessSuiteActivationJobStatus {
+  queued
+  running
+  succeeded
+  failed
+  needs_review
 }
 
 enum LightweightSaleStatus {
@@ -244,6 +280,7 @@ model User {
   conversationNotes ConversationNote[]
   cashClosings              CashClosing[]       @relation("CashClosingCreatedBy")
   tenantFeatureOverridesCreated TenantFeatureOverride[]
+  requestedBusinessSuiteActivationJobs BusinessSuiteActivationJob[] @relation("RequestedBusinessSuiteActivationJobs")
 }
 
 model Tenant {
@@ -281,6 +318,7 @@ model Tenant {
   sriSubmissionJobs         SriSubmissionJob[]
   operationalConfig         TenantOperationalConfig?
   featureOverrides          TenantFeatureOverride[]
+  businessSuiteActivationJobs BusinessSuiteActivationJob[]
 }
 
 model Plan {
@@ -302,6 +340,7 @@ model TenantSubscription {
   tenantId            String
   planId              String
   status              TenantSubscriptionStatus @default(active)
+  billingMode         TenantBillingMode        @default(manual)
   startedAt           DateTime                 @default(now())
   trialEndsAt         DateTime?
   currentPeriodEndsAt DateTime?
@@ -321,6 +360,7 @@ model TenantOperationalConfig {
   tenantId            String                  @unique
   operatingMode       OperatingMode           @default(CORE)
   status              TenantOperationalStatus @default(active)
+  businessSuiteStatus BusinessSuiteStatus     @default(locked)
   sriEnabled          Boolean                 @default(false)
   sharedErpEnabled    Boolean                 @default(false)
   dedicatedErpEnabled Boolean                 @default(false)
@@ -333,6 +373,33 @@ model TenantOperationalConfig {
 
   @@index([operatingMode])
   @@index([status])
+  @@index([businessSuiteStatus])
+}
+
+model BusinessSuiteActivationJob {
+  id                String                           @id @default(cuid())
+  tenantId          String
+  requestedByUserId String?
+  sourceMode        BusinessSuitePlanMode
+  targetMode        BusinessSuitePlanMode
+  businessSuiteMode BusinessSuiteAccessMode
+  status            BusinessSuiteActivationJobStatus @default(queued)
+  dryRun            Boolean                          @default(true)
+  summary           Json?
+  errorMessage      String?
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  createdAt         DateTime                         @default(now())
+  updatedAt         DateTime                         @updatedAt
+
+  tenant          Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedByUser User?  @relation("RequestedBusinessSuiteActivationJobs", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([requestedByUserId])
+  @@index([status])
+  @@index([tenantId, status])
+  @@index([createdAt])
 }
 
 model TenantFeatureOverride {

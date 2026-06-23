@@ -8,9 +8,19 @@ import { Input } from "@/components/ui/input";
 
 type LegacyPlanKey = "free" | "trial" | "pro" | "enterprise";
 type SubscriptionStatus = "active" | "trialing" | "past_due" | "canceled" | "manual";
+type BillingMode = "stripe" | "manual" | "internal" | "trial";
 type CommercialPlan = "BASIC" | "PLUS" | "ADVANCED" | "ENTERPRISE";
 type OperatingMode = "CORE" | "SHARED_ERP" | "DEDICATED_ERP";
 type OperationalStatus = "active" | "pending_setup" | "suspended" | "disabled";
+type BusinessSuiteStatus =
+  | "locked"
+  | "pending_migration"
+  | "migrating"
+  | "active"
+  | "failed"
+  | "suspended";
+type BusinessSuiteMode = "none" | "shared" | "dedicated";
+type PublicPlan = "basic" | "business_shared" | "business_dedicated";
 type FeatureKey =
   | "inventory_basic"
   | "pos_basic"
@@ -39,15 +49,20 @@ type TenantBillingRow = {
   planKey: LegacyPlanKey;
   planName: string;
   status: SubscriptionStatus;
+  billingMode: BillingMode;
   trialEndsAt?: string | Date | null;
   currentPeriodEndsAt?: string | Date | null;
   commercialPlan: CommercialPlan;
+  publicPlan: PublicPlan;
+  businessSuiteMode: BusinessSuiteMode;
+  businessSuiteStatus: BusinessSuiteStatus;
   configuredOperatingMode: OperatingMode;
   effectiveOperatingMode: OperatingMode;
   operationalStatus: OperationalStatus;
   operationalConfig: {
     operatingMode: OperatingMode;
     status: OperationalStatus;
+    businessSuiteStatus: BusinessSuiteStatus;
     sriEnabled: boolean;
     sharedErpEnabled: boolean;
     dedicatedErpEnabled: boolean;
@@ -69,11 +84,28 @@ type TenantBillingRow = {
   sriEnabled: boolean;
   sharedErpEnabled: boolean;
   dedicatedErpEnabled: boolean;
+  latestActivationJob: {
+    id: string;
+    status: "queued" | "running" | "succeeded" | "failed" | "needs_review";
+    dryRun: boolean;
+    summary: {
+      counts?: {
+        products?: number;
+        customers?: number;
+        salesHistory?: number;
+        sriDocuments?: number;
+      };
+      warnings?: string[];
+      readyForReview?: boolean;
+    } | null;
+    createdAt: string | Date;
+  } | null;
 };
 
 type PlanEditableState = {
   planKey: LegacyPlanKey;
   status: SubscriptionStatus;
+  billingMode: BillingMode;
   trialEndsAt: string;
   currentPeriodEndsAt: string;
 };
@@ -81,6 +113,7 @@ type PlanEditableState = {
 type OperationalEditableState = {
   operatingMode: OperatingMode;
   status: OperationalStatus;
+  businessSuiteStatus: BusinessSuiteStatus;
   sriEnabled: boolean;
   sharedErpEnabled: boolean;
   dedicatedErpEnabled: boolean;
@@ -88,6 +121,7 @@ type OperationalEditableState = {
 };
 
 type FeatureEditableState = Record<FeatureKey, OverrideState>;
+type BusinessSuiteActionMode = Extract<BusinessSuiteMode, "shared" | "dedicated">;
 
 const planOptions: LegacyPlanKey[] = ["free", "trial", "pro", "enterprise"];
 const statusOptions: SubscriptionStatus[] = [
@@ -97,6 +131,7 @@ const statusOptions: SubscriptionStatus[] = [
   "past_due",
   "canceled",
 ];
+const billingModeOptions: BillingMode[] = ["manual", "internal", "trial", "stripe"];
 const operatingModeOptions: OperatingMode[] = [
   "CORE",
   "SHARED_ERP",
@@ -107,6 +142,14 @@ const operationalStatusOptions: OperationalStatus[] = [
   "pending_setup",
   "suspended",
   "disabled",
+];
+const businessSuiteStatusOptions: BusinessSuiteStatus[] = [
+  "locked",
+  "pending_migration",
+  "migrating",
+  "active",
+  "failed",
+  "suspended",
 ];
 const featureOptions: Array<{ key: FeatureKey; label: string }> = [
   { key: "inventory_basic", label: "Inventario basico" },
@@ -149,6 +192,7 @@ function buildPlanState(tenants: TenantBillingRow[]) {
       {
         planKey: tenant.planKey,
         status: tenant.status,
+        billingMode: tenant.billingMode,
         trialEndsAt: toDateInput(tenant.trialEndsAt),
         currentPeriodEndsAt: toDateInput(tenant.currentPeriodEndsAt),
       },
@@ -163,6 +207,7 @@ function buildOperationalState(tenants: TenantBillingRow[]) {
       {
         operatingMode: tenant.operationalConfig.operatingMode,
         status: tenant.operationalConfig.status,
+        businessSuiteStatus: tenant.operationalConfig.businessSuiteStatus,
         sriEnabled: tenant.operationalConfig.sriEnabled,
         sharedErpEnabled: tenant.operationalConfig.sharedErpEnabled,
         dedicatedErpEnabled: tenant.operationalConfig.dedicatedErpEnabled,
@@ -200,6 +245,18 @@ function badgeClass(enabled: boolean) {
   return enabled
     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
     : "border-slate-200 bg-slate-50 text-slate-500";
+}
+
+function publicPlanLabel(plan: PublicPlan) {
+  if (plan === "business_dedicated") return "Gestion Empresarial Dedicada";
+  if (plan === "business_shared") return "Gestion Empresarial Compartida";
+  return "Basico";
+}
+
+function businessSuiteModeLabel(mode: BusinessSuiteMode) {
+  if (mode === "dedicated") return "Dedicado";
+  if (mode === "shared") return "Compartido";
+  return "Sin activar";
 }
 
 export function BillingAdminTable({
@@ -265,6 +322,7 @@ export function BillingAdminTable({
         body: JSON.stringify({
           planKey: value.planKey,
           status: value.status,
+          billingMode: value.billingMode,
           trialEndsAt: value.trialEndsAt || null,
           currentPeriodEndsAt: value.currentPeriodEndsAt || null,
         }),
@@ -300,6 +358,54 @@ export function BillingAdminTable({
     }
 
     setMessage("Configuracion operativa actualizada.");
+    startTransition(() => router.refresh());
+  }
+
+  async function prepareInternalActivation(
+    tenantId: string,
+    businessSuiteMode: BusinessSuiteActionMode
+  ) {
+    setMessage(null);
+    const response = await fetch(
+      `/api/admin/billing/tenants/${tenantId}/business-suite/internal-activation`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessSuiteMode }),
+      }
+    );
+    const payload = (await response.json()) as { ok?: boolean; message?: string };
+
+    if (!response.ok || !payload.ok) {
+      setMessage(payload.message ?? "No se pudo preparar la activacion interna.");
+      return;
+    }
+
+    setMessage("Activacion interna preparada.");
+    startTransition(() => router.refresh());
+  }
+
+  async function runMigrationDryRun(
+    tenantId: string,
+    businessSuiteMode: BusinessSuiteActionMode
+  ) {
+    setMessage(null);
+    const response = await fetch(
+      `/api/admin/billing/tenants/${tenantId}/business-suite/dry-run`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessSuiteMode }),
+      }
+    );
+    const payload = (await response.json()) as { ok?: boolean; message?: string };
+
+    if (!response.ok || !payload.ok) {
+      setMessage(payload.message ?? "No se pudo ejecutar el dry-run.");
+      return;
+    }
+
+    setMessage("Dry-run de migracion registrado.");
     startTransition(() => router.refresh());
   }
 
@@ -379,6 +485,9 @@ export function BillingAdminTable({
                 <span className={`rounded-full border px-2.5 py-1 ${badgeClass(true)}`}>
                   Plan comercial: {tenant.commercialPlan}
                 </span>
+                <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-sky-700">
+                  Suite: {publicPlanLabel(tenant.publicPlan)}
+                </span>
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-700">
                   Modo configurado: {tenant.configuredOperatingMode}
                 </span>
@@ -434,6 +543,24 @@ export function BillingAdminTable({
                         }
                       >
                         {statusOptions.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-muted-foreground">Cobro</span>
+                      <select
+                        className="h-9 w-full rounded-md border bg-background px-2"
+                        value={plan.billingMode}
+                        onChange={(event) =>
+                          updatePlanState(tenant.tenantId, {
+                            billingMode: event.target.value as BillingMode,
+                          })
+                        }
+                      >
+                        {billingModeOptions.map((option) => (
                           <option key={option} value={option}>
                             {option}
                           </option>
@@ -518,6 +645,26 @@ export function BillingAdminTable({
                         ))}
                       </select>
                     </label>
+                    <label className="space-y-1">
+                      <span className="text-muted-foreground">
+                        Estado Gestion Empresarial
+                      </span>
+                      <select
+                        className="h-9 w-full rounded-md border bg-background px-2"
+                        value={operational.businessSuiteStatus}
+                        onChange={(event) =>
+                          updateOperationalState(tenant.tenantId, {
+                            businessSuiteStatus: event.target.value as BusinessSuiteStatus,
+                          })
+                        }
+                      >
+                        {businessSuiteStatusOptions.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   </div>
                   <div className="grid gap-2">
                     <label className="flex items-center gap-2">
@@ -542,7 +689,7 @@ export function BillingAdminTable({
                           })
                         }
                       />
-                      <span>Shared ERP habilitado</span>
+                      <span>Gestion compartida habilitada</span>
                     </label>
                     <label className="flex items-center gap-2">
                       <input
@@ -554,7 +701,7 @@ export function BillingAdminTable({
                           })
                         }
                       />
-                      <span>Dedicated ERP habilitado</span>
+                      <span>Gestion dedicada habilitada</span>
                     </label>
                   </div>
                   <label className="space-y-1">
@@ -577,27 +724,70 @@ export function BillingAdminTable({
                   >
                     Guardar configuracion
                   </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={isPending}
+                      onClick={() =>
+                        void prepareInternalActivation(tenant.tenantId, "shared")
+                      }
+                    >
+                      Marcar interno compartido
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={isPending}
+                      onClick={() =>
+                        void runMigrationDryRun(tenant.tenantId, "shared")
+                      }
+                    >
+                      Dry-run compartido
+                    </Button>
+                  </div>
                 </div>
               </section>
 
               <section className="rounded-lg border p-4">
                 <p className="font-medium">Estado efectivo</p>
                 <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-                  <p>ERP dedicado: {tenant.erpDisplayStatus}</p>
+                  <p>Provision dedicado: {tenant.erpDisplayStatus}</p>
+                  <p>Billing mode: {tenant.billingMode}</p>
+                  <p>Suite publica: {publicPlanLabel(tenant.publicPlan)}</p>
+                  <p>Modo suite: {businessSuiteModeLabel(tenant.businessSuiteMode)}</p>
+                  <p>Estado suite: {tenant.businessSuiteStatus}</p>
                   <p>SRI flag: {tenant.sriEnabled ? "Habilitado" : "Bloqueado"}</p>
                   <p>
-                    Shared ERP: {tenant.sharedErpEnabled ? "Habilitado" : "Bloqueado"}
+                    Gestion compartida: {tenant.sharedErpEnabled ? "Habilitado" : "Bloqueado"}
                   </p>
                   <p>
-                    Dedicated ERP:{" "}
+                    Gestion dedicada:{" "}
                     {tenant.dedicatedErpEnabled ? "Habilitado" : "Bloqueado"}
                   </p>
-                  <p>
-                    ERP real activo: {tenant.hasRealDedicatedErp ? "Si" : "No"}
-                  </p>
+                  <p>ERP real activo: {tenant.hasRealDedicatedErp ? "Si" : "No"}</p>
                   <p>
                     ERP pendiente/error: {tenant.hasPendingDedicatedErp ? "Si" : "No"}
                   </p>
+                  {tenant.latestActivationJob ? (
+                    <div className="rounded-md border bg-slate-50 p-3">
+                      <p className="font-medium text-slate-900">
+                        Ultimo dry-run: {tenant.latestActivationJob.status}
+                      </p>
+                      <p>
+                        Productos: {tenant.latestActivationJob.summary?.counts?.products ?? 0} ·
+                        Clientes: {tenant.latestActivationJob.summary?.counts?.customers ?? 0} ·
+                        Ventas: {tenant.latestActivationJob.summary?.counts?.salesHistory ?? 0} ·
+                        SRI: {tenant.latestActivationJob.summary?.counts?.sriDocuments ?? 0}
+                      </p>
+                      <p>
+                        Listo para revision:{" "}
+                        {tenant.latestActivationJob.summary?.readyForReview ? "Si" : "No"}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               </section>
             </div>

@@ -39,7 +39,7 @@ async function loadErpResource<T>(
       error:
         error instanceof Error
           ? error.message
-          : "No se pudo cargar informacion desde el ERP",
+          : "No se pudo cargar informacion desde la suite empresarial",
     };
   }
 }
@@ -48,7 +48,7 @@ function getErpBlockedDescription(
   erpProvisioning: Awaited<ReturnType<typeof getErpProvisioningState>>
 ) {
   if (erpProvisioning.isSimulated) {
-    return "La validacion tecnica termino, pero ERP/POS/Reportes seguiran bloqueados hasta completar el provisioning real.";
+    return "La validacion tecnica termino, pero la suite empresarial seguira bloqueada hasta completar el provisioning real.";
   }
   if (erpProvisioning.isPending) {
     return erpProvisioning.displayStatus;
@@ -57,7 +57,7 @@ function getErpBlockedDescription(
     return `${erpProvisioning.displayStatus}. Revisa el ultimo error o reintenta la solicitud si tienes permisos.`;
   }
   if (erpProvisioning.status === "not_configured") {
-    return "Este tenant todavia no tiene un ERP solicitado. Primero solicita el ERP dedicado; Appsolux creara un job y el worker de infraestructura lo preparara fuera del dashboard.";
+    return "Este tenant todavia no tiene una suite dedicada solicitada. Primero solicita la activacion dedicada; Appsolux creara un job y el worker de infraestructura la preparara fuera del dashboard.";
   }
 
   return erpProvisioning.displayStatus;
@@ -74,7 +74,7 @@ export default async function ErpPage() {
             Sesion requerida
           </h1>
           <p className="text-muted-foreground">
-            Inicia sesion para ver el modulo ERP de Appsolux.
+            Inicia sesion para ver Gestion Empresarial de Appsolux.
           </p>
         </div>
       </DashboardShell>
@@ -97,14 +97,14 @@ export default async function ErpPage() {
           </Link>
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">
-              ERP avanzado no activado
+              Gestion Empresarial no activada
             </h1>
             <p className="mt-2 max-w-3xl text-muted-foreground">
               {getErpBlockedDescription(erpProvisioning)}
             </p>
             <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-              ERP Avanzado requiere activacion. Mientras tanto, el modo Basico
-              sigue separado y disponible para ventas simples.
+              El historial del modo Basico y SRI sigue protegido mientras esta
+              suite no este activa.
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               Empresa: {tenant.name}
@@ -112,7 +112,7 @@ export default async function ErpPage() {
           </div>
 
           <AdvancedErpNotActivatedState
-            description="Tu tenant esta operando en modo Core. Mientras el ERP avanzado no este habilitado, esta ruta no cargara datos de ERPNext."
+            description="Tu tenant esta operando en modo Core. Mientras Gestion Empresarial no este habilitada, esta ruta no cargara datos operativos externos."
           />
 
           <ErpDedicatedProvisionCard
@@ -123,7 +123,7 @@ export default async function ErpPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Datos ERP protegidos</CardTitle>
+              <CardTitle>Datos empresariales protegidos</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
               {erpProvisioning.isSimulated ? (
@@ -144,7 +144,7 @@ export default async function ErpPage() {
                 <>
                   <p>
                     Productos, bodegas, clientes, inventario y movimientos no se
-                    cargaran hasta que el ERP este activo.
+                    cargaran hasta que la suite este activa.
                   </p>
                   <p>
                     Esto evita errores en tenants reales que aun no tienen un sitio
@@ -217,22 +217,22 @@ export default async function ErpPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h1 className="text-3xl font-semibold tracking-tight">
-                ERP Comercial
+                Gestion Empresarial
               </h1>
               <p className="mt-2 max-w-3xl text-muted-foreground">
-                Controla ventas, compras, inventario, caja, clientes y
-                facturación desde un solo lugar.
+                Controla ventas, compras, inventario, caja y clientes desde un
+                solo lugar.
               </p>
               <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
                 Inventario, compras, caja, contabilidad y reportes avanzados.
-                No mueve ni sincroniza datos del modo Basico.
+                No mueve ni sincroniza datos historicos del modo Basico.
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Empresa: {tenant.name}
               </p>
             </div>
             <span className="inline-flex h-7 items-center rounded-full border border-green-200 bg-green-50 px-3 text-sm font-medium text-green-700">
-              ERP Avanzado
+              Gestion Empresarial
             </span>
           </div>
         </div>

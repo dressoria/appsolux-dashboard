@@ -48,7 +48,7 @@ export function getDashboardNavigation(appRouting: TenantAppRouting): Navigation
       : null,
     appRouting.shouldShowAdvancedErp
       ? {
-          title: "ERP Avanzado",
+          title: "Gestion Empresarial",
           href: appRouting.advancedErp.href,
           description: appRouting.advancedErp.description,
         }
@@ -83,7 +83,7 @@ export function getDashboardNavigation(appRouting: TenantAppRouting): Navigation
     {
       title: "Ajustes",
       href: routes.settings,
-      description: "Empresa, usuarios, permisos, canales, Chatwoot, ERP y seguridad.",
+      description: "Empresa, usuarios, permisos, canales, integraciones y seguridad.",
     },
   ].filter(Boolean) as NavigationItem[];
 }
@@ -151,7 +151,7 @@ export const dashboardNavigation: NavigationItem[] = getDashboardNavigation({
   },
   advancedErp: {
     href: routes.billing,
-    description: "ERP avanzado disponible segun plan y activacion operativa.",
+    description: "Gestion Empresarial disponible segun plan y activacion operativa.",
     features: [],
     statusLabel: "Disponible en un plan superior",
     statusVariant: "locked",

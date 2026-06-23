@@ -31,6 +31,7 @@ export type TenantPlanGateState = {
   planKey: PlanKey;
   planName: string;
   status: "active" | "trialing" | "past_due" | "canceled" | "manual";
+  subscription: Awaited<ReturnType<typeof getTenantSubscription>> | null;
   trialEndsAt?: Date | null;
   currentPeriodEndsAt?: Date | null;
   features: PlanFeatures;
@@ -243,13 +244,14 @@ export async function getTenantPlanState(
   let planKey: PlanKey = fallbackPlanKey;
   let planName = defaultPlanDefinitions[fallbackPlanKey].name;
   let status: TenantPlanGateState["status"] = "active";
+  let subscription: Awaited<ReturnType<typeof getTenantSubscription>> | null = null;
   let trialEndsAt: Date | null | undefined;
   let currentPeriodEndsAt: Date | null | undefined;
   let limits = defaultPlanDefinitions[fallbackPlanKey].limits;
   let features = defaultPlanDefinitions[fallbackPlanKey].features;
 
   try {
-    const subscription = await getTenantSubscription(tenantId);
+    subscription = await getTenantSubscription(tenantId);
 
     if (subscription && isPlanKey(subscription.plan.key)) {
       planKey = subscription.plan.key;
@@ -301,6 +303,7 @@ export async function getTenantPlanState(
     planKey,
     planName,
     status,
+    subscription,
     trialEndsAt,
     currentPeriodEndsAt,
     features: effectiveFeatures,

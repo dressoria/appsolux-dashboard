@@ -5,6 +5,7 @@ import { assertInternalAdmin } from "@/lib/auth/internal-admin";
 import {
   isManualBillingPlanKey,
   isManualBillingStatus,
+  isTenantBillingModeValue,
   setTenantPlanManually,
 } from "@/lib/core/billing-admin";
 
@@ -51,6 +52,7 @@ export async function PATCH(request: Request, context: Context) {
     const body = (await request.json()) as Record<string, unknown>;
     const planKey = body.planKey;
     const status = body.status;
+    const billingMode = body.billingMode;
 
     if (!isManualBillingPlanKey(planKey)) {
       return NextResponse.json(
@@ -66,11 +68,19 @@ export async function PATCH(request: Request, context: Context) {
       );
     }
 
+    if (billingMode !== undefined && billingMode !== null && !isTenantBillingModeValue(billingMode)) {
+      return NextResponse.json(
+        { ok: false, message: "Modo de cobro invalido." },
+        { status: 400 }
+      );
+    }
+
     const subscription = await setTenantPlanManually({
       actorUserId: user.id,
       tenantId,
       planKey,
       status,
+      billingMode: isTenantBillingModeValue(billingMode) ? billingMode : undefined,
       trialEndsAt: readOptionalDate(body, "trialEndsAt"),
       currentPeriodEndsAt: readOptionalDate(body, "currentPeriodEndsAt"),
     });

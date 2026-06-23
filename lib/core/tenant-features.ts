@@ -23,6 +23,10 @@ import {
   mapLegacyPlanKeyToCommercialPlan,
   type TenantFeatureMap,
 } from "@/lib/core/commercial-plans";
+import {
+  canUseBusinessSuite,
+  resolveBusinessSuiteStatus,
+} from "@/lib/core/business-suite";
 import { getTenantSubscription, type PlanKey, type TenantPlanGateState } from "@/lib/core/plans";
 
 export type TenantFeatureOverrideRecord = Pick<
@@ -34,6 +38,7 @@ export type TenantOperationalConfigRecord = Pick<
   TenantOperationalConfig,
   | "operatingMode"
   | "status"
+  | "businessSuiteStatus"
   | "sriEnabled"
   | "sharedErpEnabled"
   | "dedicatedErpEnabled"
@@ -47,6 +52,7 @@ export type EffectiveTenantAccess = {
   configuredOperatingMode: OperatingMode;
   effectiveOperatingMode: OperatingMode;
   operationalStatus: TenantOperationalStatus;
+  operationalConfig: TenantOperationalConfigRecord | null;
   features: TenantFeatureMap;
   overridesApplied: TenantFeatureOverrideRecord[];
   isSuspended: boolean;
@@ -144,6 +150,14 @@ export function resolveEffectiveOperatingMode(input: {
 }) {
   const configuredOperatingMode =
     input.operationalConfig?.operatingMode ?? getDefaultOperatingModeForPlan(input.commercialPlan);
+  const businessSuiteStatus = resolveBusinessSuiteStatus({
+    configuredOperatingMode,
+    operationalStatus: input.operationalConfig?.status ?? "active",
+    configuredStatus: input.operationalConfig?.businessSuiteStatus,
+    sharedErpEnabled: input.operationalConfig?.sharedErpEnabled ?? false,
+    dedicatedErpEnabled: input.operationalConfig?.dedicatedErpEnabled ?? false,
+    hasRealDedicatedErp: Boolean(input.erpProvisioning?.isRealActive),
+  });
 
   if (input.operationalConfig?.status === "suspended" || input.operationalConfig?.status === "disabled") {
     return {
@@ -154,6 +168,7 @@ export function resolveEffectiveOperatingMode(input: {
 
   if (configuredOperatingMode === "DEDICATED_ERP") {
     if (
+      canUseBusinessSuite(businessSuiteStatus) &&
       input.operationalConfig?.dedicatedErpEnabled &&
       input.erpProvisioning?.isRealActive
     ) {
@@ -170,7 +185,10 @@ export function resolveEffectiveOperatingMode(input: {
   }
 
   if (configuredOperatingMode === "SHARED_ERP") {
-    if (input.operationalConfig?.sharedErpEnabled) {
+    if (
+      canUseBusinessSuite(businessSuiteStatus) &&
+      input.operationalConfig?.sharedErpEnabled
+    ) {
       return {
         configuredOperatingMode,
         effectiveOperatingMode: "SHARED_ERP" as OperatingMode,
@@ -224,6 +242,7 @@ export function resolveEffectiveTenantAccess(input: {
     configuredOperatingMode,
     effectiveOperatingMode,
     operationalStatus,
+    operationalConfig: input.operationalConfig,
     features,
     overridesApplied: overrides,
     isSuspended: operationalStatus === "suspended" || operationalStatus === "disabled",

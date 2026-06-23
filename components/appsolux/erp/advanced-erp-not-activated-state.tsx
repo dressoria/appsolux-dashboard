@@ -14,11 +14,11 @@ export function AdvancedErpNotActivatedState({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>ERP avanzado no activado</CardTitle>
+        <CardTitle>Gestion Empresarial no activada</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Este espacio esta disponible solo para cuentas con ERP avanzado habilitado.
+          Este espacio esta disponible solo para cuentas con Gestion Empresarial habilitada.
         </p>
         <p className="text-sm text-muted-foreground">{description}</p>
         <div className="flex flex-wrap gap-2">

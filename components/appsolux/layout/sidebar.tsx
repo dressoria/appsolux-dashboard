@@ -40,7 +40,7 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
       ? { title: "Facturacion", href: appRouting.invoicing.href, icon: FileCheck }
       : null,
     appRouting.shouldShowAdvancedErp
-      ? { title: "ERP Avanzado", href: appRouting.advancedErp.href, icon: Sparkles }
+      ? { title: "Gestion Empresarial", href: appRouting.advancedErp.href, icon: Sparkles }
       : null,
   ].filter(Boolean) as SidebarItem[];
   const configurationItems = [
@@ -85,7 +85,7 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
         </h2>
         <p className="mt-1 text-sm text-slate-600">
           {tenantMode.shouldUseAdvancedMode
-            ? "Navegacion ajustada al motor ERP activo del tenant."
+            ? "Navegacion ajustada a la suite empresarial activa del tenant."
             : "Navegacion ajustada al motor Core del tenant."}
         </p>
       </div>

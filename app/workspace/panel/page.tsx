@@ -41,8 +41,8 @@ function getSriSignatureLabel(
 }
 
 function getOperatingModeLabel(mode: Awaited<ReturnType<typeof getTenantModeState>>["effectiveOperatingMode"]) {
-  if (mode === "DEDICATED_ERP") return "ERP dedicado";
-  if (mode === "SHARED_ERP") return "ERP compartido";
+  if (mode === "DEDICATED_ERP") return "Gestion dedicada";
+  if (mode === "SHARED_ERP") return "Gestion compartida";
   return "Core";
 }
 
@@ -130,31 +130,31 @@ export default async function WorkspacePanelPage() {
               <SectionHeader
                 eyebrow="Fase 3"
                 title="Mis Aplicaciones"
-                description="El launcher ahora respeta el motor operativo efectivo del tenant para mostrar Core, ERP compartido o ERP dedicado sin rutas rotas."
+                description="El launcher ahora respeta el motor operativo efectivo del tenant para mostrar Core o Gestion Empresarial sin rutas rotas."
               />
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard
                   label="Productos"
-                  value={tenantMode.shouldUseAdvancedMode ? "ERP" : String(basicReports.counts.products)}
+                  value={tenantMode.shouldUseAdvancedMode ? "Suite" : String(basicReports.counts.products)}
                   helper={
                     tenantMode.shouldUseAdvancedMode
-                      ? "Catalogo principal administrado desde ERP"
+                      ? "Catalogo principal administrado desde Gestion Empresarial"
                       : "Catalogo disponible para venta y control de stock"
                   }
                 />
                 <MetricCard
                   label="Clientes"
-                  value={tenantMode.shouldUseAdvancedMode ? "ERP" : String(basicReports.counts.customers)}
+                  value={tenantMode.shouldUseAdvancedMode ? "Suite" : String(basicReports.counts.customers)}
                   helper={
                     tenantMode.shouldUseAdvancedMode
-                      ? "Base comercial centralizada en el motor ERP"
+                      ? "Base comercial centralizada en la suite empresarial"
                       : "Base activa para ventas, cobranza y fidelizacion"
                   }
                 />
                 <MetricCard
                   label="Motor"
                   value={operatingModeLabel}
-                  helper={`Plan ${tenantMode.commercialPlan} · Estado ${tenantMode.dedicatedErpDisplayStatus}`}
+                  helper={`Plan ${tenantMode.publicPlan} · Estado ${tenantMode.businessSuiteStatus}`}
                 />
                 <MetricCard
                   label="Estado SRI"
@@ -186,10 +186,10 @@ export default async function WorkspacePanelPage() {
               <div className="mt-6 space-y-3">
                 <QuickActionCard
                   href={appRouting.inventory.href}
-                  title={tenantMode.shouldUseAdvancedMode ? "Revisar inventario ERP" : "Revisar inventario"}
+                  title={tenantMode.shouldUseAdvancedMode ? "Revisar inventario empresarial" : "Revisar inventario"}
                   description={
                     tenantMode.shouldUseAdvancedMode
-                      ? "Consulta stock ERP, bodegas, kardex y productos criticos."
+                      ? "Consulta stock, bodegas, kardex y productos criticos."
                       : "Consulta stock, productos criticos y movimientos del Core."
                   }
                   icon={Boxes}
@@ -199,7 +199,7 @@ export default async function WorkspacePanelPage() {
                   title="Abrir POS / Ventas"
                   description={
                     tenantMode.shouldUseAdvancedMode
-                      ? "Registrar ventas y cobrar desde el flujo avanzado conectado al ERP."
+                      ? "Registrar ventas y cobrar desde el flujo avanzado conectado a Gestion Empresarial."
                       : "Registrar ventas y cobrar sin navegar por modulos tecnicos."
                   }
                   icon={ShoppingCart}
@@ -259,7 +259,7 @@ export default async function WorkspacePanelPage() {
                     </p>
                     <p className="font-semibold text-slate-900">
                       {tenantMode.shouldUseAdvancedMode
-                        ? "ERP"
+                        ? "Suite"
                         : basicReports.outOfStockProducts.length + basicReports.lowStockProducts.length}
                     </p>
                   </div>
@@ -289,7 +289,7 @@ export default async function WorkspacePanelPage() {
                       {tenantMode.shouldUseAdvancedMode ? "Flujo" : "Ventas"}
                     </p>
                     <p className="font-semibold text-slate-900">
-                      {tenantMode.shouldUseAdvancedMode ? "ERP" : basicReports.counts.receipts}
+                      {tenantMode.shouldUseAdvancedMode ? "Suite" : basicReports.counts.receipts}
                     </p>
                   </div>
                   <div>
@@ -297,7 +297,7 @@ export default async function WorkspacePanelPage() {
                       {tenantMode.shouldUseAdvancedMode ? "Clientes" : "Base"}
                     </p>
                     <p className="font-semibold text-slate-900">
-                      {tenantMode.shouldUseAdvancedMode ? "ERP" : basicReports.counts.customers}
+                      {tenantMode.shouldUseAdvancedMode ? "Suite" : basicReports.counts.customers}
                     </p>
                   </div>
                 </div>
@@ -348,7 +348,7 @@ export default async function WorkspacePanelPage() {
           <SectionHeader
             eyebrow="Apps extendidas"
             title="Configuracion y crecimiento"
-            description="Configuracion SRI, ERP avanzado, reportes y comunicacion quedan separados de la operacion diaria, pero siguen visibles cuando aplican."
+            description="Configuracion SRI, Gestion Empresarial, reportes y comunicacion quedan separados de la operacion diaria, pero siguen visibles cuando aplican."
           />
 
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -392,7 +392,7 @@ export default async function WorkspacePanelPage() {
 
             <AppCard
               icon={CreditCard}
-              title="ERP Avanzado"
+              title="Gestion Empresarial"
               description={appRouting.advancedErp.description}
               features={appRouting.advancedErp.features}
               status={
