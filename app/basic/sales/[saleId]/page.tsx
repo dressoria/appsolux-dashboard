@@ -95,6 +95,7 @@ export default async function BasicSaleDetailPage({
         canCancel={sale.status !== "canceled"}
         canPay={sale.status !== "canceled" && pending > 0}
         pendingAmount={pending}
+        sriDocumentStatus={existingDraft?.status ?? null}
       />
 
       <SimpleReceipt

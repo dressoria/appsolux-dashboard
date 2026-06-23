@@ -10,13 +10,13 @@ function validateSegment(label: string, value: string) {
 }
 
 export function getAuthorizedXmlStoragePath(): string {
-  const base = process.env.SRI_AUTHORIZED_XML_STORAGE_PATH?.trim();
-  if (base) return base;
+  const explicit = process.env.SRI_AUTHORIZED_XML_STORAGE_PATH?.trim();
+  if (explicit) return explicit;
 
-  const certPath = process.env.SRI_CERT_STORAGE_PATH?.trim();
-  if (certPath) return path.join(certPath, "authorized-xml");
-
-  throw new Error("SRI_AUTHORIZED_XML_STORAGE_PATH no configurado.");
+  // Dedicated volume mounted in docker-compose.prod.yml.
+  // Must match the host path used by the signing worker
+  // (/home/ubuntu/appsolux-secure/sri-authorized-xml).
+  return "/app/.appsolux-secure/sri-authorized-xml";
 }
 
 export function buildAuthorizedXmlStorageKey(
@@ -42,5 +42,15 @@ export async function readAuthorizedXml(storageKey: string): Promise<string> {
     throw new Error("Path traversal bloqueado.");
   }
 
-  return readFile(fullPath, "utf8");
+  try {
+    return await readFile(fullPath, "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new Error(
+        "XML autorizado aún no disponible. " +
+          "Verifica que el volumen sri-authorized-xml esté montado y el worker haya procesado este documento."
+      );
+    }
+    throw err;
+  }
 }

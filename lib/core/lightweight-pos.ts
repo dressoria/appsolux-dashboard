@@ -361,37 +361,65 @@ export async function updateCustomer(input: UpdateCustomerInput) {
   });
 }
 
-export async function listSales(
+function buildSalesWhere(
+  tenantId: string,
+  input: { status?: "all" | "paid" | "pending" | "canceled"; customerId?: string }
+): Prisma.LightweightSaleWhereInput {
+  const status = input.status ?? "all";
+  return {
+    tenantId,
+    ...(input.customerId ? { customerId: input.customerId } : {}),
+    ...(status === "paid" ? { paymentStatus: "paid" } : {}),
+    ...(status === "pending"
+      ? {
+          status: { not: "canceled" as LightweightSaleStatus },
+          paymentStatus: { in: ["pending", "partial"] as LightweightPaymentStatus[] },
+        }
+      : {}),
+    ...(status === "canceled" ? { status: "canceled" } : {}),
+  };
+}
+
+export async function countSales(
   tenantId: string,
   input: { status?: "all" | "paid" | "pending" | "canceled"; customerId?: string } = {}
+): Promise<number> {
+  const prisma = getPrismaClient();
+  return prisma.lightweightSale.count({ where: buildSalesWhere(tenantId, input) });
+}
+
+export async function countActiveSales(tenantId: string): Promise<number> {
+  const prisma = getPrismaClient();
+  return prisma.lightweightSale.count({
+    where: { tenantId, status: { not: "canceled" } },
+  });
+}
+
+export async function listSales(
+  tenantId: string,
+  input: {
+    status?: "all" | "paid" | "pending" | "canceled";
+    customerId?: string;
+    page?: number;
+    perPage?: number;
+  } = {}
 ) {
   const prisma = getPrismaClient();
-  const status = input.status ?? "all";
+  const perPage = Math.min(input.perPage ?? 20, 50);
+  const page = Math.max(input.page ?? 1, 1);
 
   return prisma.lightweightSale.findMany({
-    where: {
-      tenantId,
-      ...(input.customerId ? { customerId: input.customerId } : {}),
-      ...(status === "paid" ? { paymentStatus: "paid" } : {}),
-      ...(status === "pending"
-        ? {
-            status: { not: "canceled" },
-            paymentStatus: { in: ["pending", "partial"] },
-          }
-        : {}),
-      ...(status === "canceled" ? { status: "canceled" } : {}),
-    },
+    where: buildSalesWhere(tenantId, input),
     include: {
       customer: true,
       items: {
-        include: {
-          product: true,
-        },
+        include: { product: true },
       },
       payments: true,
     },
     orderBy: { createdAt: "desc" },
-    take: 50,
+    skip: (page - 1) * perPage,
+    take: perPage,
   });
 }
 

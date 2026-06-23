@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight, Download, FileCheck2, FileText, Search, X } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
-import { Download, FileCheck2, FileText, Search, X } from "lucide-react";
 
 import { SriDownloadButton } from "@/components/appsolux/sri/sri-download-button";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,7 @@ function money(value: string | number) {
 }
 
 function paidAmount(sale: Sale) {
-  return sale.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+  return sale.payments.reduce((sum, p) => sum + Number(p.amount), 0);
 }
 
 function PaymentStatusBadge({ status }: { status: string }) {
@@ -117,12 +117,65 @@ function matchesSearch(sale: Sale, query: string): boolean {
   return false;
 }
 
+function CancelButton({
+  saleId,
+  sri,
+  onCancel,
+}: {
+  saleId: string;
+  sri: SriDocInfo | undefined;
+  onCancel: (id: string) => void;
+}) {
+  if (sri?.status === "AUTHORIZED") {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        disabled
+        title="La anulación SRI se realizará con nota de crédito en una fase posterior."
+        className="text-slate-400 cursor-not-allowed"
+      >
+        Anular SRI
+      </Button>
+    );
+  }
+  if (sri?.status === "SIGNED" || sri?.status === "SENT") {
+    return (
+      <span className="text-[11px] text-amber-600">
+        No cancelable · factura SRI en proceso
+      </span>
+    );
+  }
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="text-red-600 hover:bg-red-50"
+      onClick={() => onCancel(saleId)}
+    >
+      Cancelar
+    </Button>
+  );
+}
+
 export function SalesList({
   sales,
   sriDocuments = {},
+  page = 1,
+  totalPages = 1,
+  totalItems = 0,
+  prevHref,
+  nextHref,
 }: {
   sales: Sale[];
   sriDocuments?: Record<string, SriDocInfo>;
+  page?: number;
+  totalPages?: number;
+  totalItems?: number;
+  prevHref?: string;
+  nextHref?: string;
 }) {
   const router = useRouter();
   const [paymentSaleId, setPaymentSaleId] = useState("");
@@ -141,17 +194,10 @@ export function SalesList({
   async function cancelSale(saleId: string) {
     setMessage("");
     setError("");
-
     try {
-      const response = await fetch(`/api/basic/sales/${saleId}/cancel`, {
-        method: "POST",
-      });
+      const response = await fetch(`/api/basic/sales/${saleId}/cancel`, { method: "POST" });
       const result = (await response.json()) as { ok?: boolean; message?: string };
-
-      if (!response.ok || !result.ok) {
-        throw new Error(result.message ?? "No se pudo cancelar venta.");
-      }
-
+      if (!response.ok || !result.ok) throw new Error(result.message ?? "No se pudo cancelar venta.");
       setMessage("Venta cancelada.");
       router.refresh();
     } catch (requestError) {
@@ -163,9 +209,7 @@ export function SalesList({
     event.preventDefault();
     setMessage("");
     setError("");
-
     const form = new FormData(event.currentTarget);
-
     try {
       const response = await fetch(`/api/basic/sales/${saleId}/payments`, {
         method: "POST",
@@ -176,26 +220,19 @@ export function SalesList({
         }),
       });
       const result = (await response.json()) as { ok?: boolean; message?: string };
-
-      if (!response.ok || !result.ok) {
-        throw new Error(result.message ?? "No se pudo registrar abono.");
-      }
-
+      if (!response.ok || !result.ok) throw new Error(result.message ?? "No se pudo registrar abono.");
       setPaymentSaleId("");
       setMessage("Abono registrado.");
       router.refresh();
     } catch (requestError) {
-      setError(
-        requestError instanceof Error ? requestError.message : "No se pudo registrar abono."
-      );
+      setError(requestError instanceof Error ? requestError.message : "No se pudo registrar abono.");
     }
   }
 
   return (
     <div className="space-y-4">
-      {/* Filters row */}
+      {/* Filters */}
       <div className="space-y-3">
-        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
@@ -216,7 +253,6 @@ export function SalesList({
           )}
         </div>
 
-        {/* Type filter tabs */}
         <div className="flex flex-wrap gap-1.5">
           {TYPE_FILTER_OPTIONS.map(({ key, label }) => (
             <button
@@ -283,8 +319,8 @@ export function SalesList({
                   </p>
                 </div>
 
-                {/* Acciones principales */}
-                <div className="flex shrink-0 flex-wrap gap-2">
+                {/* Acciones */}
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
                   <Button type="button" variant="outline" size="sm" asChild>
                     <Link href={`/basic/sales/${sale.id}`}>Ver venta</Link>
                   </Button>
@@ -298,32 +334,20 @@ export function SalesList({
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() =>
-                        setPaymentSaleId(paymentSaleId === sale.id ? "" : sale.id)
-                      }
+                      onClick={() => setPaymentSaleId(paymentSaleId === sale.id ? "" : sale.id)}
                     >
                       Abonar
                     </Button>
                   )}
                   {sale.status !== "canceled" && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:bg-red-50"
-                      onClick={() => cancelSale(sale.id)}
-                    >
-                      Cancelar
-                    </Button>
+                    <CancelButton saleId={sale.id} sri={sri} onCancel={cancelSale} />
                   )}
                 </div>
               </div>
 
-              {/* Row 2: descargas directas SRI */}
+              {/* Row 2: descargas SRI */}
               {sri &&
-                (sri.status === "SIGNED" ||
-                  sri.status === "SENT" ||
-                  sri.status === "AUTHORIZED") && (
+                (sri.status === "SIGNED" || sri.status === "SENT" || sri.status === "AUTHORIZED") && (
                   <div className="flex flex-wrap items-start gap-2 border-t border-slate-100 pt-3">
                     <span className="mr-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">
                       Descargas
@@ -353,14 +377,14 @@ export function SalesList({
                   </div>
                 )}
 
-              {/* Row 3: form de abono */}
-              {paymentSaleId === sale.id ? (
+              {/* Row 3: abono */}
+              {paymentSaleId === sale.id && (
                 <form
                   onSubmit={(event) => addPayment(event, sale.id)}
                   className="grid gap-3 border-t border-slate-100 pt-3 md:grid-cols-[160px_160px_auto]"
                 >
                   <div className="space-y-1">
-                    <Label>Metodo</Label>
+                    <Label>Método</Label>
                     <select
                       name="method"
                       className="h-9 w-full rounded-md border bg-background px-3 text-sm"
@@ -372,20 +396,13 @@ export function SalesList({
                   </div>
                   <div className="space-y-1">
                     <Label>Monto</Label>
-                    <Input
-                      name="amount"
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      max={pending}
-                      required
-                    />
+                    <Input name="amount" type="number" min="0.01" step="0.01" max={pending} required />
                   </div>
                   <div className="flex items-end">
                     <Button type="submit">Registrar abono</Button>
                   </div>
                 </form>
-              ) : null}
+              )}
             </div>
           );
         })}
@@ -398,6 +415,43 @@ export function SalesList({
           </p>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+          <p className="text-xs text-slate-500">
+            {totalItems} resultado{totalItems !== 1 ? "s" : ""} · página {page} de {totalPages}
+          </p>
+          <div className="flex gap-2">
+            <Button asChild variant="outline" size="sm" disabled={!prevHref}>
+              {prevHref ? (
+                <Link href={prevHref}>
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </Link>
+              ) : (
+                <span>
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </span>
+              )}
+            </Button>
+            <Button asChild variant="outline" size="sm" disabled={!nextHref}>
+              {nextHref ? (
+                <Link href={nextHref}>
+                  Siguiente
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              ) : (
+                <span>
+                  Siguiente
+                  <ChevronRight className="h-4 w-4" />
+                </span>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
