@@ -117,6 +117,10 @@ function matchesSearch(sale: Sale, query: string): boolean {
   return false;
 }
 
+function internalSaleNumber(saleId: string) {
+  return saleId.slice(-8).toUpperCase();
+}
+
 function CancelButton({
   saleId,
   sri,
@@ -136,7 +140,7 @@ function CancelButton({
         title="La anulación SRI se realizará con nota de crédito en una fase posterior."
         className="text-slate-400 cursor-not-allowed"
       >
-        Anular SRI
+        Anular factura SRI
       </Button>
     );
   }
@@ -304,6 +308,10 @@ export function SalesList({
                       </span>
                     )}
                   </div>
+                  <p className="font-mono text-[11px] text-slate-500">
+                    Venta interna: {internalSaleNumber(sale.id)}
+                    {sri?.sriAuthorizationNumber ? ` · Factura SRI: ${sri.sriAuthorizationNumber}` : ""}
+                  </p>
                   <p className="text-xs text-slate-500">
                     {new Date(sale.createdAt).toLocaleString("es-EC", {
                       day: "2-digit",
@@ -328,6 +336,14 @@ export function SalesList({
                     <Button type="button" variant="outline" size="sm" asChild>
                       <Link href={`/sri/documents/${sri.id}`}>Factura SRI</Link>
                     </Button>
+                  )}
+                  {!sri && (
+                    <SriDownloadButton
+                      href={`/api/basic/sales/${sale.id}/download-receipt`}
+                      label="Recibo PDF"
+                      icon={FileText}
+                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    />
                   )}
                   {canPay && (
                     <Button

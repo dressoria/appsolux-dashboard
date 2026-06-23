@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { SriDownloadButton } from "@/components/appsolux/sri/sri-download-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,12 +16,14 @@ export function SaleDetailActions({
   canPay,
   pendingAmount,
   sriDocumentStatus,
+  hasSriDocument = false,
 }: {
   saleId: string;
   canCancel: boolean;
   canPay: boolean;
   pendingAmount: number;
   sriDocumentStatus?: string | null;
+  hasSriDocument?: boolean;
 }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
@@ -74,6 +77,13 @@ export function SaleDetailActions({
         <Button type="button" onClick={() => window.print()}>
           Imprimir recibo
         </Button>
+        {!hasSriDocument && (
+          <SriDownloadButton
+            href={`/api/basic/sales/${saleId}/download-receipt`}
+            label="Recibo PDF"
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          />
+        )}
         <Button asChild variant="outline">
           <Link href={routes.basicSales}>Volver</Link>
         </Button>

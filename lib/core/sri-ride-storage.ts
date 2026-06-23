@@ -13,10 +13,7 @@ export function getRideStoragePath(): string {
   const base = process.env.SRI_RIDE_STORAGE_PATH?.trim();
   if (base) return base;
 
-  const certPath = process.env.SRI_CERT_STORAGE_PATH?.trim();
-  if (certPath) return path.join(certPath, "rides");
-
-  throw new Error("SRI_RIDE_STORAGE_PATH no configurado.");
+  return "/app/.appsolux-secure/sri-rides";
 }
 
 export function buildRideStorageKey(tenantId: string, documentId: string): string {

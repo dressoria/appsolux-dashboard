@@ -16,6 +16,7 @@ import { SriXmlPreviewSection } from "@/components/appsolux/sri/sri-xml-preview-
 import { Button } from "@/components/ui/button";
 import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getSaleById } from "@/lib/core/lightweight-pos";
 import {
   getSriDocumentById,
   getSriProfile,
@@ -28,6 +29,8 @@ import { getSriDocumentReadinessForSigning } from "@/lib/core/sri-technical-chec
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 type Props = { params: Promise<{ documentId: string }> };
+
+export const dynamic = "force-dynamic";
 
 function money(value: string | number) {
   return `$${Number(value).toFixed(2)}`;
@@ -375,18 +378,22 @@ export default async function SriDocumentDetailPage({ params }: Props) {
   const tenant = await getCurrentTenant(user);
   const { documentId } = await params;
 
-  const [doc, profile, latestJob, latestSubmissionJob, signingReadiness] =
-    await Promise.all([
-      getSriDocumentById(tenant.id, documentId),
-      getSriProfile(tenant.id),
-      getLatestSriSigningJobForDocument(tenant.id, documentId),
-      getLatestSriSubmissionJobForDocument(tenant.id, documentId),
-      getSriDocumentReadinessForSigning(tenant.id, documentId),
-    ]);
+  const doc = await getSriDocumentById(tenant.id, documentId);
 
   if (!doc) {
     notFound();
   }
+
+  const [profile, latestJob, latestSubmissionJob, signingReadiness, sourceSale] =
+    await Promise.all([
+      getSriProfile(tenant.id).catch(() => null),
+      getLatestSriSigningJobForDocument(tenant.id, documentId).catch(() => null),
+      getLatestSriSubmissionJobForDocument(tenant.id, documentId).catch(() => null),
+      getSriDocumentReadinessForSigning(tenant.id, documentId).catch(() => null),
+      doc.sourceType === "BASIC_SALE" && doc.sourceId
+        ? getSaleById(tenant.id, doc.sourceId).catch(() => null)
+        : Promise.resolve(null),
+    ]);
 
   const typeLabel = SRI_DOCUMENT_TYPE_LABELS[doc.documentType] ?? doc.documentType;
   const displayNumber = buildDisplayNumber(
@@ -489,13 +496,19 @@ export default async function SriDocumentDetailPage({ params }: Props) {
                 label={doc.environment === "TEST" ? "Pruebas" : "Produccion"}
                 variant="info"
               />
+              {doc.sourceType === "BASIC_SALE" && (
+                <FacturationStatusBadge
+                  label={sourceSale ? "Venta origen disponible" : "Venta origen no disponible"}
+                  variant={sourceSale ? "neutral" : "warning"}
+                />
+              )}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {doc.sourceType === "BASIC_SALE" && doc.sourceId ? (
+            {doc.sourceType === "BASIC_SALE" && sourceSale ? (
               <>
                 <Button asChild variant="outline" size="sm">
-                  <Link href={`/basic/sales/${doc.sourceId}`}>
+                  <Link href={`/basic/sales/${sourceSale.id}`}>
                     <ArrowLeft className="mr-1 h-4 w-4" />
                     Ver venta
                   </Link>
@@ -569,7 +582,9 @@ export default async function SriDocumentDetailPage({ params }: Props) {
               <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
                 Cliente
               </p>
-              <p className="text-sm font-semibold text-slate-900">{doc.customerName}</p>
+              <p className="text-sm font-semibold text-slate-900">
+                {doc.customerName || "Consumidor final"}
+              </p>
               {doc.customerIdentification && (
                 <p className="font-mono text-xs text-slate-500">
                   {doc.customerIdentification}
@@ -592,10 +607,10 @@ export default async function SriDocumentDetailPage({ params }: Props) {
                 {displayNumber}
               </p>
               <p className="text-xs text-slate-500">
-                Est. {doc.establishment.code} — {doc.establishment.name}
+                Est. {doc.establishment?.code ?? "—"} — {doc.establishment?.name ?? "Sin establecimiento"}
               </p>
               <p className="text-xs text-slate-500">
-                Punto: {doc.issuePoint.code} — {doc.issuePoint.name}
+                Punto: {doc.issuePoint?.code ?? "—"} — {doc.issuePoint?.name ?? "Sin punto de emision"}
               </p>
               {doc.sequentialNumber != null && (
                 <p className="font-mono text-xs text-slate-500">
@@ -637,7 +652,7 @@ export default async function SriDocumentDetailPage({ params }: Props) {
         </div>
 
         {/* 3. Panel de autorización SRI — solo cuando está autorizado */}
-        {doc.status === "AUTHORIZED" && latestSubmissionJob && (
+        {doc.status === "AUTHORIZED" && (
           <div className="rounded-[24px] border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
             <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-emerald-600">
               Autorización SRI
@@ -648,7 +663,7 @@ export default async function SriDocumentDetailPage({ params }: Props) {
                   Número de autorización
                 </p>
                 <p className="break-all font-mono text-sm font-semibold text-emerald-900">
-                  {latestSubmissionJob.sriAuthorizationNumber ?? "—"}
+                  {latestSubmissionJob?.sriAuthorizationNumber ?? "—"}
                 </p>
               </div>
               <div className="space-y-1">
@@ -656,7 +671,7 @@ export default async function SriDocumentDetailPage({ params }: Props) {
                   Fecha de autorización
                 </p>
                 <p className="text-sm font-semibold text-emerald-900">
-                  {latestSubmissionJob.authorizedAt
+                  {latestSubmissionJob?.authorizedAt
                     ? new Date(latestSubmissionJob.authorizedAt).toLocaleString("es-EC", {
                         timeZone: "America/Guayaquil",
                       })
@@ -716,28 +731,36 @@ export default async function SriDocumentDetailPage({ params }: Props) {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {doc.lines.map((line) => (
-                  <tr key={line.id}>
-                    <td className="py-2.5 pr-4">
-                      <p className="font-medium text-slate-900">{line.itemName}</p>
-                      {line.itemCode && (
-                        <p className="font-mono text-xs text-slate-500">{line.itemCode}</p>
-                      )}
-                    </td>
-                    <td className="py-2.5 pr-4 text-right text-slate-700">
-                      {Number(line.quantity)}
-                    </td>
-                    <td className="py-2.5 pr-4 text-right font-mono text-slate-700">
-                      {money(line.unitPrice.toString())}
-                    </td>
-                    <td className="py-2.5 pr-4 text-right text-slate-500">
-                      {Number(line.taxRate)}%
-                    </td>
-                    <td className="py-2.5 text-right font-mono font-semibold text-slate-900">
-                      {money(line.total.toString())}
+                {doc.lines.length > 0 ? (
+                  doc.lines.map((line) => (
+                    <tr key={line.id}>
+                      <td className="py-2.5 pr-4">
+                        <p className="font-medium text-slate-900">{line.itemName}</p>
+                        {line.itemCode && (
+                          <p className="font-mono text-xs text-slate-500">{line.itemCode}</p>
+                        )}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right text-slate-700">
+                        {Number(line.quantity)}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right font-mono text-slate-700">
+                        {money(line.unitPrice.toString())}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right text-slate-500">
+                        {Number(line.taxRate)}%
+                      </td>
+                      <td className="py-2.5 text-right font-mono font-semibold text-slate-900">
+                        {money(line.total.toString())}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="py-4 text-center text-sm text-slate-500">
+                      No hay lineas disponibles para este documento.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>

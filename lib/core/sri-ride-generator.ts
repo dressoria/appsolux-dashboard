@@ -3,6 +3,8 @@ import "@/lib/security/server-only";
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
 
+import { applyPdfKitFont } from "@/lib/core/pdfkit-fonts";
+
 // ── Tipos de entrada ──────────────────────────────────────────────────────────
 
 export type RideEmitter = {
@@ -140,7 +142,9 @@ export async function generateRidePdf(data: RideData): Promise<Buffer> {
     doc
       .fillColor(BLUE)
       .fontSize(11)
-      .font("Helvetica-Bold")
+      ;
+    applyPdfKitFont(doc, "bold");
+    doc
       .text(data.emitter.legalName.toUpperCase(), leftX + 8, 44, {
         width: pageW * 0.62 - 16,
       });
@@ -149,8 +153,9 @@ export async function generateRidePdf(data: RideData): Promise<Buffer> {
       doc
         .fillColor(GRAY_MED)
         .fontSize(8)
-        .font("Helvetica")
-        .text(data.emitter.tradeName.toUpperCase(), leftX + 8, doc.y + 2, {
+        ;
+      applyPdfKitFont(doc);
+      doc.text(data.emitter.tradeName.toUpperCase(), leftX + 8, doc.y + 2, {
           width: pageW * 0.62 - 16,
         });
     }
@@ -158,7 +163,9 @@ export async function generateRidePdf(data: RideData): Promise<Buffer> {
     doc
       .fillColor(GRAY_DARK)
       .fontSize(8)
-      .font("Helvetica")
+      ;
+    applyPdfKitFont(doc);
+    doc
       .text(`RUC: ${data.emitter.ruc}`, leftX + 8, doc.y + 4)
       .text(
         `Dirección Matriz: ${data.emitter.dirMatriz ?? "—"}`,
@@ -196,16 +203,18 @@ export async function generateRidePdf(data: RideData): Promise<Buffer> {
     doc
       .fillColor("#FFFFFF")
       .fontSize(9)
-      .font("Helvetica-Bold")
-      .text(docTypeLabel(data.documentType), rightX + 4, 46, {
+      ;
+    applyPdfKitFont(doc, "bold");
+    doc.text(docTypeLabel(data.documentType), rightX + 4, 46, {
         width: rightW - 8,
         align: "center",
       });
 
     doc
       .fontSize(12)
-      .font("Helvetica-Bold")
-      .text(
+      ;
+    applyPdfKitFont(doc, "bold");
+    doc.text(
         displayNumber(data.establishmentCode, data.issuePointCode, data.sequentialNumber),
         rightX + 4,
         doc.y + 4,
@@ -214,8 +223,9 @@ export async function generateRidePdf(data: RideData): Promise<Buffer> {
 
     doc
       .fontSize(7.5)
-      .font("Helvetica")
-      .text(
+      ;
+    applyPdfKitFont(doc);
+    doc.text(
         data.environment === "TEST" ? "AMBIENTE: PRUEBAS" : "AMBIENTE: PRODUCCIÓN",
         rightX + 4,
         doc.y + 6,
@@ -239,14 +249,16 @@ export async function generateRidePdf(data: RideData): Promise<Buffer> {
     doc
       .fillColor(GRAY_MED)
       .fontSize(7)
-      .font("Helvetica-Bold")
-      .text("CLAVE DE ACCESO", leftX + 8, claveY + 6);
+      ;
+    applyPdfKitFont(doc, "bold");
+    doc.text("CLAVE DE ACCESO", leftX + 8, claveY + 6);
 
     doc
       .fillColor(GRAY_DARK)
       .fontSize(7.5)
-      .font("Helvetica")
-      .text(data.accessKey, leftX + 8, claveY + 16, { width: pageW - 120 });
+      ;
+    applyPdfKitFont(doc);
+    doc.text(data.accessKey, leftX + 8, claveY + 16, { width: pageW - 120 });
 
     // QR code a la derecha
     doc.image(qrPng, leftX + pageW - 100, claveY - 10, { width: 90, height: 90 });
@@ -264,20 +276,23 @@ export async function generateRidePdf(data: RideData): Promise<Buffer> {
     doc
       .fillColor(GRAY_MED)
       .fontSize(7)
-      .font("Helvetica-Bold")
-      .text("NÚMERO DE AUTORIZACIÓN", leftX + 8, authY + 5);
+      ;
+    applyPdfKitFont(doc, "bold");
+    doc.text("NÚMERO DE AUTORIZACIÓN", leftX + 8, authY + 5);
 
     doc
       .fillColor(GRAY_DARK)
       .fontSize(8.5)
-      .font("Helvetica-Bold")
-      .text(data.authorizationNumber, leftX + 8, authY + 15);
+      ;
+    applyPdfKitFont(doc, "bold");
+    doc.text(data.authorizationNumber, leftX + 8, authY + 15);
 
     doc
       .fillColor(GRAY_MED)
       .fontSize(7.5)
-      .font("Helvetica")
-      .text(
+      ;
+    applyPdfKitFont(doc);
+    doc.text(
         `Fecha de autorización: ${fmtDateTime(data.authorizedAt)}`,
         leftX + 8,
         authY + 27
@@ -296,16 +311,18 @@ export async function generateRidePdf(data: RideData): Promise<Buffer> {
     doc
       .fillColor(GRAY_MED)
       .fontSize(7)
-      .font("Helvetica-Bold")
-      .text("DATOS DEL COMPRADOR", leftX + 8, buyerY + 5);
+      ;
+    applyPdfKitFont(doc, "bold");
+    doc.text("DATOS DEL COMPRADOR", leftX + 8, buyerY + 5);
 
     const halfW = pageW / 2 - 12;
 
     doc
       .fillColor(GRAY_DARK)
       .fontSize(8)
-      .font("Helvetica")
-      .text(`Razón social / Nombres: ${data.customer.name}`, leftX + 8, buyerY + 16, {
+      ;
+    applyPdfKitFont(doc);
+    doc.text(`Razón social / Nombres: ${data.customer.name}`, leftX + 8, buyerY + 16, {
         width: halfW,
       })
       .text(
@@ -346,8 +363,9 @@ export async function generateRidePdf(data: RideData): Promise<Buffer> {
       doc
         .fillColor("#FFFFFF")
         .fontSize(7)
-        .font("Helvetica-Bold")
-        .text(h, colX[i]! + 2, tableY + 4, {
+        ;
+      applyPdfKitFont(doc, "bold");
+      doc.text(h, colX[i]! + 2, tableY + 4, {
           width: colWidths[i]! - 4,
           align: i >= 2 ? "right" : "left",
         });
@@ -377,8 +395,9 @@ export async function generateRidePdf(data: RideData): Promise<Buffer> {
         doc
           .fillColor(GRAY_DARK)
           .fontSize(7.5)
-          .font("Helvetica")
-          .text(cell, colX[i]! + 2, rowY + 4, {
+          ;
+        applyPdfKitFont(doc);
+        doc.text(cell, colX[i]! + 2, rowY + 4, {
             width: colWidths[i]! - 4,
             align: i >= 2 ? "right" : "left",
             ellipsis: true,
@@ -405,8 +424,9 @@ export async function generateRidePdf(data: RideData): Promise<Buffer> {
       doc
         .fillColor(GRAY_MED)
         .fontSize(8)
-        .font("Helvetica")
-        .text(label!, totalsLabelX, ty, { width: 120, align: "right" });
+        ;
+      applyPdfKitFont(doc);
+      doc.text(label!, totalsLabelX, ty, { width: 120, align: "right" });
       doc
         .fillColor(GRAY_DARK)
         .text(value!, totalsValueX, ty, { width: 70, align: "right" });
@@ -422,8 +442,9 @@ export async function generateRidePdf(data: RideData): Promise<Buffer> {
     doc
       .fillColor("#FFFFFF")
       .fontSize(9)
-      .font("Helvetica-Bold")
-      .text("TOTAL:", totalsLabelX, ty + 5, { width: 120, align: "right" })
+      ;
+    applyPdfKitFont(doc, "bold");
+    doc.text("TOTAL:", totalsLabelX, ty + 5, { width: 120, align: "right" })
       .text(`$${money(data.grandTotal)}`, totalsValueX, ty + 5, {
         width: 70,
         align: "right",
@@ -435,8 +456,9 @@ export async function generateRidePdf(data: RideData): Promise<Buffer> {
     doc
       .fillColor(GRAY_MED)
       .fontSize(8)
-      .font("Helvetica")
-      .text(`Forma de pago: ${data.paymentMethod}`, leftX, ty);
+      ;
+    applyPdfKitFont(doc);
+    doc.text(`Forma de pago: ${data.paymentMethod}`, leftX, ty);
 
     // ── Pie de página ────────────────────────────────────────────────────────
 
@@ -450,8 +472,9 @@ export async function generateRidePdf(data: RideData): Promise<Buffer> {
     doc
       .fillColor(GRAY_MED)
       .fontSize(7)
-      .font("Helvetica")
-      .text(
+      ;
+    applyPdfKitFont(doc);
+    doc.text(
         "Representación impresa del comprobante electrónico. Para verificar su validez, consulte: https://srienlinea.sri.gob.ec",
         leftX,
         ty + 6,

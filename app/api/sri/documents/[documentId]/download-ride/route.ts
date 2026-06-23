@@ -4,7 +4,7 @@ import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { getSriProfile, formatSequentialNumber } from "@/lib/core/sri";
 import { generateRidePdf, type RideData } from "@/lib/core/sri-ride-generator";
-import { saveRidePdf, readRidePdf, buildRideStorageKey } from "@/lib/core/sri-ride-storage";
+import { saveRidePdf, readRidePdf } from "@/lib/core/sri-ride-storage";
 
 type Props = { params: Promise<{ documentId: string }> };
 

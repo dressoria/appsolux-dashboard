@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { Download, FileCheck2, FileText } from "lucide-react";
 
 import { BasicModuleShell } from "@/components/appsolux/basic/basic-module-shell";
@@ -13,6 +14,8 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { getSaleById } from "@/lib/core/lightweight-pos";
 import { getSriDraftForSale, getSriModuleStatus } from "@/lib/core/sri";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+
+export const dynamic = "force-dynamic";
 
 type BasicSaleDetailPageProps = {
   params: Promise<{
@@ -46,19 +49,7 @@ export default async function BasicSaleDetailPage({
   ]);
 
   if (!sale) {
-    return (
-      <BasicModuleShell
-        title="Recibo simple"
-        description="Detalle de venta y comprobante simple."
-        activeHref={routes.basicSales}
-      >
-        <Card>
-          <CardContent className="p-6 text-sm text-muted-foreground">
-            Venta no encontrada.
-          </CardContent>
-        </Card>
-      </BasicModuleShell>
-    );
+    notFound();
   }
 
   const existingDraft = sale.status !== "canceled"
@@ -96,6 +87,7 @@ export default async function BasicSaleDetailPage({
         canPay={sale.status !== "canceled" && pending > 0}
         pendingAmount={pending}
         sriDocumentStatus={existingDraft?.status ?? null}
+        hasSriDocument={Boolean(existingDraft)}
       />
 
       <SimpleReceipt
@@ -104,6 +96,9 @@ export default async function BasicSaleDetailPage({
           id: sale.id,
           createdAt: sale.createdAt,
           total: sale.total.toString(),
+          subtotal: sale.subtotal.toString(),
+          taxTotal: sale.taxTotal.toString(),
+          discountTotal: sale.discountTotal.toString(),
           status: sale.status,
           paymentStatus: sale.paymentStatus,
           customer: sale.customer ? { name: sale.customer.name } : null,

@@ -21,6 +21,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { routes } from "@/config/routes";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type NavLink = {
@@ -72,6 +74,7 @@ const NAV_GROUPS: NavGroup[] = [
         items: [
           { kind: "link", icon: ShoppingCart, label: "Facturar", href: "/basic/pos", exact: false },
           { kind: "link", icon: ReceiptText, label: "Documentos", href: "/basic/sales", exact: false },
+          { kind: "link", icon: ReceiptText, label: "Documentos SRI", href: "/sri/documents", exact: false },
           { kind: "locked", icon: Lock, label: "Órdenes de venta" },
           { kind: "locked", icon: Lock, label: "Proformas" },
         ],
@@ -80,8 +83,8 @@ const NAV_GROUPS: NavGroup[] = [
         key: "compras",
         label: "Compras",
         items: [
-          { kind: "locked", icon: Lock, label: "Documentos" },
-          { kind: "locked", icon: Lock, label: "Registrar compra" },
+          { kind: "link", icon: ReceiptText, label: "Documentos", href: routes.erpPurchasesDocuments, exact: false },
+          { kind: "link", icon: ReceiptText, label: "Registrar compra", href: routes.erpFiscalReceived, exact: false },
         ],
       },
     ],
@@ -107,10 +110,10 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-// Default open state: Transacciones + Ventas open, everything else closed
+// Default open state keeps the tree compact until the active route needs it.
 const DEFAULT_OPEN: Record<string, boolean> = {
-  transacciones: true,
-  ventas: true,
+  transacciones: false,
+  ventas: false,
   compras: false,
   gestion: true,
   sistema: false,
@@ -132,22 +135,65 @@ function getAllItems(groups: NavGroup[]): NavItem[] {
   return all;
 }
 
+function matchesHref(pathname: string, href: string, exact: boolean) {
+  return exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
+}
+
+function getDerivedOpenState(pathname: string) {
+  const next = { ...DEFAULT_OPEN };
+
+  for (const group of NAV_GROUPS) {
+    if ("subsections" in group) {
+      let groupHasActiveItem = false;
+
+      for (const subsection of group.subsections) {
+        const subsectionHasActiveItem = subsection.items.some(
+          (item) => item.kind === "link" && matchesHref(pathname, item.href, item.exact)
+        );
+
+        if (subsectionHasActiveItem) {
+          next[subsection.key] = true;
+          groupHasActiveItem = true;
+        }
+      }
+
+      if (groupHasActiveItem) {
+        next[group.key] = true;
+      }
+    } else if (
+      group.items.some((item) => item.kind === "link" && matchesHref(pathname, item.href, item.exact))
+    ) {
+      next[group.key] = true;
+    }
+  }
+
+  return next;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function BillingModuleSidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const [open, setOpen] = useState<Record<string, boolean>>(DEFAULT_OPEN);
+  const [open, setOpen] = useState<Record<string, boolean>>(() => getDerivedOpenState(pathname));
 
   useEffect(() => {
+    const derived = getDerivedOpenState(pathname);
+
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setOpen({ ...DEFAULT_OPEN, ...JSON.parse(raw) });
+      if (raw) {
+        setOpen({ ...derived, ...JSON.parse(raw) });
+      } else {
+        setOpen(derived);
+      }
 
       const wasCollapsed = localStorage.getItem("billing-sidebar-collapsed") === "true";
       setCollapsed(wasCollapsed);
-    } catch {}
-  }, []);
+    } catch {
+      setOpen(derived);
+    }
+  }, [pathname]);
 
   function toggleCollapsed() {
     const next = !collapsed;
@@ -164,9 +210,7 @@ export function BillingModuleSidebar() {
   }
 
   function isActive(item: NavLink): boolean {
-    return item.exact
-      ? pathname === item.href
-      : pathname === item.href || pathname.startsWith(item.href + "/");
+    return matchesHref(pathname, item.href, item.exact);
   }
 
   // ── Render helpers ───────────────────────────────────────────────────────
@@ -286,7 +330,7 @@ export function BillingModuleSidebar() {
               <button
                 type="button"
                 onClick={() => toggleSection(group.key)}
-                className="flex w-full items-center justify-between px-3 pt-2 pb-0.5 text-[9px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors"
+                className="flex w-full items-center justify-between px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 transition-colors hover:text-slate-700"
               >
                 <span>{group.section}</span>
                 <ChevronDown
@@ -308,7 +352,7 @@ export function BillingModuleSidebar() {
                           <button
                             type="button"
                             onClick={() => toggleSection(sub.key)}
-                            className="flex w-full items-center justify-between px-3 py-1.5 text-[8px] font-semibold uppercase tracking-wider text-slate-300 hover:text-slate-500 transition-colors"
+                            className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
                           >
                             <span>{sub.label}</span>
                             <ChevronDown

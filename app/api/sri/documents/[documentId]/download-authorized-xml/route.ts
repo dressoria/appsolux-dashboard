@@ -58,7 +58,8 @@ export async function GET(_req: Request, { params }: Props) {
     xml = await readAuthorizedXml(submissionJob.authorizedXmlStorageKey);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error al leer XML autorizado.";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const status = msg.includes("XML autorizado aún no disponible") ? 404 : 500;
+    return NextResponse.json({ error: msg }, { status });
   }
 
   const accessKey = document.accessKey ?? documentId;
