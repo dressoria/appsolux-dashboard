@@ -1,125 +1,31 @@
 import "@/lib/security/server-only";
 
 import PDFDocument from "pdfkit";
-import QRCode from "qrcode";
 
 import { applyPdfKitFont } from "@/lib/core/pdfkit-fonts";
+import type { ParsedAuthorizedSriInvoice } from "@/lib/core/sri-authorized-xml-parser";
 
-// ── Tipos de entrada ──────────────────────────────────────────────────────────
-
-export type RideEmitter = {
-  legalName: string;
-  tradeName: string | null;
-  ruc: string;
-  dirMatriz: string | null;
-  contribuyenteRimpe: string | null;
-  accountingRequired: boolean;
-};
-
-export type RideCustomer = {
-  name: string;
-  identification: string | null;
-  email: string | null;
-};
-
-export type RideLine = {
-  itemCode: string | null;
-  itemName: string;
-  quantity: number;
-  unitPrice: number;
-  discountAmount: number;
-  subtotal: number;
-  taxRate: number;
-  taxAmount: number;
-  total: number;
-};
-
-export type RideData = {
-  environment: "TEST" | "PRODUCTION";
-  documentType: string;
-  establishmentCode: string;
-  issuePointCode: string;
-  sequentialNumber: number;
-  accessKey: string;
-  authorizationNumber: string;
-  authorizedAt: Date;
-  issuedAt: Date;
-  emitter: RideEmitter;
-  customer: RideCustomer;
-  lines: RideLine[];
-  subtotal: number;
-  taxTotal: number;
-  discountTotal: number;
-  grandTotal: number;
-  paymentMethod: string;
-};
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function money(n: number): string {
-  return n.toFixed(2);
+function money(value: string) {
+  const parsed = Number(value || "0");
+  return Number.isFinite(parsed) ? parsed.toFixed(2) : value || "0.00";
 }
 
-function fmtDate(d: Date): string {
-  return d.toLocaleDateString("es-EC", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "America/Guayaquil",
-  });
+function safeText(value: string | undefined) {
+  return value?.trim() || "N/A";
 }
 
-function fmtDateTime(d: Date): string {
-  return d.toLocaleString("es-EC", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    timeZone: "America/Guayaquil",
-  });
-}
-
-function docTypeLabel(type: string): string {
-  const labels: Record<string, string> = {
-    INVOICE: "FACTURA",
-    CREDIT_NOTE: "NOTA DE CRÉDITO",
-    DEBIT_NOTE: "NOTA DE DÉBITO",
-    WITHHOLDING: "COMPROBANTE DE RETENCIÓN",
-    DELIVERY_NOTE: "GUÍA DE REMISIÓN",
-  };
-  return labels[type] ?? type;
-}
-
-function displayNumber(estab: string, pto: string, seq: number): string {
-  return `${estab.padStart(3, "0")}-${pto.padStart(3, "0")}-${String(seq).padStart(9, "0")}`;
-}
-
-// ── Generación del PDF ────────────────────────────────────────────────────────
-
-const BLUE = "#0052CC";
-const GRAY_DARK = "#1A1A2E";
-const GRAY_MED = "#4A4A68";
-const GRAY_LIGHT = "#F5F7FA";
-const BORDER = "#D0D5DD";
-
-export async function generateRidePdf(data: RideData): Promise<Buffer> {
-  const qrPng = await QRCode.toBuffer(data.accessKey, {
-    width: 100,
-    margin: 1,
-    color: { dark: "#000000", light: "#FFFFFF" },
-  });
-
+export async function generateRidePdfFromAuthorizedXml(
+  invoice: ParsedAuthorizedSriInvoice
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     const doc = new PDFDocument({
       size: "A4",
-      margins: { top: 36, bottom: 36, left: 40, right: 40 },
+      margins: { top: 36, bottom: 36, left: 36, right: 36 },
       info: {
-        Title: `RIDE - ${docTypeLabel(data.documentType)} ${displayNumber(data.establishmentCode, data.issuePointCode, data.sequentialNumber)}`,
-        Author: data.emitter.legalName,
-        Creator: "Appsolux / Bionvers",
+        Title: `RIDE ${invoice.document.number || invoice.authorization.number}`,
+        Author: invoice.emitter.legalName,
+        Creator: "Appsolux",
       },
     });
 
@@ -127,359 +33,188 @@ export async function generateRidePdf(data: RideData): Promise<Buffer> {
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    const pageW = doc.page.width - 80; // usable width
-    const leftX = 40;
+    const pageWidth = doc.page.width - 72;
+    const leftX = 36;
+    const topY = 36;
+    const leftWidth = pageWidth * 0.56;
+    const rightWidth = pageWidth - leftWidth - 12;
+    const rightX = leftX + leftWidth + 12;
 
-    // ── Cabecera ────────────────────────────────────────────────────────────
+    doc.rect(leftX, topY, leftWidth, 126).stroke("#cbd5e1");
+    doc.rect(rightX, topY, rightWidth, 126).stroke("#cbd5e1");
 
-    // Bloque izquierdo: datos del emisor
-    doc
-      .rect(leftX, 36, pageW * 0.62, 120)
-      .fillColor(GRAY_LIGHT)
-      .fill()
-      .stroke(BORDER);
-
-    doc
-      .fillColor(BLUE)
-      .fontSize(11)
-      ;
+    doc.fontSize(11).fillColor("#0f172a");
     applyPdfKitFont(doc, "bold");
-    doc
-      .text(data.emitter.legalName.toUpperCase(), leftX + 8, 44, {
-        width: pageW * 0.62 - 16,
-      });
+    doc.text(safeText(invoice.emitter.legalName), leftX + 10, topY + 10, { width: leftWidth - 20 });
 
-    if (data.emitter.tradeName) {
-      doc
-        .fillColor(GRAY_MED)
-        .fontSize(8)
-        ;
-      applyPdfKitFont(doc);
-      doc.text(data.emitter.tradeName.toUpperCase(), leftX + 8, doc.y + 2, {
-          width: pageW * 0.62 - 16,
-        });
+    doc.fontSize(8.5).fillColor("#334155");
+    applyPdfKitFont(doc);
+    let currentY = topY + 30;
+    const emitterLines = [
+      invoice.emitter.tradeName ? `Nombre comercial: ${invoice.emitter.tradeName}` : "",
+      `Direccion matriz: ${safeText(invoice.emitter.dirMatriz)}`,
+      `Direccion establecimiento: ${safeText(invoice.emitter.dirEstablecimiento)}`,
+      `Obligado a llevar contabilidad: ${safeText(invoice.emitter.obligadoContabilidad)}`,
+      invoice.emitter.contribuyenteRimpe || "",
+      invoice.emitter.agenteRetencion
+        ? `Agente de Retencion Resolucion No. ${invoice.emitter.agenteRetencion}`
+        : "",
+    ].filter(Boolean);
+
+    for (const line of emitterLines) {
+      doc.text(line, leftX + 10, currentY, { width: leftWidth - 20 });
+      currentY = doc.y + 3;
     }
 
-    doc
-      .fillColor(GRAY_DARK)
-      .fontSize(8)
-      ;
-    applyPdfKitFont(doc);
-    doc
-      .text(`RUC: ${data.emitter.ruc}`, leftX + 8, doc.y + 4)
-      .text(
-        `Dirección Matriz: ${data.emitter.dirMatriz ?? "—"}`,
-        leftX + 8,
-        doc.y + 2,
-        { width: pageW * 0.62 - 16 }
-      );
-
-    if (data.emitter.contribuyenteRimpe) {
-      doc
-        .fontSize(7.5)
-        .text(data.emitter.contribuyenteRimpe, leftX + 8, doc.y + 2, {
-          width: pageW * 0.62 - 16,
-        });
-    }
-
-    doc
-      .fontSize(8)
-      .text(
-        `Obligado a llevar contabilidad: ${data.emitter.accountingRequired ? "SI" : "NO"}`,
-        leftX + 8,
-        doc.y + 2
-      );
-
-    // Bloque derecho: tipo documento + número + ambiente
-    const rightX = leftX + pageW * 0.62 + 8;
-    const rightW = pageW * 0.38 - 8;
-
-    doc
-      .rect(rightX, 36, rightW, 120)
-      .fillColor(BLUE)
-      .fill()
-      .stroke(BORDER);
-
-    doc
-      .fillColor("#FFFFFF")
-      .fontSize(9)
-      ;
+    doc.fontSize(10).fillColor("#0f172a");
     applyPdfKitFont(doc, "bold");
-    doc.text(docTypeLabel(data.documentType), rightX + 4, 46, {
-        width: rightW - 8,
-        align: "center",
-      });
-
-    doc
-      .fontSize(12)
-      ;
-    applyPdfKitFont(doc, "bold");
-    doc.text(
-        displayNumber(data.establishmentCode, data.issuePointCode, data.sequentialNumber),
-        rightX + 4,
-        doc.y + 4,
-        { width: rightW - 8, align: "center" }
-      );
-
-    doc
-      .fontSize(7.5)
-      ;
-    applyPdfKitFont(doc);
-    doc.text(
-        data.environment === "TEST" ? "AMBIENTE: PRUEBAS" : "AMBIENTE: PRODUCCIÓN",
-        rightX + 4,
-        doc.y + 6,
-        { width: rightW - 8, align: "center" }
-      )
-      .text("EMISIÓN NORMAL", rightX + 4, doc.y + 2, {
-        width: rightW - 8,
-        align: "center",
-      });
-
-    // ── Clave de acceso + QR ────────────────────────────────────────────────
-
-    const claveY = 166;
-
-    doc
-      .rect(leftX, claveY, pageW, 44)
-      .fillColor(GRAY_LIGHT)
-      .fill()
-      .stroke(BORDER);
-
-    doc
-      .fillColor(GRAY_MED)
-      .fontSize(7)
-      ;
-    applyPdfKitFont(doc, "bold");
-    doc.text("CLAVE DE ACCESO", leftX + 8, claveY + 6);
-
-    doc
-      .fillColor(GRAY_DARK)
-      .fontSize(7.5)
-      ;
-    applyPdfKitFont(doc);
-    doc.text(data.accessKey, leftX + 8, claveY + 16, { width: pageW - 120 });
-
-    // QR code a la derecha
-    doc.image(qrPng, leftX + pageW - 100, claveY - 10, { width: 90, height: 90 });
-
-    // ── Número de autorización ──────────────────────────────────────────────
-
-    const authY = claveY + 52;
-
-    doc
-      .rect(leftX, authY, pageW, 40)
-      .fillColor("#FFFFFF")
-      .fill()
-      .stroke(BORDER);
-
-    doc
-      .fillColor(GRAY_MED)
-      .fontSize(7)
-      ;
-    applyPdfKitFont(doc, "bold");
-    doc.text("NÚMERO DE AUTORIZACIÓN", leftX + 8, authY + 5);
-
-    doc
-      .fillColor(GRAY_DARK)
-      .fontSize(8.5)
-      ;
-    applyPdfKitFont(doc, "bold");
-    doc.text(data.authorizationNumber, leftX + 8, authY + 15);
-
-    doc
-      .fillColor(GRAY_MED)
-      .fontSize(7.5)
-      ;
-    applyPdfKitFont(doc);
-    doc.text(
-        `Fecha de autorización: ${fmtDateTime(data.authorizedAt)}`,
-        leftX + 8,
-        authY + 27
-      );
-
-    // ── Datos del comprador ─────────────────────────────────────────────────
-
-    const buyerY = authY + 48;
-
-    doc
-      .rect(leftX, buyerY, pageW, 52)
-      .fillColor(GRAY_LIGHT)
-      .fill()
-      .stroke(BORDER);
-
-    doc
-      .fillColor(GRAY_MED)
-      .fontSize(7)
-      ;
-    applyPdfKitFont(doc, "bold");
-    doc.text("DATOS DEL COMPRADOR", leftX + 8, buyerY + 5);
-
-    const halfW = pageW / 2 - 12;
-
-    doc
-      .fillColor(GRAY_DARK)
-      .fontSize(8)
-      ;
-    applyPdfKitFont(doc);
-    doc.text(`Razón social / Nombres: ${data.customer.name}`, leftX + 8, buyerY + 16, {
-        width: halfW,
-      })
-      .text(
-        `Identificación: ${data.customer.identification ?? "Consumidor Final"}`,
-        leftX + 8,
-        buyerY + 28
-      )
-      .text(`Fecha emisión: ${fmtDate(data.issuedAt)}`, leftX + 8, buyerY + 40);
-
-    if (data.customer.email) {
-      doc.text(
-        `Email: ${data.customer.email}`,
-        leftX + halfW + 16,
-        buyerY + 16,
-        { width: halfW }
-      );
-    }
-
-    // ── Tabla de items ──────────────────────────────────────────────────────
-
-    const tableY = buyerY + 60;
-    const colWidths = [60, 0, 50, 60, 55, 50, 55]; // [code, name(flexible), qty, unitPrice, disc, taxRate, total]
-    colWidths[1] = pageW - colWidths.reduce((a, b) => a + b, 0); // name takes remaining space
-
-    const headers = ["Cód.", "Descripción", "Cant.", "P. Unit.", "Desc.", "IVA%", "Total"];
-    const colX: number[] = [leftX];
-    for (let i = 0; i < colWidths.length - 1; i++) {
-      colX.push(colX[i]! + colWidths[i]!);
-    }
-
-    // Header row
-    doc
-      .rect(leftX, tableY, pageW, 16)
-      .fillColor(BLUE)
-      .fill();
-
-    headers.forEach((h, i) => {
-      doc
-        .fillColor("#FFFFFF")
-        .fontSize(7)
-        ;
-      applyPdfKitFont(doc, "bold");
-      doc.text(h, colX[i]! + 2, tableY + 4, {
-          width: colWidths[i]! - 4,
-          align: i >= 2 ? "right" : "left",
-        });
+    doc.text(invoice.document.typeLabel, rightX + 10, topY + 10, {
+      width: rightWidth - 20,
+      align: "center",
     });
 
-    // Data rows
-    let rowY = tableY + 16;
-    data.lines.forEach((line, idx) => {
-      const rowH = 18;
-      doc
-        .rect(leftX, rowY, pageW, rowH)
-        .fillColor(idx % 2 === 0 ? "#FFFFFF" : GRAY_LIGHT)
-        .fill()
-        .stroke(BORDER);
-
-      const cells = [
-        line.itemCode ?? "",
-        line.itemName,
-        String(line.quantity),
-        money(line.unitPrice),
-        money(line.discountAmount),
-        `${line.taxRate}%`,
-        money(line.total),
-      ];
-
-      cells.forEach((cell, i) => {
-        doc
-          .fillColor(GRAY_DARK)
-          .fontSize(7.5)
-          ;
-        applyPdfKitFont(doc);
-        doc.text(cell, colX[i]! + 2, rowY + 4, {
-            width: colWidths[i]! - 4,
-            align: i >= 2 ? "right" : "left",
-            ellipsis: true,
-          });
-      });
-
-      rowY += rowH;
-    });
-
-    // ── Totales ─────────────────────────────────────────────────────────────
-
-    const totalsY = rowY + 8;
-    const totalsLabelX = leftX + pageW - 200;
-    const totalsValueX = leftX + pageW - 80;
-
-    const totals = [
-      ["Subtotal sin impuestos:", money(data.subtotal)],
-      ["Descuento:", money(data.discountTotal)],
-      ["IVA:", money(data.taxTotal)],
+    doc.fontSize(8.5);
+    applyPdfKitFont(doc);
+    const rightLines = [
+      `RUC: ${safeText(invoice.emitter.ruc)}`,
+      `Numero: ${safeText(invoice.document.number)}`,
+      `Numero autorizacion: ${safeText(invoice.authorization.number)}`,
+      `Fecha autorizacion: ${safeText(invoice.authorization.date)}`,
+      `Ambiente: ${invoice.authorization.environmentLabel}`,
+      `Emision: ${invoice.authorization.emissionLabel}`,
+      `Clave de acceso: ${safeText(invoice.authorization.accessKey)}`,
     ];
 
-    let ty = totalsY;
-    totals.forEach(([label, value]) => {
-      doc
-        .fillColor(GRAY_MED)
-        .fontSize(8)
-        ;
-      applyPdfKitFont(doc);
-      doc.text(label!, totalsLabelX, ty, { width: 120, align: "right" });
-      doc
-        .fillColor(GRAY_DARK)
-        .text(value!, totalsValueX, ty, { width: 70, align: "right" });
-      ty += 14;
+    currentY = topY + 32;
+    for (const line of rightLines) {
+      doc.text(line, rightX + 10, currentY, { width: rightWidth - 20 });
+      currentY = doc.y + 3;
+    }
+
+    const customerY = topY + 142;
+    doc.rect(leftX, customerY, pageWidth, 64).stroke("#cbd5e1");
+    doc.fontSize(8.5).fillColor("#334155");
+    applyPdfKitFont(doc, "bold");
+    doc.text("Cliente", leftX + 10, customerY + 8);
+    applyPdfKitFont(doc);
+    doc.text(`Razon social / Nombres: ${safeText(invoice.customer.name)}`, leftX + 10, customerY + 24, {
+      width: pageWidth * 0.5,
+    });
+    doc.text(`Identificacion: ${safeText(invoice.customer.identification)}`, leftX + 10, customerY + 40, {
+      width: pageWidth * 0.5,
+    });
+    doc.text(`Fecha emision: ${safeText(invoice.document.issueDate)}`, leftX + pageWidth * 0.55, customerY + 24);
+    if (invoice.document.guideRemission) {
+      doc.text(`Guia remision: ${invoice.document.guideRemission}`, leftX + pageWidth * 0.55, customerY + 40);
+    }
+
+    const tableY = customerY + 80;
+    const columns = [76, 52, 180, 60, 56, 72];
+    const headers = ["Cod.", "Cant.", "Descripcion", "P. Unit.", "Desc.", "Total s/impuesto"];
+    const xOffsets = [leftX];
+    for (let i = 0; i < columns.length - 1; i += 1) {
+      xOffsets.push(xOffsets[i]! + columns[i]!);
+    }
+
+    doc.rect(leftX, tableY, pageWidth, 18).fill("#0f4c81");
+    headers.forEach((header, index) => {
+      doc.fillColor("#ffffff").fontSize(7.5);
+      applyPdfKitFont(doc, "bold");
+      doc.text(header, xOffsets[index]! + 4, tableY + 5, {
+        width: columns[index]! - 8,
+        align: index >= 1 ? "right" : "left",
+      });
     });
 
-    // Total general
-    doc
-      .rect(totalsLabelX - 4, ty, 200, 20)
-      .fillColor(BLUE)
-      .fill();
+    let rowY = tableY + 18;
+    invoice.details.forEach((detail, index) => {
+      const rowHeight = 22;
+      doc.rect(leftX, rowY, pageWidth, rowHeight).fillAndStroke(
+        index % 2 === 0 ? "#ffffff" : "#f8fafc",
+        "#e2e8f0"
+      );
+      const values = [
+        safeText(detail.code),
+        safeText(detail.quantity),
+        safeText(detail.description),
+        money(detail.unitPrice),
+        money(detail.discount),
+        money(detail.subtotalExcludingTax),
+      ];
 
-    doc
-      .fillColor("#FFFFFF")
-      .fontSize(9)
-      ;
-    applyPdfKitFont(doc, "bold");
-    doc.text("TOTAL:", totalsLabelX, ty + 5, { width: 120, align: "right" })
-      .text(`$${money(data.grandTotal)}`, totalsValueX, ty + 5, {
-        width: 70,
-        align: "right",
+      values.forEach((value, valueIndex) => {
+        doc.fillColor("#0f172a").fontSize(7.5);
+        applyPdfKitFont(doc);
+        doc.text(value, xOffsets[valueIndex]! + 4, rowY + 6, {
+          width: columns[valueIndex]! - 8,
+          align: valueIndex >= 1 ? "right" : "left",
+          ellipsis: true,
+        });
       });
 
-    ty += 28;
+      rowY += rowHeight;
+    });
 
-    // Forma de pago
-    doc
-      .fillColor(GRAY_MED)
-      .fontSize(8)
-      ;
+    const extraStartY = rowY + 10;
+    doc.fontSize(8.5).fillColor("#334155");
+    applyPdfKitFont(doc, "bold");
+    doc.text("Informacion adicional", leftX, extraStartY);
     applyPdfKitFont(doc);
-    doc.text(`Forma de pago: ${data.paymentMethod}`, leftX, ty);
+    let textY = extraStartY + 14;
 
-    // ── Pie de página ────────────────────────────────────────────────────────
+    if (invoice.additionalFields.length === 0) {
+      doc.text("N/A", leftX, textY);
+      textY += 16;
+    } else {
+      for (const field of invoice.additionalFields) {
+        doc.text(`${safeText(field.name)}: ${safeText(field.value)}`, leftX, textY, {
+          width: pageWidth * 0.58,
+        });
+        textY = doc.y + 2;
+      }
+    }
 
-    ty += 20;
+    const paymentText =
+      invoice.payments.length > 0
+        ? invoice.payments.map((payment) => `${payment.code} - ${payment.label}`).join(" · ")
+        : "N/A";
+    doc.fontSize(8.5).fillColor("#334155");
+    applyPdfKitFont(doc, "bold");
+    doc.text("Forma de pago", leftX, textY + 6);
+    applyPdfKitFont(doc);
+    doc.text(paymentText, leftX, textY + 20, { width: pageWidth * 0.58 });
 
-    doc
-      .rect(leftX, ty, pageW, 1)
-      .fillColor(BORDER)
-      .fill();
+    const summaryX = leftX + pageWidth * 0.62;
+    let summaryY = extraStartY;
+    const summaryRows = [
+      ...invoice.totals.subtotalTaxed.map((row) => [row.label, money(row.baseAmount)] as const),
+      ["SUBTOTAL 0%", money(invoice.totals.subtotalZero)] as const,
+      ["SUBTOTAL NO OBJETO DE IVA", money(invoice.totals.subtotalNoObjetoIva)] as const,
+      ["SUBTOTAL EXENTO DE IVA", money(invoice.totals.subtotalExentoIva)] as const,
+      ["SUBTOTAL SIN IMPUESTOS", money(invoice.totals.subtotalSinImpuestos)] as const,
+      ["TOTAL DESCUENTO", money(invoice.totals.totalDescuento)] as const,
+      ["ICE", money(invoice.totals.ice)] as const,
+      ...invoice.totals.iva.map((row) => [row.label, money(row.value)] as const),
+      ["VALOR TOTAL", money(invoice.totals.importeTotal)] as const,
+    ];
 
-    doc
-      .fillColor(GRAY_MED)
-      .fontSize(7)
-      ;
+    summaryRows.forEach(([label, value], index) => {
+      const isTotal = index === summaryRows.length - 1;
+      doc.fontSize(isTotal ? 9.5 : 8.2).fillColor(isTotal ? "#0f172a" : "#475569");
+      applyPdfKitFont(doc, isTotal ? "bold" : "regular");
+      doc.text(label, summaryX, summaryY, { width: 120, align: "right" });
+      doc.text(value, summaryX + 126, summaryY, { width: 70, align: "right" });
+      summaryY += isTotal ? 16 : 13;
+    });
+
+    doc.fontSize(7.5).fillColor("#64748b");
     applyPdfKitFont(doc);
     doc.text(
-        "Representación impresa del comprobante electrónico. Para verificar su validez, consulte: https://srienlinea.sri.gob.ec",
-        leftX,
-        ty + 6,
-        { width: pageW, align: "center" }
-      );
+      "Representacion impresa del comprobante electronico autorizado por el SRI.",
+      leftX,
+      doc.page.height - 34,
+      { width: pageWidth, align: "center" }
+    );
 
     doc.end();
   });
