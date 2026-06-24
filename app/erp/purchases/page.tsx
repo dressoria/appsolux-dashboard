@@ -15,13 +15,13 @@ function getPurchasesBlockedDescription(
   erpProvisioning: Awaited<ReturnType<typeof getErpProvisioningState>>
 ) {
   if (erpProvisioning.isSimulated) {
-    return "La validacion tecnica termino, pero ERP/Compras seguiran bloqueados hasta completar el provisioning real.";
+    return "La validacion tecnica termino, pero Compras seguira bloqueado hasta completar la activacion operativa.";
   }
   if (erpProvisioning.isPending || erpProvisioning.isFailed) {
     return erpProvisioning.displayStatus;
   }
   if (erpProvisioning.status === "not_configured") {
-    return "El modulo de compras necesita un ERP dedicado activo para consultar proveedores, compras y facturas recibidas.";
+    return "El modulo de compras necesita Gestion Empresarial activa para consultar proveedores, compras y facturas recibidas.";
   }
 
   return erpProvisioning.displayStatus;
@@ -55,8 +55,8 @@ export default async function ErpPurchasesPage() {
         <div className="space-y-6">
           <div>
             <p className="text-sm text-muted-foreground">
-              <Link href={routes.erp} className="hover:underline">
-                ERP Comercial
+              <Link href={routes.facturacion} className="hover:underline">
+                Facturacion
               </Link>{" "}
               / Compras
             </p>
@@ -93,8 +93,8 @@ export default async function ErpPurchasesPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm text-muted-foreground">
-              <Link href={routes.erp} className="hover:underline">
-                ERP Comercial
+              <Link href={routes.facturacion} className="hover:underline">
+                Facturacion
               </Link>{" "}
               / Compras
             </p>
@@ -103,14 +103,14 @@ export default async function ErpPurchasesPage() {
             </h1>
             <p className="mt-2 text-muted-foreground">
               Gestiona proveedores, compras, ingresos de mercaderia y cuentas
-              por pagar desde el ERP.
+              por pagar desde el motor empresarial de Facturacion.
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               Empresa: {tenant.name}
             </p>
           </div>
           <Button asChild variant="outline">
-            <Link href={routes.erp}>Volver al ERP</Link>
+            <Link href={routes.facturacion}>Volver a Facturacion</Link>
           </Button>
         </div>
 

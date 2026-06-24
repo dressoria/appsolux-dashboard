@@ -22,7 +22,7 @@ export default async function ErpCustomersPage() {
             Sesion requerida
           </h1>
           <p className="text-muted-foreground">
-            Inicia sesion para ver clientes ERP.
+            Inicia sesion para ver clientes.
           </p>
         </div>
       </DashboardShell>
@@ -34,14 +34,14 @@ export default async function ErpCustomersPage() {
 
   if (!tenantMode.canUseAdvancedErp) {
     return (
-      <DashboardShell>
+        <DashboardShell>
         <div className="space-y-6">
-          <h1 className="text-3xl font-semibold tracking-tight">Clientes ERP</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Clientes</h1>
           <Card>
             <CardContent className="p-6 text-sm text-muted-foreground">
-              <p>El ERP dedicado es necesario para ver clientes ERP.</p>
+              <p>Gestion Empresarial activa es necesaria para ver los clientes operativos.</p>
               <Button asChild variant="outline" size="sm" className="mt-3">
-                <Link href={routes.erp}>Ir al ERP</Link>
+                <Link href={routes.facturacion}>Ir a Facturacion</Link>
               </Button>
             </CardContent>
           </Card>
@@ -66,17 +66,16 @@ export default async function ErpCustomersPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm text-muted-foreground">
-              <Link href={routes.erp} className="hover:underline">
-                ERP Comercial
+              <Link href={routes.facturacion} className="hover:underline">
+                Facturacion
               </Link>{" "}
               / Clientes
             </p>
             <h1 className="text-3xl font-semibold tracking-tight">
-              Clientes ERP
+              Clientes
             </h1>
             <p className="mt-2 text-muted-foreground">
-              Directorio de clientes de ERP Avanzado, separado de Appsolux
-              Basico.
+              Directorio operativo de clientes gestionado por el motor empresarial de Facturacion.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -87,7 +86,7 @@ export default async function ErpCustomersPage() {
               <Link href={routes.erpFinanceReceivables}>Cuentas por cobrar</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href={routes.erp}>Volver al ERP</Link>
+              <Link href={routes.facturacion}>Volver a Facturacion</Link>
             </Button>
           </div>
         </div>

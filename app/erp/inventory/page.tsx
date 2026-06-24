@@ -330,8 +330,8 @@ export default async function ErpInventoryPage() {
         <div className="space-y-6">
           <div>
             <p className="text-sm text-muted-foreground">
-              <Link href={routes.erp} className="hover:underline">
-                ERP Comercial
+              <Link href={routes.facturacion} className="hover:underline">
+                Facturacion
               </Link>{" "}
               / Inventario
             </p>
@@ -339,9 +339,9 @@ export default async function ErpInventoryPage() {
           </div>
           <Card className="rounded-[24px] border-slate-200 bg-white shadow-sm">
             <CardContent className="p-6 text-sm text-muted-foreground">
-              <p>El ERP dedicado es necesario para gestionar inventario.</p>
+              <p>Gestion Empresarial activa es necesaria para gestionar inventario.</p>
               <Button asChild variant="outline" size="sm" className="mt-3 rounded-full">
-                <Link href={routes.erp}>Ir al ERP</Link>
+                <Link href={routes.facturacion}>Ir a Facturacion</Link>
               </Button>
             </CardContent>
           </Card>
@@ -373,13 +373,13 @@ export default async function ErpInventoryPage() {
             <div className="space-y-5">
               <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white/85 px-3 py-1 text-xs font-medium text-sky-700">
                 <LayoutGrid className="h-3.5 w-3.5" />
-                Inventario ERP
+                Inventario empresarial
               </div>
 
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-sm text-slate-500">
-                  <Link href={routes.erp} className="transition hover:text-slate-900">
-                    ERP Comercial
+                  <Link href={routes.facturacion} className="transition hover:text-slate-900">
+                    Facturacion
                   </Link>
                   <ChevronRight className="h-4 w-4 text-slate-400" />
                   <span className="text-slate-700">Inventario</span>
@@ -402,7 +402,7 @@ export default async function ErpInventoryPage() {
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
                   <Sparkles className="h-4 w-4" />
-                  ERP real activo
+                  Gestion Empresarial activa
                 </div>
               </div>
             </div>
@@ -416,7 +416,7 @@ export default async function ErpInventoryPage() {
                   </p>
                 </div>
                 <Button asChild variant="outline" className="rounded-full border-slate-200">
-                  <Link href={routes.erp}>Volver al ERP</Link>
+                  <Link href={routes.facturacion}>Volver a Facturacion</Link>
                 </Button>
               </div>
 
@@ -471,7 +471,7 @@ export default async function ErpInventoryPage() {
           <MetricCard
             title="Productos"
             value={items.length}
-            helper="Catalogo disponible en ERP."
+            helper="Catalogo disponible en Gestion Empresarial."
             icon={Package}
           />
           <MetricCard

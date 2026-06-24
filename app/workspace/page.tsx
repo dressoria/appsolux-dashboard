@@ -22,7 +22,7 @@ export default async function WorkspacePage() {
         detail: "POS · Inventario · SRI · Reportes",
         badge: "Gestion Empresarial activa",
         subtext: "Motor Gestion Empresarial activo",
-        href: routes.erp,
+        href: routes.facturacion,
       }
     : {
         title: "Facturacion",
@@ -30,7 +30,7 @@ export default async function WorkspacePage() {
           "Gestiona ventas, clientes, inventario, comprobantes y reportes financieros.",
         detail: "Ventas · Inventario · SRI · Reportes",
         subtext: "Motor basico activo",
-        href: routes.sales,
+        href: routes.facturacion,
       };
 
   return (

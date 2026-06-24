@@ -34,7 +34,7 @@ async function loadResource<T>(loader: () => Promise<T>, fallback: T) {
       error:
         error instanceof Error
           ? error.message
-          : "No se pudo conectar con ERPNext.",
+          : "No se pudo conectar con Gestion Empresarial.",
     };
   }
 }
@@ -62,8 +62,8 @@ export default async function ErpInventoryProductsPage() {
         <div className="space-y-6">
           <div>
             <p className="text-sm text-muted-foreground">
-              <Link href={routes.erp} className="hover:underline">
-                ERP Comercial
+              <Link href={routes.facturacion} className="hover:underline">
+                Facturacion
               </Link>{" "}
               /{" "}
               <Link href={routes.erpInventory} className="hover:underline">
@@ -75,9 +75,9 @@ export default async function ErpInventoryProductsPage() {
           </div>
           <Card>
             <CardContent className="p-6 text-sm text-muted-foreground">
-              <p>El ERP dedicado es necesario para ver productos.</p>
+              <p>Gestion Empresarial activa es necesaria para ver productos operativos.</p>
               <Button asChild variant="outline" size="sm" className="mt-3 rounded-full">
-                <Link href={routes.erp}>Ir al ERP</Link>
+                <Link href={routes.facturacion}>Ir a Facturacion</Link>
               </Button>
             </CardContent>
           </Card>
@@ -122,12 +122,12 @@ export default async function ErpInventoryProductsPage() {
             <div className="space-y-4">
               <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white/85 px-3 py-1 text-xs font-medium text-sky-700">
                 <Sparkles className="h-3.5 w-3.5" />
-                Catalogo ERP
+                Catalogo empresarial
               </div>
 
               <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Link href={routes.erp} className="transition hover:text-slate-900">
-                  ERP Comercial
+                <Link href={routes.facturacion} className="transition hover:text-slate-900">
+                  Facturacion
                 </Link>
                 <ChevronRight className="h-4 w-4 text-slate-400" />
                 <Link href={routes.erpInventory} className="transition hover:text-slate-900">
@@ -174,7 +174,7 @@ export default async function ErpInventoryProductsPage() {
                   <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
                     {items.length}
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">Registrados en ERP.</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">Registrados en Gestion Empresarial.</p>
                 </div>
                 <div className="rounded-2xl bg-sky-100 p-3 text-blue-600">
                   <Package className="h-5 w-5" />
@@ -192,7 +192,7 @@ export default async function ErpInventoryProductsPage() {
                     {stockItemsCount}
                   </p>
                   <p className="mt-1 text-xs leading-5 text-slate-500">
-                    Manejan inventario en ERP.
+                    Manejan inventario en Gestion Empresarial.
                   </p>
                 </div>
                 <div className="rounded-2xl bg-sky-100 p-3 text-blue-600">
@@ -271,7 +271,7 @@ export default async function ErpInventoryProductsPage() {
           <CardContent className="pb-6">
             {itemsResult.error || inventoryResult.error ? (
               <div className="mb-5 rounded-[24px] border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-800">
-                <p className="font-medium">Algunos datos no se pudieron cargar desde ERPNext.</p>
+                <p className="font-medium">Algunos datos no se pudieron cargar desde Gestion Empresarial.</p>
                 <div className="mt-1 space-y-1 leading-6">
                   {itemsResult.error ? <p>Productos: {itemsResult.error}</p> : null}
                   {inventoryResult.error ? <p>Inventario: {inventoryResult.error}</p> : null}

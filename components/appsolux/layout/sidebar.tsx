@@ -24,7 +24,6 @@ import {
 
 import { routes } from "@/config/routes";
 import { isInternalAdmin } from "@/lib/auth/internal-admin";
-import { resolveTenantAppRouting } from "@/lib/core/tenant-app-routing";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { cn } from "@/lib/utils";
 import type { AppsoluxUser } from "@/types/user";
@@ -37,52 +36,42 @@ type SidebarItem = {
 
 export async function Sidebar({ user }: { user: AppsoluxUser }) {
   const tenantMode = await getTenantModeState(user.tenant);
-  const appRouting = resolveTenantAppRouting(tenantMode);
   const showInternalAdmin = isInternalAdmin(user);
   const isBusinessSuiteActive = tenantMode.businessSuiteStatus === "active";
   const operationsItems = isBusinessSuiteActive
     ? ([
-        { title: "POS / Ventas", href: routes.pos, icon: ShoppingCart },
-        { title: "Facturador rapido", href: routes.erpQuickInvoice, icon: FileText },
-        { title: "Clientes", href: routes.erpCustomers, icon: Users },
-        { title: "Productos", href: routes.erpInventoryProducts, icon: Package },
-        { title: "Inventario", href: routes.erpInventory, icon: Boxes },
-        { title: "Compras", href: routes.erpPurchases, icon: FolderTree },
-        { title: "Caja y bancos", href: routes.erpFinance, icon: CreditCard },
-        appRouting.shouldShowReports
-          ? { title: "Reportes", href: routes.reports, icon: BarChart3 }
-          : null,
+        { title: "POS / Ventas", href: routes.facturacionPos, icon: ShoppingCart },
+        { title: "Facturador rapido", href: routes.facturacionQuickInvoice, icon: FileText },
+        { title: "Documentos", href: routes.facturacionDocuments, icon: FileCheck },
+        { title: "Clientes", href: routes.facturacionCustomers, icon: Users },
+        { title: "Productos", href: routes.facturacionProducts, icon: Package },
+        { title: "Inventario", href: routes.facturacionInventory, icon: Boxes },
+        { title: "Compras", href: routes.facturacionPurchases, icon: FolderTree },
+        { title: "Caja", href: routes.facturacionCash, icon: CreditCard },
+        { title: "Reportes", href: routes.facturacionReports, icon: BarChart3 },
       ].filter(Boolean) as SidebarItem[])
     : ([
-        { title: "Inventario", href: appRouting.inventory.href, icon: Boxes },
-        { title: "POS / Ventas", href: appRouting.sales.href, icon: ShoppingCart },
-        appRouting.shouldShowReports
-          ? { title: "Reportes", href: appRouting.reports.href, icon: BarChart3 }
-          : null,
-        appRouting.invoicing.isEnabled
-          ? { title: "Facturacion", href: appRouting.invoicing.href, icon: FileCheck }
-          : null,
-        appRouting.shouldShowAdvancedErp
-          ? { title: "Motor empresarial", href: appRouting.advancedErp.href, icon: Sparkles }
-          : null,
+        { title: "POS / Ventas", href: routes.facturacionPos, icon: ShoppingCart },
+        { title: "Documentos", href: routes.facturacionDocuments, icon: FileCheck },
+        { title: "Clientes", href: routes.facturacionCustomers, icon: Users },
+        { title: "Productos", href: routes.facturacionProducts, icon: Package },
+        { title: "Inventario", href: routes.facturacionInventory, icon: Boxes },
+        { title: "Caja", href: routes.facturacionCash, icon: CreditCard },
+        { title: "Reportes", href: routes.facturacionReports, icon: BarChart3 },
       ].filter(Boolean) as SidebarItem[]);
   const configurationItems = isBusinessSuiteActive
     ? ([
-        { title: "Empresa y ajustes", href: routes.settings, icon: Building2 },
+        { title: "Empresa y ajustes", href: routes.facturacionSettings, icon: Building2 },
         { title: "Bodegas", href: routes.erpInventoryWarehouses, icon: Warehouse },
         { title: "Categorias", href: routes.erpInventoryCategories, icon: FolderTree },
         { title: "Unidades", href: routes.erpInventoryUnits, icon: Package },
         { title: "Metodos de pago", href: routes.erpFinancePaymentMethods, icon: CreditCard },
-        appRouting.sriConfiguration.isEnabled
-          ? { title: "Configuracion SRI", href: appRouting.sriConfiguration.href, icon: Settings2 }
-          : null,
-        { title: "Historial Basico", href: routes.basic, icon: MessageSquareWarning },
+        { title: "Configuracion SRI", href: routes.facturacionSri, icon: Settings2 },
+        { title: "Historial Basico", href: routes.facturacionHistoryBasic, icon: MessageSquareWarning },
       ].filter(Boolean) as SidebarItem[])
     : ([
-        appRouting.sriConfiguration.isEnabled
-          ? { title: "Configuracion SRI", href: appRouting.sriConfiguration.href, icon: Settings2 }
-          : null,
-        { title: "Ajustes", href: routes.settings, icon: MessageSquareWarning },
+        { title: "Configuracion SRI", href: routes.facturacionSri, icon: Settings2 },
+        { title: "Ajustes", href: routes.facturacionSettings, icon: MessageSquareWarning },
       ].filter(Boolean) as SidebarItem[]);
   const accountItems = [
     { title: "Mi Plan", href: routes.billing, icon: WalletCards },
@@ -105,7 +94,7 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
               { title: "SRI Ecuador", href: routes.erpFiscalEcuador, icon: Receipt },
               {
                 title: "Documentos electronicos",
-                href: routes.erpFiscalDocuments,
+                href: routes.facturacionDocuments,
                 icon: FileCheck,
               },
             ],
@@ -165,7 +154,7 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
 
       <div className="mb-4">
         <Link
-          href={routes.workspace}
+          href={routes.facturacion}
           className="flex items-center gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-medium text-sky-700 transition hover:bg-sky-100"
         >
           <div className="rounded-xl bg-white p-2 text-sky-700 shadow-sm">

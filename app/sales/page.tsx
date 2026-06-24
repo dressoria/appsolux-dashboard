@@ -28,7 +28,7 @@ export default async function SalesPage() {
   const tenantMode = await getTenantModeState(tenant);
 
   if (tenantMode.canUseAdvancedErp) {
-    redirect(routes.pos);
+    redirect(routes.facturacionPos);
   }
 
   const prisma = getPrismaClient();
@@ -93,7 +93,7 @@ export default async function SalesPage() {
               variant={sriStatus.hasProfile ? "success" : "warning"}
             />
             <Button asChild size="sm" className="bg-[#004080] hover:bg-[#003060]">
-              <Link href={routes.basicPos}>
+              <Link href={routes.facturacionPos}>
                 <ShoppingCart className="mr-2 h-4 w-4" />
                 Nueva venta
               </Link>
@@ -150,19 +150,19 @@ export default async function SalesPage() {
             </h2>
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
               <SalesQuickAction
-                href={routes.basicPos}
+                href={routes.facturacionPos}
                 title="Nueva venta"
                 description="Ir directo al checkout operativo."
                 icon={ShoppingCart}
               />
               <SalesQuickAction
-                href={routes.basicSales}
+                href={routes.facturacionDocuments}
                 title="Ventas recientes"
                 description="Recibos, pagos parciales y cancelaciones."
                 icon={ReceiptText}
               />
               <SalesQuickAction
-                href={routes.basicCustomers}
+                href={routes.facturacionCustomers}
                 title="Clientes"
                 description="Consulta clientes y ventas relacionadas."
                 icon={Users}
@@ -174,13 +174,13 @@ export default async function SalesPage() {
                 icon={FileCheck2}
               />
               <SalesQuickAction
-                href={routes.basicCash}
+                href={routes.facturacionCash}
                 title="Caja / cierre"
                 description="Revisar cobros y estado diario."
                 icon={Wallet}
               />
               <SalesQuickAction
-                href={routes.basicReports}
+                href={routes.facturacionReports}
                 title="Reportes"
                 description="Ventas, cobros y stock del período."
                 icon={BarChart3}
@@ -211,7 +211,7 @@ export default async function SalesPage() {
                         <Link href={routes.sriDocuments}>Ver comprobantes</Link>
                       </Button>
                       <Button asChild variant="outline" className="flex-1">
-                        <Link href={routes.basicPos}>Nueva venta</Link>
+                        <Link href={routes.facturacionPos}>Nueva venta</Link>
                       </Button>
                     </div>
                   </>
@@ -295,7 +295,7 @@ export default async function SalesPage() {
                   variant="outline"
                   className="border-[#004080]/30 text-[#004080] hover:bg-[#004080]/5"
                 >
-                  <Link href={routes.erp}>Conocer ERP avanzado</Link>
+                  <Link href={routes.facturacion}>Ver Facturacion empresarial</Link>
                 </Button>
               </CardContent>
             </Card>

@@ -24,7 +24,9 @@ async function loadResource<T>(loader: () => Promise<T>, fallback: T) {
     return {
       data: fallback,
       error:
-        error instanceof Error ? error.message : "No se pudo cargar la informacion ERP.",
+        error instanceof Error
+          ? error.message
+          : "No se pudo cargar la informacion de Facturacion.",
     };
   }
 }
@@ -52,7 +54,7 @@ export default async function QuickInvoicePage() {
         <div className="space-y-6">
           <div>
             <p className="text-sm text-muted-foreground">
-              <Link href={routes.erp} className="hover:underline">
+              <Link href={routes.facturacion} className="hover:underline">
                 Facturacion
               </Link>{" "}
               / Facturador rapido
@@ -121,7 +123,7 @@ export default async function QuickInvoicePage() {
         <section className="overflow-hidden rounded-[32px] border border-sky-100 bg-linear-to-br from-sky-100 via-white to-slate-50 shadow-sm shadow-sky-100/60">
           <div className="space-y-3 px-6 py-8 lg:px-8">
             <p className="text-sm text-slate-500">
-              <Link href={routes.erp} className="hover:text-slate-900">
+              <Link href={routes.facturacion} className="hover:text-slate-900">
                 Facturacion
               </Link>{" "}
               / Facturador rapido

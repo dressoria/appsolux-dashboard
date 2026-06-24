@@ -74,7 +74,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
 
   const inventory = isAdvancedMode
     ? createEntry({
-        href: routes.erpInventory,
+        href: routes.facturacionInventory,
         description:
           "Inventario empresarial como fuente principal: productos, stock por bodega, kardex y control operativo avanzado.",
         features: [
@@ -96,7 +96,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
         isVisible: true,
       })
     : createEntry({
-        href: tenantMode.canAccessBasicInventory ? routes.basicStock : routes.billing,
+        href: tenantMode.canAccessBasicInventory ? routes.facturacionInventory : routes.billing,
         description:
           "Inventario Core para productos, stock simple y movimientos diarios sin depender de Gestion Empresarial.",
         features: [
@@ -119,7 +119,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
 
   const sales = isAdvancedMode
     ? createEntry({
-        href: routes.pos,
+        href: routes.facturacionPos,
         description:
           "POS y ventas avanzadas integradas con Facturacion usando el motor empresarial para pedidos, cobros y seguimiento comercial desde un solo flujo.",
         features: [
@@ -138,7 +138,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
         isVisible: true,
       })
     : createEntry({
-        href: tenantMode.canAccessBasicSales ? routes.basicPos : routes.billing,
+        href: tenantMode.canAccessBasicSales ? routes.facturacionPos : routes.billing,
         description:
           "POS y ventas Core para cobrar, emitir recibos internos y preparar facturacion SRI sin salir del flujo principal.",
         features: [
@@ -161,7 +161,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
 
   const reports = tenantMode.canAccessAdvancedReports
     ? createEntry({
-        href: routes.reports,
+        href: routes.facturacionReports,
         description:
           "Reportes avanzados para ventas, stock, compras y seguimiento financiero sobre el flujo empresarial.",
         features: [
@@ -180,7 +180,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
         isVisible: true,
       })
     : createEntry({
-        href: tenantMode.canAccessBasicReports ? routes.basicReports : routes.billing,
+        href: tenantMode.canAccessBasicReports ? routes.facturacionReports : routes.billing,
         description:
           "Reportes operativos para revisar productos, clientes y ventas del modo Core sin complejidad extra.",
         features: [
@@ -203,7 +203,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
 
   const invoicing = hasSriInvoicing
     ? createEntry({
-        href: routes.sriDocuments,
+        href: routes.facturacionDocuments,
         description:
           "Revision y seguimiento de comprobantes SRI: borradores, firmados, autorizados, pendientes o rechazados.",
         features: [
@@ -222,7 +222,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
         isVisible: true,
       })
     : createEntry({
-        href: hasSriConfiguration ? routes.sri : routes.billing,
+        href: hasSriConfiguration ? routes.facturacionSri : routes.billing,
         description:
           "Facturacion SRI separada de la operacion diaria, con acceso solo cuando el modulo de emision este habilitado.",
         features: [
@@ -245,7 +245,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
 
   const sriConfiguration = hasSriConfiguration
     ? createEntry({
-        href: routes.sri,
+        href: routes.facturacionSri,
         description:
           "Empresa, RUC, firma electronica, secuenciales, ambiente y monitoreo tecnico del modulo SRI.",
         features: [
@@ -287,7 +287,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
 
   if (tenantMode.effectiveOperatingMode === "DEDICATED_ERP") {
     advancedErp = createEntry({
-      href: routes.erp,
+      href: routes.facturacion,
       description:
         "Motor empresarial dedicado para Facturacion, compras, inventario y crecimiento financiero.",
       features: [
@@ -307,7 +307,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
     });
   } else if (tenantMode.effectiveOperatingMode === "SHARED_ERP") {
     advancedErp = createEntry({
-      href: routes.erp,
+      href: routes.facturacion,
       description:
         "Motor empresarial compartido para Facturacion, inventario, compras y reportes avanzados sin requerir una instancia dedicada.",
       features: [
@@ -395,9 +395,9 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
     sriConfiguration,
     advancedErp,
     inventoryHref: inventory.href,
-    productsHref: isAdvancedMode ? routes.erpInventoryProducts : routes.basicProducts,
-    stockHref: isAdvancedMode ? routes.erpInventoryStock : routes.basicStock,
-    movementsHref: isAdvancedMode ? routes.erpInventoryKardex : routes.basicStock,
+    productsHref: routes.facturacionProducts,
+    stockHref: routes.facturacionInventory,
+    movementsHref: routes.facturacionInventory,
     salesHref: sales.href,
     posHref: sales.href,
     reportsHref: reports.href,

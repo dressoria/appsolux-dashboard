@@ -54,19 +54,19 @@ function getErpBadge(erp: {
 }): { label: string; className: string } {
   if (erp.isRealActive) {
     return {
-      label: "ERP activo",
+      label: "Gestion Empresarial activa",
       className: "border-green-200 bg-green-50 text-green-700",
     };
   }
   if (erp.isPending || erp.isSimulated) {
     return {
-      label: "ERP en preparacion",
+      label: "Gestion Empresarial en preparacion",
       className: "border-amber-200 bg-amber-50 text-amber-700",
     };
   }
   if (erp.isFailed) {
     return {
-      label: "Error ERP",
+      label: "Error de activacion",
       className: "border-red-200 bg-red-50 text-red-700",
     };
   }
@@ -141,7 +141,7 @@ export default async function SettingsPage() {
           <Card className="border-amber-200 bg-amber-50/60">
             <CardContent className="p-4 text-sm text-amber-800">
               <span className="font-medium">
-                La empresa configurada no coincide con el ERP.
+                La empresa configurada no coincide con Gestion Empresarial.
               </span>{" "}
               Se muestra la empresa disponible. Revisa la configuracion del
               tenant.

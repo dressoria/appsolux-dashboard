@@ -45,8 +45,8 @@ export default async function ErpFinancePage() {
         <div className="space-y-6">
           <div>
             <p className="text-sm text-muted-foreground">
-              <Link href={routes.erp} className="hover:underline">
-                ERP Comercial
+              <Link href={routes.facturacion} className="hover:underline">
+                Facturacion
               </Link>{" "}
               / Caja y bancos
             </p>
@@ -56,9 +56,9 @@ export default async function ErpFinancePage() {
           </div>
           <Card>
             <CardContent className="p-6 text-sm text-muted-foreground">
-              <p>El ERP dedicado es necesario para ver el modulo financiero.</p>
+              <p>Gestion Empresarial activa es necesaria para ver caja y bancos.</p>
               <Button asChild variant="outline" size="sm" className="mt-3">
-                <Link href={routes.erp}>Ir al ERP</Link>
+                <Link href={routes.facturacion}>Ir a Facturacion</Link>
               </Button>
             </CardContent>
           </Card>
@@ -107,8 +107,8 @@ export default async function ErpFinancePage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm text-muted-foreground">
-              <Link href={routes.erp} className="hover:underline">
-                ERP Comercial
+              <Link href={routes.facturacion} className="hover:underline">
+                Facturacion
               </Link>{" "}
               / Caja y bancos
             </p>
@@ -125,7 +125,7 @@ export default async function ErpFinancePage() {
               <Link href={routes.reports}>Ver reportes</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href={routes.erp}>Volver al ERP</Link>
+              <Link href={routes.facturacion}>Volver a Facturacion</Link>
             </Button>
           </div>
         </div>

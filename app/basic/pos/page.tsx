@@ -11,7 +11,9 @@ import { getPrismaClient } from "@/lib/db/prisma";
 import { listCustomers, listProducts } from "@/lib/core/lightweight-pos";
 import { getTenantPlanState } from "@/lib/core/plans";
 import { getSriModuleStatus } from "@/lib/core/sri";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { redirect } from "next/navigation";
 
 type BasicPosPageProps = {
   searchParams: Promise<{ customerId?: string }>;
@@ -50,6 +52,11 @@ export default async function BasicPosPage({ searchParams }: BasicPosPageProps) 
   const tenant = await getCurrentTenant(user);
   const resolvedParams = await searchParams;
   const plan = await getTenantPlanState(tenant.id);
+  const tenantMode = await getTenantModeState(tenant);
+
+  if (tenantMode.canUseAdvancedErp) {
+    redirect(routes.facturacionPos);
+  }
 
   if (!plan.canUseBasicPos) {
     return (
