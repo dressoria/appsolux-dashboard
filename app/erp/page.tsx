@@ -101,11 +101,11 @@ function getErpBlockedDescription(
   erpProvisioning: Awaited<ReturnType<typeof getErpProvisioningState>>
 ) {
   if (tenantMode.businessSuiteStatus === "pending_migration") {
-    return "Gestion Empresarial esta preparada para este tenant, pero aun no se activa la migracion operativa. El modo Basico sigue siendo la fuente activa y el historial SRI queda protegido.";
+    return "Facturacion ya tiene preparado el motor empresarial para este tenant, pero aun no se activa la migracion operativa. El modo Basico sigue siendo la fuente activa y el historial SRI queda protegido.";
   }
 
   if (tenantMode.businessSuiteStatus === "migrating") {
-    return "Gestion Empresarial esta en migracion controlada. Todavia no se habilita como motor principal hasta completar las validaciones operativas.";
+    return "Facturacion esta en migracion controlada hacia el motor empresarial. Todavia no se habilita como motor principal hasta completar las validaciones operativas.";
   }
 
   if (erpProvisioning.isSimulated) {
@@ -135,7 +135,7 @@ export default async function ErpPage() {
             Sesion requerida
           </h1>
           <p className="text-muted-foreground">
-            Inicia sesion para ver Gestion Empresarial de Appsolux.
+            Inicia sesion para ver Facturacion de Appsolux.
           </p>
         </div>
       </DashboardShell>
@@ -160,8 +160,8 @@ export default async function ErpPage() {
             <h1 className="text-3xl font-semibold tracking-tight">
               {tenantMode.businessSuiteStatus === "pending_migration" ||
               tenantMode.businessSuiteStatus === "migrating"
-                ? "Gestion Empresarial pendiente"
-                : "Gestion Empresarial bloqueada"}
+                ? "Facturacion avanzada pendiente"
+                : "Facturacion avanzada bloqueada"}
             </h1>
             <p className="mt-2 max-w-3xl text-muted-foreground">
               {getErpBlockedDescription(tenantMode, erpProvisioning)}
@@ -180,7 +180,7 @@ export default async function ErpPage() {
               tenantMode.businessSuiteStatus === "pending_migration" ||
               tenantMode.businessSuiteStatus === "migrating"
                 ? "La suite esta en estado pendiente. Antes de activarla por completo, el tenant sigue operando en Core para evitar migraciones destructivas."
-                : "Tu tenant esta operando en modo Core. Mientras Gestion Empresarial no este habilitada, esta ruta no cargara datos operativos externos."
+                : "Tu tenant esta operando en modo Core. Mientras el motor empresarial no este habilitado, esta ruta no cargara datos operativos externos."
             }
           />
 
@@ -351,12 +351,14 @@ export default async function ErpPage() {
       { label: "Reportes", href: routes.reports, status: "Disponible" },
     ],
     configuracion: [
+      { label: "Gestion Empresarial", href: routes.erp, status: "Disponible" },
       { label: "Empresa y ajustes", href: routes.settings, status: "Disponible" },
       { label: "Sucursales / bodegas", href: routes.erpInventoryWarehouses, status: "Disponible" },
       { label: "Categorias", href: routes.erpInventoryCategories, status: "Disponible" },
       { label: "Unidades", href: routes.erpInventoryUnits, status: "Disponible" },
       { label: "Metodos de pago", href: routes.erpFinancePaymentMethods, status: "Disponible" },
       { label: "Datos fiscales", href: routes.erpFiscalSettings, status: "Disponible" },
+      { label: "Historial Basico", href: routes.basic, status: "Disponible" },
       { label: "Usuarios y permisos", href: routes.settings, status: "Disponible" },
     ],
     fiscal: [
@@ -388,10 +390,10 @@ export default async function ErpPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h1 className="text-3xl font-semibold tracking-tight">
-                Gestion Empresarial
+                Facturacion
               </h1>
               <p className="mt-2 max-w-3xl text-muted-foreground">
-                Gestion Empresarial ya es el modo operativo principal de este
+                Facturacion ya opera con el motor empresarial principal de este
                 tenant.
               </p>
               <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
@@ -476,7 +478,7 @@ export default async function ErpPage() {
             <CardContent className="space-y-1">
               <p className="text-2xl font-semibold">{activeCustomersCount}</p>
               <p className="text-xs text-muted-foreground">
-                Base comercial activa en Gestion Empresarial
+                Base comercial activa en Facturacion
               </p>
             </CardContent>
           </Card>
@@ -553,7 +555,7 @@ export default async function ErpPage() {
                 ))
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No hay alertas fuertes visibles. La operacion principal ya esta concentrada en Gestion Empresarial.
+                  No hay alertas fuertes visibles. La operacion principal ya esta concentrada en Facturacion con motor empresarial.
                 </p>
               )}
             </CardContent>
@@ -588,7 +590,7 @@ export default async function ErpPage() {
                 ))
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Aun no hay ventas registradas en Gestion Empresarial.
+                  Aun no hay ventas registradas en Facturacion con motor empresarial.
                 </p>
               )}
             </CardContent>

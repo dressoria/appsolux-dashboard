@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type ModeSwitcherProps = {
@@ -42,47 +41,55 @@ export function ModeSwitcher({
   const pathname = usePathname();
   const currentMode = getCurrentMode(pathname);
   const erpTarget = canUseErp ? erpHref : upgradeHref;
-  const basicLabel = canUseErp ? "Historial Basico" : "Basico";
-  const erpLabel = canUseErp ? "Gestion Empresarial" : "Activar Gestion";
 
   return (
     <div
-      className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border bg-muted/30 p-1"
-      aria-label="Selector de modo Appsolux"
+      className="flex max-w-full flex-wrap items-center gap-2"
+      aria-label="Estado del motor de facturacion"
     >
-      <Button
-        asChild={canUseBasic}
-        type="button"
-        size="sm"
-        variant={currentMode === "basic" ? "default" : "ghost"}
-        disabled={!canUseBasic}
+      <Link
+        href={erpTarget}
         className={cn(
-          "h-7 px-2 text-xs",
-          currentMode !== "basic" && "text-muted-foreground"
+          "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition",
+          currentMode === "erp"
+            ? "border-sky-200 bg-sky-50 text-sky-800"
+            : "border-slate-200 bg-white text-slate-700 hover:border-sky-200 hover:text-sky-800"
         )}
+        title={canUseErp ? "Facturacion con motor empresarial activo" : erpStatusLabel}
       >
-        {canUseBasic ? <Link href={basicHref}>{basicLabel}</Link> : <span>{basicLabel}</span>}
-      </Button>
-      <Button
-        asChild
-        size="sm"
-        variant={currentMode === "erp" ? "default" : "ghost"}
-        title={
-          canUseErp
-            ? "Gestion Empresarial activa"
-            : "Gestion Empresarial requiere activacion"
-        }
-        className={cn(
-          "h-7 px-2 text-xs",
-          currentMode !== "erp" && "text-muted-foreground"
-        )}
-      >
-        <Link href={erpTarget}>{erpLabel}</Link>
-      </Button>
-      {!canUseErp ? (
-        <span className="hidden px-2 text-[11px] text-muted-foreground xl:inline">
-          {erpStatusLabel}
+        <span>Facturacion</span>
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[11px]",
+            canUseErp
+              ? "bg-emerald-100 text-emerald-700"
+              : "bg-slate-100 text-slate-600"
+          )}
+        >
+          {canUseErp ? "Gestion Empresarial activa" : "Motor basico"}
         </span>
+      </Link>
+      {canUseBasic ? (
+        <Link
+          href={basicHref}
+          className={cn(
+            "inline-flex items-center rounded-full border px-3 py-1.5 text-xs transition",
+            currentMode === "basic"
+              ? "border-slate-300 bg-slate-100 text-slate-800"
+              : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
+          )}
+        >
+          {canUseErp ? "Historial basico" : "Basico"}
+        </Link>
+      ) : null}
+      {!canUseErp ? (
+        <Link
+          href={upgradeHref}
+          className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 transition hover:border-sky-200 hover:text-sky-800"
+          title={erpStatusLabel}
+        >
+          Activar Gestion Empresarial
+        </Link>
       ) : null}
     </div>
   );

@@ -41,9 +41,9 @@ function getSriSignatureLabel(
 }
 
 function getOperatingModeLabel(mode: Awaited<ReturnType<typeof getTenantModeState>>["effectiveOperatingMode"]) {
-  if (mode === "DEDICATED_ERP") return "Gestion dedicada";
-  if (mode === "SHARED_ERP") return "Gestion compartida";
-  return "Core";
+  if (mode === "DEDICATED_ERP") return "Motor dedicado";
+  if (mode === "SHARED_ERP") return "Motor empresarial";
+  return "Motor basico";
 }
 
 export default async function WorkspacePanelPage() {
@@ -130,7 +130,7 @@ export default async function WorkspacePanelPage() {
               <SectionHeader
                 eyebrow="Fase 3"
                 title="Mis Aplicaciones"
-                description="El launcher ahora respeta el motor operativo efectivo del tenant para mostrar Core o Gestion Empresarial sin rutas rotas."
+                description="El launcher ahora respeta el motor operativo efectivo del tenant para mostrar Facturacion como experiencia principal sin rutas rotas."
               />
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard
@@ -138,7 +138,7 @@ export default async function WorkspacePanelPage() {
                   value={tenantMode.shouldUseAdvancedMode ? "Suite" : String(basicReports.counts.products)}
                   helper={
                     tenantMode.shouldUseAdvancedMode
-                      ? "Catalogo principal administrado desde Gestion Empresarial"
+                      ? "Catalogo principal administrado desde Facturacion con motor empresarial"
                       : "Catalogo disponible para venta y control de stock"
                   }
                 />
@@ -147,7 +147,7 @@ export default async function WorkspacePanelPage() {
                   value={tenantMode.shouldUseAdvancedMode ? "Suite" : String(basicReports.counts.customers)}
                   helper={
                     tenantMode.shouldUseAdvancedMode
-                      ? "Base comercial centralizada en la suite empresarial"
+                      ? "Base comercial centralizada en Facturacion con motor empresarial"
                       : "Base activa para ventas, cobranza y fidelizacion"
                   }
                 />
@@ -178,7 +178,7 @@ export default async function WorkspacePanelPage() {
                 <div>
                   <p className="text-sm font-semibold text-slate-900">Operacion recomendada</p>
                   <p className="text-sm text-slate-600">
-                    Inventario y ventas se abren desde el motor activo del tenant, mientras SRI queda separado para configuracion y facturacion.
+                    Inventario y ventas se abren desde Facturacion usando el motor activo del tenant, mientras SRI queda separado para configuracion y facturacion.
                   </p>
                 </div>
               </div>
@@ -199,7 +199,7 @@ export default async function WorkspacePanelPage() {
                   title="Abrir POS / Ventas"
                   description={
                     tenantMode.shouldUseAdvancedMode
-                      ? "Registrar ventas y cobrar desde el flujo avanzado conectado a Gestion Empresarial."
+                      ? "Registrar ventas y cobrar desde el flujo avanzado de Facturacion."
                       : "Registrar ventas y cobrar sin navegar por modulos tecnicos."
                   }
                   icon={ShoppingCart}

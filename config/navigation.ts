@@ -48,7 +48,7 @@ export function getDashboardNavigation(appRouting: TenantAppRouting): Navigation
       : null,
     appRouting.shouldShowAdvancedErp
       ? {
-          title: "Gestion Empresarial",
+          title: "Motor empresarial",
           href: appRouting.advancedErp.href,
           description: appRouting.advancedErp.description,
         }

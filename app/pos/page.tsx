@@ -5,9 +5,9 @@ import { AdvancedErpNotActivatedState } from "@/components/appsolux/erp/advanced
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getErpnextCustomers } from "@/lib/api/erpnext/customers";
+import { getErpnextCompanies } from "@/lib/api/erpnext/companies";
 import { getErpnextInventory } from "@/lib/api/erpnext/inventory";
 import { getErpnextItems } from "@/lib/api/erpnext/items";
-import { getErpnextMasters } from "@/lib/api/erpnext/masters";
 import { getErpnextModesOfPayment } from "@/lib/api/erpnext/modes-of-payment";
 import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -16,8 +16,6 @@ import { getErpProductPricingMap } from "@/lib/core/erp-pricing";
 import { getErpProvisioningState } from "@/lib/core/erp-provisioning-status";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
-import type { ErpnextMasters } from "@/types/erpnext";
-
 type LoadResult<T> = {
   data: T;
   error: string | null;
@@ -53,7 +51,7 @@ function getPosBlockedDescription(
     return erpProvisioning.displayStatus;
   }
   if (erpProvisioning.status === "not_configured") {
-    return "El punto de venta necesita productos, bodegas, clientes, metodos de pago e inventario desde Gestion Empresarial. Solicita primero un Sistema Dedicado.";
+    return "El POS de Facturacion necesita productos, bodegas, clientes, metodos de pago e inventario desde el motor empresarial. Solicita primero la activacion correspondiente.";
   }
 
   return erpProvisioning.displayStatus;
@@ -87,7 +85,7 @@ export default async function PosPage() {
         <div className="space-y-6">
           <div>
             <p className="text-sm text-muted-foreground">POS</p>
-            <h1 className="text-3xl font-semibold tracking-tight">Gestion Empresarial no activada</h1>
+            <h1 className="text-3xl font-semibold tracking-tight">Facturacion avanzada no activada</h1>
             <p className="mt-2 max-w-3xl text-muted-foreground">
               {getPosBlockedDescription(erpProvisioning)}
             </p>
@@ -97,7 +95,7 @@ export default async function PosPage() {
           </div>
 
           <AdvancedErpNotActivatedState
-            description="Tu tenant esta operando en modo Core. El punto de venta principal de Gestion Empresarial no cargara productos ni inventario hasta que la suite este habilitada."
+            description="Tu tenant esta operando en modo Core. El POS de Facturacion usara el motor basico hasta que la capa empresarial este habilitada."
           />
 
           <ErpDedicatedProvisionCard
@@ -122,7 +120,7 @@ export default async function PosPage() {
               ) : (
                 <p>
                   El POS no cargara productos ni intentara vender hasta que
-                  Gestion Empresarial este activa para este tenant.
+                  el motor empresarial este activo para este tenant.
                 </p>
               )}
             </CardContent>
@@ -138,25 +136,19 @@ export default async function PosPage() {
     );
   }
 
-  const emptyMasters: ErpnextMasters = {
-    itemGroups: [],
-    uoms: [],
-    territories: [],
-    companies: [],
-  };
   const [
     itemsResult,
     inventoryResult,
     customersResult,
     warehousesResult,
-    mastersResult,
+    companiesResult,
     modesOfPaymentResult,
   ] = await Promise.all([
     loadErpResource(getErpnextItems, []),
     loadErpResource(getErpnextInventory, []),
     loadErpResource(getErpnextCustomers, []),
     loadErpResource(getErpnextWarehouses, []),
-    loadErpResource(getErpnextMasters, emptyMasters),
+    loadErpResource(getErpnextCompanies, []),
     loadErpResource(getErpnextModesOfPayment, []),
   ]);
   const usableWarehouses = warehousesResult.data.filter(
@@ -171,7 +163,7 @@ export default async function PosPage() {
     { label: "Inventario", message: inventoryResult.error },
     { label: "Clientes", message: customersResult.error },
     { label: "Bodegas", message: warehousesResult.error },
-    { label: "Empresas", message: mastersResult.error },
+    { label: "Empresas", message: companiesResult.error },
     { label: "Metodos de pago", message: modesOfPaymentResult.error },
   ].filter(
     (resourceError): resourceError is { label: string; message: string } =>
@@ -187,7 +179,7 @@ export default async function PosPage() {
           inventory={inventoryResult.data}
           customers={customersResult.data}
           warehouses={usableWarehouses}
-          companies={mastersResult.data.companies}
+          companies={companiesResult.data}
           modesOfPayment={modesOfPaymentResult.data}
           tenant={{
             id: tenant.id,

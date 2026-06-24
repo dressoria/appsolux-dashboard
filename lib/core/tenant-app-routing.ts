@@ -121,7 +121,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
     ? createEntry({
         href: routes.pos,
         description:
-          "POS y ventas avanzadas integradas con Gestion Empresarial para pedidos, cobros y seguimiento comercial desde un solo flujo.",
+          "POS y ventas avanzadas integradas con Facturacion usando el motor empresarial para pedidos, cobros y seguimiento comercial desde un solo flujo.",
         features: [
           "POS avanzado",
           "Ventas conectadas a la suite",
@@ -289,7 +289,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
     advancedErp = createEntry({
       href: routes.erp,
       description:
-        "Gestion Empresarial dedicada para operaciones de mayor complejidad, compras, inventario y crecimiento financiero.",
+        "Motor empresarial dedicado para Facturacion, compras, inventario y crecimiento financiero.",
       features: [
         "Inventario empresarial",
         "Compras y proveedores",
@@ -299,7 +299,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
       ],
       statusLabel: "Gestion dedicada activa",
       statusVariant: "active",
-      actionLabel: "Abrir Gestion Empresarial",
+      actionLabel: "Abrir Facturacion",
       buttonVariant: "default",
       helperText: "La suite dedicada ya esta operativa para este tenant.",
       isEnabled: true,
@@ -309,7 +309,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
     advancedErp = createEntry({
       href: routes.erp,
       description:
-        "Gestion Empresarial compartida para inventario, compras y reportes avanzados sin requerir una instancia dedicada.",
+        "Motor empresarial compartido para Facturacion, inventario, compras y reportes avanzados sin requerir una instancia dedicada.",
       features: [
         "Inventario compartido",
         "POS avanzado",
@@ -319,7 +319,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
       ],
       statusLabel: "Gestion compartida activa",
       statusVariant: "active",
-      actionLabel: "Abrir Gestion Empresarial",
+      actionLabel: "Abrir Facturacion",
       buttonVariant: "default",
       helperText: "El tenant ya opera en la suite compartida.",
       isEnabled: true,

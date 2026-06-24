@@ -63,7 +63,7 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
           ? { title: "Facturacion", href: appRouting.invoicing.href, icon: FileCheck }
           : null,
         appRouting.shouldShowAdvancedErp
-          ? { title: "Gestion Empresarial", href: appRouting.advancedErp.href, icon: Sparkles }
+          ? { title: "Motor empresarial", href: appRouting.advancedErp.href, icon: Sparkles }
           : null,
       ].filter(Boolean) as SidebarItem[]);
   const configurationItems = isBusinessSuiteActive
@@ -155,12 +155,12 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
       <div className="mb-6 rounded-2xl border border-sky-100 bg-white px-4 py-4 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">Workspace</p>
         <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-900">
-          Panel empresarial
+          Facturacion
         </h2>
         <p className="mt-1 text-sm text-slate-600">
           {tenantMode.shouldUseAdvancedMode
-            ? "Gestion Empresarial es el motor principal. El modo Basico queda como historial protegido."
-            : "Navegacion ajustada al motor Core del tenant."}
+            ? "Motor empresarial activo. El historial basico queda protegido para consulta."
+            : "Operacion diaria con motor basico activo para este tenant."}
         </p>
       </div>
 

@@ -7,12 +7,16 @@ export function WorkspaceServiceCard({
   title,
   description,
   detail,
+  badge,
+  subtext,
   href,
 }: {
   icon: LucideIcon;
   title: string;
   description: string;
   detail?: string;
+  badge?: string;
+  subtext?: string;
   href: string;
 }) {
   return (
@@ -31,11 +35,19 @@ export function WorkspaceServiceCard({
       </div>
 
       <div className="space-y-2">
-        <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+          {badge ? (
+            <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
+              {badge}
+            </span>
+          ) : null}
+        </div>
         <p className="text-sm leading-6 text-slate-500">{description}</p>
         {detail && (
           <p className="text-xs text-slate-400">{detail}</p>
         )}
+        {subtext ? <p className="text-xs font-medium text-slate-500">{subtext}</p> : null}
       </div>
     </Link>
   );

@@ -16,10 +16,12 @@ export default async function WorkspacePage() {
   const tenantMode = await getTenantModeState(user.tenant);
   const operationsCard = tenantMode.canUseAdvancedErp
     ? {
-        title: "Gestion Empresarial",
+        title: "Facturacion",
         description:
-          "Opera ventas, inventario, compras, caja y reportes desde tu modo principal.",
-        detail: "Operacion · POS · Inventario · Reportes",
+          "Vende, factura, cobra, controla inventario y gestiona clientes desde un solo lugar.",
+        detail: "POS · Inventario · Clientes · Reportes",
+        badge: "Gestion Empresarial activa",
+        subtext: "Motor empresarial activo",
         href: routes.erp,
       }
     : {
@@ -27,6 +29,7 @@ export default async function WorkspacePage() {
         description:
           "Gestiona ventas, clientes, inventario, comprobantes y reportes financieros.",
         detail: "Ventas · Inventario · SRI · Reportes",
+        subtext: "Motor basico activo",
         href: routes.sales,
       };
 
@@ -52,6 +55,8 @@ export default async function WorkspacePage() {
               title={operationsCard.title}
               description={operationsCard.description}
               detail={operationsCard.detail}
+              badge={operationsCard.badge}
+              subtext={operationsCard.subtext}
               href={operationsCard.href}
             />
             <WorkspaceServiceCard

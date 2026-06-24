@@ -14,21 +14,38 @@ const itemGroupFields = [
   "item_group_name",
   "parent_item_group",
   "is_group",
-  "disabled",
 ];
 
 export async function getErpnextItemGroups(
   options: { onlyUsable?: boolean } = {}
 ): Promise<ErpnextItemGroup[]> {
-  const params = new URLSearchParams({
-    fields: JSON.stringify(itemGroupFields),
-    limit_page_length: "500",
-    order_by: "name asc",
-  });
+  let response: ErpnextListResponse<ErpnextItemGroup>;
 
-  const response = await erpnextFetch<ErpnextListResponse<ErpnextItemGroup>>(
-    `/api/resource/Item%20Group?${params.toString()}`
-  );
+  try {
+    const params = new URLSearchParams({
+      fields: JSON.stringify([...itemGroupFields, "disabled"]),
+      limit_page_length: "500",
+      order_by: "name asc",
+    });
+
+    response = await erpnextFetch<ErpnextListResponse<ErpnextItemGroup>>(
+      `/api/resource/Item%20Group?${params.toString()}`
+    );
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.includes("disabled")) {
+      throw error;
+    }
+
+    const fallbackParams = new URLSearchParams({
+      fields: JSON.stringify(itemGroupFields),
+      limit_page_length: "500",
+      order_by: "name asc",
+    });
+
+    response = await erpnextFetch<ErpnextListResponse<ErpnextItemGroup>>(
+      `/api/resource/Item%20Group?${fallbackParams.toString()}`
+    );
+  }
 
   if (!options.onlyUsable) return response.data;
 

@@ -53,7 +53,7 @@ export default async function QuickInvoicePage() {
           <div>
             <p className="text-sm text-muted-foreground">
               <Link href={routes.erp} className="hover:underline">
-                Gestion Empresarial
+                Facturacion
               </Link>{" "}
               / Facturador rapido
             </p>
@@ -61,7 +61,7 @@ export default async function QuickInvoicePage() {
           </div>
           <Card>
             <CardContent className="p-6 text-sm text-muted-foreground">
-              Esta herramienta necesita Gestion Empresarial activa para este tenant.
+              Esta herramienta necesita Facturacion con motor empresarial activo para este tenant.
             </CardContent>
           </Card>
         </div>
@@ -122,7 +122,7 @@ export default async function QuickInvoicePage() {
           <div className="space-y-3 px-6 py-8 lg:px-8">
             <p className="text-sm text-slate-500">
               <Link href={routes.erp} className="hover:text-slate-900">
-                Gestion Empresarial
+                Facturacion
               </Link>{" "}
               / Facturador rapido
             </p>
