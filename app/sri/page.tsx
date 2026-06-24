@@ -31,6 +31,7 @@ import {
   listSriIssuePoints,
   listSriSequences,
 } from "@/lib/core/sri";
+import { getSriSubmissionDiagnostic } from "@/lib/core/sri-submission-jobs";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 function getSignatureLabel(status: Awaited<ReturnType<typeof getSriModuleStatus>>) {
@@ -85,7 +86,17 @@ export default async function SriPage() {
     prisma.sriDocument.count({ where: { tenantId: tenant.id, status: "REJECTED" } }),
     prisma.sriSubmissionJob.findMany({
       where: { tenantId: tenant.id, status: { in: ["FAILED", "REJECTED"] } },
-      select: { id: true, errorMessage: true, updatedAt: true, documentId: true },
+      select: {
+        id: true,
+        errorMessage: true,
+        errorCode: true,
+        sriReceiptStatus: true,
+        sriAuthorizationStatus: true,
+        sriResponseRaw: true,
+        updatedAt: true,
+        documentId: true,
+        status: true,
+      },
       orderBy: { updatedAt: "desc" },
       take: 3,
     }),
@@ -110,7 +121,9 @@ export default async function SriPage() {
     ...latestSubmissionErrors.map((item) => ({
       id: item.id,
       kind: "Envio",
-      errorMessage: item.errorMessage,
+      errorMessage:
+        getSriSubmissionDiagnostic(item).primaryMessage ??
+        item.errorMessage,
       updatedAt: item.updatedAt,
       documentId: item.documentId,
     })),

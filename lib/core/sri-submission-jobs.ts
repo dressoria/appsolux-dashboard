@@ -6,6 +6,126 @@ import { getPrismaClient } from "@/lib/db/prisma";
 
 export type { SriSubmissionJobStatus };
 
+type SubmissionJobDiagnosticInput = {
+  status?: string | null;
+  sriReceiptStatus?: string | null;
+  sriAuthorizationStatus?: string | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  sriResponseRaw?: Prisma.JsonValue | null;
+};
+
+export type SriSubmissionDiagnostic = {
+  primaryMessage: string | null;
+  secondaryMessage: string | null;
+  rawSnippet: string | null;
+};
+
+function pushCandidate(candidates: string[], value: unknown) {
+  if (typeof value !== "string") return;
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return;
+  if (!candidates.includes(normalized)) {
+    candidates.push(normalized);
+  }
+}
+
+function collectMessages(value: unknown, candidates: string[]) {
+  if (value == null) return;
+
+  if (typeof value === "string") {
+    pushCandidate(candidates, value);
+    return;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    pushCandidate(candidates, String(value));
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectMessages(item, candidates);
+    }
+    return;
+  }
+
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const preferredKeys = [
+      "mensaje",
+      "message",
+      "mensajes",
+      "messages",
+      "descripcion",
+      "description",
+      "informacionAdicional",
+      "additionalInformation",
+      "identificador",
+      "identifier",
+      "detalle",
+      "detail",
+      "estado",
+      "status",
+      "respuesta",
+      "response",
+    ];
+
+    for (const key of preferredKeys) {
+      if (key in record) {
+        collectMessages(record[key], candidates);
+      }
+    }
+
+    for (const nestedValue of Object.values(record)) {
+      collectMessages(nestedValue, candidates);
+    }
+  }
+}
+
+function buildRawSnippet(raw: Prisma.JsonValue | null | undefined) {
+  if (raw == null) return null;
+
+  if (typeof raw === "string") {
+    return raw.slice(0, 600);
+  }
+
+  try {
+    return JSON.stringify(raw, null, 2).slice(0, 600);
+  } catch {
+    return null;
+  }
+}
+
+export function getSriSubmissionDiagnostic(
+  input: SubmissionJobDiagnosticInput
+): SriSubmissionDiagnostic {
+  const candidates: string[] = [];
+
+  pushCandidate(candidates, input.errorMessage);
+  pushCandidate(candidates, input.errorCode ? `Codigo ${input.errorCode}` : null);
+  pushCandidate(candidates, input.sriReceiptStatus);
+  pushCandidate(candidates, input.sriAuthorizationStatus);
+  collectMessages(input.sriResponseRaw, candidates);
+
+  const filtered = candidates.filter((candidate) => {
+    const normalized = candidate.toLowerCase();
+    return (
+      normalized !== "null" &&
+      normalized !== "undefined" &&
+      normalized !== "rejected" &&
+      normalized !== "failed" &&
+      normalized !== "received"
+    );
+  });
+
+  return {
+    primaryMessage: filtered[0] ?? null,
+    secondaryMessage: filtered.length > 1 ? filtered.slice(1, 4).join(" · ") : null,
+    rawSnippet: buildRawSnippet(input.sriResponseRaw),
+  };
+}
+
 export type CreateSriSubmissionJobResult =
   | { ok: true; jobId: string; status: SriSubmissionJobStatus; alreadyExists: boolean }
   | {

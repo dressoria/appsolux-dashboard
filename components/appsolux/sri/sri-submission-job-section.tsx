@@ -28,6 +28,11 @@ type SubmissionJob = {
   sriAuthorizationStatus: string | null;
   errorCode: string | null;
   errorMessage: string | null;
+  diagnostic?: {
+    primaryMessage: string | null;
+    secondaryMessage: string | null;
+    rawSnippet: string | null;
+  } | null;
 };
 
 type Props = {
@@ -215,9 +220,17 @@ export function SriSubmissionJobSection({ documentId, documentStatus }: Props) {
               )}
 
               {job.status === "REJECTED" && (
-                <p className="text-xs text-red-700 font-medium">
-                  Rechazado por el SRI. No reenvies este comprobante; crea uno nuevo.
-                </p>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-red-700">
+                    Rechazado por el SRI. No reenvies este comprobante; crea uno nuevo.
+                  </p>
+                  {job.diagnostic?.primaryMessage ? (
+                    <p className="text-xs text-red-700">{job.diagnostic.primaryMessage}</p>
+                  ) : null}
+                  {job.diagnostic?.secondaryMessage ? (
+                    <p className="text-xs text-red-600">{job.diagnostic.secondaryMessage}</p>
+                  ) : null}
+                </div>
               )}
 
               {job.status === "FAILED" && (
@@ -238,7 +251,10 @@ export function SriSubmissionJobSection({ documentId, documentStatus }: Props) {
                 </p>
               )}
 
-              {(job.errorCode || job.errorMessage) && (
+              {(job.errorCode ||
+                job.errorMessage ||
+                job.diagnostic?.primaryMessage ||
+                job.diagnostic?.rawSnippet) && (
                 <details className="mt-1">
                   <summary className="cursor-pointer text-xs text-muted-foreground hover:text-slate-700">
                     Ver detalle del error
@@ -250,6 +266,11 @@ export function SriSubmissionJobSection({ documentId, documentStatus }: Props) {
                     {job.errorMessage && (
                       <p className="text-xs text-destructive">{job.errorMessage}</p>
                     )}
+                    {job.diagnostic?.rawSnippet ? (
+                      <pre className="mt-2 overflow-x-auto rounded-md bg-slate-950 p-2 text-[10px] leading-5 text-slate-100">
+                        {job.diagnostic.rawSnippet}
+                      </pre>
+                    ) : null}
                   </div>
                 </details>
               )}

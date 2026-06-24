@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   BarChart3,
   Boxes,
-  CreditCard,
   FileCheck,
   MessageSquareText,
   ReceiptText,
@@ -217,8 +216,9 @@ export default async function WorkspacePanelPage() {
                   Plan activo: {tenantMode.planName}
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-600">
-                  Modo efectivo: {operatingModeLabel} · Productos: {basicReports.counts.products}/{tenantMode.limits.products} ·
-                  Clientes: {basicReports.counts.customers}/{tenantMode.limits.customers}
+                  {tenantMode.shouldUseAdvancedMode
+                    ? `Modo efectivo: ${operatingModeLabel} · Facturacion opera con el motor empresarial activo`
+                    : `Modo efectivo: ${operatingModeLabel} · Productos: ${basicReports.counts.products}/${tenantMode.limits.products} · Clientes: ${basicReports.counts.customers}/${tenantMode.limits.customers}`}
                 </p>
                 <Button asChild variant="outline" size="sm" className="mt-3">
                   <Link href={routes.billing}>Ver plan</Link>
@@ -348,10 +348,10 @@ export default async function WorkspacePanelPage() {
           <SectionHeader
             eyebrow="Apps extendidas"
             title="Configuracion y crecimiento"
-            description="Configuracion SRI, Gestion Empresarial, reportes y comunicacion quedan separados de la operacion diaria, pero siguen visibles cuando aplican."
+            description="Configuracion SRI, reportes y comunicacion complementan la operacion diaria de Facturacion sin presentarse como apps competidoras."
           />
 
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             <AppCard
               icon={Settings2}
               title="Configuracion SRI"
@@ -388,28 +388,6 @@ export default async function WorkspacePanelPage() {
               href={appRouting.sriConfiguration.href}
               actionLabel={appRouting.sriConfiguration.actionLabel}
               buttonVariant={appRouting.sriConfiguration.buttonVariant}
-            />
-
-            <AppCard
-              icon={CreditCard}
-              title="Gestion Empresarial"
-              description={appRouting.advancedErp.description}
-              features={appRouting.advancedErp.features}
-              status={
-                <StatusBadge
-                  variant={appRouting.advancedErp.statusVariant}
-                  label={appRouting.advancedErp.statusLabel}
-                />
-              }
-              meta={
-                <div className="text-xs text-slate-600">
-                  <p className="font-medium text-slate-900">{appRouting.advancedErp.statusLabel}</p>
-                  <p className="mt-1 leading-5">{appRouting.advancedErp.helperText}</p>
-                </div>
-              }
-              href={appRouting.advancedErp.href}
-              actionLabel={appRouting.advancedErp.actionLabel}
-              buttonVariant={appRouting.advancedErp.buttonVariant}
             />
 
             <AppCard

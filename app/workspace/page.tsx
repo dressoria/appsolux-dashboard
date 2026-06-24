@@ -19,9 +19,9 @@ export default async function WorkspacePage() {
         title: "Facturacion",
         description:
           "Vende, factura, cobra, controla inventario y gestiona clientes desde un solo lugar.",
-        detail: "POS · Inventario · Clientes · Reportes",
+        detail: "POS · Inventario · SRI · Reportes",
         badge: "Gestion Empresarial activa",
-        subtext: "Motor empresarial activo",
+        subtext: "Motor Gestion Empresarial activo",
         href: routes.erp,
       }
     : {

@@ -351,7 +351,6 @@ export default async function ErpPage() {
       { label: "Reportes", href: routes.reports, status: "Disponible" },
     ],
     configuracion: [
-      { label: "Gestion Empresarial", href: routes.erp, status: "Disponible" },
       { label: "Empresa y ajustes", href: routes.settings, status: "Disponible" },
       { label: "Sucursales / bodegas", href: routes.erpInventoryWarehouses, status: "Disponible" },
       { label: "Categorias", href: routes.erpInventoryCategories, status: "Disponible" },

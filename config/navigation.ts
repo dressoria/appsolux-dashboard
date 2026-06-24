@@ -46,13 +46,6 @@ export function getDashboardNavigation(appRouting: TenantAppRouting): Navigation
           description: appRouting.sriConfiguration.description,
         }
       : null,
-    appRouting.shouldShowAdvancedErp
-      ? {
-          title: "Motor empresarial",
-          href: appRouting.advancedErp.href,
-          description: appRouting.advancedErp.description,
-        }
-      : null,
     {
       title: "Conversaciones",
       href: routes.conversations,

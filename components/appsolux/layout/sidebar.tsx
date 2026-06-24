@@ -68,7 +68,6 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
       ].filter(Boolean) as SidebarItem[]);
   const configurationItems = isBusinessSuiteActive
     ? ([
-        { title: "Gestion Empresarial", href: routes.erp, icon: Sparkles },
         { title: "Empresa y ajustes", href: routes.settings, icon: Building2 },
         { title: "Bodegas", href: routes.erpInventoryWarehouses, icon: Warehouse },
         { title: "Categorias", href: routes.erpInventoryCategories, icon: FolderTree },

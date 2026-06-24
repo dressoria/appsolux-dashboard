@@ -24,7 +24,10 @@ import {
   formatSequentialNumber,
 } from "@/lib/core/sri";
 import { getLatestSriSigningJobForDocument } from "@/lib/core/sri-signing-jobs";
-import { getLatestSriSubmissionJobForDocument } from "@/lib/core/sri-submission-jobs";
+import {
+  getLatestSriSubmissionJobForDocument,
+  getSriSubmissionDiagnostic,
+} from "@/lib/core/sri-submission-jobs";
 import { getSriDocumentReadinessForSigning } from "@/lib/core/sri-technical-checklist";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
@@ -413,12 +416,19 @@ export default async function SriDocumentDetailPage({ params }: Props) {
     docStatus: doc.status,
     latestJobStatus: latestJob?.status ?? null,
     latestJobError: latestJob?.errorMessage ?? null,
-    submissionError: latestSubmissionJob?.errorMessage ?? null,
+    submissionError: latestSubmissionJob
+      ? getSriSubmissionDiagnostic(latestSubmissionJob).primaryMessage ??
+        latestSubmissionJob.errorMessage ??
+        null
+      : null,
     canRequestSigning: signingReadiness?.canRequestSigning ?? false,
     missingSignatureReasons: signingReadiness?.missingSignatureReasons ?? [],
     checklistHasBlockers: (signingReadiness?.blockingErrors?.length ?? 0) > 0,
     checklistHasWarnings: (signingReadiness?.warnings?.length ?? 0) > 0,
   });
+  const submissionDiagnostic = latestSubmissionJob
+    ? getSriSubmissionDiagnostic(latestSubmissionJob)
+    : null;
 
   const flowStatus =
     doc.status === "AUTHORIZED"
@@ -719,6 +729,48 @@ export default async function SriDocumentDetailPage({ params }: Props) {
 
         {/* 5. Siguiente accion */}
         <NextActionCard action={nextAction} />
+
+        {doc.status === "REJECTED" && latestSubmissionJob ? (
+          <div className="rounded-[24px] border border-red-200 bg-red-50 p-5 shadow-sm">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-red-600">
+              Respuesta del SRI
+            </p>
+            <div className="space-y-2 text-sm text-red-900">
+              <p className="font-medium">
+                {submissionDiagnostic?.primaryMessage ??
+                  latestSubmissionJob.errorMessage ??
+                  "El SRI rechazo el comprobante y no devolvio un mensaje resumido."}
+              </p>
+              {submissionDiagnostic?.secondaryMessage ? (
+                <p>{submissionDiagnostic.secondaryMessage}</p>
+              ) : null}
+              <div className="grid gap-2 sm:grid-cols-2">
+                <p>
+                  Estado recepcion:{" "}
+                  <span className="font-medium">
+                    {latestSubmissionJob.sriReceiptStatus ?? "No disponible"}
+                  </span>
+                </p>
+                <p>
+                  Estado autorizacion:{" "}
+                  <span className="font-medium">
+                    {latestSubmissionJob.sriAuthorizationStatus ?? "No disponible"}
+                  </span>
+                </p>
+              </div>
+              {submissionDiagnostic?.rawSnippet ? (
+                <details className="pt-2">
+                  <summary className="cursor-pointer text-xs font-medium text-red-700">
+                    Ver respuesta cruda resumida
+                  </summary>
+                  <pre className="mt-2 overflow-x-auto rounded-xl bg-slate-950 p-3 text-[11px] leading-5 text-slate-100">
+                    {submissionDiagnostic.rawSnippet}
+                  </pre>
+                </details>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         {/* 6. Detalle de items */}
         <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
