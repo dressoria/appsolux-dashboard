@@ -41,7 +41,7 @@ export default async function BasicSalesPage({ searchParams }: BasicSalesPagePro
       <BasicModuleShell
         title="Documentos de venta"
         description="Recibos internos y facturas SRI · busca, filtra y descarga directamente."
-        activeHref={routes.basicSales}
+        activeHref={routes.facturacionDocuments}
       >
         <p className="text-muted-foreground">Sesión requerida.</p>
       </BasicModuleShell>
@@ -91,7 +91,7 @@ export default async function BasicSalesPage({ searchParams }: BasicSalesPagePro
     if (key !== "all") params.set("status", key);
     if (filteredCustomerId) params.set("customerId", filteredCustomerId);
     const qs = params.toString();
-    return qs ? `/basic/sales?${qs}` : "/basic/sales";
+    return qs ? `${routes.facturacionDocuments}?${qs}` : routes.facturacionDocuments;
   }
 
   function pageHref(p: number) {
@@ -100,14 +100,14 @@ export default async function BasicSalesPage({ searchParams }: BasicSalesPagePro
     if (filteredCustomerId) params.set("customerId", filteredCustomerId);
     if (p > 1) params.set("page", String(p));
     const qs = params.toString();
-    return qs ? `/basic/sales?${qs}` : "/basic/sales";
+    return qs ? `${routes.facturacionDocuments}?${qs}` : routes.facturacionDocuments;
   }
 
   return (
     <BasicModuleShell
       title="Documentos de venta"
       description="Recibos internos y facturas SRI · busca, filtra y descarga directamente."
-      activeHref={routes.basicSales}
+      activeHref={routes.facturacionDocuments}
     >
       <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -120,7 +120,7 @@ export default async function BasicSalesPage({ searchParams }: BasicSalesPagePro
                 Cliente: <span className="font-semibold">{filteredCustomerName}</span>
               </span>
               <Button asChild variant="ghost" size="sm" className="h-auto py-0">
-                <Link href="/basic/sales">×</Link>
+                <Link href={routes.facturacionDocuments}>×</Link>
               </Button>
             </div>
           )}
