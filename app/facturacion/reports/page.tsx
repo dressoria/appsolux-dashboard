@@ -1,5 +1,6 @@
 import BasicReportsPage from "@/app/basic/reports/page";
 import ReportsPage from "@/app/reports/page";
+import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 
@@ -14,8 +15,16 @@ export default async function FacturacionReportsPage({
   const tenantMode = await getTenantModeState(tenant);
 
   if (tenantMode.canUseAdvancedErp) {
-    return <ReportsPage searchParams={searchParams} />;
+    return (
+      <DashboardShell mainClassName="" contentClassName="">
+        <ReportsPage searchParams={searchParams} />
+      </DashboardShell>
+    );
   }
 
-  return <BasicReportsPage />;
+  return (
+    <DashboardShell mainClassName="" contentClassName="">
+      <BasicReportsPage />
+    </DashboardShell>
+  );
 }

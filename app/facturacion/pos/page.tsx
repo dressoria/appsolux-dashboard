@@ -6,6 +6,7 @@ import { BasicPosClient } from "@/components/appsolux/basic/pos-client";
 import { BillingWarehouseSelector } from "@/components/appsolux/billing/billing-warehouse-selector";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { routes } from "@/config/routes";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { listCustomers, listProducts } from "@/lib/core/lightweight-pos";
@@ -47,23 +48,25 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
 
   if (!plan.canUseBasicPos) {
     return (
-      <BasicModuleShell
-        title="POS / Ventas"
-        description="Vende, cobra y genera recibos o facturas desde un solo lugar."
-        activeHref={routes.facturacionPos}
-        action={compactActions}
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle>POS no disponible</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Tu plan actual no incluye POS.
-            </p>
-          </CardContent>
-        </Card>
-      </BasicModuleShell>
+      <DashboardShell mainClassName="" contentClassName="">
+        <BasicModuleShell
+          title="POS / Ventas"
+          description="Vende, cobra y genera recibos o facturas desde un solo lugar."
+          activeHref={routes.facturacionPos}
+          action={compactActions}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>POS no disponible</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Tu plan actual no incluye POS.
+              </p>
+            </CardContent>
+          </Card>
+        </BasicModuleShell>
+      </DashboardShell>
     );
   }
 
@@ -91,36 +94,38 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
   }
 
   return (
-    <BasicModuleShell
-      title="POS / Ventas"
-      description="Vende, cobra y genera recibos o facturas desde un solo lugar."
-      activeHref={routes.facturacionPos}
-      action={compactActions}
-    >
-      <div className="space-y-4">
-        <BillingWarehouseSelector />
-        <BasicPosClient
-          tenantName={tenant.name}
-          currentUserName={user.name}
-          hasSriConfig={hasSriConfig}
-          initialCustomerId={initialCustomerId}
-          products={products.map((product) => ({
-            id: product.id,
-            name: product.name,
-            price: product.price.toString(),
-            stock: product.stock,
-            barcode: product.barcode,
-            taxRate: product.taxRate.toString(),
-          }))}
-          customers={customers.map((customer) => ({
-            id: customer.id,
-            name: customer.name,
-            phone: customer.phone,
-            email: customer.email,
-            address: customer.address,
-          }))}
-        />
-      </div>
-    </BasicModuleShell>
+    <DashboardShell mainClassName="" contentClassName="">
+      <BasicModuleShell
+        title="POS / Ventas"
+        description="Vende, cobra y genera recibos o facturas desde un solo lugar."
+        activeHref={routes.facturacionPos}
+        action={compactActions}
+      >
+        <div className="space-y-4">
+          <BillingWarehouseSelector />
+          <BasicPosClient
+            tenantName={tenant.name}
+            currentUserName={user.name}
+            hasSriConfig={hasSriConfig}
+            initialCustomerId={initialCustomerId}
+            products={products.map((product) => ({
+              id: product.id,
+              name: product.name,
+              price: product.price.toString(),
+              stock: product.stock,
+              barcode: product.barcode,
+              taxRate: product.taxRate.toString(),
+            }))}
+            customers={customers.map((customer) => ({
+              id: customer.id,
+              name: customer.name,
+              phone: customer.phone,
+              email: customer.email,
+              address: customer.address,
+            }))}
+          />
+        </div>
+      </BasicModuleShell>
+    </DashboardShell>
   );
 }

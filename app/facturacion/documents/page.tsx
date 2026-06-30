@@ -1,5 +1,6 @@
 import BasicSalesPage from "@/app/basic/sales/page";
 import SriDocumentsPage from "@/app/sri/documents/page";
+import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 
@@ -20,8 +21,16 @@ export default async function FacturacionDocumentsPage({
   const tenantMode = await getTenantModeState(tenant);
 
   if (tenantMode.canUseAdvancedErp) {
-    return <SriDocumentsPage searchParams={searchParams} />;
+    return (
+      <DashboardShell mainClassName="" contentClassName="">
+        <SriDocumentsPage searchParams={searchParams} />
+      </DashboardShell>
+    );
   }
 
-  return <BasicSalesPage searchParams={searchParams} />;
+  return (
+    <DashboardShell mainClassName="" contentClassName="">
+      <BasicSalesPage searchParams={searchParams} />
+    </DashboardShell>
+  );
 }

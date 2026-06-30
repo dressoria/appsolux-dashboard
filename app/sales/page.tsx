@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 
 import { SalesMetricCard, SalesQuickAction, SaleStatusBadge } from "@/components/appsolux/basic/sales-ui";
-import { BillingModuleShell } from "@/components/appsolux/billing/billing-module-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/config/routes";
@@ -72,7 +71,7 @@ export default async function SalesPage() {
   const soldItems = soldItemsAggregate._sum.quantity ?? 0;
 
   return (
-    <BillingModuleShell>
+    <>
       {/* Page header */}
       <div className="border-b border-slate-200 bg-white px-8 py-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -307,6 +306,6 @@ export default async function SalesPage() {
           </p>
         </div>
       </main>
-    </BillingModuleShell>
+    </>
   );
 }

@@ -1,17 +1,16 @@
 import Link from "next/link";
 import {
+  Archive,
   BarChart3,
-  Boxes,
   BookOpen,
   Building2,
   CreditCard,
-  FileText,
   FileCheck,
+  FileText,
   FolderTree,
   LayoutGrid,
   type LucideIcon,
   MessageSquareText,
-  MessageSquareWarning,
   Package,
   Receipt,
   Settings2,
@@ -34,92 +33,78 @@ type SidebarItem = {
   icon: LucideIcon;
 };
 
+type NavGroup = {
+  title: string;
+  items: SidebarItem[];
+};
+
 export async function Sidebar({ user }: { user: AppsoluxUser }) {
   const tenantMode = await getTenantModeState(user.tenant);
   const showInternalAdmin = isInternalAdmin(user);
-  const isBusinessSuiteActive = tenantMode.businessSuiteStatus === "active";
-  const operationsItems = isBusinessSuiteActive
-    ? ([
+  const isAdvanced = tenantMode.businessSuiteStatus === "active";
+
+  const operationItems: SidebarItem[] = isAdvanced
+    ? [
         { title: "POS / Ventas", href: routes.facturacionPos, icon: ShoppingCart },
         { title: "Facturador rapido", href: routes.facturacionQuickInvoice, icon: FileText },
         { title: "Documentos", href: routes.facturacionDocuments, icon: FileCheck },
         { title: "Clientes", href: routes.facturacionCustomers, icon: Users },
         { title: "Productos", href: routes.facturacionProducts, icon: Package },
-        { title: "Inventario", href: routes.facturacionInventory, icon: Boxes },
+        { title: "Inventario", href: routes.facturacionInventory, icon: Archive },
         { title: "Compras", href: routes.facturacionPurchases, icon: FolderTree },
         { title: "Caja", href: routes.facturacionCash, icon: CreditCard },
         { title: "Reportes", href: routes.facturacionReports, icon: BarChart3 },
-      ].filter(Boolean) as SidebarItem[])
-    : ([
+      ]
+    : [
         { title: "POS / Ventas", href: routes.facturacionPos, icon: ShoppingCart },
         { title: "Documentos", href: routes.facturacionDocuments, icon: FileCheck },
         { title: "Clientes", href: routes.facturacionCustomers, icon: Users },
         { title: "Productos", href: routes.facturacionProducts, icon: Package },
-        { title: "Inventario", href: routes.facturacionInventory, icon: Boxes },
+        { title: "Inventario", href: routes.facturacionInventory, icon: Archive },
         { title: "Caja", href: routes.facturacionCash, icon: CreditCard },
         { title: "Reportes", href: routes.facturacionReports, icon: BarChart3 },
-      ].filter(Boolean) as SidebarItem[]);
-  const configurationItems = isBusinessSuiteActive
-    ? ([
+      ];
+
+  const configItems: SidebarItem[] = isAdvanced
+    ? [
         { title: "Empresa y ajustes", href: routes.facturacionSettings, icon: Building2 },
-        { title: "Bodegas", href: routes.erpInventoryWarehouses, icon: Warehouse },
-        { title: "Categorias", href: routes.erpInventoryCategories, icon: FolderTree },
-        { title: "Unidades", href: routes.erpInventoryUnits, icon: Package },
-        { title: "Metodos de pago", href: routes.erpFinancePaymentMethods, icon: CreditCard },
-        { title: "Configuracion SRI", href: routes.facturacionSri, icon: Settings2 },
-        { title: "Historial Basico", href: routes.facturacionHistoryBasic, icon: MessageSquareWarning },
-      ].filter(Boolean) as SidebarItem[])
-    : ([
-        { title: "Configuracion SRI", href: routes.facturacionSri, icon: Settings2 },
-        { title: "Ajustes", href: routes.facturacionSettings, icon: MessageSquareWarning },
-      ].filter(Boolean) as SidebarItem[]);
-  const accountItems = [
+        { title: "Bodegas", href: routes.facturacionSettingsWarehouses, icon: Warehouse },
+        { title: "Categorias", href: routes.facturacionSettingsCategories, icon: FolderTree },
+        { title: "Unidades", href: routes.facturacionSettingsUnits, icon: Package },
+        { title: "Metodos de pago", href: routes.facturacionSettingsPaymentMethods, icon: CreditCard },
+        { title: "Historial Basico", href: routes.facturacionHistoryBasic, icon: BarChart3 },
+      ]
+    : [
+        { title: "Ajustes", href: routes.facturacionSettings, icon: Settings2 },
+      ];
+
+  const fiscalItems: SidebarItem[] = [
+    { title: "SRI Ecuador", href: routes.sri, icon: Receipt },
+    { title: "Documentos electronicos", href: routes.sriDocuments, icon: FileCheck },
+  ];
+
+  const accountItems: SidebarItem[] = [
     { title: "Mi Plan", href: routes.billing, icon: WalletCards },
-    showInternalAdmin ? { title: "Admin Billing", href: routes.adminBilling, icon: Sparkles } : null,
-  ].filter(Boolean) as SidebarItem[];
-  const navigationGroups = [
-    {
-      title: "Operacion",
-      items: operationsItems,
-    },
-    {
-      title: "Configuracion",
-      items: configurationItems,
-    },
-    ...(isBusinessSuiteActive
+    ...(showInternalAdmin
+      ? [{ title: "Admin Billing", href: routes.adminBilling, icon: Sparkles }]
+      : []),
+  ];
+
+  const navigationGroups: NavGroup[] = [
+    { title: "Operacion", items: operationItems },
+    { title: "Configuracion", items: configItems },
+    { title: "Fiscal", items: fiscalItems },
+    ...(isAdvanced
       ? [
-          {
-            title: "Fiscal",
-            items: [
-              { title: "SRI Ecuador", href: routes.erpFiscalEcuador, icon: Receipt },
-              {
-                title: "Documentos electronicos",
-                href: routes.facturacionDocuments,
-                icon: FileCheck,
-              },
-            ],
-          },
           {
             title: "Contabilidad",
             items: [
-              { title: "Plan de cuentas", href: routes.erpAccountingAccounts, icon: BookOpen },
-              { title: "Libro diario", href: routes.erpAccountingJournal, icon: BookOpen },
-              { title: "Libro mayor", href: routes.erpAccountingGeneralLedger, icon: BookOpen },
-              {
-                title: "Estado de resultados",
-                href: routes.erpAccountingProfitAndLoss,
-                icon: BarChart3,
-              },
-              {
-                title: "Balance general",
-                href: routes.erpAccountingBalanceSheet,
-                icon: BarChart3,
-              },
-              {
-                title: "Balance de comprobacion",
-                href: routes.erpAccountingTrialBalance,
-                icon: BarChart3,
-              },
+              { title: "Plan de cuentas", href: routes.facturacionAccountingChartOfAccounts, icon: BookOpen },
+              { title: "Libro diario", href: routes.facturacionAccountingJournal, icon: BookOpen },
+              { title: "Libro mayor", href: routes.facturacionAccountingLedger, icon: BookOpen },
+              { title: "Estado de resultados", href: routes.facturacionAccountingIncomeStatement, icon: BarChart3 },
+              { title: "Balance general", href: routes.facturacionAccountingBalanceSheet, icon: BarChart3 },
+              { title: "Balance de comprobacion", href: routes.facturacionAccountingTrialBalance, icon: BarChart3 },
             ],
           },
         ]
@@ -132,23 +117,20 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
         { title: "Automatizaciones", href: routes.automations, icon: Sparkles },
       ],
     },
-    {
-      title: "Cuenta",
-      items: accountItems,
-    },
+    { title: "Cuenta", items: accountItems },
   ];
 
   return (
     <aside className="hidden min-h-screen w-72 border-r border-slate-200 bg-linear-to-b from-slate-50 via-white to-slate-50/60 px-4 py-6 lg:block">
       <div className="mb-6 rounded-2xl border border-sky-100 bg-white px-4 py-4 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">Workspace</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">Facturación</p>
         <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-900">
-          Facturacion
+          {isAdvanced ? "Gestión Empresarial" : "Básico"}
         </h2>
-        <p className="mt-1 text-sm text-slate-600">
-          {tenantMode.shouldUseAdvancedMode
-            ? "Motor empresarial activo. El historial basico queda protegido para consulta."
-            : "Operacion diaria con motor basico activo para este tenant."}
+        <p className="mt-1 text-xs text-slate-500">
+          {isAdvanced
+            ? "Motor empresarial activo."
+            : "Motor Core activo."}
         </p>
       </div>
 
@@ -160,7 +142,7 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
           <div className="rounded-xl bg-white p-2 text-sky-700 shadow-sm">
             <LayoutGrid className="h-4 w-4" />
           </div>
-          Mis Aplicaciones
+          Facturación
         </Link>
       </div>
 

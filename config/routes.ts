@@ -82,6 +82,21 @@ export const routes = {
   facturacionSettings: "/facturacion/settings",
   facturacionHistoryBasic: "/facturacion/history/basic",
 
+  facturacionSettingsWarehouses: "/facturacion/settings/warehouses",
+  facturacionSettingsCategories: "/facturacion/settings/categories",
+  facturacionSettingsUnits: "/facturacion/settings/units",
+  facturacionSettingsPaymentMethods: "/facturacion/settings/payment-methods",
+
+  facturacionPurchasesDocuments: "/facturacion/purchases/documents",
+  facturacionPurchasesReceived: "/facturacion/purchases/received",
+
+  facturacionAccountingChartOfAccounts: "/facturacion/accounting/chart-of-accounts",
+  facturacionAccountingJournal: "/facturacion/accounting/journal",
+  facturacionAccountingLedger: "/facturacion/accounting/ledger",
+  facturacionAccountingIncomeStatement: "/facturacion/accounting/income-statement",
+  facturacionAccountingBalanceSheet: "/facturacion/accounting/balance-sheet",
+  facturacionAccountingTrialBalance: "/facturacion/accounting/trial-balance",
+
   basic: "/basic",
   basicProducts: "/basic/products",
   basicCustomers: "/basic/customers",

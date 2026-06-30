@@ -1,5 +1,6 @@
 import BasicCashPage from "@/app/basic/cash/page";
 import ErpFinanceCashPage from "@/app/erp/finance/cash/page";
+import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 
@@ -18,5 +19,9 @@ export default async function FacturacionCashPage({
     return <ErpFinanceCashPage searchParams={resolvedSearchParams} />;
   }
 
-  return <BasicCashPage />;
+  return (
+    <DashboardShell mainClassName="" contentClassName="">
+      <BasicCashPage />
+    </DashboardShell>
+  );
 }

@@ -1,5 +1,6 @@
 import BasicStockPage from "@/app/basic/stock/page";
 import ErpInventoryPage from "@/app/erp/inventory/page";
+import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 
@@ -17,5 +18,9 @@ export default async function FacturacionInventoryPage({
     return <ErpInventoryPage />;
   }
 
-  return <BasicStockPage searchParams={searchParams} />;
+  return (
+    <DashboardShell mainClassName="" contentClassName="">
+      <BasicStockPage searchParams={searchParams} />
+    </DashboardShell>
+  );
 }
