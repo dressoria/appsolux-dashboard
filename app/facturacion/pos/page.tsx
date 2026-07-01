@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { AdvancedPosPage } from "@/components/appsolux/facturacion/advanced-pos-page";
 import { BasicModuleShell } from "@/components/appsolux/basic/basic-module-shell";
 import { BasicPosClient } from "@/components/appsolux/basic/pos-client";
 import { BillingWarehouseSelector } from "@/components/appsolux/billing/billing-warehouse-selector";
@@ -14,6 +13,10 @@ import { getTenantPlanState } from "@/lib/core/plans";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { getSriModuleStatus } from "@/lib/core/sri";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
+import {
+  loadSharedErpPosCustomers,
+  loadSharedErpPosProducts,
+} from "@/lib/core/billing/pos-engine";
 
 type FacturacionPosPageProps = {
   searchParams: Promise<{ customerId?: string }>;
@@ -35,18 +38,14 @@ const compactActions = (
 
 export default async function FacturacionPosPage({ searchParams }: FacturacionPosPageProps) {
   const { user, tenant } = await requireDashboardSession();
-  const tenantMode = await getTenantModeState(tenant);
-
-  if (tenantMode.canUseAdvancedErp) {
-    return <AdvancedPosPage />;
-  }
-
-  const [resolvedParams, plan] = await Promise.all([
+  const [resolvedParams, tenantMode, plan] = await Promise.all([
     searchParams,
+    getTenantModeState(tenant),
     getTenantPlanState(tenant.id),
   ]);
 
-  if (!plan.canUseBasicPos) {
+  // Plan gate — only applies to CORE (SHARED_ERP always has POS)
+  if (!plan.canUseBasicPos && !tenantMode.canUseAdvancedErp) {
     return (
       <DashboardShell mainClassName="" contentClassName="">
         <BasicModuleShell
@@ -70,7 +69,72 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
     );
   }
 
-  const [products, customers, sriStatus] = await Promise.all([
+  // ── SHARED_ERP: load products and customers from ERP engine ──────────────
+  if (tenantMode.canUseAdvancedErp) {
+    let products: Array<{
+      id: string;
+      name: string;
+      price: string;
+      stock: number;
+      barcode?: string | null;
+      taxRate: string;
+    }> = [];
+    let customers: Array<{
+      id: string;
+      name: string;
+      phone?: string | null;
+      email?: string | null;
+      address?: string | null;
+    }> = [];
+    let erpError: string | null = null;
+
+    try {
+      [products, customers] = await Promise.all([
+        loadSharedErpPosProducts(tenant.id),
+        loadSharedErpPosCustomers(),
+      ]);
+    } catch (err) {
+      erpError =
+        err instanceof Error
+          ? err.message
+          : "No se pudo conectar con Gestión Empresarial.";
+    }
+
+    return (
+      <DashboardShell mainClassName="" contentClassName="">
+        <BasicModuleShell
+          title="POS / Ventas"
+          description="Vende, cobra y genera recibos o facturas desde un solo lugar."
+          activeHref={routes.facturacionPos}
+          action={compactActions}
+        >
+          <div className="space-y-4">
+            <BillingWarehouseSelector />
+            {erpError ? (
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-destructive">{erpError}</p>
+                </CardContent>
+              </Card>
+            ) : null}
+            <BasicPosClient
+              tenantName={tenant.name}
+              currentUserName={user.name}
+              hasSriConfig={false}
+              initialCustomerId=""
+              products={products}
+              customers={customers}
+              saleEndpoint="/api/billing/pos/sale"
+              engine="SHARED_ERP"
+            />
+          </div>
+        </BasicModuleShell>
+      </DashboardShell>
+    );
+  }
+
+  // ── CORE: existing logic ──────────────────────────────────────────────────
+  const [coreProducts, coreCustomers, sriStatus] = await Promise.all([
     listProducts(tenant.id),
     listCustomers(tenant.id),
     getSriModuleStatus(tenant.id),
@@ -108,7 +172,7 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
             currentUserName={user.name}
             hasSriConfig={hasSriConfig}
             initialCustomerId={initialCustomerId}
-            products={products.map((product) => ({
+            products={coreProducts.map((product) => ({
               id: product.id,
               name: product.name,
               price: product.price.toString(),
@@ -116,7 +180,7 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
               barcode: product.barcode,
               taxRate: product.taxRate.toString(),
             }))}
-            customers={customers.map((customer) => ({
+            customers={coreCustomers.map((customer) => ({
               id: customer.id,
               name: customer.name,
               phone: customer.phone,

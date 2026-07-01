@@ -115,6 +115,8 @@ export function BasicPosClient({
   customers: initialCustomers,
   initialCustomerId,
   hasSriConfig = false,
+  saleEndpoint = "/api/basic/sales",
+  engine = "CORE",
 }: {
   tenantName: string;
   currentUserName?: string;
@@ -122,6 +124,8 @@ export function BasicPosClient({
   customers: Customer[];
   initialCustomerId?: string;
   hasSriConfig?: boolean;
+  saleEndpoint?: string;
+  engine?: "CORE" | "SHARED_ERP";
 }) {
   const router = useRouter();
 
@@ -384,7 +388,7 @@ export function BasicPosClient({
         }
       }
 
-      const response = await fetch("/api/basic/sales", {
+      const response = await fetch(saleEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -886,14 +890,16 @@ export function BasicPosClient({
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <Label className="text-xs text-slate-500">Seleccionar cliente</Label>
-                        <button
-                          type="button"
-                          onClick={() => setShowNewCustomer(true)}
-                          className="flex items-center gap-1 text-xs text-[#004080] hover:text-[#003060]"
-                        >
-                          <UserPlus className="h-3 w-3" />
-                          Nuevo cliente
-                        </button>
+                        {engine === "CORE" ? (
+                          <button
+                            type="button"
+                            onClick={() => setShowNewCustomer(true)}
+                            className="flex items-center gap-1 text-xs text-[#004080] hover:text-[#003060]"
+                          >
+                            <UserPlus className="h-3 w-3" />
+                            Nuevo cliente
+                          </button>
+                        ) : null}
                       </div>
                       <select
                         value={customerId}
@@ -1191,9 +1197,11 @@ export function BasicPosClient({
                   </Link>
                 </Button>
               )}
-              <Button asChild size="sm" variant="outline">
-                <Link href={`/basic/sales/${lastSale.id}`}>Ver venta</Link>
-              </Button>
+              {engine === "CORE" ? (
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/basic/sales/${lastSale.id}`}>Ver venta</Link>
+                </Button>
+              ) : null}
               <Button
                 size="sm"
                 className="bg-[#004080] hover:bg-[#003060]"
@@ -1354,14 +1362,16 @@ export function BasicPosClient({
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor="customerId">Cliente</Label>
-              <button
-                type="button"
-                onClick={() => setShowNewCustomer(true)}
-                className="flex items-center gap-1 text-xs text-[#004080] hover:text-[#003060]"
-              >
-                <UserPlus className="h-3 w-3" />
-                Nuevo cliente
-              </button>
+              {engine === "CORE" ? (
+                <button
+                  type="button"
+                  onClick={() => setShowNewCustomer(true)}
+                  className="flex items-center gap-1 text-xs text-[#004080] hover:text-[#003060]"
+                >
+                  <UserPlus className="h-3 w-3" />
+                  Nuevo cliente
+                </button>
+              ) : null}
             </div>
             {initialCustomerId && customerId === initialCustomerId && (
               <p className="text-xs text-slate-500">
