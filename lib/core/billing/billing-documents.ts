@@ -69,6 +69,97 @@ const VALID_SRI_STATUSES = [
   "CANCELLED",
 ] as const;
 
+// ── Basic history for SHARED_ERP (ventas internas históricas) ─────────────────
+
+async function loadBasicHistoryItems(
+  tenantId: string,
+  limit = 30
+): Promise<BillingDocumentListItem[]> {
+  const prisma = getPrismaClient();
+  const sales = await prisma.lightweightSale.findMany({
+    where: { tenantId, status: { not: "canceled" } },
+    include: {
+      customer: { select: { name: true } },
+      items: { include: { product: { select: { name: true } } }, take: 4 },
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+
+  if (sales.length === 0) return [];
+
+  const saleIds = sales.map((s) => s.id);
+  const sriDocs = await prisma.sriDocument.findMany({
+    where: { tenantId, sourceType: "BASIC_SALE", sourceId: { in: saleIds } },
+    select: {
+      id: true,
+      sourceId: true,
+      status: true,
+      environment: true,
+      accessKey: true,
+      establishment: { select: { code: true } },
+      issuePoint: { select: { code: true } },
+      sequentialNumber: true,
+      submissionJobs: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: {
+          sriAuthorizationNumber: true,
+          authorizedAt: true,
+          errorMessage: true,
+          sriReceiptStatus: true,
+          sriAuthorizationStatus: true,
+        },
+      },
+    },
+  });
+
+  const sriBySourceId = Object.fromEntries(
+    sriDocs.filter((d) => d.sourceId).map((d) => [d.sourceId!, d])
+  );
+
+  return sales.map((sale) => {
+    const sri = sriBySourceId[sale.id] ?? null;
+    const job = sri?.submissionJobs[0] ?? null;
+    const rejectionMessage =
+      sri?.status === "REJECTED"
+        ? job?.errorMessage ?? job?.sriAuthorizationStatus ?? job?.sriReceiptStatus ?? null
+        : null;
+    const displayNumber = sri
+      ? formatDisplayNumber(
+          sri.establishment?.code ?? "???",
+          sri.issuePoint?.code ?? "???",
+          sri.sequentialNumber
+        )
+      : null;
+
+    return {
+      id: sale.id,
+      type: "BASIC_SALE" as const,
+      displayNumber,
+      customerName: sale.customer?.name ?? null,
+      total: sale.total.toString(),
+      issuedAt: sale.createdAt.toISOString(),
+      source: "BASIC_HISTORY" as const,
+      sourceLabel: "Historial Básico",
+      internalStatus: sale.status,
+      internalStatusLabel: INTERNAL_STATUS_LABELS[sale.status] ?? sale.status,
+      sriStatus: sri?.status ?? null,
+      sriStatusLabel: sri ? sriLabel(sri.status) : null,
+      sriDocumentId: sri?.id ?? null,
+      accessKey: sri?.accessKey ?? null,
+      authorizationNumber: job?.sriAuthorizationNumber ?? null,
+      authorizationDate: job?.authorizedAt ? job.authorizedAt.toISOString() : null,
+      environment: sri?.environment ?? null,
+      rejectionMessage,
+      saleDetailHref: `/basic/sales/${sale.id}`,
+      sriDetailHref: sri ? `/sri/documents/${sri.id}` : null,
+      itemsSummary:
+        sale.items.map((i) => `${i.product.name} ×${i.quantity}`).join(", ") || null,
+    };
+  });
+}
+
 export async function loadCoreDocuments(
   tenantId: string,
   options: { status?: string; page?: number; perPage?: number } = {}
@@ -191,8 +282,13 @@ export async function loadCoreDocuments(
 
 export async function loadErpDocuments(
   tenantId: string,
-  options: { status?: string; page?: number; perPage?: number } = {}
-): Promise<{ items: BillingDocumentListItem[]; total: number }> {
+  options: {
+    status?: string;
+    page?: number;
+    perPage?: number;
+    includeBasicHistory?: boolean;
+  } = {}
+): Promise<{ items: BillingDocumentListItem[]; total: number; basicHistoryCount: number }> {
   const prisma = getPrismaClient();
   const perPage = Math.min(options.perPage ?? 20, 50);
   const page = Math.max(options.page ?? 1, 1);
@@ -204,7 +300,7 @@ export async function loadErpDocuments(
 
   const where = { tenantId, ...(statusValue ? { status: statusValue as never } : {}) };
 
-  const [docs, total] = await Promise.all([
+  const [docs, total, basicHistory] = await Promise.all([
     prisma.sriDocument.findMany({
       where,
       include: {
@@ -232,47 +328,55 @@ export async function loadErpDocuments(
       take: perPage,
     }),
     prisma.sriDocument.count({ where }),
+    options.includeBasicHistory ? loadBasicHistoryItems(tenantId, 20) : Promise.resolve([]),
   ]);
 
-  return {
-    items: docs.map((doc) => {
-      const job = doc.submissionJobs[0] ?? null;
-      const rejectionMessage =
-        doc.status === "REJECTED"
-          ? job?.errorMessage ??
-            job?.sriAuthorizationStatus ??
-            job?.sriReceiptStatus ??
-            null
-          : null;
+  const sriItems: BillingDocumentListItem[] = docs.map((doc) => {
+    const job = doc.submissionJobs[0] ?? null;
+    const rejectionMessage =
+      doc.status === "REJECTED"
+        ? job?.errorMessage ?? job?.sriAuthorizationStatus ?? job?.sriReceiptStatus ?? null
+        : null;
 
-      return {
-        id: doc.id,
-        type: "SRI_DOCUMENT" as const,
-        displayNumber: formatDisplayNumber(
-          doc.establishment?.code ?? "???",
-          doc.issuePoint?.code ?? "???",
-          doc.sequentialNumber
-        ),
-        customerName: doc.customerName ?? null,
-        total: doc.grandTotal.toString(),
-        issuedAt: doc.createdAt.toISOString(),
-        source: "SRI" as const,
-        sourceLabel: "Documento SRI",
-        internalStatus: doc.status,
-        internalStatusLabel: sriLabel(doc.status),
-        sriStatus: doc.status,
-        sriStatusLabel: sriLabel(doc.status),
-        sriDocumentId: doc.id,
-        accessKey: doc.accessKey ?? null,
-        authorizationNumber: job?.sriAuthorizationNumber ?? null,
-        authorizationDate: job?.authorizedAt ? job.authorizedAt.toISOString() : null,
-        environment: doc.environment,
-        rejectionMessage,
-        saleDetailHref: null,
-        sriDetailHref: `/sri/documents/${doc.id}`,
-        itemsSummary: null,
-      };
-    }),
+    return {
+      id: doc.id,
+      type: "SRI_DOCUMENT" as const,
+      displayNumber: formatDisplayNumber(
+        doc.establishment?.code ?? "???",
+        doc.issuePoint?.code ?? "???",
+        doc.sequentialNumber
+      ),
+      customerName: doc.customerName ?? null,
+      total: doc.grandTotal.toString(),
+      issuedAt: doc.createdAt.toISOString(),
+      source: "SRI" as const,
+      sourceLabel: "Documento SRI",
+      internalStatus: doc.status,
+      internalStatusLabel: sriLabel(doc.status),
+      sriStatus: doc.status,
+      sriStatusLabel: sriLabel(doc.status),
+      sriDocumentId: doc.id,
+      accessKey: doc.accessKey ?? null,
+      authorizationNumber: job?.sriAuthorizationNumber ?? null,
+      authorizationDate: job?.authorizedAt ? job.authorizedAt.toISOString() : null,
+      environment: doc.environment,
+      rejectionMessage,
+      saleDetailHref: null,
+      sriDetailHref: `/sri/documents/${doc.id}`,
+      itemsSummary: null,
+    };
+  });
+
+  // Merge SRI docs + basic history, sorted by date desc
+  const merged = [...sriItems, ...basicHistory].sort((a, b) => {
+    const dateA = a.issuedAt ? new Date(a.issuedAt).getTime() : 0;
+    const dateB = b.issuedAt ? new Date(b.issuedAt).getTime() : 0;
+    return dateB - dateA;
+  });
+
+  return {
+    items: merged,
     total,
+    basicHistoryCount: basicHistory.length,
   };
 }

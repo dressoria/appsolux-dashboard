@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CoreMigrationNotice } from "@/components/appsolux/business-suite/core-migration-notice";
 import { CreateCustomerForm } from "@/components/appsolux/erp/create-customer-form";
 import { CustomersTable } from "@/components/appsolux/erp/customers-table";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
@@ -6,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getErpnextCustomers } from "@/lib/api/erpnext/customers";
 import { getErpnextMasters } from "@/lib/api/erpnext/masters";
+import { getPrismaClient } from "@/lib/db/prisma";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
@@ -50,7 +52,7 @@ export default async function ErpCustomersPage() {
     );
   }
 
-  const [customers, masters] = await Promise.all([
+  const [customers, masters, coreCustomerCount] = await Promise.all([
     getErpnextCustomers().catch(() => []),
     getErpnextMasters().catch(() => ({
       itemGroups: [],
@@ -58,11 +60,17 @@ export default async function ErpCustomersPage() {
       territories: [],
       companies: [],
     })),
+    getPrismaClient().lightweightCustomer.count({ where: { tenantId: tenant.id } }),
   ]);
 
   return (
     <DashboardShell>
       <div className="space-y-6">
+        <CoreMigrationNotice
+          coreProductCount={0}
+          coreCustomerCount={coreCustomerCount}
+          type="customers"
+        />
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm text-muted-foreground">

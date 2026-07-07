@@ -54,9 +54,16 @@ export default async function FacturacionDocumentsPage({ searchParams }: Props) 
   const isErp = tenantMode.canUseAdvancedErp;
   const mode = isErp ? "SHARED_ERP" : "CORE";
 
-  const { items, total } = isErp
-    ? await loadErpDocuments(tenant.id, { status: statusParam, page, perPage: PAGE_SIZE })
-    : await loadCoreDocuments(tenant.id, { status: statusParam, page, perPage: PAGE_SIZE });
+  const loadResult = isErp
+    ? await loadErpDocuments(tenant.id, {
+        status: statusParam,
+        page,
+        perPage: PAGE_SIZE,
+        includeBasicHistory: true,
+      })
+    : { ...(await loadCoreDocuments(tenant.id, { status: statusParam, page, perPage: PAGE_SIZE })), basicHistoryCount: 0 };
+
+  const { items, total } = loadResult;
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);

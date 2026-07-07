@@ -8,6 +8,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import { CoreMigrationNotice } from "@/components/appsolux/business-suite/core-migration-notice";
 import { CreateItemForm } from "@/components/appsolux/erp/create-item-form";
 import { ProductPricingManager } from "@/components/appsolux/erp/product-pricing-manager";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
@@ -18,6 +19,7 @@ import { getErpnextInventory } from "@/lib/api/erpnext/inventory";
 import { getErpnextItems } from "@/lib/api/erpnext/items";
 import { getErpnextMasters } from "@/lib/api/erpnext/masters";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getPrismaClient } from "@/lib/db/prisma";
 import { getErpProductPricingMap } from "@/lib/core/erp-pricing";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
@@ -86,7 +88,7 @@ export default async function ErpInventoryProductsPage() {
     );
   }
 
-  const [itemsResult, mastersResult, inventoryResult] = await Promise.all([
+  const [itemsResult, mastersResult, inventoryResult, coreProductCount] = await Promise.all([
     loadResource(getErpnextItems, []),
     loadResource(getErpnextMasters, {
       itemGroups: [],
@@ -95,6 +97,7 @@ export default async function ErpInventoryProductsPage() {
       companies: [],
     }),
     loadResource(getErpnextInventory, []),
+    getPrismaClient().lightweightProduct.count({ where: { tenantId: tenant.id } }),
   ]);
   const items = itemsResult.data;
   const pricingMap = await getErpProductPricingMap(
@@ -117,6 +120,11 @@ export default async function ErpInventoryProductsPage() {
   return (
     <DashboardShell contentClassName="mx-auto max-w-7xl">
       <div className="space-y-8">
+        <CoreMigrationNotice
+          coreProductCount={coreProductCount}
+          coreCustomerCount={0}
+          type="products"
+        />
         <section className="overflow-hidden rounded-[32px] border border-sky-100 bg-linear-to-br from-sky-100 via-white to-slate-50 shadow-sm shadow-sky-100/60">
           <div className="grid gap-8 px-6 py-8 lg:grid-cols-[1.2fr_0.8fr] lg:px-8">
             <div className="space-y-4">

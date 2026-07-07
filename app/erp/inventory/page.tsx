@@ -22,6 +22,7 @@ import {
   Warehouse,
 } from "lucide-react";
 
+import { CoreMigrationNotice } from "@/components/appsolux/business-suite/core-migration-notice";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +31,7 @@ import { getErpnextInventory } from "@/lib/api/erpnext/inventory";
 import { getErpnextItems } from "@/lib/api/erpnext/items";
 import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getPrismaClient } from "@/lib/db/prisma";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
@@ -350,10 +352,11 @@ export default async function ErpInventoryPage() {
     );
   }
 
-  const [items, warehouses, inventory] = await Promise.all([
+  const [items, warehouses, inventory, coreProductCount] = await Promise.all([
     getErpnextItems().catch(() => []),
     getErpnextWarehouses().catch(() => []),
     getErpnextInventory().catch(() => []),
+    getPrismaClient().lightweightProduct.count({ where: { tenantId: tenant.id } }),
   ]);
 
   const operativeWarehouses = warehouses.filter(
@@ -368,6 +371,11 @@ export default async function ErpInventoryPage() {
   return (
     <DashboardShell contentClassName="mx-auto max-w-7xl">
       <div className="space-y-8">
+        <CoreMigrationNotice
+          coreProductCount={coreProductCount}
+          coreCustomerCount={0}
+          type="inventory"
+        />
         <section className="overflow-hidden rounded-[32px] border border-sky-100 bg-linear-to-br from-sky-100 via-white to-slate-50 shadow-sm shadow-sky-100/60">
           <div className="grid gap-8 px-6 py-8 lg:grid-cols-[1.35fr_0.95fr] lg:px-8">
             <div className="space-y-5">
