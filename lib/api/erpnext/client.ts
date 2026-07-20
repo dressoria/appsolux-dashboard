@@ -120,20 +120,21 @@ function getSafeBaseOrigin(baseUrl: string) {
 
 export async function erpnextFetch<T>(
   path: string,
-  options?: RequestInit
+  options?: (RequestInit & { suppressExpectedErrorLog?: boolean }) | undefined
 ): Promise<T> {
   const { baseUrl, apiKey, apiSecret } = getErpnextConfig();
   const requestUrl = `${baseUrl}${path}`;
   const safeOrigin = getSafeBaseOrigin(baseUrl);
+  const { suppressExpectedErrorLog = false, ...requestOptions } = options ?? {};
   let response: Response;
 
   try {
     response = await fetch(requestUrl, {
-      ...options,
+      ...requestOptions,
       headers: {
         "Content-Type": "application/json",
         Authorization: `token ${apiKey}:${apiSecret}`,
-        ...options?.headers,
+        ...requestOptions.headers,
       },
       cache: "no-store",
     });
@@ -167,13 +168,15 @@ export async function erpnextFetch<T>(
         ? payload
         : `ERPNext request failed: ${response.status}`);
 
-    console.error("[erpnext] Request returned error response", {
-      origin: safeOrigin,
-      path,
-      method: options?.method ?? "GET",
-      status: response.status,
-      message: cleanSafeErpnextMessage(message),
-    });
+    if (!suppressExpectedErrorLog) {
+      console.error("[erpnext] Request returned error response", {
+        origin: safeOrigin,
+        path,
+        method: requestOptions.method ?? "GET",
+        status: response.status,
+        message: cleanSafeErpnextMessage(message),
+      });
+    }
 
     throw new Error(cleanSafeErpnextMessage(message));
   }

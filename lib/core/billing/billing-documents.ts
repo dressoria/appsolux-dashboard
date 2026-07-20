@@ -25,6 +25,7 @@ export type BillingDocumentListItem = {
   saleDetailHref: string | null;
   sriDetailHref: string | null;
   itemsSummary: string | null;
+  itemsUnavailable?: boolean;
 };
 
 const INTERNAL_STATUS_LABELS: Record<string, string> = {
@@ -328,7 +329,15 @@ export async function loadErpDocuments(
       take: perPage,
     }),
     prisma.sriDocument.count({ where }),
-    options.includeBasicHistory ? loadBasicHistoryItems(tenantId, 20) : Promise.resolve([]),
+    options.includeBasicHistory
+      ? loadBasicHistoryItems(tenantId, 20).catch((error) => {
+          console.warn("[billing-documents] Basic history could not be loaded; continuing", {
+            tenantId,
+            message: error instanceof Error ? error.message : "Unknown error",
+          });
+          return [];
+        })
+      : Promise.resolve([]),
   ]);
 
   const sriItems: BillingDocumentListItem[] = docs.map((doc) => {
@@ -364,6 +373,7 @@ export async function loadErpDocuments(
       saleDetailHref: null,
       sriDetailHref: `/sri/documents/${doc.id}`,
       itemsSummary: null,
+      itemsUnavailable: false,
     };
   });
 

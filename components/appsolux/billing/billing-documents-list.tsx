@@ -153,6 +153,11 @@ function DocumentRow({ doc }: { doc: BillingDocumentListItem }) {
           {doc.itemsSummary && (
             <p className="max-w-sm truncate text-xs text-slate-400">{doc.itemsSummary}</p>
           )}
+          {doc.itemsUnavailable && (
+            <p className="text-xs text-slate-400">
+              Detalle de items no disponible con los permisos actuales.
+            </p>
+          )}
         </div>
 
         {/* Total + actions */}

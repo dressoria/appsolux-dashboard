@@ -16,6 +16,17 @@ const itemGroupFields = [
   "is_group",
 ];
 
+function isDisabledFieldNotAllowedError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("campo no permitido") ||
+    message.includes("field not permitted") ||
+    message.includes("not permitted in query")
+  ) && message.includes("disabled");
+}
+
 export async function getErpnextItemGroups(
   options: { onlyUsable?: boolean } = {}
 ): Promise<ErpnextItemGroup[]> {
@@ -29,12 +40,17 @@ export async function getErpnextItemGroups(
     });
 
     response = await erpnextFetch<ErpnextListResponse<ErpnextItemGroup>>(
-      `/api/resource/Item%20Group?${params.toString()}`
+      `/api/resource/Item%20Group?${params.toString()}`,
+      { suppressExpectedErrorLog: true }
     );
   } catch (error) {
-    if (!(error instanceof Error) || !error.message.includes("disabled")) {
+    if (!isDisabledFieldNotAllowedError(error)) {
       throw error;
     }
+
+    console.warn(
+      "[erpnext] Item Group disabled field not allowed; retrying without disabled"
+    );
 
     const fallbackParams = new URLSearchParams({
       fields: JSON.stringify(itemGroupFields),
@@ -50,7 +66,7 @@ export async function getErpnextItemGroups(
   if (!options.onlyUsable) return response.data;
 
   const usableItemGroups = response.data.filter(
-    (itemGroup) => itemGroup.is_group !== 1 && itemGroup.disabled !== 1
+    (itemGroup) => itemGroup.is_group !== 1 && (itemGroup.disabled ?? 0) !== 1
   );
 
   return usableItemGroups.length > 0 ? usableItemGroups : response.data;

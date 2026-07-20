@@ -84,6 +84,17 @@ type SalesInvoiceItemReportRow = ErpnextSalesInvoiceItem & {
   parent: string;
 };
 
+function isSalesInvoiceItemPermissionError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("permissionerror") ||
+    message.includes("permission error") ||
+    message.includes("not permitted")
+  );
+}
+
 function getDateFilters(range?: ReportDateRange) {
   const filters: unknown[] = [];
 
@@ -240,11 +251,24 @@ async function getInvoiceItemsForReports(
     limit_page_length: "500",
   });
 
-  const response = await erpnextFetch<
-    ErpnextListResponse<SalesInvoiceItemReportRow>
-  >(`/api/resource/Sales%20Invoice%20Item?${params.toString()}`);
+  try {
+    const response = await erpnextFetch<
+      ErpnextListResponse<SalesInvoiceItemReportRow>
+    >(`/api/resource/Sales%20Invoice%20Item?${params.toString()}`, {
+      suppressExpectedErrorLog: true,
+    });
 
-  return response.data;
+    return response.data;
+  } catch (error) {
+    if (!isSalesInvoiceItemPermissionError(error)) {
+      throw error;
+    }
+
+    console.warn(
+      "[erpnext] Sales Invoice Item cannot be read directly; continuing without invoice item details"
+    );
+    return [];
+  }
 }
 
 function buildProductSalesRows(
