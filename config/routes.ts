@@ -73,6 +73,7 @@ export const routes = {
   facturacionDocuments: "/facturacion/documents",
   facturacionCustomers: "/facturacion/customers",
   facturacionProducts: "/facturacion/products",
+  facturacionImports: "/facturacion/imports",
   facturacionInventory: "/facturacion/inventory",
   facturacionPurchases: "/facturacion/purchases",
   facturacionCash: "/facturacion/cash",

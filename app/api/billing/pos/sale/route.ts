@@ -7,6 +7,7 @@ import { getErpnextModesOfPayment } from "@/lib/api/erpnext/modes-of-payment";
 import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { startSriFlowFromBasicSale } from "@/lib/core/basic-sales-sri";
+import { getTenantPreferredWarehouseName } from "@/lib/core/business-suite/erpnext-master-data";
 import { getErpProductPricingMap } from "@/lib/core/erp-pricing";
 import { createSale } from "@/lib/core/lightweight-pos";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
@@ -58,6 +59,10 @@ function findErpModeOfPayment(
   return found?.name ?? enabled[0]?.name ?? null;
 }
 
+function getRequestedWarehouseName(body: Record<string, unknown>) {
+  return typeof body.warehouseName === "string" ? body.warehouseName.trim() : "";
+}
+
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -79,18 +84,24 @@ export async function POST(request: Request) {
         );
       }
 
-      const [companies, warehousesRaw, modesOfPayment, pricingMap] = await Promise.all([
+      const [companies, warehousesRaw, modesOfPayment, pricingMap, preferredWarehouseName] = await Promise.all([
         getErpnextCompanies(),
         getErpnextWarehouses(),
         getErpnextModesOfPayment(),
         getErpProductPricingMap(tenant.id, items.map((i) => i.productId)),
+        getTenantPreferredWarehouseName(tenant.id),
       ]);
 
       const usableWarehouses = warehousesRaw.filter(
         (w) => w.disabled !== 1 && w.is_group !== 1
       );
       const company = companies[0]?.name ?? null;
-      const warehouse = usableWarehouses[0]?.name ?? null;
+      const requestedWarehouseName = getRequestedWarehouseName(body);
+      const warehouse =
+        usableWarehouses.find((entry) => entry.name === requestedWarehouseName)?.name ??
+        usableWarehouses.find((entry) => entry.name === preferredWarehouseName)?.name ??
+        usableWarehouses[0]?.name ??
+        null;
       const modeOfPayment = findErpModeOfPayment(String(body.paymentMethod ?? "cash"), modesOfPayment);
 
       if (!company) {
@@ -105,6 +116,15 @@ export async function POST(request: Request) {
             ok: false,
             message:
               "No hay bodegas configuradas en Gestión Empresarial. Ve a Configuración > Bodegas.",
+          },
+          { status: 400 }
+        );
+      }
+      if (requestedWarehouseName && warehouse !== requestedWarehouseName) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: "La bodega seleccionada no está disponible para este tenant.",
           },
           { status: 400 }
         );

@@ -57,6 +57,7 @@ export async function PUT(request: Request) {
       item_name: itemName,
       stock_uom: stockUom,
       item_group: itemGroup,
+      barcode: getStringField(body, "barcode") || undefined,
       is_stock_item: getBooleanField(body, "is_stock_item"),
     });
 
@@ -239,6 +240,7 @@ export async function POST(request: Request) {
       item_name: itemName,
       stock_uom: stockUom,
       item_group: itemGroup,
+      barcode: getStringField(body, "barcode") || undefined,
       is_stock_item: getBooleanField(body, "is_stock_item"),
     };
     const item = await createErpnextItem(input);

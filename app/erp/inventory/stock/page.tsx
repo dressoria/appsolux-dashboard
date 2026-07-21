@@ -1,12 +1,16 @@
 import Link from "next/link";
+
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { routes } from "@/config/routes";
 import { getErpnextInventory } from "@/lib/api/erpnext/inventory";
+import { getErpnextItems } from "@/lib/api/erpnext/items";
+import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getTenantPreferredWarehouseName } from "@/lib/core/business-suite/erpnext-master-data";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
-import { routes } from "@/config/routes";
 
 function formatQty(value: number | undefined) {
   if (value === undefined) return "-";
@@ -16,23 +20,34 @@ function formatQty(value: number | undefined) {
 }
 
 type StockPageProps = {
-  searchParams: { filter?: string };
+  searchParams: Promise<{ filter?: string; warehouse?: string }>;
+};
+
+type ProductStockRow = {
+  itemCode: string;
+  itemName: string;
+  totalQty: number;
+  projectedQty: number;
+  reservedQty: number;
+  selectedWarehouseQty: number;
+  warehouses: Array<{
+    name: string;
+    qty: number;
+  }>;
 };
 
 export default async function ErpInventoryStockPage({ searchParams }: StockPageProps) {
-  const filter = searchParams.filter ?? "all";
+  const params = await searchParams;
+  const filter = params.filter ?? "all";
+  const warehouseFilter = params.warehouse ?? "all";
   const user = await getCurrentUser();
 
   if (!user) {
     return (
       <DashboardShell>
         <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Sesion requerida
-          </h1>
-          <p className="text-muted-foreground">
-            Inicia sesion para ver stock actual.
-          </p>
+          <h1 className="text-3xl font-semibold tracking-tight">Sesion requerida</h1>
+          <p className="text-muted-foreground">Inicia sesion para ver stock actual.</p>
         </div>
       </DashboardShell>
     );
@@ -56,9 +71,7 @@ export default async function ErpInventoryStockPage({ searchParams }: StockPageP
               </Link>{" "}
               / Stock actual
             </p>
-            <h1 className="text-3xl font-semibold tracking-tight">
-              Stock actual
-            </h1>
+            <h1 className="text-3xl font-semibold tracking-tight">Stock actual</h1>
           </div>
           <Card>
             <CardContent className="p-6 text-sm text-muted-foreground">
@@ -75,17 +88,75 @@ export default async function ErpInventoryStockPage({ searchParams }: StockPageP
 
   const LOW_STOCK_THRESHOLD = 5;
 
-  const inventory = await getErpnextInventory();
-  const noStockRows = inventory.filter((b) => (b.actual_qty ?? 0) <= 0);
-  const withStockRows = inventory.filter((b) => (b.actual_qty ?? 0) > 0);
-  const lowStockRows = withStockRows.filter((b) => (b.actual_qty ?? 0) <= LOW_STOCK_THRESHOLD);
+  const [inventory, items, warehouses, preferredWarehouseName] = await Promise.all([
+    getErpnextInventory(),
+    getErpnextItems(),
+    getErpnextWarehouses(),
+    getTenantPreferredWarehouseName(tenant.id),
+  ]);
+
+  const activeWarehouses = warehouses.filter(
+    (warehouse) => warehouse.disabled !== 1 && warehouse.is_group !== 1
+  );
+  const validWarehouseFilter =
+    warehouseFilter !== "all" &&
+    activeWarehouses.some((warehouse) => warehouse.name === warehouseFilter)
+      ? warehouseFilter
+      : "all";
+
+  const itemNameByCode = new Map(
+    items.map((item) => [item.item_code, item.item_name || item.item_code])
+  );
+
+  const rowsByItem = inventory.reduce<Map<string, ProductStockRow>>((acc, bin) => {
+    const existing = acc.get(bin.item_code) ?? {
+      itemCode: bin.item_code,
+      itemName: itemNameByCode.get(bin.item_code) ?? bin.item_code,
+      totalQty: 0,
+      projectedQty: 0,
+      reservedQty: 0,
+      selectedWarehouseQty: 0,
+      warehouses: [],
+    };
+
+    const qty = bin.actual_qty ?? 0;
+    existing.totalQty += qty;
+    existing.projectedQty += bin.projected_qty ?? 0;
+    existing.reservedQty += bin.reserved_qty ?? 0;
+    if (validWarehouseFilter !== "all" && bin.warehouse === validWarehouseFilter) {
+      existing.selectedWarehouseQty += qty;
+    }
+    existing.warehouses.push({
+      name: bin.warehouse,
+      qty,
+    });
+
+    acc.set(bin.item_code, existing);
+    return acc;
+  }, new Map());
+
+  const allRows = Array.from(rowsByItem.values())
+    .map((row) => ({
+      ...row,
+      warehouses: row.warehouses.sort((a, b) => b.qty - a.qty),
+    }))
+    .sort((a, b) => a.itemName.localeCompare(b.itemName, "es"));
+
+  const getVisibleQty = (row: ProductStockRow) =>
+    validWarehouseFilter === "all" ? row.totalQty : row.selectedWarehouseQty;
+
+  const noStockRows = allRows.filter((row) => getVisibleQty(row) <= 0);
+  const withStockRows = allRows.filter((row) => getVisibleQty(row) > 0);
+  const lowStockRows = withStockRows.filter(
+    (row) => getVisibleQty(row) <= LOW_STOCK_THRESHOLD
+  );
 
   const displayRows =
     filter === "out"
       ? noStockRows
       : filter === "low"
         ? lowStockRows
-        : inventory;
+        : allRows;
 
   const pageTitle =
     filter === "out"
@@ -111,7 +182,7 @@ export default async function ErpInventoryStockPage({ searchParams }: StockPageP
             </p>
             <h1 className="text-3xl font-semibold tracking-tight">{pageTitle}</h1>
             <p className="mt-2 text-muted-foreground">
-              Cantidades disponibles, proyectadas y reservadas por producto y bodega.
+              Revisa stock total y por bodega para cada producto operativo.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -124,62 +195,80 @@ export default async function ErpInventoryStockPage({ searchParams }: StockPageP
             <Button asChild variant="outline">
               <Link href={routes.erpInventory}>Volver a inventario</Link>
             </Button>
-            <Button asChild variant="outline">
-              <Link href={routes.erp}>Volver al ERP</Link>
-            </Button>
           </div>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-sm text-muted-foreground">
-          Los ingresos o transferencias en borrador no afectan el stock hasta ser confirmados en el
-          ERP.
+          {validWarehouseFilter === "all"
+            ? "La vista consolida el stock de todas las bodegas activas."
+            : `Mostrando disponibilidad operativa para la bodega ${validWarehouseFilter}.`}
         </div>
 
         <div className="flex flex-wrap gap-2">
           <Link
-            href={`${routes.erpInventoryStock}`}
+            href={validWarehouseFilter === "all" ? routes.erpInventoryStock : `${routes.erpInventoryStock}?warehouse=${encodeURIComponent(validWarehouseFilter)}`}
             className={`inline-flex h-8 items-center rounded-lg border px-3 text-sm font-medium transition-colors ${
-              filter === "all" || filter === undefined || filter === ""
-                ? "border-slate-900 bg-slate-900 text-white"
-                : "border-input bg-background hover:bg-muted"
+              filter === "all" ? "border-slate-900 bg-slate-900 text-white" : "border-input bg-background hover:bg-muted"
             }`}
           >
-            Todos ({inventory.length})
+            Todos ({allRows.length})
           </Link>
           <Link
-            href={`${routes.erpInventoryStock}?filter=out`}
+            href={`${routes.erpInventoryStock}?filter=low${validWarehouseFilter === "all" ? "" : `&warehouse=${encodeURIComponent(validWarehouseFilter)}`}`}
             className={`inline-flex h-8 items-center rounded-lg border px-3 text-sm font-medium transition-colors ${
-              filter === "out"
-                ? "border-amber-600 bg-amber-600 text-white"
-                : "border-input bg-background hover:bg-muted"
-            }`}
-          >
-            Sin stock ({noStockRows.length})
-          </Link>
-          <Link
-            href={`${routes.erpInventoryStock}?filter=low`}
-            className={`inline-flex h-8 items-center rounded-lg border px-3 text-sm font-medium transition-colors ${
-              filter === "low"
-                ? "border-amber-500 bg-amber-500 text-white"
-                : "border-input bg-background hover:bg-muted"
+              filter === "low" ? "border-amber-500 bg-amber-500 text-white" : "border-input bg-background hover:bg-muted"
             }`}
           >
             Stock bajo ({lowStockRows.length})
           </Link>
+          <Link
+            href={`${routes.erpInventoryStock}?filter=out${validWarehouseFilter === "all" ? "" : `&warehouse=${encodeURIComponent(validWarehouseFilter)}`}`}
+            className={`inline-flex h-8 items-center rounded-lg border px-3 text-sm font-medium transition-colors ${
+              filter === "out" ? "border-amber-600 bg-amber-600 text-white" : "border-input bg-background hover:bg-muted"
+            }`}
+          >
+            Sin stock ({noStockRows.length})
+          </Link>
         </div>
 
-        {filter === "low" ? (
-          <p className="text-xs text-muted-foreground">
-            Stock bajo: productos con cantidad disponible entre 1 y {LOW_STOCK_THRESHOLD} unidades (estimado). Para umbrales exactos configura nivel de reorden en el ERP.
-          </p>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={filter === "all" ? routes.erpInventoryStock : `${routes.erpInventoryStock}?filter=${encodeURIComponent(filter)}`}
+            className={`inline-flex h-8 items-center rounded-lg border px-3 text-sm font-medium transition-colors ${
+              validWarehouseFilter === "all" ? "border-sky-700 bg-sky-700 text-white" : "border-input bg-background hover:bg-muted"
+            }`}
+          >
+            Todas las bodegas
+          </Link>
+          {activeWarehouses.map((warehouse) => {
+            const href =
+              filter === "all"
+                ? `${routes.erpInventoryStock}?warehouse=${encodeURIComponent(warehouse.name)}`
+                : `${routes.erpInventoryStock}?filter=${encodeURIComponent(filter)}&warehouse=${encodeURIComponent(warehouse.name)}`;
+
+            const active = validWarehouseFilter === warehouse.name;
+
+            return (
+              <Link
+                key={warehouse.name}
+                href={href}
+                className={`inline-flex h-8 items-center rounded-lg border px-3 text-sm font-medium transition-colors ${
+                  active ? "border-slate-900 bg-slate-900 text-white" : "border-input bg-background hover:bg-muted"
+                }`}
+              >
+                {warehouse.warehouse_name || warehouse.name}
+                {preferredWarehouseName === warehouse.name ? " · Principal" : ""}
+              </Link>
+            );
+          })}
+        </div>
 
         <div className="grid gap-3 md:grid-cols-3">
           <Card>
             <CardHeader>
-              <CardTitle>Filas de stock</CardTitle>
+              <CardTitle>Productos</CardTitle>
             </CardHeader>
-            <CardContent className="text-2xl font-semibold">{inventory.length}</CardContent>
+            <CardContent className="text-2xl font-semibold">{allRows.length}</CardContent>
           </Card>
           <Card>
             <CardHeader>
@@ -204,66 +293,80 @@ export default async function ErpInventoryStockPage({ searchParams }: StockPageP
         <Card>
           <CardHeader>
             <CardTitle>
-              {filter === "out"
-                ? "Productos sin stock"
-                : filter === "low"
-                  ? "Productos con stock bajo"
-                  : "Stock por producto y bodega"}
+              {validWarehouseFilter === "all"
+                ? "Stock consolidado por producto"
+                : `Stock por producto en ${validWarehouseFilter}`}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {displayRows.length === 0 ? (
               <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                {filter === "out"
-                  ? "No hay productos sin stock en este momento."
-                  : filter === "low"
-                    ? "No hay productos con stock bajo en este momento."
-                    : "Aun no hay stock registrado. Agrega stock desde ajustes o ingresos de mercaderia."}
+                No hay productos para este filtro.
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
+                <table className="w-full min-w-[1100px] text-left text-sm">
                   <thead className="border-b text-xs text-muted-foreground">
                     <tr>
                       <th className="py-2 pr-4 font-medium">Producto</th>
-                      <th className="py-2 pr-4 font-medium">Bodega</th>
-                      <th className="py-2 pr-4 font-medium text-right">Disponible</th>
+                      <th className="py-2 pr-4 font-medium text-right">
+                        {validWarehouseFilter === "all" ? "Stock total" : "Stock en bodega"}
+                      </th>
                       <th className="py-2 pr-4 font-medium text-right">Proyectado</th>
                       <th className="py-2 pr-4 font-medium text-right">Reservado</th>
-                      <th className="py-2 font-medium">Estado</th>
+                      <th className="py-2 pr-4 font-medium">Stock por bodega</th>
+                      <th className="py-2 pr-4 font-medium">Estado</th>
                       <th className="py-2 font-medium">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {displayRows.map((bin) => {
-                      const qty = bin.actual_qty ?? 0;
+                    {displayRows.map((row) => {
+                      const qty = getVisibleQty(row);
                       const isNoStock = qty <= 0;
                       const isLow = qty > 0 && qty <= LOW_STOCK_THRESHOLD;
+
                       return (
-                        <tr key={bin.name}>
-                          <td className="py-2 pr-4 font-medium">
+                        <tr key={row.itemCode}>
+                          <td className="py-2 pr-4">
                             <Link
-                              href={`${routes.erpInventoryKardex}?item=${encodeURIComponent(bin.item_code)}`}
-                              className="hover:underline"
+                              href={`${routes.erpInventoryKardex}?item=${encodeURIComponent(row.itemCode)}`}
+                              className="font-medium hover:underline"
                             >
-                              {bin.item_code}
+                              {row.itemName}
                             </Link>
+                            <p className="text-xs text-muted-foreground">{row.itemCode}</p>
                           </td>
-                          <td className="py-2 pr-4 text-muted-foreground">{bin.warehouse}</td>
                           <td
                             className={`py-2 pr-4 text-right font-semibold ${
                               isNoStock ? "text-amber-600" : isLow ? "text-orange-600" : ""
                             }`}
                           >
-                            {formatQty(bin.actual_qty)}
+                            {formatQty(qty)}
                           </td>
                           <td className="py-2 pr-4 text-right text-muted-foreground">
-                            {formatQty(bin.projected_qty)}
+                            {formatQty(row.projectedQty)}
                           </td>
                           <td className="py-2 pr-4 text-right text-muted-foreground">
-                            {formatQty(bin.reserved_qty)}
+                            {formatQty(row.reservedQty)}
                           </td>
-                          <td className="py-2">
+                          <td className="py-2 pr-4">
+                            <div className="flex flex-wrap gap-1.5">
+                              {row.warehouses.map((warehouse) => (
+                                <span
+                                  key={`${row.itemCode}-${warehouse.name}`}
+                                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${
+                                    preferredWarehouseName === warehouse.name
+                                      ? "border-sky-200 bg-sky-50 text-sky-700"
+                                      : "border-slate-200 bg-slate-50 text-slate-700"
+                                  }`}
+                                >
+                                  {warehouse.name}: {formatQty(warehouse.qty)}
+                                  {preferredWarehouseName === warehouse.name ? " · Principal" : ""}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="py-2 pr-4">
                             {isNoStock ? (
                               <span className="inline-flex h-5 items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700">
                                 Sin stock
@@ -282,25 +385,16 @@ export default async function ErpInventoryStockPage({ searchParams }: StockPageP
                             <div className="flex flex-wrap gap-1.5">
                               <Button asChild size="xs" variant="outline">
                                 <Link
-                                  href={`${routes.erpInventoryAdjustments}?item=${encodeURIComponent(
-                                    bin.item_code
-                                  )}&warehouse=${encodeURIComponent(bin.warehouse)}`}
+                                  href={`${routes.erpInventoryAdjustments}?item=${encodeURIComponent(row.itemCode)}${validWarehouseFilter === "all" ? "" : `&warehouse=${encodeURIComponent(validWarehouseFilter)}`}`}
                                 >
                                   Ajustar
                                 </Link>
                               </Button>
                               <Button asChild size="xs" variant="outline">
                                 <Link
-                                  href={`${routes.erpInventoryKardex}?item=${encodeURIComponent(
-                                    bin.item_code
-                                  )}&warehouse=${encodeURIComponent(bin.warehouse)}`}
+                                  href={`${routes.erpInventoryKardex}?item=${encodeURIComponent(row.itemCode)}${validWarehouseFilter === "all" ? "" : `&warehouse=${encodeURIComponent(validWarehouseFilter)}`}`}
                                 >
                                   Kardex
-                                </Link>
-                              </Button>
-                              <Button asChild size="xs" variant="outline">
-                                <Link href={routes.erpInventoryTransfers}>
-                                  Transferir
                                 </Link>
                               </Button>
                             </div>

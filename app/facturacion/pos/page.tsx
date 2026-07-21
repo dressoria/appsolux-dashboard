@@ -2,11 +2,12 @@ import Link from "next/link";
 
 import { BasicModuleShell } from "@/components/appsolux/basic/basic-module-shell";
 import { BasicPosClient } from "@/components/appsolux/basic/pos-client";
-import { BillingWarehouseSelector } from "@/components/appsolux/billing/billing-warehouse-selector";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { routes } from "@/config/routes";
+import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
+import { getTenantPreferredWarehouseName } from "@/lib/core/business-suite/erpnext-master-data";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { listCustomers, listProducts } from "@/lib/core/lightweight-pos";
 import { getTenantPlanState } from "@/lib/core/plans";
@@ -78,6 +79,7 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
       stock: number;
       barcode?: string | null;
       taxRate: string;
+      warehouseStock?: Record<string, number>;
     }> = [];
     let customers: Array<{
       id: string;
@@ -87,12 +89,29 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
       address?: string | null;
     }> = [];
     let erpError: string | null = null;
+    let warehouseOptions: Array<{ name: string; label?: string | null }> = [];
+    let initialWarehouseName = "";
 
     try {
-      [products, customers] = await Promise.all([
+      const [loadedProducts, loadedCustomers, warehouses, preferredWarehouseName] = await Promise.all([
         loadSharedErpPosProducts(tenant.id),
         loadSharedErpPosCustomers(),
+        getErpnextWarehouses(),
+        getTenantPreferredWarehouseName(tenant.id),
       ]);
+
+      products = loadedProducts;
+      customers = loadedCustomers;
+      warehouseOptions = warehouses
+        .filter((warehouse) => warehouse.is_group !== 1 && warehouse.disabled !== 1)
+        .map((warehouse) => ({
+          name: warehouse.name,
+          label: warehouse.warehouse_name || warehouse.name,
+        }));
+      initialWarehouseName =
+        warehouseOptions.find((warehouse) => warehouse.name === preferredWarehouseName)?.name ??
+        warehouseOptions[0]?.name ??
+        "";
     } catch (err) {
       erpError =
         err instanceof Error
@@ -109,7 +128,6 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
           action={compactActions}
         >
           <div className="space-y-4">
-            <BillingWarehouseSelector />
             {erpError ? (
               <Card>
                 <CardContent className="p-4">
@@ -126,6 +144,8 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
               customers={customers}
               saleEndpoint="/api/billing/pos/sale"
               engine="SHARED_ERP"
+              warehouses={warehouseOptions}
+              initialWarehouseName={initialWarehouseName}
             />
           </div>
         </BasicModuleShell>
@@ -166,7 +186,6 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
         action={compactActions}
       >
         <div className="space-y-4">
-          <BillingWarehouseSelector />
           <BasicPosClient
             tenantName={tenant.name}
             currentUserName={user.name}

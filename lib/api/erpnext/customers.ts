@@ -14,6 +14,7 @@ const customerFields = [
   "customer_type",
   "territory",
   "tax_id",
+  "email_id",
   "mobile_no",
   "disabled",
 ];
@@ -45,6 +46,7 @@ export async function updateErpnextCustomer(
         customer_type: input.customer_type ?? "Individual",
         territory: input.territory,
         tax_id: input.tax_id ?? undefined,
+        email_id: input.email_id ?? undefined,
         mobile_no: input.mobile_no ?? undefined,
       }),
     }
@@ -90,6 +92,7 @@ export async function createErpnextCustomer(
         customer_type: input.customer_type ?? "Individual",
         territory: input.territory,
         tax_id: input.tax_id ?? undefined,
+        email_id: input.email_id ?? undefined,
         mobile_no: input.mobile_no ?? undefined,
       }),
     }

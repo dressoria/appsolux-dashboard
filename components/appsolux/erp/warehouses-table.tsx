@@ -18,6 +18,7 @@ import {
 
 type WarehousesTableProps = {
   warehouses: ErpnextWarehouse[];
+  preferredWarehouseName?: string | null;
 };
 
 function formatFlag(value: 0 | 1 | undefined) {
@@ -31,7 +32,10 @@ type DeleteWarehouseResponse = ApiResponse<{
 }>;
 type UpdateWarehouseResponse = ApiResponse<{ warehouse: ErpnextWarehouse }>;
 
-export function WarehousesTable({ warehouses }: WarehousesTableProps) {
+export function WarehousesTable({
+  warehouses,
+  preferredWarehouseName = null,
+}: WarehousesTableProps) {
   const router = useRouter();
   const [toast, setToast] = useState<ErpToastState>(null);
   const [editingWarehouse, setEditingWarehouse] =
@@ -39,6 +43,7 @@ export function WarehousesTable({ warehouses }: WarehousesTableProps) {
   const [deletingWarehouse, setDeletingWarehouse] =
     useState<ErpnextWarehouse | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const [settingDefaultName, setSettingDefaultName] = useState<string | null>(null);
   const usableWarehouses = warehouses
     .filter((warehouse) => warehouse.is_group !== 1)
     .sort((left, right) =>
@@ -134,6 +139,34 @@ export function WarehousesTable({ warehouses }: WarehousesTableProps) {
       setIsPending(false);
     }
   }
+
+  async function handleSetDefaultWarehouse(warehouseName: string) {
+    setSettingDefaultName(warehouseName);
+
+    try {
+      const response = await fetch("/api/billing/warehouses/default", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ warehouseName }),
+      });
+      const result = (await response.json()) as ApiResponse<{ warehouseName: string }>;
+
+      if (!result.success) {
+        showToast({ type: "error", message: result.error.message });
+        return;
+      }
+
+      showToast({ type: "success", message: "Bodega principal actualizada." });
+      router.refresh();
+    } catch (error) {
+      showToast({
+        type: "error",
+        message: error instanceof Error ? error.message : "No se pudo guardar la bodega principal.",
+      });
+    } finally {
+      setSettingDefaultName(null);
+    }
+  }
   const groupWarehouses = warehouses
     .filter((warehouse) => warehouse.is_group === 1)
     .sort((left, right) =>
@@ -177,7 +210,14 @@ export function WarehousesTable({ warehouses }: WarehousesTableProps) {
                   {usableWarehouses.map((warehouse) => (
                     <tr key={warehouse.name}>
                       <td className="py-2 pr-4 font-medium">
-                        {warehouse.warehouse_name}
+                        <div className="flex items-center gap-2">
+                          <span>{warehouse.warehouse_name}</span>
+                          {preferredWarehouseName === warehouse.name ? (
+                            <span className="inline-flex h-5 items-center rounded-full border border-sky-200 bg-sky-50 px-2 text-xs font-medium text-sky-700">
+                              Principal
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="py-2 pr-4">{warehouse.company ?? "-"}</td>
                       <td className="py-2 pr-4">
@@ -187,6 +227,19 @@ export function WarehousesTable({ warehouses }: WarehousesTableProps) {
                         {formatFlag(warehouse.disabled)}
                       </td>
                       <td className="py-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={settingDefaultName === warehouse.name}
+                          onClick={() => handleSetDefaultWarehouse(warehouse.name)}
+                        >
+                          {preferredWarehouseName === warehouse.name
+                            ? "Bodega activa"
+                            : settingDefaultName === warehouse.name
+                              ? "Guardando..."
+                              : "Usar en POS"}
+                        </Button>
                         <Button
                           type="button"
                           variant="outline"

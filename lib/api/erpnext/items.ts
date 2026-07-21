@@ -12,24 +12,55 @@ const itemFields = [
   "name",
   "item_name",
   "item_code",
+  "barcode",
   "item_group",
   "stock_uom",
   "disabled",
   "is_stock_item",
 ];
 
+function isBarcodeFieldNotAllowedError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("campo no permitido") ||
+    message.includes("field not permitted") ||
+    message.includes("not permitted in query")
+  ) && message.includes("barcode");
+}
+
 export async function getErpnextItems(): Promise<ErpnextItem[]> {
-  const params = new URLSearchParams({
-    fields: JSON.stringify(itemFields),
-    limit_page_length: "100",
-    order_by: "modified desc",
-  });
+  try {
+    const params = new URLSearchParams({
+      fields: JSON.stringify(itemFields),
+      limit_page_length: "100",
+      order_by: "modified desc",
+    });
 
-  const response = await erpnextFetch<ErpnextListResponse<ErpnextItem>>(
-    `/api/resource/Item?${params.toString()}`
-  );
+    const response = await erpnextFetch<ErpnextListResponse<ErpnextItem>>(
+      `/api/resource/Item?${params.toString()}`,
+      { suppressExpectedErrorLog: true }
+    );
 
-  return response.data;
+    return response.data;
+  } catch (error) {
+    if (!isBarcodeFieldNotAllowedError(error)) {
+      throw error;
+    }
+
+    const params = new URLSearchParams({
+      fields: JSON.stringify(itemFields.filter((field) => field !== "barcode")),
+      limit_page_length: "100",
+      order_by: "modified desc",
+    });
+
+    const response = await erpnextFetch<ErpnextListResponse<ErpnextItem>>(
+      `/api/resource/Item?${params.toString()}`
+    );
+
+    return response.data;
+  }
 }
 
 export async function createErpnextItem(
@@ -42,6 +73,7 @@ export async function createErpnextItem(
       body: JSON.stringify({
         item_code: input.item_code,
         item_name: input.item_name,
+        barcode: input.barcode,
         stock_uom: input.stock_uom,
         item_group: input.item_group,
         is_stock_item: input.is_stock_item === false ? 0 : 1,
@@ -62,6 +94,7 @@ export async function updateErpnextItem(
       method: "PUT",
       body: JSON.stringify({
         item_name: input.item_name,
+        barcode: input.barcode,
         stock_uom: input.stock_uom,
         item_group: input.item_group,
         is_stock_item:

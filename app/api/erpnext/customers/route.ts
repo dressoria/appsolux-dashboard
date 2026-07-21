@@ -59,6 +59,7 @@ export async function PUT(request: Request) {
       territory,
       tax_id: getStringField(body, "tax_id") || undefined,
       mobile_no: getStringField(body, "mobile_no") || undefined,
+      email_id: getStringField(body, "email_id") || undefined,
     });
 
     return NextResponse.json({
@@ -235,6 +236,7 @@ export async function POST(request: Request) {
       territory,
       tax_id: getStringField(body, "tax_id") || undefined,
       mobile_no: getStringField(body, "mobile_no") || undefined,
+      email_id: getStringField(body, "email_id") || undefined,
     };
     const customer = await createErpnextCustomer(input);
 

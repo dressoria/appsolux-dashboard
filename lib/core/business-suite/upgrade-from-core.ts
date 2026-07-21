@@ -21,6 +21,7 @@ import {
   getErpnextWarehouses,
 } from "@/lib/api/erpnext/warehouses";
 import { getPrismaClient } from "@/lib/db/prisma";
+import { resolveBusinessSuiteErpMasterData } from "@/lib/core/business-suite/erpnext-master-data";
 import { getTenantIntegrationByProvider } from "@/lib/core/integrations";
 import type {
   ErpnextCompany,
@@ -605,7 +606,7 @@ export async function executeUpgradeFromCore(
   const dryRun = options.dryRun !== false;
   const territory = options.territory ?? "All Territories";
   const analysis = await analyzeCoreData(tenantId);
-  const masterData = await resolveUpgradeMasterData(tenantId, {
+  const masterData = await resolveBusinessSuiteErpMasterData(tenantId, {
     dryRun,
     companyName: options.companyName,
     defaultItemGroup: options.defaultItemGroup,

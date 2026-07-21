@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { BillingWarehouseSelector } from "@/components/appsolux/billing/billing-warehouse-selector";
 import { SimpleReceipt } from "@/components/appsolux/basic/simple-receipt";
 import { SaleStatusBadge } from "@/components/appsolux/basic/sales-ui";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ type Product = {
   stock: number;
   barcode?: string | null;
   taxRate: string;
+  warehouseStock?: Record<string, number>;
 };
 
 type Customer = {
@@ -56,6 +58,11 @@ type Customer = {
   phone?: string | null;
   email?: string | null;
   address?: string | null;
+};
+
+type WarehouseOption = {
+  name: string;
+  label?: string | null;
 };
 
 type CartItem = {
@@ -117,6 +124,8 @@ export function BasicPosClient({
   hasSriConfig = false,
   saleEndpoint = "/api/basic/sales",
   engine = "CORE",
+  warehouses = [],
+  initialWarehouseName = "",
 }: {
   tenantName: string;
   currentUserName?: string;
@@ -126,6 +135,8 @@ export function BasicPosClient({
   hasSriConfig?: boolean;
   saleEndpoint?: string;
   engine?: "CORE" | "SHARED_ERP";
+  warehouses?: WarehouseOption[];
+  initialWarehouseName?: string;
 }) {
   const router = useRouter();
 
@@ -152,6 +163,7 @@ export function BasicPosClient({
   const [transferRef, setTransferRef] = useState("");
 
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [selectedWarehouse, setSelectedWarehouse] = useState(initialWarehouseName);
 
   // Invoice editor customer fields (editable overrides)
   const [invoiceCustomerName, setInvoiceCustomerName] = useState("Consumidor Final");
@@ -175,6 +187,14 @@ export function BasicPosClient({
   const tipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const productById = new Map(products.map((p) => [p.id, p]));
+
+  useEffect(() => {
+    if (!warehouses.length) return;
+    if (selectedWarehouse && warehouses.some((warehouse) => warehouse.name === selectedWarehouse)) {
+      return;
+    }
+    setSelectedWarehouse(initialWarehouseName || warehouses[0]?.name || "");
+  }, [initialWarehouseName, selectedWarehouse, warehouses]);
 
   // Sync invoice customer fields when selection changes
   useEffect(() => {
@@ -252,6 +272,12 @@ export function BasicPosClient({
   const saldo = paymentMethod === "credit" ? cartTotals.total : Math.max(0, cartTotals.total - paidNum);
   const vuelto = paymentMethod !== "credit" && paidNum > cartTotals.total ? paidNum - cartTotals.total : 0;
 
+  function getAvailableStock(product: Product) {
+    if (engine !== "SHARED_ERP") return product.stock;
+    if (!selectedWarehouse) return product.stock;
+    return Math.max(0, product.warehouseStock?.[selectedWarehouse] ?? 0);
+  }
+
   function showTip() {
     if (tipTimerRef.current) clearTimeout(tipTimerRef.current);
     tipTimerRef.current = setTimeout(() => setShowComprobanteTip(true), 400);
@@ -275,10 +301,11 @@ export function BasicPosClient({
     setError("");
     setCart((current) => {
       const product = productById.get(productId);
-      if (!product || product.stock <= 0) return current;
+      const availableStock = product ? getAvailableStock(product) : 0;
+      if (!product || availableStock <= 0) return current;
       const existing = current.find((item) => item.productId === productId);
       if (existing) {
-        if (existing.quantity >= product.stock) {
+        if (existing.quantity >= availableStock) {
           setError(`Stock insuficiente para ${product.name}.`);
           return current;
         }
@@ -303,11 +330,12 @@ export function BasicPosClient({
     const raw = cartInputs[productId] ?? "";
     const product = productById.get(productId);
     const parsed = parseInt(raw, 10);
+    const availableStock = product ? getAvailableStock(product) : parsed;
     const safe =
       !Number.isFinite(parsed) || parsed < 1
         ? 1
         : product
-          ? Math.min(parsed, product.stock)
+          ? Math.min(parsed, availableStock)
           : parsed;
     setCartInputs((prev) => ({ ...prev, [productId]: String(safe) }));
     setCart((current) => {
@@ -383,7 +411,7 @@ export function BasicPosClient({
       }
       for (const item of cart) {
         const product = productById.get(item.productId);
-        if (!product || item.quantity > product.stock) {
+        if (!product || item.quantity > getAvailableStock(product)) {
           throw new Error(`Stock insuficiente para ${product?.name ?? "producto"}.`);
         }
       }
@@ -397,6 +425,7 @@ export function BasicPosClient({
           paidAmount:
             paymentMethod === "credit" ? 0 : paidAmount ? Number(paidAmount) : cartTotals.total,
           outputMode,
+          warehouseName: selectedWarehouse || undefined,
           items: cart.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,
@@ -1226,6 +1255,16 @@ export function BasicPosClient({
         </div>
       ) : null}
 
+      {engine === "SHARED_ERP" ? (
+        <BillingWarehouseSelector
+          warehouses={warehouses}
+          selectedWarehouse={selectedWarehouse}
+          preferredWarehouse={initialWarehouseName}
+          onChange={setSelectedWarehouse}
+          disabled={isLoading}
+        />
+      ) : null}
+
       {/* ── POS grid ────────────────────────────────────────────────────────── */}
       <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
 
@@ -1254,14 +1293,19 @@ export function BasicPosClient({
                 type="button"
                 onClick={() => addProduct(product.id)}
                 className="rounded-[22px] border border-slate-200 bg-white p-4 text-left text-sm shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={isLoading || product.stock <= 0}
+                disabled={isLoading || getAvailableStock(product) <= 0}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <span className="block font-medium text-slate-900">{product.name}</span>
                     <span className="text-slate-500">
-                      {money(toNumber(product.price))} · stock {product.stock}
+                      {money(toNumber(product.price))} · stock {getAvailableStock(product)}
                     </span>
+                    {engine === "SHARED_ERP" ? (
+                      <span className="block text-xs text-slate-400">
+                        Total ERP {product.stock}
+                      </span>
+                    ) : null}
                     {toNumber(product.taxRate) > 0 && (
                       <span className="block text-xs text-slate-400">
                         IVA {product.taxRate}%
@@ -1269,8 +1313,8 @@ export function BasicPosClient({
                     )}
                   </div>
                   <SaleStatusBadge
-                    label={product.stock > 0 ? "Disponible" : "Agotado"}
-                    variant={product.stock > 0 ? "success" : "danger"}
+                    label={getAvailableStock(product) > 0 ? "Disponible" : "Agotado"}
+                    variant={getAvailableStock(product) > 0 ? "success" : "danger"}
                   />
                 </div>
                 <p className="mt-3 text-xs text-slate-500">Toca para agregar al carrito.</p>

@@ -18,6 +18,7 @@ export type ErpnextItem = {
   name: string;
   item_name: string;
   item_code: string;
+  barcode?: string;
   item_group?: string;
   stock_uom?: string;
   disabled?: 0 | 1;
@@ -27,6 +28,7 @@ export type ErpnextItem = {
 export type CreateErpnextItemInput = {
   item_code: string;
   item_name: string;
+  barcode?: string;
   stock_uom: string;
   item_group: string;
   is_stock_item?: boolean;
@@ -63,6 +65,7 @@ export type ErpnextCustomer = {
   customer_type?: string;
   territory?: string;
   tax_id?: string;
+  email_id?: string;
   mobile_no?: string;
   disabled?: 0 | 1;
 };
@@ -73,6 +76,7 @@ export type CreateErpnextCustomerInput = {
   territory: string;
   tax_id?: string;
   mobile_no?: string;
+  email_id?: string;
 };
 
 export type ErpnextItemGroup = {

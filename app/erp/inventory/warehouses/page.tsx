@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { getErpnextCompanies } from "@/lib/api/erpnext/companies";
 import { getErpnextWarehouses } from "@/lib/api/erpnext/warehouses";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getTenantPreferredWarehouseName } from "@/lib/core/business-suite/erpnext-master-data";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { routes } from "@/config/routes";
@@ -64,9 +65,10 @@ export default async function ErpInventoryWarehousesPage() {
     );
   }
 
-  const [warehouses, companies] = await Promise.all([
+  const [warehouses, companies, preferredWarehouseName] = await Promise.all([
     getErpnextWarehouses().catch(() => []),
     getErpnextCompanies().catch(() => []),
+    getTenantPreferredWarehouseName(tenant.id).catch(() => null),
   ]);
   const groups = warehouses.filter((w) => w.is_group === 1);
 
@@ -121,7 +123,10 @@ export default async function ErpInventoryWarehousesPage() {
           <CreateWarehouseDialog companies={companies} />
         </div>
 
-        <WarehousesTable warehouses={warehouses} />
+        <WarehousesTable
+          warehouses={warehouses}
+          preferredWarehouseName={preferredWarehouseName}
+        />
       </div>
     </DashboardShell>
   );
