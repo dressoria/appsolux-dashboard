@@ -20,8 +20,7 @@ export default async function WorkspacePage() {
         description:
           "Vende, factura, cobra, controla inventario y gestiona clientes desde un solo lugar.",
         detail: "POS · Inventario · SRI · Reportes",
-        badge: "Gestion Empresarial activa",
-        subtext: "Motor Gestion Empresarial activo",
+        subtext: "Gestión Empresarial activa",
         href: routes.facturacion,
       }
     : {
@@ -29,7 +28,7 @@ export default async function WorkspacePage() {
         description:
           "Gestiona ventas, clientes, inventario, comprobantes y reportes financieros.",
         detail: "Ventas · Inventario · SRI · Reportes",
-        subtext: "Motor basico activo",
+        subtext: "Básico activo",
         href: routes.facturacion,
       };
 
@@ -55,7 +54,6 @@ export default async function WorkspacePage() {
               title={operationsCard.title}
               description={operationsCard.description}
               detail={operationsCard.detail}
-              badge={operationsCard.badge}
               subtext={operationsCard.subtext}
               href={operationsCard.href}
             />

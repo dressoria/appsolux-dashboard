@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getBasicUsageCounts, listCustomers } from "@/lib/core/lightweight-pos";
-import { getTenantPlanState } from "@/lib/core/plans";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 type BasicCustomersPageProps = {
@@ -37,12 +37,12 @@ export default async function BasicCustomersPage({
 
   const tenant = await getCurrentTenant(user);
   const resolvedSearchParams = await searchParams;
-  const plan = await getTenantPlanState(tenant.id);
+  const tenantMode = await getTenantModeState(tenant);
   const [customers, counts] = await Promise.all([
     listCustomers(tenant.id, { search: resolvedSearchParams.q }),
     getBasicUsageCounts(tenant.id),
   ]);
-  const limitReached = counts.customers >= plan.limits.customers;
+  const limitReached = counts.customers >= tenantMode.operationalLimits.customers;
 
   return (
     <BasicModuleShell
@@ -52,7 +52,7 @@ export default async function BasicCustomersPage({
     >
       <div className="space-y-6">
         <p className="text-sm text-muted-foreground">
-          {counts.customers} / {plan.limits.customers} clientes del plan.
+          {counts.customers} / {tenantMode.operationalLimits.customers} clientes del plan.
         </p>
 
         <Card>

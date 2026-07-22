@@ -17,7 +17,7 @@ import {
   resolveBusinessSuiteStatus,
 } from "@/lib/core/business-suite";
 import { getErpProvisioningState } from "@/lib/core/erp-provisioning-status";
-import { getTenantPlanState } from "@/lib/core/plans";
+import { getOperationalPlanLimits, getTenantPlanState } from "@/lib/core/plans";
 import { canUseAdvancedErp } from "@/lib/core/advanced-erp-access";
 import { resolveEffectiveTenantAccessForTenant } from "@/lib/core/tenant-features";
 import type { AppsoluxTenant } from "@/types/tenant";
@@ -30,6 +30,7 @@ export type TenantModeState = {
   trialEndsAt?: Date | null;
   currentPeriodEndsAt?: Date | null;
   limits: Awaited<ReturnType<typeof getTenantPlanState>>["limits"];
+  operationalLimits: Awaited<ReturnType<typeof getTenantPlanState>>["limits"];
   features: Awaited<ReturnType<typeof getTenantPlanState>>["features"];
   isFreeLike: boolean;
   isPaidLike: boolean;
@@ -99,6 +100,10 @@ export async function getTenantModeState(tenant: AppsoluxTenant): Promise<Tenant
       ? effectiveAccess.effectiveOperatingMode
       : effectiveAccess.configuredOperatingMode
   );
+  const operationalLimits = getOperationalPlanLimits({
+    effectiveOperatingMode: effectiveAccess.effectiveOperatingMode,
+    planLimits: plan.limits,
+  });
 
   const tenantMode = {
     planKey: plan.planKey,
@@ -108,6 +113,7 @@ export async function getTenantModeState(tenant: AppsoluxTenant): Promise<Tenant
     trialEndsAt: plan.trialEndsAt,
     currentPeriodEndsAt: plan.currentPeriodEndsAt,
     limits: plan.limits,
+    operationalLimits,
     features: plan.features,
     isFreeLike: plan.isFreeLike,
     isPaidLike: plan.isPaidLike,

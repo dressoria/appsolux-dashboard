@@ -17,7 +17,6 @@ import { routes } from "@/config/routes";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { getBasicReports } from "@/lib/core/lightweight-pos";
 import { getSriModuleStatus, getSriDocuments } from "@/lib/core/sri";
-import { getTenantPlanState } from "@/lib/core/plans";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { redirect } from "next/navigation";
@@ -35,10 +34,9 @@ export default async function SalesPage() {
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  const [reports, sriStatus, plan, sriDocs] = await Promise.all([
+  const [reports, sriStatus, sriDocs] = await Promise.all([
     getBasicReports(tenant.id),
     getSriModuleStatus(tenant.id),
-    getTenantPlanState(tenant.id),
     getSriDocuments(tenant.id, { take: 5 }),
   ]);
 
@@ -229,39 +227,35 @@ export default async function SalesPage() {
 
             <Card className="rounded-[24px] border-slate-200 bg-white shadow-sm">
               <CardHeader>
-                <CardTitle className="text-base text-slate-900">
-                  {plan.isFreeLike
-                    ? "Modo Básico · Motor Appsolux Core"
-                    : plan.planName}
-                </CardTitle>
+                <CardTitle className="text-base text-slate-900">Básico</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm text-slate-500">
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span>Ventas registradas</span>
                     <span className="font-medium text-slate-900">
-                      {reports.counts.receipts} / {plan.limits.receipts}
+                      {reports.counts.receipts} / {tenantMode.operationalLimits.receipts}
                     </span>
                   </div>
                   <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
                     <div
                       className="h-full rounded-full bg-[#004080]"
                       style={{
-                        width: `${Math.min(100, (reports.counts.receipts / plan.limits.receipts) * 100)}%`,
+                        width: `${Math.min(100, (reports.counts.receipts / tenantMode.operationalLimits.receipts) * 100)}%`,
                       }}
                     />
                   </div>
                   <div className="flex justify-between">
                     <span>Clientes</span>
                     <span className="font-medium text-slate-900">
-                      {reports.counts.customers} / {plan.limits.customers}
+                      {reports.counts.customers} / {tenantMode.operationalLimits.customers}
                     </span>
                   </div>
                   <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
                     <div
                       className="h-full rounded-full bg-[#007BFF]"
                       style={{
-                        width: `${Math.min(100, (reports.counts.customers / plan.limits.customers) * 100)}%`,
+                        width: `${Math.min(100, (reports.counts.customers / tenantMode.operationalLimits.customers) * 100)}%`,
                       }}
                     />
                   </div>
@@ -274,7 +268,7 @@ export default async function SalesPage() {
           </div>
 
           {/* ERP upsell — siempre visible en modo básico */}
-          {plan.isFreeLike && (
+          {tenantMode.shouldUseBasicMode && (
             <Card className="rounded-[24px] border-blue-100 bg-gradient-to-br from-blue-50 to-white shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base text-[#004080]">

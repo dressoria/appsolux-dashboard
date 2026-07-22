@@ -40,9 +40,9 @@ function getSriSignatureLabel(
 }
 
 function getOperatingModeLabel(mode: Awaited<ReturnType<typeof getTenantModeState>>["effectiveOperatingMode"]) {
-  if (mode === "DEDICATED_ERP") return "Motor dedicado";
-  if (mode === "SHARED_ERP") return "Motor empresarial";
-  return "Motor basico";
+  if (mode === "DEDICATED_ERP") return "Sistema Dedicado";
+  if (mode === "SHARED_ERP") return "Gestión Empresarial";
+  return "Básico";
 }
 
 export default async function WorkspacePanelPage() {
@@ -137,7 +137,7 @@ export default async function WorkspacePanelPage() {
                   value={tenantMode.shouldUseAdvancedMode ? "Suite" : String(basicReports.counts.products)}
                   helper={
                     tenantMode.shouldUseAdvancedMode
-                      ? "Catalogo principal administrado desde Facturacion con motor empresarial"
+                      ? "Catalogo principal administrado desde Facturación"
                       : "Catalogo disponible para venta y control de stock"
                   }
                 />
@@ -146,14 +146,14 @@ export default async function WorkspacePanelPage() {
                   value={tenantMode.shouldUseAdvancedMode ? "Suite" : String(basicReports.counts.customers)}
                   helper={
                     tenantMode.shouldUseAdvancedMode
-                      ? "Base comercial centralizada en Facturacion con motor empresarial"
+                      ? "Base comercial centralizada en Facturación"
                       : "Base activa para ventas, cobranza y fidelizacion"
                   }
                 />
                 <MetricCard
                   label="Motor"
                   value={operatingModeLabel}
-                  helper={`Plan ${tenantMode.publicPlan} · Estado ${tenantMode.businessSuiteStatus}`}
+                  helper={`Plan ${tenantMode.planName} · Estado ${tenantMode.canUseAdvancedErp ? "activo" : "básico"}`}
                 />
                 <MetricCard
                   label="Estado SRI"
@@ -217,8 +217,8 @@ export default async function WorkspacePanelPage() {
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-600">
                   {tenantMode.shouldUseAdvancedMode
-                    ? `Modo efectivo: ${operatingModeLabel} · Facturacion opera con el motor empresarial activo`
-                    : `Modo efectivo: ${operatingModeLabel} · Productos: ${basicReports.counts.products}/${tenantMode.limits.products} · Clientes: ${basicReports.counts.customers}/${tenantMode.limits.customers}`}
+                    ? `Operación actual: ${operatingModeLabel} activa`
+                    : `Operación actual: ${operatingModeLabel} · Productos: ${basicReports.counts.products}/${tenantMode.operationalLimits.products} · Clientes: ${basicReports.counts.customers}/${tenantMode.operationalLimits.customers}`}
                 </p>
                 <Button asChild variant="outline" size="sm" className="mt-3">
                   <Link href={routes.billing}>Ver plan</Link>

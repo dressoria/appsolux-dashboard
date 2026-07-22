@@ -7,8 +7,8 @@ import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { listSales, countSales, countActiveSales } from "@/lib/core/lightweight-pos";
-import { getTenantPlanState } from "@/lib/core/plans";
 import { getSriDocumentsForSales } from "@/lib/core/sri";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 const PAGE_SIZE = 20;
@@ -52,7 +52,7 @@ export default async function BasicSalesPage({ searchParams }: BasicSalesPagePro
   const resolvedParams = await searchParams;
   const status = normalizeStatus(resolvedParams.status);
   const page = normalizePage(resolvedParams.page);
-  const plan = await getTenantPlanState(tenant.id);
+  const tenantMode = await getTenantModeState(tenant);
 
   // Validate customerId belongs to this tenant
   let filteredCustomerId: string | undefined;
@@ -112,7 +112,7 @@ export default async function BasicSalesPage({ searchParams }: BasicSalesPagePro
       <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
-            {activeSalesCount} / {plan.limits.receipts} ventas activas del plan.
+            {activeSalesCount} / {tenantMode.operationalLimits.receipts} ventas activas del plan.
           </p>
           {filteredCustomerName && (
             <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-1.5 text-sm">

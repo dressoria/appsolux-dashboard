@@ -160,6 +160,10 @@ export const defaultPlanDefinitions: Record<
   },
 };
 
+export const basicOperationalLimits: PlanLimits = {
+  ...defaultPlanDefinitions.trial.limits,
+};
+
 function isPlanKey(value: string | null | undefined): value is PlanKey {
   return (
     value === "free" ||
@@ -218,6 +222,17 @@ export function getPlanLimits(planKey: string | null | undefined): PlanLimits {
 
 export function getPlanFeatures(planKey: string | null | undefined): PlanFeatures {
   return defaultPlanDefinitions[isPlanKey(planKey) ? planKey : getDefaultPlanKey()].features;
+}
+
+export function getOperationalPlanLimits(input: {
+  effectiveOperatingMode: "CORE" | "SHARED_ERP" | "DEDICATED_ERP";
+  planLimits: PlanLimits;
+}) {
+  if (input.effectiveOperatingMode === "CORE") {
+    return basicOperationalLimits;
+  }
+
+  return input.planLimits;
 }
 
 export const getTenantSubscription = cache(async function getTenantSubscription(tenantId: string) {

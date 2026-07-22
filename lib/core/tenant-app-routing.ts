@@ -106,12 +106,12 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
           "Base para ventas diarias",
           "Operacion liviana desde Core DB",
         ],
-        statusLabel: tenantMode.canAccessBasicInventory ? "Core activo" : "Disponible en un plan superior",
+        statusLabel: tenantMode.canAccessBasicInventory ? "Básico activo" : "Disponible en un plan superior",
         statusVariant: tenantMode.canAccessBasicInventory ? "active" : "locked",
         actionLabel: tenantMode.canAccessBasicInventory ? "Abrir inventario" : "Ver planes",
         buttonVariant: tenantMode.canAccessBasicInventory ? "default" : "outline",
         helperText: tenantMode.canAccessBasicInventory
-          ? "Tu tenant opera inventario desde el motor Core."
+          ? "Tu tenant opera inventario desde Básico."
           : "Inventario requiere activacion del modulo Core o un plan superior.",
         isEnabled: tenantMode.canAccessBasicInventory,
         isVisible: true,
@@ -148,7 +148,7 @@ export function resolveTenantAppRouting(tenantMode: TenantModeState): TenantAppR
           "Recibos internos",
           "Puente a factura SRI",
         ],
-        statusLabel: tenantMode.canAccessBasicSales ? "Core activo" : "Activacion admin requerida",
+        statusLabel: tenantMode.canAccessBasicSales ? "Básico activo" : "Activacion admin requerida",
         statusVariant: tenantMode.canAccessBasicSales ? "active" : "locked",
         actionLabel: tenantMode.canAccessBasicSales ? "Abrir ventas" : "Revisar acceso",
         buttonVariant: tenantMode.canAccessBasicSales ? "default" : "outline",

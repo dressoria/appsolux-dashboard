@@ -10,7 +10,7 @@ import {
   getDailyCashSummary,
   listStockMovements,
 } from "@/lib/core/lightweight-pos";
-import { getTenantPlanState } from "@/lib/core/plans";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 function money(value: { toString(): string }) {
@@ -33,11 +33,11 @@ export async function BasicHomePage() {
   }
 
   const tenant = await getCurrentTenant(user);
-  const [reports, cash, movements, plan] = await Promise.all([
+  const [reports, cash, movements, tenantMode] = await Promise.all([
     getBasicReports(tenant.id),
     getDailyCashSummary(tenant.id),
     listStockMovements(tenant.id, { take: 5 }),
-    getTenantPlanState(tenant.id),
+    getTenantModeState(tenant),
   ]);
 
   return (
@@ -107,9 +107,9 @@ export async function BasicHomePage() {
             <CardTitle>Uso del plan</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <p>Productos: {reports.counts.products} / {plan.limits.products}</p>
-            <p>Clientes: {reports.counts.customers} / {plan.limits.customers}</p>
-            <p>Ventas: {reports.counts.receipts} / {plan.limits.receipts}</p>
+            <p>Productos: {reports.counts.products} / {tenantMode.operationalLimits.products}</p>
+            <p>Clientes: {reports.counts.customers} / {tenantMode.operationalLimits.customers}</p>
+            <p>Ventas: {reports.counts.receipts} / {tenantMode.operationalLimits.receipts}</p>
             <Button asChild variant="outline" className="mt-2">
               <Link href={routes.billing}>Mejorar plan</Link>
             </Button>

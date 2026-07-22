@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getBasicUsageCounts, listProducts } from "@/lib/core/lightweight-pos";
-import { getTenantPlanState } from "@/lib/core/plans";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 type BasicProductsPageProps = {
@@ -34,13 +34,13 @@ export default async function BasicProductsPage({ searchParams }: BasicProductsP
 
   const tenant = await getCurrentTenant(user);
   const resolvedSearchParams = await searchParams;
-  const plan = await getTenantPlanState(tenant.id);
+  const tenantMode = await getTenantModeState(tenant);
   const [products, counts] = await Promise.all([
     listProducts(tenant.id, { search: resolvedSearchParams.q, take: 50 }),
     getBasicUsageCounts(tenant.id),
   ]);
-  const limitReached = counts.products >= plan.limits.products;
-  const usagePercent = Math.min(100, (counts.products / plan.limits.products) * 100);
+  const limitReached = counts.products >= tenantMode.operationalLimits.products;
+  const usagePercent = Math.min(100, (counts.products / tenantMode.operationalLimits.products) * 100);
 
   return (
     <BasicModuleShell
@@ -63,7 +63,7 @@ export default async function BasicProductsPage({ searchParams }: BasicProductsP
                 Productos registrados
               </span>
               <span className="text-xs font-semibold text-slate-700">
-                {counts.products} / {plan.limits.products}
+                {counts.products} / {tenantMode.operationalLimits.products}
               </span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">

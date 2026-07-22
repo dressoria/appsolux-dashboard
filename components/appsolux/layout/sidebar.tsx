@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 
 import { routes } from "@/config/routes";
-import { isInternalAdmin } from "@/lib/auth/internal-admin";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { cn } from "@/lib/utils";
 import type { AppsoluxUser } from "@/types/user";
@@ -40,7 +39,6 @@ type NavGroup = {
 
 export async function Sidebar({ user }: { user: AppsoluxUser }) {
   const tenantMode = await getTenantModeState(user.tenant);
-  const showInternalAdmin = isInternalAdmin(user);
   const isAdvanced = tenantMode.businessSuiteStatus === "active";
 
   const operationItems: SidebarItem[] = isAdvanced
@@ -85,9 +83,6 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
 
   const accountItems: SidebarItem[] = [
     { title: "Mi Plan", href: routes.billing, icon: WalletCards },
-    ...(showInternalAdmin
-      ? [{ title: "Admin Billing", href: routes.adminBilling, icon: Sparkles }]
-      : []),
   ];
 
   const navigationGroups: NavGroup[] = [
@@ -109,14 +104,18 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
           },
         ]
       : []),
-    {
-      title: "Comunicacion",
-      items: [
-        { title: "Conversaciones", href: routes.conversations, icon: MessageSquareText },
-        { title: "Canales", href: routes.channels, icon: LayoutGrid },
-        { title: "Automatizaciones", href: routes.automations, icon: Sparkles },
-      ],
-    },
+    ...(isAdvanced
+      ? [
+          {
+            title: "Comunicacion",
+            items: [
+              { title: "Conversaciones", href: routes.conversations, icon: MessageSquareText },
+              { title: "Canales", href: routes.channels, icon: LayoutGrid },
+              { title: "Automatizaciones", href: routes.automations, icon: Sparkles },
+            ],
+          },
+        ]
+      : []),
     { title: "Cuenta", items: accountItems },
   ];
 
@@ -124,14 +123,12 @@ export async function Sidebar({ user }: { user: AppsoluxUser }) {
     <aside className="hidden min-h-screen w-72 border-r border-slate-200 bg-linear-to-b from-slate-50 via-white to-slate-50/60 px-4 py-6 lg:block">
       <div className="mb-6 rounded-2xl border border-sky-100 bg-white px-4 py-4 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">Facturación</p>
-        <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-900">
-          {isAdvanced ? "Gestión Empresarial" : "Básico"}
-        </h2>
-        <p className="mt-1 text-xs text-slate-500">
-          {isAdvanced
-            ? "Motor empresarial activo."
-            : "Motor Core activo."}
-        </p>
+        <div className="mt-2 flex items-center gap-2">
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900">Panel</h2>
+          <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+            {isAdvanced ? "Gestión Empresarial" : "Básico"}
+          </span>
+        </div>
       </div>
 
       <div className="mb-4">

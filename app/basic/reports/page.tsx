@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getBasicReports } from "@/lib/core/lightweight-pos";
-import { getTenantPlanState } from "@/lib/core/plans";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 function money(value: { toString(): string }) {
@@ -29,9 +29,9 @@ export default async function BasicReportsPage() {
   }
 
   const tenant = await getCurrentTenant(user);
-  const [reports, plan] = await Promise.all([
+  const [reports, tenantMode] = await Promise.all([
     getBasicReports(tenant.id),
-    getTenantPlanState(tenant.id),
+    getTenantModeState(tenant),
   ]);
 
   return (
@@ -191,13 +191,13 @@ export default async function BasicReportsPage() {
           </CardHeader>
           <CardContent className="grid gap-3 text-sm md:grid-cols-3">
             <p>
-              Productos: {reports.counts.products} / {plan.limits.products}
+              Productos: {reports.counts.products} / {tenantMode.operationalLimits.products}
             </p>
             <p>
-              Clientes: {reports.counts.customers} / {plan.limits.customers}
+              Clientes: {reports.counts.customers} / {tenantMode.operationalLimits.customers}
             </p>
             <p>
-              Ventas: {reports.counts.receipts} / {plan.limits.receipts}
+              Ventas: {reports.counts.receipts} / {tenantMode.operationalLimits.receipts}
             </p>
           </CardContent>
         </Card>
