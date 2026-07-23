@@ -6,11 +6,12 @@
 
 /* Facturom brand tokens */
 :root {
-  --brand-primary: #4868FF;
-  --brand-yellow: #FFE847;
-  --brand-gold: #FFBC47;
-  --brand-dark: #0f0f1e;
-  --brand-navy: #1a1f4b;
+  --brand-green: #588100;
+  --brand-green-light: #8db600;
+  --brand-purple: #7f00b2;
+  --brand-purple-light: #bc4ed8;
+  --brand-dark: #0d1c0a;
+  --brand-dark-purple: #1a0d2e;
 }
 
 @theme inline {

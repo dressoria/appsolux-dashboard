@@ -1,11 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { MessageCircle, Mail, Clock, ArrowRight } from "lucide-react";
+import { MessageCircle, Mail, Clock, ArrowRight, Phone, CheckCircle } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Contacto",
-  description: "Contacta al equipo de Facturom. Soporte por WhatsApp y correo electrónico.",
+  description: "Contacta al equipo de Facturom. Soporte por WhatsApp, correo y atención personalizada.",
 };
+
+const usos = [
+  "Preguntas sobre planes y precios",
+  "Soporte técnico de la plataforma",
+  "Configuración de firma electrónica",
+  "Solicitar demo o capacitación",
+  "Información sobre planes Pymes y Corporativo",
+  "Integraciones o necesidades especiales",
+];
 
 export default function ContactoPage() {
   const whatsapp = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "";
@@ -14,69 +23,74 @@ export default function ContactoPage() {
   return (
     <div>
       {/* Header */}
-      <section className="bg-white py-20 text-center border-b border-gray-100">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6">
-          <h1 className="text-4xl sm:text-5xl font-bold text-gray-950 mb-4 leading-tight">
-            Estamos para ayudarte
+      <section className="bg-white py-20 border-b border-gray-100">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
+          <h1 className="text-4xl sm:text-5xl font-black text-gray-950 mb-5 leading-tight">
+            Estamos aquí para ayudarte.
           </h1>
           <p className="text-lg text-gray-500">
-            Si tienes preguntas sobre la plataforma, planes o firma electrónica, escríbenos.
+            Tienes preguntas sobre Facturom, planes, firma electrónica o necesitas soporte.
+            Escríbenos por el canal que prefieras.
           </p>
         </div>
       </section>
 
-      {/* Canales */}
+      {/* Canales principales */}
       <section className="bg-gray-50 py-20">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8">
             {/* WhatsApp */}
-            <div className="bg-white rounded-2xl p-7 border border-gray-100 shadow-sm flex flex-col gap-4">
+            <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm flex flex-col gap-5">
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: "#25D36618" }}
+                className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                style={{ backgroundColor: "#25D36615" }}
               >
-                <MessageCircle size={20} style={{ color: "#25D366" }} />
+                <MessageCircle size={22} style={{ color: "#25D366" }} />
               </div>
               <div>
-                <h2 className="text-base font-bold text-gray-900 mb-1">WhatsApp</h2>
-                <p className="text-sm text-gray-500 mb-4">
-                  Respuesta rápida para dudas sobre la plataforma, precios o soporte técnico.
+                <h2 className="text-base font-black text-gray-900 mb-2">WhatsApp</h2>
+                <p className="text-sm text-gray-500 leading-relaxed mb-5">
+                  Respuesta rápida para dudas sobre la plataforma, planes o soporte técnico.
+                  Es el canal más rápido para obtener ayuda.
                 </p>
                 {whatsapp ? (
                   <a
                     href={`https://wa.me/${whatsapp}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg"
-                    style={{ backgroundColor: "#25D36614", color: "#1a7a3f" }}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90"
+                    style={{ backgroundColor: "#25D366", color: "white" }}
                   >
-                    <MessageCircle size={14} /> Escribir por WhatsApp
+                    <MessageCircle size={15} /> Escribir por WhatsApp
                   </a>
                 ) : (
-                  <span className="text-xs text-gray-400">
-                    Número disponible próximamente
-                  </span>
+                  <div
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold"
+                    style={{ backgroundColor: "#f3f4f6", color: "#9ca3af" }}
+                  >
+                    <Phone size={14} /> Disponible pronto
+                  </div>
                 )}
               </div>
             </div>
 
             {/* Email */}
-            <div className="bg-white rounded-2xl p-7 border border-gray-100 shadow-sm flex flex-col gap-4">
+            <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm flex flex-col gap-5">
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: "#4868FF12" }}
+                className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                style={{ backgroundColor: "#58810012" }}
               >
-                <Mail size={20} style={{ color: "#4868FF" }} />
+                <Mail size={22} style={{ color: "#588100" }} />
               </div>
               <div>
-                <h2 className="text-base font-bold text-gray-900 mb-1">Correo electrónico</h2>
-                <p className="text-sm text-gray-500 mb-4">
-                  Para consultas detalladas, reportes o solicitudes de planes empresariales.
+                <h2 className="text-base font-black text-gray-900 mb-2">Correo electrónico</h2>
+                <p className="text-sm text-gray-500 leading-relaxed mb-5">
+                  Para consultas detalladas, reportes de problemas, solicitudes de planes empresariales o integraciones especiales.
                 </p>
                 <a
                   href={`mailto:${email}`}
-                  className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg"
-                  style={{ backgroundColor: "#4868FF12", color: "#4868FF" }}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90"
+                  style={{ backgroundColor: "#58810012", color: "#588100" }}
                 >
                   <Mail size={14} /> {email}
                 </a>
@@ -85,39 +99,62 @@ export default function ContactoPage() {
           </div>
 
           {/* Horario */}
-          <div className="mt-5 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex items-start gap-4">
+          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex items-start gap-4">
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-              style={{ backgroundColor: "#FFBC4714" }}
+              className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
+              style={{ backgroundColor: "#7f00b210" }}
             >
-              <Clock size={20} style={{ color: "#FFBC47" }} />
+              <Clock size={20} style={{ color: "#7f00b2" }} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-gray-900 mb-1">Horario de soporte</h2>
+              <h3 className="text-base font-black text-gray-900 mb-1">Horario de atención</h3>
               <p className="text-sm text-gray-500">
-                Lunes a viernes en horario de oficina. Los mensajes fuera de horario se
-                responden el siguiente día hábil.
+                Lunes a viernes en horario de oficina (Ecuador, GMT-5). Los mensajes fuera de
+                horario se responden el siguiente día hábil.
               </p>
             </div>
           </div>
         </div>
       </section>
 
+      {/* Para qué contactarnos */}
+      <section className="bg-white py-20 border-t border-gray-100">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6">
+          <h2 className="text-2xl font-black text-gray-950 mb-10 text-center">¿Cuándo contactarnos?</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {usos.map((u) => (
+              <div key={u} className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <CheckCircle size={15} className="shrink-0" style={{ color: "#588100" }} />
+                <span className="text-sm text-gray-700">{u}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
-      <section className="bg-white py-16 text-center border-t border-gray-100">
+      <section
+        className="py-20 text-center"
+        style={{ background: "linear-gradient(135deg, #0d1c0a, #1a0d2e)" }}
+      >
         <div className="max-w-xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl font-bold text-gray-950 mb-4">¿Prefieres explorar primero?</h2>
+          <h2 className="text-2xl font-black text-white mb-4">
+            ¿Prefieres explorar primero?
+          </h2>
+          <p className="text-gray-400 mb-8">
+            Puedes empezar gratis y contactarnos cuando tengas preguntas.
+          </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
-              href="/funciones"
-              className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white"
-              style={{ backgroundColor: "#4868FF" }}
+              href="/sign-up"
+              className="flex items-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-bold text-white"
+              style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
             >
-              Ver funciones <ArrowRight size={15} />
+              Empezar gratis <ArrowRight size={15} />
             </Link>
             <Link
               href="/precios"
-              className="px-6 py-3 rounded-xl text-sm font-semibold text-gray-700 bg-gray-100"
+              className="flex items-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-semibold border border-gray-700 text-gray-300 hover:border-gray-500 transition-colors"
             >
               Ver precios
             </Link>
