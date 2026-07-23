@@ -1,5 +1,12 @@
 export const routes = {
   home: "/",
+  // Public pages
+  funciones: "/funciones",
+  precios: "/precios",
+  firma: "/firma",
+  contacto: "/contacto",
+  blog: "/blog",
+  // Auth
   login: "/login",
   register: "/register",
   onboarding: "/onboarding",

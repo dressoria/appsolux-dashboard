@@ -1,6 +1,17 @@
 export const appConfig = {
-  name: process.env.NEXT_PUBLIC_APP_NAME ?? "Panel empresarial",
-  description: "Panel de gestion para negocios",
-  url: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-  supportEmail: process.env.SUPPORT_EMAIL ?? "soporte@empresa.com",
+  name: "Facturom",
+  description: "Facturación electrónica simple para negocios en Ecuador.",
+  url: process.env.NEXT_PUBLIC_APP_URL ?? "https://facturom.com",
+  supportEmail: process.env.SUPPORT_EMAIL ?? "soporte@facturom.com",
+};
+
+export const siteConfig = {
+  name: "Facturom",
+  tagline: "Facturación electrónica simple para negocios en Ecuador.",
+  url: process.env.NEXT_PUBLIC_APP_URL ?? "https://facturom.com",
+  description:
+    "Emite comprobantes electrónicos, vende desde POS y gestiona productos, clientes, inventario y documentos en una sola plataforma.",
+  whatsapp: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "",
+  supportEmail: process.env.SUPPORT_EMAIL ?? "soporte@facturom.com",
+  operator: "Bionvers SAS",
 };
