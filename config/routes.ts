@@ -8,7 +8,7 @@ export const routes = {
   blog: "/blog",
   // Auth
   login: "/login",
-  register: "/register",
+  register: "/sign-up",
   onboarding: "/onboarding",
 
   dashboard: "/dashboard",

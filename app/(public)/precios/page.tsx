@@ -1,263 +1,239 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CheckCircle, ArrowRight, MessageCircle, Zap } from "lucide-react";
+import { ArrowRight, CheckCircle, MessageCircle, Zap } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Precios",
-  description: "Planes de Facturom desde $0. Gratis, Emprendedor, Pymes y Corporativo para negocios en Ecuador.",
+  description: "Planes de Facturom para Ecuador: Gratis, Emprendedor, Pymes y Corporativo.",
 };
 
-const planes = [
+const plans = [
   {
     name: "Gratis",
-    ideal: "Para empezar a conocer Facturom",
     price: "$0",
-    period: "",
-    note: "3 meses sin costo",
-    tag: "Sin tarjeta",
+    period: "/ 3 meses",
+    badge: "Sin costo inicial",
     features: [
-      "20 documentos electrónicos",
-      "Plataforma web completa",
+      "20 documentos",
+      "Plataforma web",
       "Registro de clientes",
       "Registro de productos",
-      "Acceso al POS",
     ],
-    notIncluded: ["Reportes avanzados", "Soporte WhatsApp", "Múltiples emisores"],
-    cta: "Empezar gratis",
+    ctaLabel: "Comenzar gratis",
     ctaHref: "/sign-up",
-    highlight: false,
-    color: "#588100",
+    featured: false,
   },
   {
     name: "Emprendedor",
-    ideal: "Para negocios que ya facturan",
     price: "$8.92",
-    period: "/ año",
-    note: "+ IVA",
-    tag: "Popular",
+    period: "+ IVA / año",
+    badge: "Para empezar a facturar más",
     features: [
-      "100 documentos al año",
-      "Genera recibos y proformas",
+      "100 documentos",
+      "Genera recibos",
+      "Genera proformas",
       "Reportes de facturación",
       "Soporte vía WhatsApp",
-      "Historial de comprobantes",
-      "POS incluido",
     ],
-    notIncluded: ["Multiusuario", "Múltiples puntos de emisión"],
-    cta: "Elegir plan",
-    ctaHref: "/contacto",
-    highlight: false,
-    color: "#588100",
+    ctaLabel: "Solicitar Emprendedor",
+    ctaHref: "/contacto?plan=emprendedor",
+    featured: false,
   },
   {
     name: "Pymes",
-    ideal: "Para negocios en crecimiento",
     price: "$26.78",
-    period: "/ año",
-    note: "+ IVA",
-    tag: "Recomendado",
+    period: "+ IVA / año",
+    badge: "Recomendado",
     features: [
-      "350 documentos al año",
-      "Importa documentos masivamente",
+      "350 documentos",
+      "Importa documentos",
       "Multiusuario",
-      "Capacitaciones incluidas",
+      "Capacitaciones",
       "Múltiples puntos de emisión",
       "Analítica de resultados",
       "Soporte telefónico",
     ],
-    notIncluded: [],
-    cta: "Elegir plan",
-    ctaHref: "/contacto",
-    highlight: true,
-    color: "#7f00b2",
+    ctaLabel: "Solicitar Pymes",
+    ctaHref: "/contacto?plan=pymes",
+    featured: true,
   },
   {
     name: "Corporativo",
-    ideal: "Para empresas con volumen alto",
     price: "$44.64",
-    period: "/ año",
-    note: "+ IVA",
-    tag: "Empresas",
+    period: "+ IVA / año",
+    badge: "Para operación de mayor volumen",
     features: [
-      "700 documentos al año",
+      "700 documentos",
       "Generación de ATS",
       "Analítica de resultados",
       "Tutoriales personalizados",
       "Asesor personal",
-      "Instrucciones de negocio",
-      "Todo lo del plan Pymes",
     ],
-    notIncluded: [],
-    cta: "Hablar con ventas",
-    ctaHref: "/contacto",
-    highlight: false,
-    color: "#588100",
+    ctaLabel: "Hablar con asesor",
+    ctaHref: "/contacto?plan=corporativo",
+    featured: false,
   },
 ];
 
-const faq = [
+const faqs = [
   {
-    q: "¿Puedo cambiar de plan después?",
-    a: "Sí. Puedes escalar al plan que necesites en cualquier momento desde tu cuenta o contactándonos.",
+    question: "¿Los precios incluyen IVA?",
+    answer: "No. Los valores publicados para planes anuales son más IVA.",
   },
   {
-    q: "¿Los documentos se acumulan o se reinician?",
-    a: "Los documentos se cuentan por período anual contratado. Al renovar, el contador se reinicia.",
+    question: "¿Qué pasa si supero mis documentos?",
+    answer: "Puedes escribirnos para revisar un plan superior o una alternativa de mayor volumen.",
   },
   {
-    q: "¿Qué pasa si me quedo sin documentos?",
-    a: "Puedes consultar un upgrade de plan o compra adicional contactando al equipo de soporte.",
+    question: "¿Puedo cambiar de plan?",
+    answer: "Sí. Si tu operación crece, podemos orientarte para pasar al plan que mejor encaje.",
   },
   {
-    q: "¿Necesito instalar algo?",
-    a: "No. Facturom es 100% web. Accedes desde cualquier navegador, sin instalaciones.",
+    question: "¿Necesito firma electrónica?",
+    answer: "Sí, para emitir comprobantes electrónicos válidos ante el SRI necesitas una firma electrónica vigente.",
+  },
+  {
+    question: "¿Funciona con SRI Ecuador?",
+    answer: "Sí. Facturom está pensado para el flujo de facturación electrónica requerido en Ecuador.",
   },
 ];
 
 export default function PreciosPage() {
   return (
     <div>
-      {/* Header */}
-      <section className="bg-white py-20 text-center border-b border-gray-100">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6">
+      <section className="border-b border-gray-100 bg-white py-20 text-center">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6">
           <div
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-6 border"
+            className="mb-6 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold"
             style={{ borderColor: "#58810020", backgroundColor: "#5881000a", color: "#588100" }}
           >
-            <Zap size={12} /> 3 meses gratis para empezar
+            <Zap size={12} />
+            Prueba gratis disponible
           </div>
-          <h1 className="text-4xl sm:text-5xl font-black text-gray-950 mb-5 leading-tight">
-            Precios claros.
-            <br />Sin sorpresas.
+          <h1 className="mb-5 text-4xl font-black leading-tight text-gray-950 sm:text-5xl">
+            Precios claros
+            <br />
+            para elegir con intención.
           </h1>
           <p className="text-lg text-gray-500">
-            Elige el plan que se ajusta a tu volumen. Empieza gratis y escala cuando crezcas.
+            Empieza gratis o solicita el plan que necesita tu negocio según volumen, equipo y nivel de operación.
           </p>
         </div>
       </section>
 
-      {/* Planes */}
       <section className="bg-gray-50 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-            {planes.map((p) => (
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+            {plans.map((plan) => (
               <div
-                key={p.name}
-                className="bg-white rounded-2xl p-7 border flex flex-col transition-all hover:shadow-lg"
+                key={plan.name}
+                className="flex flex-col rounded-3xl border bg-white p-7"
                 style={{
-                  borderColor: p.highlight ? p.color : "#e5e7eb",
-                  boxShadow: p.highlight
-                    ? `0 0 0 1px ${p.color}30, 0 8px 32px ${p.color}12`
-                    : undefined,
+                  borderColor: plan.featured ? "#7f00b2" : "#e5e7eb",
+                  boxShadow: plan.featured ? "0 0 0 1px #7f00b220, 0 12px 36px #7f00b212" : undefined,
                 }}
               >
-                {/* Tag */}
-                <div className="flex items-start justify-between mb-5">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">{p.ideal}</p>
-                    <h2 className="text-xl font-black text-gray-900">{p.name}</h2>
-                  </div>
+                <div className="mb-5">
                   <span
-                    className="text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 ml-2"
+                    className="inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold"
                     style={
-                      p.highlight
-                        ? { backgroundColor: `${p.color}18`, color: p.color }
-                        : { backgroundColor: "#f3f4f6", color: "#6b7280" }
+                      plan.featured
+                        ? { backgroundColor: "#7f00b212", color: "#7f00b2" }
+                        : { backgroundColor: "#58810010", color: "#588100" }
                     }
                   >
-                    {p.tag}
+                    {plan.badge}
                   </span>
+                  <h2 className="mt-4 text-2xl font-black text-gray-950">{plan.name}</h2>
                 </div>
 
-                {/* Price */}
-                <div className="mb-1">
-                  <span className="text-4xl font-black text-gray-950">{p.price}</span>
-                  {p.period && <span className="text-sm text-gray-400 ml-1">{p.period}</span>}
+                <div className="mb-6">
+                  <span className="text-4xl font-black text-gray-950">{plan.price}</span>
+                  <span className="ml-2 text-sm text-gray-400">{plan.period}</span>
                 </div>
-                <p className="text-xs text-gray-400 mb-6">{p.note}</p>
 
-                {/* Features */}
-                <ul className="space-y-2.5 mb-6 flex-1">
-                  {p.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2.5 text-sm text-gray-700">
-                      <CheckCircle
-                        size={14}
-                        className="mt-0.5 shrink-0"
-                        style={{ color: p.color }}
-                      />
-                      {f}
-                    </li>
-                  ))}
-                  {p.notIncluded.map((f) => (
-                    <li key={f} className="flex items-start gap-2.5 text-sm text-gray-300 line-through">
-                      <span className="w-3.5 h-3.5 mt-0.5 shrink-0 text-gray-200 flex items-center justify-center text-xs">—</span>
-                      {f}
+                <ul className="mb-6 flex-1 space-y-2.5">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-2 text-sm text-gray-700">
+                      <CheckCircle size={14} className="mt-0.5 shrink-0 text-[#588100]" />
+                      {feature}
                     </li>
                   ))}
                 </ul>
 
-                {/* CTA */}
                 <Link
-                  href={p.ctaHref}
-                  className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all"
+                  href={plan.ctaHref}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold transition-all"
                   style={
-                    p.highlight
+                    plan.featured
                       ? {
-                          background: `linear-gradient(135deg, ${p.color}, #bc4ed8)`,
+                          background: "linear-gradient(135deg, #7f00b2 0%, #bc4ed8 100%)",
                           color: "white",
-                          boxShadow: `0 4px 16px ${p.color}30`,
                         }
                       : { backgroundColor: "#f3f4f6", color: "#374151" }
                   }
                 >
-                  {p.cta} <ArrowRight size={14} />
+                  {plan.ctaLabel}
+                  <ArrowRight size={14} />
                 </Link>
               </div>
             ))}
           </div>
-
-          {/* Nota IVA */}
-          <p className="text-center text-xs text-gray-400 mt-8">
-            Precios en USD. Los planes anuales excluyen IVA. Se confirman durante el registro o por contacto directo.
-          </p>
         </div>
       </section>
 
-      {/* FAQ */}
-      <section className="bg-white py-20 border-t border-gray-100">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl font-black text-gray-950 mb-10 text-center">Preguntas frecuentes</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {faq.map((item) => (
-              <div key={item.q} className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                <h3 className="text-sm font-bold text-gray-900 mb-2">{item.q}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{item.a}</p>
+      <section className="border-t border-gray-100 bg-white py-16">
+        <div className="mx-auto max-w-3xl rounded-3xl border border-gray-100 bg-gray-50 px-6 py-8 text-center sm:px-8">
+          <h2 className="mb-3 text-2xl font-black text-gray-950">¿Necesitas más documentos?</h2>
+          <p className="mb-6 text-gray-500">
+            Si tu volumen es mayor o tu operación tiene otra estructura, te ayudamos a revisar una opción más adecuada.
+          </p>
+          <Link
+            href="/contacto?plan=alto-volumen"
+            className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold text-white"
+            style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
+          >
+            Solicitar opción de alto volumen
+            <ArrowRight size={14} />
+          </Link>
+        </div>
+      </section>
+
+      <section className="border-t border-gray-100 bg-white py-20">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6">
+          <h2 className="mb-10 text-center text-2xl font-black text-gray-950">Preguntas frecuentes</h2>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {faqs.map((faq) => (
+              <div key={faq.question} className="rounded-2xl border border-gray-100 bg-gray-50 p-6">
+                <h3 className="mb-2 text-sm font-bold text-gray-900">{faq.question}</h3>
+                <p className="text-sm leading-relaxed text-gray-500">{faq.answer}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="bg-gray-50 py-16 border-t border-gray-100 text-center">
-        <div className="max-w-xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl font-black text-gray-950 mb-4">¿Tienes dudas sobre qué plan elegir?</h2>
-          <p className="text-gray-500 mb-8">
-            Escríbenos y te ayudamos a encontrar la mejor opción para tu negocio.
+      <section className="border-t border-gray-100 bg-gray-50 py-16 text-center">
+        <div className="mx-auto max-w-xl px-4 sm:px-6">
+          <h2 className="mb-4 text-2xl font-black text-gray-950">¿Quieres ayuda para elegir?</h2>
+          <p className="mb-8 text-gray-500">
+            Si no tienes claro qué plan te conviene, podemos orientarte según tu número de documentos y tu operación.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
               href="/sign-up"
-              className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white"
+              className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold text-white"
               style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
             >
-              Empezar gratis <ArrowRight size={14} />
+              Comenzar gratis
+              <ArrowRight size={14} />
             </Link>
             <Link
               href="/contacto"
-              className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-gray-700 bg-white border border-gray-200"
+              className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-gray-700"
             >
-              <MessageCircle size={14} /> Contactar
+              <MessageCircle size={14} />
+              Contactar asesor
             </Link>
           </div>
         </div>

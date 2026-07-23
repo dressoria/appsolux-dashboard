@@ -16,59 +16,52 @@ export function PublicHeader() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white/96 backdrop-blur-md border-b border-gray-100/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-[62px] flex items-center justify-between">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 shrink-0 group">
+    <header className="fixed left-0 right-0 top-0 z-50 border-b border-gray-100/80 bg-white/96 shadow-[0_1px_3px_rgba(0,0,0,0.04)] backdrop-blur-md">
+      <div className="mx-auto flex h-[62px] max-w-7xl items-center justify-between px-4 sm:px-6">
+        <Link href="/" className="group flex shrink-0 items-center gap-2">
           <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-black"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-xs font-black text-white"
             style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
           >
             F
           </div>
-          <span className="text-[17px] font-bold tracking-tight text-gray-900 group-hover:text-[#588100] transition-colors">
+          <span className="text-[17px] font-bold tracking-tight text-gray-900 transition-colors group-hover:text-[#588100]">
             Facturom
           </span>
         </Link>
 
-        {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-6">
-          {navLinks.map((l) => (
+        <nav className="hidden items-center gap-6 md:flex">
+          {navLinks.map((link) => (
             <Link
-              key={l.href}
-              href={l.href}
-              className="text-sm text-gray-600 hover:text-[#588100] transition-colors font-medium"
+              key={link.href}
+              href={link.href}
+              className="text-sm font-medium text-gray-600 transition-colors hover:text-[#588100]"
             >
-              {l.label}
+              {link.label}
             </Link>
           ))}
         </nav>
 
-        {/* CTA */}
-        <div className="hidden md:flex items-center gap-3">
-          <Link
-            href="/sign-in"
-            className="text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors px-3 py-1.5"
-          >
+        <div className="hidden items-center gap-3 md:flex">
+          <Link href="/login" className="px-3 py-1.5 text-sm font-semibold text-gray-700 transition-colors hover:text-gray-900">
             Entrar
           </Link>
           <Link
             href="/sign-up"
-            className="text-sm font-bold px-5 py-2 rounded-lg text-white transition-all hover:opacity-90 hover:shadow-md"
+            className="rounded-lg px-5 py-2 text-sm font-bold text-white transition-all hover:opacity-90 hover:shadow-md"
             style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
           >
             Comenzar gratis
           </Link>
         </div>
 
-        {/* Mobile */}
-        <div className="flex md:hidden items-center gap-2">
-          <Link href="/sign-in" className="text-sm font-semibold text-gray-700 px-3 py-1.5">
+        <div className="flex items-center gap-2 md:hidden">
+          <Link href="/login" className="px-3 py-1.5 text-sm font-semibold text-gray-700">
             Entrar
           </Link>
           <button
-            onClick={() => setOpen((v) => !v)}
-            className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors"
+            onClick={() => setOpen((value) => !value)}
+            className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
             aria-label="Menú"
           >
             {open ? <X size={20} /> : <Menu size={20} />}
@@ -76,31 +69,30 @@ export function PublicHeader() {
         </div>
       </div>
 
-      {/* Mobile drawer */}
-      {open && (
-        <div className="md:hidden border-t border-gray-100 bg-white px-4 pb-5 shadow-lg">
-          <nav className="flex flex-col gap-0 pt-2">
-            {navLinks.map((l) => (
+      {open ? (
+        <div className="border-t border-gray-100 bg-white px-4 pb-5 shadow-lg md:hidden">
+          <nav className="flex flex-col pt-2">
+            {navLinks.map((link) => (
               <Link
-                key={l.href}
-                href={l.href}
+                key={link.href}
+                href={link.href}
                 onClick={() => setOpen(false)}
-                className="text-sm text-gray-700 hover:text-[#588100] py-3 border-b border-gray-50 transition-colors font-medium"
+                className="border-b border-gray-50 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-[#588100]"
               >
-                {l.label}
+                {link.label}
               </Link>
             ))}
           </nav>
           <Link
             href="/sign-up"
             onClick={() => setOpen(false)}
-            className="mt-4 flex justify-center text-sm font-bold px-5 py-3 rounded-xl text-white"
+            className="mt-4 flex justify-center rounded-xl px-5 py-3 text-sm font-bold text-white"
             style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
           >
             Comenzar gratis
           </Link>
         </div>
-      )}
+      ) : null}
     </header>
   );
 }

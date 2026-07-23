@@ -1,177 +1,191 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  FileText,
-  ShoppingCart,
-  Users,
-  Package,
-  Warehouse,
-  BarChart3,
-  Zap,
-  Shield,
-  CreditCard,
-  TrendingUp,
   ArrowRight,
-  CheckCircle,
+  BarChart3,
   Building2,
+  CheckCircle,
+  CreditCard,
+  FileText,
+  Package,
+  Settings2,
+  Shield,
+  ShoppingCart,
+  Sparkles,
+  TrendingUp,
+  Users,
+  Warehouse,
 } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Funciones",
-  description: "Facturación electrónica SRI, POS, inventario, compras, reportes y gestión empresarial en Facturom.",
+  description: "Explora los módulos de Facturom: facturación electrónica, POS, inventario, clientes, compras, SRI y gestión empresarial.",
 };
 
-const modulosCore = [
+const sections = [
   {
+    id: "facturacion-electronica",
     icon: FileText,
     title: "Facturación electrónica",
-    color: "#588100",
-    desc: "Emite todos los documentos autorizados por el SRI: facturas, notas de crédito y débito, retenciones y liquidaciones de compra. XML firmado y RIDE automático.",
-    features: [
-      "Facturas electrónicas autorizadas",
-      "Notas de crédito y débito",
-      "Retenciones en la fuente e IVA",
-      "Liquidaciones de compra",
-      "XML firmado con tu certificado digital",
-      "RIDE en PDF automático",
-      "Seguimiento de estados en tiempo real",
-      "Ambiente de pruebas y producción",
+    description: "Emite comprobantes electrónicos y mantén el historial documental ordenado desde el mismo panel de trabajo.",
+    benefits: [
+      "Facturas, notas de crédito y débito",
+      "Retenciones y liquidaciones de compra",
+      "XML y RIDE por documento",
+      "Consulta clara de estados de emisión",
     ],
+    ctaLabel: "Ver planes",
+    ctaHref: "/precios",
   },
   {
+    id: "pos-ventas",
     icon: ShoppingCart,
     title: "POS y ventas",
-    color: "#7f00b2",
-    desc: "Punto de venta rápido para registrar ventas, cobrar y emitir comprobante al cliente al instante. Funciona desde computadora, tablet o cualquier dispositivo web.",
-    features: [
-      "Venta rápida desde mostrador",
-      "Múltiples formas de pago",
-      "Comprobante electrónico al instante",
+    description: "Un flujo rápido para vender, cobrar y emitir el comprobante correcto sin depender de varias pantallas dispersas.",
+    benefits: [
+      "Cobro ágil desde mostrador",
+      "Varias formas de pago",
       "Historial de ventas",
-      "Búsqueda de productos en tiempo real",
-      "Notas de pedido y proformas",
+      "Venta conectada con caja e inventario",
     ],
+    ctaLabel: "Crear cuenta",
+    ctaHref: "/sign-up",
   },
   {
+    id: "clientes",
     icon: Users,
     title: "Clientes",
-    color: "#588100",
-    desc: "Gestiona tu base de clientes con datos fiscales completos. Accede al historial de comprobantes, cuentas por cobrar y estado de cada cliente.",
-    features: [
-      "Registro con RUC o cédula validado",
-      "Datos fiscales completos",
-      "Historial de comprobantes",
-      "Cuentas por cobrar",
-      "Búsqueda y filtros rápidos",
-      "Contacto directo por WhatsApp",
+    description: "Registra y reutiliza datos comerciales y fiscales para facturar con menos fricción y más contexto.",
+    benefits: [
+      "Ficha de cliente con RUC o cédula",
+      "Historial de documentos",
+      "Seguimiento de cuentas por cobrar",
+      "Búsqueda rápida en ventas y facturación",
     ],
+    ctaLabel: "Comenzar gratis",
+    ctaHref: "/sign-up",
   },
   {
+    id: "productos",
     icon: Package,
-    title: "Productos e inventario",
-    color: "#7f00b2",
-    desc: "Administra tu catálogo con precios, costos, categorías y unidades de medida. El stock se actualiza automáticamente con cada venta.",
-    features: [
-      "Catálogo de productos y servicios",
-      "Control de stock en tiempo real",
+    title: "Productos",
+    description: "Organiza tu catálogo con estructura suficiente para vender mejor y sostener el control operativo.",
+    benefits: [
+      "Productos y servicios en un solo catálogo",
+      "Precios y costos organizados",
       "Categorías y unidades de medida",
-      "Alertas de stock mínimo",
-      "Movimientos y ajustes de inventario",
-      "Kardex por producto",
+      "Búsqueda rápida desde POS y ventas",
     ],
+    ctaLabel: "Explorar precios",
+    ctaHref: "/precios",
   },
   {
+    id: "inventario",
+    icon: Warehouse,
+    title: "Inventario",
+    description: "Controla stock, movimientos y disponibilidad para vender con más certeza y menos retrabajo.",
+    benefits: [
+      "Stock actualizado por venta",
+      "Movimientos y ajustes",
+      "Alertas de reposición",
+      "Mejor visibilidad de existencias",
+    ],
+    ctaLabel: "Crear cuenta",
+    ctaHref: "/sign-up",
+  },
+  {
+    id: "compras",
     icon: TrendingUp,
-    title: "Compras y proveedores",
-    color: "#588100",
-    desc: "Registra compras, recepciones y facturas de proveedores. Controla tus cuentas por pagar y el historial de cada proveedor.",
-    features: [
-      "Órdenes de compra",
-      "Recepción de mercancía",
-      "Facturas de proveedores",
-      "Cuentas por pagar",
-      "Historial por proveedor",
+    title: "Compras",
+    description: "Mantén un flujo más ordenado desde la recepción de mercadería hasta el control de proveedores.",
+    benefits: [
+      "Registro de compras",
+      "Recepción de productos",
+      "Control por proveedor",
+      "Seguimiento de cuentas por pagar",
     ],
+    ctaLabel: "Hablar con asesor",
+    ctaHref: "/contacto",
   },
   {
+    id: "caja",
     icon: CreditCard,
-    title: "Caja y bancos",
-    color: "#7f00b2",
-    desc: "Control de caja por turno, movimientos de efectivo, cuentas bancarias y conciliación. Cierre de caja con resumen detallado.",
-    features: [
+    title: "Caja",
+    description: "Sigue tus ingresos, egresos y cierres diarios sin depender de hojas externas para cuadrar operación.",
+    benefits: [
       "Apertura y cierre de caja",
-      "Control de efectivo por turno",
-      "Múltiples cuentas bancarias",
-      "Ingresos y egresos",
-      "Conciliación bancaria",
-      "Resumen de caja diaria",
+      "Movimientos de efectivo",
+      "Resumen por turno o período",
+      "Más claridad sobre cobros del día",
     ],
+    ctaLabel: "Ver funciones comerciales",
+    ctaHref: "/funciones#pos-ventas",
   },
   {
+    id: "reportes",
     icon: BarChart3,
     title: "Reportes",
-    color: "#588100",
-    desc: "Informes operativos y fiscales para tomar decisiones. Ventas, inventario, caja, clientes y documentos SRI en formatos claros.",
-    features: [
-      "Reporte de ventas por período",
-      "Resumen de caja por turno",
-      "Estado de inventario",
-      "Documentos SRI emitidos",
-      "ATS (anexo transaccional)",
-      "Analítica de resultados",
+    description: "Consulta información útil para tomar decisiones sin perseguir datos entre módulos sueltos.",
+    benefits: [
+      "Ventas por período",
+      "Documentos emitidos",
+      "Resumen de caja",
+      "Visibilidad de inventario",
     ],
+    ctaLabel: "Ver precios",
+    ctaHref: "/precios",
   },
   {
+    id: "sri",
     icon: Shield,
-    title: "SRI y firma electrónica",
-    color: "#7f00b2",
-    desc: "Configura tu firma electrónica, establecimientos y puntos de emisión. Emite desde ambiente de pruebas o producción con validez legal.",
-    features: [
-      "Carga de certificado digital (.p12/.pfx)",
-      "Configuración de establecimiento y RUC",
+    title: "SRI",
+    description: "Configura el entorno documental de tu empresa y mantén seguimiento sobre el flujo electrónico que exige el SRI.",
+    benefits: [
       "Ambiente de pruebas y producción",
-      "Estados de autorización SRI",
-      "Historial de documentos enviados",
-      "Clave de acceso y número de autorización",
+      "Establecimientos y puntos de emisión",
+      "Estados de recepción y autorización",
+      "Historial de documentos SRI",
     ],
-  },
-];
-
-const modulosEmpresarial = [
-  {
-    icon: Warehouse,
-    title: "Bodegas",
-    desc: "Múltiples bodegas, transferencias entre locales, conteo físico y valorización de inventario.",
-    features: ["Múltiples bodegas", "Transferencias entre bodegas", "Conteo físico", "Valorización", "Kardex por bodega"],
+    ctaLabel: "Solicitar firma",
+    ctaHref: "/firma",
   },
   {
-    icon: Zap,
-    title: "Cargas masivas",
-    desc: "Importa clientes, productos y documentos desde archivos Excel para una carga inicial ágil.",
-    features: ["Importar clientes", "Importar productos", "Plantillas Excel", "Validación previa"],
-  },
-  {
+    id: "gestion-empresarial",
     icon: Building2,
-    title: "Contabilidad básica",
-    desc: "Plan de cuentas, asientos contables, libro mayor y estados financieros básicos.",
-    features: ["Plan de cuentas", "Asientos contables", "Libro mayor", "Estado de resultados", "Balance general"],
+    title: "Gestión empresarial",
+    description: "Cuando tu operación necesita más control, Facturom puede escalar hacia procesos más completos.",
+    benefits: [
+      "Más usuarios y áreas trabajando juntas",
+      "Mejor orden en inventario y compras",
+      "Mayor trazabilidad operativa",
+      "Ruta comercial para planes más robustos",
+    ],
+    ctaLabel: "Hablar con asesor",
+    ctaHref: "/contacto?plan=gestion-empresarial",
   },
   {
-    icon: BarChart3,
-    title: "Reportes avanzados",
-    desc: "ATS, analítica de resultados, reportes personalizados y exportación de datos.",
-    features: ["ATS completo", "Analítica avanzada", "Exportación de datos", "Reportes por período"],
+    id: "automatizacion",
+    icon: Sparkles,
+    title: "Automatización",
+    description: "Reduce tareas repetitivas dentro del flujo comercial y documental con acciones mejor conectadas.",
+    benefits: [
+      "Menos captura duplicada",
+      "Procesos más consistentes",
+      "Documentos y datos más alineados",
+      "Mejor seguimiento del trabajo operativo",
+    ],
+    ctaLabel: "Contactar equipo",
+    ctaHref: "/contacto",
   },
 ];
 
 export default function FuncionesPage() {
   return (
-    <div>
-      {/* Header */}
-      <section className="bg-white py-20 border-b border-gray-100">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
-          <h1 className="text-4xl sm:text-5xl font-black text-gray-950 mb-5 leading-tight">
-            Todo lo que tu negocio necesita
+    <div className="bg-white">
+      <section className="border-b border-gray-100 bg-white py-20">
+        <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
+          <h1 className="mb-5 text-4xl font-black leading-tight text-gray-950 sm:text-5xl">
+            Funciones con rutas claras,
             <br />
             <span
               style={{
@@ -181,132 +195,120 @@ export default function FuncionesPage() {
                 backgroundClip: "text",
               }}
             >
-              en un solo sistema.
+              no solo tarjetas bonitas.
             </span>
           </h1>
-          <p className="text-lg text-gray-500 mb-8">
-            Módulos integrados que trabajan juntos. Factura, vende, compra, controla y reporta sin saltar entre aplicaciones.
+          <p className="mx-auto mb-8 max-w-2xl text-lg text-gray-500">
+            Recorre cada módulo y decide si necesitas empezar gratis, comparar planes, consultar firma o hablar con un asesor.
           </p>
-          <Link
-            href="/sign-up"
-            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-bold text-white"
-            style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
-          >
-            Comenzar gratis <ArrowRight size={15} />
-          </Link>
-        </div>
-      </section>
-
-      {/* Módulos principales */}
-      <section className="bg-gray-50 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl font-black text-gray-950 mb-10 text-center">Módulos incluidos en todos los planes</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {modulosCore.map((m) => {
-              const Icon = m.icon;
-              return (
-                <div
-                  key={m.title}
-                  className="bg-white rounded-2xl p-7 border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all"
-                >
-                  <div className="flex items-start gap-4 mb-5">
-                    <div
-                      className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: `${m.color}10` }}
-                    >
-                      <Icon size={21} style={{ color: m.color }} />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-black text-gray-900 mb-1">{m.title}</h3>
-                      <p className="text-sm text-gray-500 leading-relaxed">{m.desc}</p>
-                    </div>
-                  </div>
-                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {m.features.map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-xs text-gray-600">
-                        <CheckCircle size={12} className="mt-0.5 shrink-0" style={{ color: m.color }} />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Módulos Gestión Empresarial */}
-      <section className="bg-white py-20 border-t border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <span
-              className="inline-block px-3 py-1 text-xs font-bold rounded-full mb-4"
-              style={{ backgroundColor: "#7f00b215", color: "#7f00b2" }}
+          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              href="/sign-up"
+              className="inline-flex items-center gap-2 rounded-2xl px-7 py-3.5 text-sm font-bold text-white"
+              style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
             >
-              Gestión Empresarial
-            </span>
-            <h2 className="text-2xl font-black text-gray-950 mb-3">Módulos avanzados para más control</h2>
-            <p className="text-gray-500 max-w-xl mx-auto">
-              Disponibles en planes Pymes y Corporativo. Para negocios con mayor volumen y complejidad operativa.
-            </p>
+              Comenzar gratis
+              <ArrowRight size={15} />
+            </Link>
+            <Link
+              href="/precios"
+              className="inline-flex items-center rounded-2xl border border-gray-200 bg-gray-100 px-7 py-3.5 text-sm font-semibold text-gray-700"
+            >
+              Ver planes
+            </Link>
           </div>
+        </div>
+      </section>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {modulosEmpresarial.map((m) => {
-              const Icon = m.icon;
-              return (
-                <div
-                  key={m.title}
-                  className="rounded-2xl p-7 border flex gap-5"
-                  style={{ borderColor: "#7f00b215", backgroundColor: "#7f00b205" }}
-                >
-                  <div
-                    className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: "#7f00b212" }}
-                  >
-                    <Icon size={21} style={{ color: "#7f00b2" }} />
-                  </div>
+      <section className="border-b border-gray-100 bg-gray-50 py-8">
+        <div className="mx-auto flex max-w-7xl flex-wrap justify-center gap-3 px-4 sm:px-6">
+          {sections.map((section) => (
+            <Link
+              key={section.id}
+              href={`/funciones#${section.id}`}
+              className="rounded-full border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-600 transition-colors hover:border-[#588100] hover:text-[#588100]"
+            >
+              {section.title}
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="bg-white py-20">
+        <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6">
+          {sections.map((section) => {
+            const Icon = section.icon;
+            return (
+              <article
+                key={section.id}
+                id={section.id}
+                className="scroll-mt-24 rounded-3xl border border-gray-100 bg-gray-50 p-8"
+              >
+                <div className="grid gap-8 lg:grid-cols-[1.25fr_0.75fr] lg:items-start">
                   <div>
-                    <h3 className="text-base font-black text-gray-900 mb-1.5">{m.title}</h3>
-                    <p className="text-sm text-gray-500 mb-3 leading-relaxed">{m.desc}</p>
-                    <ul className="space-y-1.5">
-                      {m.features.map((f) => (
-                        <li key={f} className="flex items-center gap-2 text-xs text-gray-600">
-                          <CheckCircle size={12} className="shrink-0" style={{ color: "#7f00b2" }} />
-                          {f}
+                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#58810012]">
+                      <Icon size={22} className="text-[#588100]" />
+                    </div>
+                    <h2 className="mb-3 text-2xl font-black text-gray-950">{section.title}</h2>
+                    <p className="mb-5 max-w-2xl text-sm leading-relaxed text-gray-500">{section.description}</p>
+                    <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {section.benefits.map((benefit) => (
+                        <li key={benefit} className="flex items-start gap-2 text-sm text-gray-700">
+                          <CheckCircle size={14} className="mt-0.5 shrink-0 text-[#7f00b2]" />
+                          {benefit}
                         </li>
                       ))}
                     </ul>
                   </div>
+                  <div className="rounded-3xl border border-white bg-white p-6">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-gray-400">
+                      Acción sugerida
+                    </p>
+                    <p className="mb-6 text-sm leading-relaxed text-gray-500">
+                      Si este módulo resuelve lo que estás buscando, sigue por la ruta que más se ajusta a tu intención actual.
+                    </p>
+                    <Link
+                      href={section.ctaHref}
+                      className="inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-white"
+                      style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
+                    >
+                      {section.ctaLabel}
+                      <ArrowRight size={14} />
+                    </Link>
+                  </div>
                 </div>
-              );
-            })}
-          </div>
+              </article>
+            );
+          })}
         </div>
       </section>
 
-      {/* CTA */}
       <section
-        className="py-20 text-center"
+        className="border-t border-gray-100 py-20"
         style={{ background: "linear-gradient(135deg, #0d1c0a, #1a0d2e)" }}
       >
-        <div className="max-w-xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl font-black text-white mb-4">¿Listo para empezar?</h2>
-          <p className="text-gray-400 mb-8">3 meses gratis. Sin tarjeta de crédito.</p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
+          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
+            <Settings2 size={20} className="text-white" />
+          </div>
+          <h2 className="mb-4 text-3xl font-black text-white">¿Quieres ver cómo encajan estos módulos en tu negocio?</h2>
+          <p className="mb-8 text-gray-400">
+            Puedes empezar con una cuenta nueva o escribirnos si ya necesitas un plan orientado a tu operación.
+          </p>
+          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
               href="/sign-up"
-              className="flex items-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-bold text-white"
+              className="inline-flex items-center gap-2 rounded-2xl px-7 py-3.5 text-sm font-bold text-white"
               style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
             >
-              Crear cuenta gratis <ArrowRight size={15} />
+              Crear cuenta
+              <ArrowRight size={15} />
             </Link>
             <Link
-              href="/precios"
-              className="flex items-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-semibold border border-gray-700 text-gray-300 hover:border-gray-500 transition-colors"
+              href="/contacto?plan=gestion-empresarial"
+              className="inline-flex items-center rounded-2xl border border-gray-700 px-7 py-3.5 text-sm font-semibold text-gray-300 transition-colors hover:border-gray-500"
             >
-              Ver precios
+              Hablar con asesor
             </Link>
           </div>
         </div>

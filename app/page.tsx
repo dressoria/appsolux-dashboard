@@ -4,469 +4,366 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { PublicHeader } from "@/components/public/public-header";
 import { PublicFooter } from "@/components/public/public-footer";
 import {
-  FileText,
-  ShoppingCart,
-  Package,
-  Users,
   ArrowRight,
-  CheckCircle,
   BarChart3,
-  Warehouse,
-  CreditCard,
-  Shield,
-  Zap,
-  TrendingUp,
   Building2,
+  CheckCircle,
+  CreditCard,
+  FileText,
+  Package,
   Receipt,
+  Shield,
+  ShoppingCart,
+  TrendingUp,
+  Users,
+  Warehouse,
 } from "lucide-react";
+
+const modules = [
+  {
+    icon: FileText,
+    title: "Facturación electrónica",
+    description: "Facturas, notas, retenciones y documentos SRI listos para emitir desde un solo flujo.",
+    href: "/funciones#facturacion-electronica",
+  },
+  {
+    icon: ShoppingCart,
+    title: "POS y ventas",
+    description: "Cobra rápido, emite comprobantes al instante y mantén tus ventas conectadas con caja e inventario.",
+    href: "/funciones#pos-ventas",
+  },
+  {
+    icon: Users,
+    title: "Clientes",
+    description: "RUC, historial de compras, cuentas por cobrar y datos listos para facturar sin repetir trabajo.",
+    href: "/funciones#clientes",
+  },
+  {
+    icon: Package,
+    title: "Inventario",
+    description: "Catálogo, stock, movimientos y reposición con visibilidad clara de lo que tienes disponible.",
+    href: "/funciones#inventario",
+  },
+  {
+    icon: TrendingUp,
+    title: "Compras",
+    description: "Registra proveedores, compras y recepción de mercadería sin perder trazabilidad.",
+    href: "/funciones#compras",
+  },
+  {
+    icon: BarChart3,
+    title: "Reportes",
+    description: "Ventas, documentos SRI, caja y resultados organizados para tomar decisiones con criterio.",
+    href: "/funciones#reportes",
+  },
+  {
+    icon: Receipt,
+    title: "SRI",
+    description: "Estados de recepción y autorización, XML, RIDE y control documental en un mismo lugar.",
+    href: "/funciones#sri",
+  },
+  {
+    icon: Shield,
+    title: "Firma electrónica",
+    description: "Te guiamos para preparar y conectar tu firma electrónica según el flujo disponible.",
+    href: "/firma",
+  },
+];
+
+const plans = [
+  {
+    name: "Gratis",
+    price: "$0",
+    period: "/ 3 meses",
+    summary: "Para empezar a operar y conocer Facturom.",
+    features: ["20 documentos", "Plataforma web", "Clientes y productos"],
+    cta: "Comenzar gratis",
+    href: "/sign-up",
+    featured: false,
+  },
+  {
+    name: "Emprendedor",
+    price: "$8.92",
+    period: "+ IVA / año",
+    summary: "Para negocios que ya emiten comprobantes con frecuencia.",
+    features: ["100 documentos", "Recibos y proformas", "Soporte por WhatsApp"],
+    cta: "Solicitar Emprendedor",
+    href: "/contacto?plan=emprendedor",
+    featured: false,
+  },
+  {
+    name: "Pymes",
+    price: "$26.78",
+    period: "+ IVA / año",
+    summary: "Para equipos en crecimiento que necesitan más control.",
+    features: ["350 documentos", "Multiusuario", "Importa documentos"],
+    cta: "Solicitar Pymes",
+    href: "/contacto?plan=pymes",
+    featured: true,
+  },
+  {
+    name: "Corporativo",
+    price: "$44.64",
+    period: "+ IVA / año",
+    summary: "Para operación más exigente y acompañamiento comercial.",
+    features: ["700 documentos", "ATS", "Asesor personal"],
+    cta: "Hablar con asesor",
+    href: "/contacto?plan=corporativo",
+    featured: false,
+  },
+];
+
+const trustCards = [
+  {
+    icon: Shield,
+    title: "Construido para Ecuador",
+    description: "Pensado para facturación SRI, establecimientos, puntos de emisión y control documental local.",
+  },
+  {
+    icon: FileText,
+    title: "Pensado para facturación SRI",
+    description: "Documentos electrónicos, XML, RIDE y seguimiento de estados organizados dentro del mismo sistema.",
+  },
+  {
+    icon: Users,
+    title: "Control de productos y clientes",
+    description: "Tu operación comercial no queda aislada: clientes, productos y ventas trabajan conectados.",
+  },
+  {
+    icon: BarChart3,
+    title: "Documentos y reportes organizados",
+    description: "Historial claro de ventas, inventario, caja y actividad SRI para revisar tu negocio con orden.",
+  },
+  {
+    icon: Building2,
+    title: "Escalable a gestión empresarial",
+    description: "Puedes avanzar desde facturación básica hacia inventario, compras y control más completo.",
+  },
+];
 
 export default async function LandingPage() {
   const user = await getCurrentUser();
-  if (user) redirect("/workspace");
+  if (user) {
+    redirect("/workspace");
+  }
 
   return (
     <>
       <PublicHeader />
       <main className="pt-[62px]">
         <HeroSection />
-        <ValueBanner />
-        <FeaturesSection />
         <ModulesSection />
-        <PlansPreview />
+        <PlansSection />
         <SriSection />
         <TrustSection />
-        <CtaSection />
+        <FinalCtaSection />
       </main>
       <PublicFooter />
     </>
   );
 }
 
-/* ─── Hero ─────────────────────────────────────────────────── */
-
 function HeroSection() {
   return (
     <section className="relative overflow-hidden bg-white">
-      {/* Decorative orbs */}
       <div
-        className="pointer-events-none absolute -top-32 -left-32 w-[600px] h-[600px] rounded-full blur-[120px] opacity-[0.07]"
+        className="pointer-events-none absolute -top-32 -left-32 h-[560px] w-[560px] rounded-full blur-[120px] opacity-10"
         style={{ background: "radial-gradient(circle, #8db600, transparent 70%)" }}
       />
       <div
-        className="pointer-events-none absolute top-20 -right-24 w-[480px] h-[480px] rounded-full blur-[100px] opacity-[0.06]"
+        className="pointer-events-none absolute top-10 right-0 h-[420px] w-[420px] rounded-full blur-[110px] opacity-10"
         style={{ background: "radial-gradient(circle, #bc4ed8, transparent 70%)" }}
       />
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-24 pb-20 md:pt-32 md:pb-28 text-center">
-        {/* Eyebrow */}
-        <div
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold mb-8 border"
-          style={{
-            borderColor: "#58810030",
-            backgroundColor: "#5881000a",
-            color: "#588100",
-          }}
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-[#8db600] animate-pulse" />
-          Solución de facturación electrónica para Ecuador
-        </div>
-
-        {/* H1 */}
-        <h1 className="text-5xl sm:text-6xl md:text-7xl font-black leading-[1.06] tracking-tight text-gray-950 mb-6">
-          Factura, vende
-          <br />y controla tu negocio
-          <br />
+      <div className="relative mx-auto flex max-w-7xl flex-col gap-12 px-4 pb-20 pt-24 sm:px-6 md:pb-24 md:pt-32 lg:flex-row lg:items-center">
+        <div className="max-w-3xl">
           <span
+            className="mb-6 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold"
             style={{
-              background: "linear-gradient(120deg, #588100 0%, #8db600 50%, #7f00b2 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
+              borderColor: "#58810030",
+              backgroundColor: "#5881000a",
+              color: "#588100",
             }}
           >
-            desde un solo lugar.
+            <span className="h-1.5 w-1.5 rounded-full bg-[#8db600]" />
+            Facturación electrónica y gestión comercial para Ecuador
           </span>
-        </h1>
-
-        {/* Subtitle */}
-        <p className="max-w-2xl mx-auto text-xl sm:text-2xl text-gray-500 leading-relaxed mb-12 font-light">
-          Facturación electrónica SRI, POS, inventario, compras, reportes y gestión empresarial
-          en una sola plataforma diseñada para Ecuador.
-        </p>
-
-        {/* CTAs */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-14">
-          <Link
-            href="/sign-up"
-            className="group flex items-center gap-2.5 px-8 py-4 rounded-2xl text-base font-bold text-white shadow-xl transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl"
-            style={{
-              background: "linear-gradient(135deg, #588100 0%, #8db600 100%)",
-              boxShadow: "0 8px 32px #58810045",
-            }}
-          >
-            Comenzar gratis
-            <ArrowRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
-          </Link>
-          <Link
-            href="/funciones"
-            className="flex items-center gap-2 px-8 py-4 rounded-2xl text-base font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors border border-gray-200"
-          >
-            Ver funciones
+          <h1 className="mb-6 text-5xl font-black leading-[1.04] tracking-tight text-gray-950 sm:text-6xl md:text-7xl">
+            Factura, vende y
+            <br />
+            controla tu negocio
+            <br />
+            <span
+              style={{
+                background: "linear-gradient(120deg, #588100 0%, #8db600 45%, #7f00b2 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              desde un solo lugar.
+            </span>
+          </h1>
+          <p className="mb-10 max-w-2xl text-lg leading-relaxed text-gray-500 sm:text-xl">
+            Documentos SRI, POS, inventario, clientes, compras y reportes conectados en una
+            plataforma diseñada para la operación diaria de negocios reales.
+          </p>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/sign-up"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl px-8 py-4 text-base font-bold text-white shadow-xl transition-all hover:scale-[1.02]"
+              style={{
+                background: "linear-gradient(135deg, #588100 0%, #8db600 100%)",
+                boxShadow: "0 8px 32px #58810045",
+              }}
+            >
+              Comenzar gratis
+              <ArrowRight size={18} />
+            </Link>
+            <Link
+              href="/precios"
+              className="inline-flex items-center justify-center rounded-2xl border border-gray-200 bg-gray-100 px-8 py-4 text-base font-semibold text-gray-700 transition-colors hover:bg-gray-200"
+            >
+              Ver planes
+            </Link>
+          </div>
+          <Link href="/funciones" className="inline-flex items-center gap-2 text-sm font-semibold text-[#588100]">
+            Explorar funciones
+            <ArrowRight size={15} />
           </Link>
         </div>
 
-        {/* Trust badges */}
-        <div className="flex flex-wrap items-center justify-center gap-2.5">
+        <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2">
           {[
-            "✓ Autorizado SRI Ecuador",
-            "✓ Firma electrónica",
-            "✓ XML y RIDE automático",
-            "✓ POS incluido",
-            "✓ Sin configuración complicada",
-          ].map((b) => (
-            <span
-              key={b}
-              className="px-3.5 py-1.5 text-xs font-medium rounded-full text-gray-600 bg-gray-50 border border-gray-200"
-            >
-              {b}
-            </span>
+            "Facturación SRI con XML y RIDE",
+            "POS listo para vender",
+            "Productos, stock y clientes conectados",
+            "Reportes para operar con orden",
+          ].map((item) => (
+            <div key={item} className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+              <CheckCircle size={18} className="mb-3 text-[#588100]" />
+              <p className="text-sm font-semibold text-gray-800">{item}</p>
+            </div>
           ))}
         </div>
       </div>
     </section>
   );
 }
-
-/* ─── Value Banner ───────────────────────────────────────────── */
-
-const valueItems = [
-  { icon: Receipt, text: "Facturación electrónica SRI" },
-  { icon: ShoppingCart, text: "POS y punto de venta" },
-  { icon: Package, text: "Inventario y productos" },
-  { icon: TrendingUp, text: "Compras y proveedores" },
-  { icon: CreditCard, text: "Caja y cobros" },
-  { icon: BarChart3, text: "Reportes y analítica" },
-  { icon: Building2, text: "Gestión empresarial" },
-  { icon: Shield, text: "Cumplimiento fiscal" },
-];
-
-function ValueBanner() {
-  return (
-    <section
-      className="py-6 border-y border-gray-100"
-      style={{ backgroundColor: "#fafafa" }}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
-          {valueItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <div key={item.text} className="flex items-center gap-2 text-gray-500">
-                <Icon size={14} style={{ color: "#588100" }} className="shrink-0" />
-                <span className="text-xs font-medium whitespace-nowrap">{item.text}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ─── Features / Value Props ────────────────────────────────── */
-
-const features = [
-  {
-    icon: Receipt,
-    title: "No es solo facturar",
-    desc: "Facturom integra facturación SRI, ventas, inventario y control financiero. Un sistema que trabaja junto, no por partes.",
-    color: "#588100",
-    bg: "#5881000a",
-  },
-  {
-    icon: Zap,
-    title: "Rápido desde el primer día",
-    desc: "Configura tu empresa, carga tu firma electrónica y emite tu primera factura en minutos. Sin instalaciones ni servidores.",
-    color: "#7f00b2",
-    bg: "#7f00b20a",
-  },
-  {
-    icon: Shield,
-    title: "Cumplimiento fiscal Ecuador",
-    desc: "Todos los documentos cumplen con los requisitos del SRI. XML firmado digitalmente, RIDE automático y estados en tiempo real.",
-    color: "#588100",
-    bg: "#5881000a",
-  },
-];
-
-function FeaturesSection() {
-  return (
-    <section className="bg-white py-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-black text-gray-950 mb-4">
-            Más que un sistema de facturación
-          </h2>
-          <p className="text-gray-500 max-w-xl mx-auto text-lg">
-            Diseñado para negocios que necesitan operar de verdad, no solo emitir comprobantes.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {features.map((f) => {
-            const Icon = f.icon;
-            return (
-              <div
-                key={f.title}
-                className="p-8 rounded-3xl border border-gray-100 hover:border-gray-200 hover:shadow-lg transition-all duration-300 group"
-              >
-                <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6"
-                  style={{ backgroundColor: f.bg }}
-                >
-                  <Icon size={22} style={{ color: f.color }} />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-3">{f.title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{f.desc}</p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ─── Modules ────────────────────────────────────────────────── */
-
-const modules = [
-  {
-    icon: FileText,
-    title: "Facturación electrónica",
-    desc: "Facturas, notas de crédito, retenciones, liquidaciones. XML autorizado y RIDE en segundos.",
-    color: "#588100",
-  },
-  {
-    icon: ShoppingCart,
-    title: "POS y ventas",
-    desc: "Punto de venta rápido, cobros, múltiples formas de pago y comprobante al instante.",
-    color: "#7f00b2",
-  },
-  {
-    icon: Users,
-    title: "Clientes",
-    desc: "Base de clientes con RUC/cédula, historial de comprobantes, cuentas por cobrar.",
-    color: "#588100",
-  },
-  {
-    icon: Package,
-    title: "Productos e inventario",
-    desc: "Catálogo, stock en tiempo real, alertas de stock bajo, movimientos y ajustes.",
-    color: "#7f00b2",
-  },
-  {
-    icon: TrendingUp,
-    title: "Compras y proveedores",
-    desc: "Órdenes de compra, recepción, facturas de proveedores y cuentas por pagar.",
-    color: "#588100",
-  },
-  {
-    icon: CreditCard,
-    title: "Caja y bancos",
-    desc: "Cierre de caja, control de efectivo, movimientos bancarios y conciliación.",
-    color: "#7f00b2",
-  },
-  {
-    icon: BarChart3,
-    title: "Reportes",
-    desc: "Ventas, inventario, SRI, caja y resultados. Información clara para tomar decisiones.",
-    color: "#588100",
-  },
-  {
-    icon: Warehouse,
-    title: "Bodegas",
-    desc: "Múltiples bodegas, transferencias, conteo físico y valorización de inventario.",
-    color: "#7f00b2",
-    badge: "Gestión Empresarial",
-  },
-];
 
 function ModulesSection() {
   return (
     <section className="bg-gray-50 py-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-black text-gray-950 mb-4">
-            Todo en uno. Sin saltar entre sistemas.
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <div className="mb-14 text-center">
+          <h2 className="mb-4 text-3xl font-black text-gray-950 sm:text-4xl">
+            Módulos conectados para trabajar con menos fricción
           </h2>
-          <p className="text-gray-500 max-w-lg mx-auto text-lg">
-            Cada módulo conecta con los demás. Tu inventario actualiza al vender. Tu caja cuadra con tus cobros.
+          <p className="mx-auto max-w-2xl text-lg text-gray-500">
+            Cada área apunta a una acción real: explorar funciones, revisar SRI, entender la firma
+            electrónica o avanzar al plan adecuado.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {modules.map((m) => {
-            const Icon = m.icon;
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+          {modules.map((module) => {
+            const Icon = module.icon;
             return (
-              <div
-                key={m.title}
-                className="bg-white rounded-2xl p-6 border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-300 group"
+              <Link
+                key={module.title}
+                href={module.href}
+                className="group rounded-3xl border border-gray-100 bg-white p-6 transition-all hover:-translate-y-0.5 hover:border-gray-200 hover:shadow-lg"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center"
-                    style={{ backgroundColor: `${m.color}12` }}
-                  >
-                    <Icon size={19} style={{ color: m.color }} />
-                  </div>
-                  {m.badge && (
-                    <span
-                      className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                      style={{ backgroundColor: "#7f00b210", color: "#7f00b2" }}
-                    >
-                      Empresarial
-                    </span>
-                  )}
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#58810010]">
+                  <Icon size={20} className="text-[#588100]" />
                 </div>
-                <h3 className="text-sm font-bold text-gray-900 mb-1.5">{m.title}</h3>
-                <p className="text-xs text-gray-500 leading-relaxed">{m.desc}</p>
-              </div>
+                <h3 className="mb-2 text-base font-black text-gray-900">{module.title}</h3>
+                <p className="mb-4 text-sm leading-relaxed text-gray-500">{module.description}</p>
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#7f00b2]">
+                  Ir a esta sección
+                  <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+                </span>
+              </Link>
             );
           })}
-        </div>
-
-        <div className="text-center mt-10">
-          <Link
-            href="/funciones"
-            className="inline-flex items-center gap-2 text-sm font-semibold transition-colors"
-            style={{ color: "#588100" }}
-          >
-            Ver todos los módulos <ArrowRight size={15} />
-          </Link>
         </div>
       </div>
     </section>
   );
 }
 
-/* ─── Plans Preview ──────────────────────────────────────────── */
-
-const plansPreview = [
-  {
-    name: "Gratis",
-    period: "3 meses",
-    price: "$0",
-    tag: "Para empezar",
-    features: ["20 documentos", "Clientes y productos", "Plataforma web"],
-    highlight: false,
-  },
-  {
-    name: "Emprendedor",
-    period: "/ año",
-    price: "$8.92",
-    note: "+ IVA",
-    tag: "Popular",
-    features: ["100 documentos", "Recibos y proformas", "Reportes", "Soporte WhatsApp"],
-    highlight: false,
-  },
-  {
-    name: "Pymes",
-    period: "/ año",
-    price: "$26.78",
-    note: "+ IVA",
-    tag: "Recomendado",
-    features: ["350 documentos", "Multiusuario", "Importación", "Múltiples emisores"],
-    highlight: true,
-  },
-  {
-    name: "Corporativo",
-    period: "/ año",
-    price: "$44.64",
-    note: "+ IVA",
-    tag: "Empresas",
-    features: ["700 documentos", "ATS incluido", "Asesor personal", "Tutoriales a medida"],
-    highlight: false,
-  },
-];
-
-function PlansPreview() {
+function PlansSection() {
   return (
     <section className="bg-white py-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="text-center mb-14">
-          <h2 className="text-3xl sm:text-4xl font-black text-gray-950 mb-4">
-            Precios claros. Sin sorpresas.
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <div className="mb-14 text-center">
+          <h2 className="mb-4 text-3xl font-black text-gray-950 sm:text-4xl">
+            Planes claros para cada etapa de tu negocio
           </h2>
-          <p className="text-gray-500 max-w-lg mx-auto text-lg">
-            Empieza gratis y escala según el volumen de tu negocio.
+          <p className="mx-auto max-w-2xl text-lg text-gray-500">
+            Elige entre empezar gratis o hablar con nosotros para el plan que mejor se ajusta a tu operación.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {plansPreview.map((p) => (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+          {plans.map((plan) => (
             <div
-              key={p.name}
-              className="rounded-2xl p-6 border flex flex-col transition-shadow hover:shadow-lg"
+              key={plan.name}
+              className="flex flex-col rounded-3xl border bg-white p-6"
               style={{
-                borderColor: p.highlight ? "#7f00b2" : "#e5e7eb",
-                boxShadow: p.highlight ? "0 0 0 1px #7f00b230, 0 8px 32px #7f00b215" : undefined,
+                borderColor: plan.featured ? "#7f00b2" : "#e5e7eb",
+                boxShadow: plan.featured ? "0 0 0 1px #7f00b220, 0 16px 40px #7f00b212" : undefined,
               }}
             >
-              <div className="flex items-center justify-between mb-5">
-                <span className="text-sm font-bold text-gray-900">{p.name}</span>
-                <span
-                  className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                  style={
-                    p.highlight
-                      ? { backgroundColor: "#7f00b215", color: "#7f00b2" }
-                      : { backgroundColor: "#5881000f", color: "#588100" }
-                  }
-                >
-                  {p.tag}
-                </span>
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-black text-gray-950">{plan.name}</h3>
+                  <p className="mt-1 text-sm text-gray-500">{plan.summary}</p>
+                </div>
+                {plan.featured ? (
+                  <span className="rounded-full bg-[#7f00b212] px-2.5 py-1 text-[11px] font-bold text-[#7f00b2]">
+                    Recomendado
+                  </span>
+                ) : null}
               </div>
-
               <div className="mb-5">
-                <span className="text-3xl font-black text-gray-950">{p.price}</span>
-                <span className="text-sm text-gray-400 ml-1">{p.period}</span>
-                {p.note && <span className="text-xs text-gray-400 ml-1">{p.note}</span>}
+                <span className="text-4xl font-black text-gray-950">{plan.price}</span>
+                <span className="ml-2 text-sm text-gray-400">{plan.period}</span>
               </div>
-
-              <ul className="space-y-2 mb-6 flex-1">
-                {p.features.map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-xs text-gray-600">
-                    <CheckCircle
-                      size={13}
-                      className="shrink-0"
-                      style={{ color: p.highlight ? "#7f00b2" : "#588100" }}
-                    />
-                    {f}
+              <ul className="mb-6 flex-1 space-y-2.5">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="flex items-start gap-2 text-sm text-gray-700">
+                    <CheckCircle size={14} className="mt-0.5 shrink-0 text-[#588100]" />
+                    {feature}
                   </li>
                 ))}
               </ul>
-
               <Link
-                href="/precios"
-                className="flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold transition-colors"
+                href={plan.href}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold transition-all"
                 style={
-                  p.highlight
-                    ? { backgroundColor: "#7f00b2", color: "white" }
-                    : { backgroundColor: "#f3f4f6", color: "#374151" }
+                  plan.featured
+                    ? {
+                        background: "linear-gradient(135deg, #7f00b2 0%, #bc4ed8 100%)",
+                        color: "white",
+                      }
+                    : {
+                        backgroundColor: "#f3f4f6",
+                        color: "#374151",
+                      }
                 }
               >
-                {p.highlight ? "Elegir plan" : "Ver detalles"}
+                {plan.cta}
+                <ArrowRight size={14} />
               </Link>
             </div>
           ))}
         </div>
 
-        <div className="text-center mt-8">
-          <Link
-            href="/precios"
-            className="inline-flex items-center gap-2 text-sm font-semibold"
-            style={{ color: "#7f00b2" }}
-          >
-            Ver comparación completa de planes <ArrowRight size={15} />
+        <div className="mt-8 text-center">
+          <Link href="/precios" className="inline-flex items-center gap-2 text-sm font-semibold text-[#7f00b2]">
+            Comparar todos los planes
+            <ArrowRight size={15} />
           </Link>
         </div>
       </div>
@@ -474,160 +371,87 @@ function PlansPreview() {
   );
 }
 
-/* ─── SRI Section ────────────────────────────────────────────── */
-
-const sriPoints = [
-  "Facturas electrónicas autorizadas por el SRI",
-  "Notas de crédito y débito electrónicas",
-  "Retenciones en la fuente e IVA",
-  "Liquidaciones de compra",
-  "XML firmado con tu certificado digital",
-  "RIDE (representación impresa) automático",
-  "Seguimiento de estados en tiempo real",
-  "Ambiente de pruebas y producción",
-  "ATS y anexo transaccional",
-];
-
 function SriSection() {
   return (
     <section
-      className="py-24 relative overflow-hidden"
+      className="relative overflow-hidden py-24"
       style={{ background: "linear-gradient(135deg, #0d1c0a 0%, #1a0d2e 100%)" }}
     >
-      {/* Decorative */}
       <div
-        className="pointer-events-none absolute -top-20 right-0 w-[400px] h-[400px] rounded-full blur-[100px] opacity-10"
+        className="pointer-events-none absolute -top-20 right-0 h-[380px] w-[380px] rounded-full blur-[100px] opacity-10"
         style={{ background: "radial-gradient(circle, #8db600, transparent 70%)" }}
       />
-      <div
-        className="pointer-events-none absolute bottom-0 left-10 w-[300px] h-[300px] rounded-full blur-[80px] opacity-10"
-        style={{ background: "radial-gradient(circle, #bc4ed8, transparent 70%)" }}
-      />
-
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <div
-              className="inline-block px-3 py-1 text-xs font-bold rounded-full mb-6"
-              style={{ backgroundColor: "#8db60018", color: "#8db600" }}
+      <div className="relative mx-auto grid max-w-7xl grid-cols-1 gap-10 px-4 sm:px-6 lg:grid-cols-2 lg:items-center">
+        <div>
+          <span className="mb-5 inline-flex rounded-full bg-[#8db60018] px-3 py-1 text-xs font-bold text-[#8db600]">
+            SRI Ecuador
+          </span>
+          <h2 className="mb-5 text-3xl font-black leading-tight text-white sm:text-4xl">
+            Emite documentos válidos y mantén seguimiento real del flujo SRI
+          </h2>
+          <p className="mb-8 text-lg leading-relaxed text-gray-400">
+            Facturom concentra la operación documental y te guía en la preparación de la firma
+            electrónica para emitir con más claridad y menos pasos manuales.
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/funciones#sri"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold text-white"
+              style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
             >
-              SRI Ecuador
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-black text-white mb-5 leading-tight">
-              Comprobantes electrónicos válidos.
-              <br />
-              <span style={{ color: "#8db600" }}>Sin complicaciones técnicas.</span>
-            </h2>
-            <p className="text-gray-400 text-lg leading-relaxed mb-8">
-              Conecta tu firma electrónica una sola vez. Facturom firma, envía al SRI y
-              hace seguimiento automático de cada documento.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/sign-up"
-                className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
-                style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
-              >
-                Comenzar <ArrowRight size={15} />
-              </Link>
-              <Link
-                href="/firma"
-                className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold border border-gray-700 text-gray-300 hover:border-gray-500 transition-colors"
-              >
-                Sobre la firma electrónica
-              </Link>
-            </div>
+              Ver funciones SRI
+              <ArrowRight size={15} />
+            </Link>
+            <Link
+              href="/firma"
+              className="inline-flex items-center justify-center rounded-2xl border border-gray-700 px-6 py-3 text-sm font-semibold text-gray-300 transition-colors hover:border-gray-500"
+            >
+              Solicitar firma electrónica
+            </Link>
           </div>
+        </div>
 
-          <div className="bg-white/5 backdrop-blur-sm rounded-3xl p-8 border border-white/10">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-6">
-              Documentos soportados
-            </h3>
-            <ul className="space-y-3">
-              {sriPoints.map((p) => (
-                <li key={p} className="flex items-center gap-3 text-sm text-gray-300">
-                  <CheckCircle size={16} className="shrink-0" style={{ color: "#8db600" }} />
-                  {p}
-                </li>
-              ))}
-            </ul>
-          </div>
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-sm">
+          <ul className="space-y-3">
+            {[
+              "Facturas, notas, retenciones y liquidaciones",
+              "Estados de envío y autorización organizados",
+              "XML y RIDE disponibles por documento",
+              "Ambiente de pruebas y producción",
+              "Control de establecimientos y puntos de emisión",
+            ].map((item) => (
+              <li key={item} className="flex items-start gap-3 text-sm text-gray-300">
+                <CheckCircle size={16} className="mt-0.5 shrink-0 text-[#8db600]" />
+                {item}
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </section>
   );
 }
 
-/* ─── Trust ──────────────────────────────────────────────────── */
-
-const trustCards = [
-  {
-    icon: Shield,
-    title: "Construido para Ecuador",
-    desc: "Diseñado para cumplir con los requisitos del SRI, RUC, establecimientos y puntos de emisión del mercado local.",
-    color: "#588100",
-  },
-  {
-    icon: FileText,
-    title: "Control total de documentos",
-    desc: "Cada comprobante queda registrado con su estado, XML y RIDE. Acceso a tu historial completo desde cualquier dispositivo.",
-    color: "#7f00b2",
-  },
-  {
-    icon: Package,
-    title: "Inventario siempre actualizado",
-    desc: "Cada venta descuenta stock automáticamente. Nunca pierdas el control de lo que tienes y lo que necesitas reponer.",
-    color: "#588100",
-  },
-  {
-    icon: BarChart3,
-    title: "Reportes sin esfuerzo",
-    desc: "Ventas por período, movimientos de caja, estado de inventario y documentos SRI. Toda la información organizada.",
-    color: "#7f00b2",
-  },
-  {
-    icon: Zap,
-    title: "Operación simple",
-    desc: "Interfaz clara, flujos directos. Tu equipo aprende rápido y opera sin fricciones desde el primer día.",
-    color: "#588100",
-  },
-  {
-    icon: Building2,
-    title: "Pensado para negocios reales",
-    desc: "No para grandes corporaciones. Para el negocio que opera día a día en Ecuador y necesita un sistema que responda.",
-    color: "#7f00b2",
-  },
-];
-
 function TrustSection() {
   return (
     <section className="bg-gray-50 py-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl sm:text-4xl font-black text-gray-950 mb-4">
-            Por qué elegir Facturom
-          </h2>
-          <p className="text-gray-500 max-w-lg mx-auto text-lg">
-            No es solo un sistema. Es la base para que tu negocio opere con orden y control.
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <div className="mb-14 text-center">
+          <h2 className="mb-4 text-3xl font-black text-gray-950 sm:text-4xl">Una web comercial que sí te orienta</h2>
+          <p className="mx-auto max-w-2xl text-lg text-gray-500">
+            Sin promesas infladas ni números inventados: lo importante es que cada ruta te ayude a entender si Facturom encaja contigo.
           </p>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {trustCards.map((c) => {
-            const Icon = c.icon;
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-5">
+          {trustCards.map((card) => {
+            const Icon = card.icon;
             return (
-              <div
-                key={c.title}
-                className="bg-white rounded-2xl p-7 border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-300"
-              >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
-                  style={{ backgroundColor: `${c.color}10` }}
-                >
-                  <Icon size={19} style={{ color: c.color }} />
+              <div key={card.title} className="rounded-3xl border border-gray-100 bg-white p-6">
+                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-[#7f00b210]">
+                  <Icon size={18} className="text-[#7f00b2]" />
                 </div>
-                <h3 className="text-sm font-bold text-gray-900 mb-2">{c.title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{c.desc}</p>
+                <h3 className="mb-2 text-sm font-black text-gray-900">{card.title}</h3>
+                <p className="text-sm leading-relaxed text-gray-500">{card.description}</p>
               </div>
             );
           })}
@@ -637,51 +461,41 @@ function TrustSection() {
   );
 }
 
-/* ─── CTA Final ──────────────────────────────────────────────── */
-
-function CtaSection() {
+function FinalCtaSection() {
   return (
-    <section
-      className="py-28 relative overflow-hidden"
-      style={{ backgroundColor: "#080c06" }}
-    >
+    <section className="relative overflow-hidden py-24" style={{ backgroundColor: "#080c06" }}>
       <div
         className="pointer-events-none absolute inset-0 opacity-20"
         style={{
-          backgroundImage: "radial-gradient(ellipse 80% 60% at 50% 0%, #588100, transparent)",
+          backgroundImage: "radial-gradient(ellipse 70% 55% at 50% 0%, #588100, transparent)",
         }}
       />
-
-      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 text-center">
-        <h2 className="text-4xl sm:text-5xl font-black text-white mb-5 leading-tight">
-          Empieza a facturar hoy.
+      <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
+        <h2 className="mb-5 text-4xl font-black leading-tight text-white sm:text-5xl">
+          Empieza con una prueba gratis
           <br />
-          <span style={{ color: "#8db600" }}>Gratis los primeros 3 meses.</span>
+          y luego decide con más información.
         </h2>
-        <p className="text-gray-400 text-lg mb-10 leading-relaxed">
-          Sin tarjeta de crédito. Sin configuraciones complicadas.
-          <br />
-          Solo tu negocio funcionando desde el primer día.
+        <p className="mb-10 text-lg leading-relaxed text-gray-400">
+          Si ya sabes que necesitas acompañamiento comercial, también puedes hablar con un asesor desde ahora.
         </p>
-
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
           <Link
             href="/sign-up"
-            className="group flex items-center gap-2.5 px-8 py-4 rounded-2xl text-base font-bold transition-all hover:opacity-90 hover:scale-[1.02]"
+            className="inline-flex items-center gap-2 rounded-2xl px-8 py-4 text-base font-bold text-white"
             style={{
               background: "linear-gradient(135deg, #588100 0%, #8db600 100%)",
               boxShadow: "0 8px 32px #58810055",
-              color: "white",
             }}
           >
-            Crear cuenta gratis
-            <ArrowRight size={17} className="group-hover:translate-x-0.5 transition-transform" />
+            Crear cuenta
+            <ArrowRight size={16} />
           </Link>
           <Link
-            href="/precios"
-            className="flex items-center gap-2 px-8 py-4 rounded-2xl text-base font-semibold border border-gray-700 text-gray-300 hover:border-gray-500 transition-colors"
+            href="/contacto"
+            className="inline-flex items-center rounded-2xl border border-gray-700 px-8 py-4 text-base font-semibold text-gray-300 transition-colors hover:border-gray-500"
           >
-            Ver planes y precios
+            Hablar con asesor
           </Link>
         </div>
       </div>

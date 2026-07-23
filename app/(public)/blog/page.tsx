@@ -4,80 +4,73 @@ import { ArrowRight, Clock, Tag } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Blog",
-  description: "Guías sobre facturación electrónica, SRI, inventario y gestión de negocios en Ecuador.",
+  description: "Guías y recursos sobre facturación electrónica, SRI, inventario y operación comercial en Ecuador.",
 };
 
-const articulos = [
+const guides = [
   {
-    slug: "#",
-    categoria: "SRI Ecuador",
-    categoriaColor: "#588100",
-    titulo: "¿Qué documentos electrónicos acepta el SRI en Ecuador?",
-    resumen:
-      "El SRI establece tipos de comprobantes electrónicos con requisitos específicos. Conoce cuáles aplican a tu negocio: facturas, notas de crédito, retenciones y más.",
-    lectura: "5 min",
-    estado: "proximamente",
+    id: "guia-facturacion-electronica",
+    category: "Guía",
+    color: "#588100",
+    title: "Cómo empezar con facturación electrónica en Ecuador",
+    excerpt: "Qué preparar antes de emitir, qué datos revisar y cómo ordenar tu operación desde el primer día.",
+    readingTime: "5 min",
+    body: "Antes de emitir, conviene tener claros tus datos fiscales, tu flujo de clientes y productos, y la forma en que vas a operar ventas y documentos. Empezar con orden reduce errores cuando pasas de la prueba a la emisión real.",
   },
   {
-    slug: "#",
-    categoria: "Firma electrónica",
-    categoriaColor: "#7f00b2",
-    titulo: "Cómo conectar tu firma electrónica con tu sistema de facturación",
-    resumen:
-      "Guía paso a paso para cargar tu certificado digital, configurar tu establecimiento y empezar a emitir facturas válidas en ambiente de producción.",
-    lectura: "7 min",
-    estado: "proximamente",
+    id: "guia-sri",
+    category: "Guía",
+    color: "#7f00b2",
+    title: "Qué revisar del flujo SRI antes de emitir",
+    excerpt: "Ambiente, establecimiento, punto de emisión y seguimiento documental: lo esencial para no perder contexto.",
+    readingTime: "4 min",
+    body: "El flujo SRI no es solo enviar un XML. También importa revisar ambiente, secuencia, puntos de emisión y el seguimiento del estado del documento. Tener ese contexto visible ayuda a operar con menos incertidumbre.",
   },
   {
-    slug: "#",
-    categoria: "Inventario",
-    categoriaColor: "#588100",
-    titulo: "Control de inventario: buenas prácticas para negocios en Ecuador",
-    resumen:
-      "Qué es un kardex, cómo hacer un conteo físico, cuándo hacer ajustes y cómo mantener tu stock actualizado sin perder tiempo.",
-    lectura: "6 min",
-    estado: "proximamente",
+    id: "guia-inventario",
+    category: "Guía",
+    color: "#588100",
+    title: "Control de inventario para vender con más claridad",
+    excerpt: "Stock actualizado, movimientos y catálogo bien estructurado para evitar ventas desordenadas.",
+    readingTime: "5 min",
+    body: "Cuando inventario y ventas no conversan, empiezan los errores de stock, precios y reposición. Un catálogo bien armado y movimientos consistentes te ahorran ajustes dolorosos al final del mes.",
   },
   {
-    slug: "#",
-    categoria: "Facturación",
-    categoriaColor: "#7f00b2",
-    titulo: "Diferencias entre factura, nota de venta y recibo en Ecuador",
-    resumen:
-      "No todos los comprobantes son iguales. Aprende cuándo usar cada tipo de documento, cuáles requieren firma electrónica y qué implican para tu contabilidad.",
-    lectura: "4 min",
-    estado: "proximamente",
+    id: "guia-clientes",
+    category: "Guía",
+    color: "#7f00b2",
+    title: "Cómo organizar clientes y documentos sin duplicar trabajo",
+    excerpt: "Reutiliza información comercial y fiscal para facturar más rápido y sostener el seguimiento de cobros.",
+    readingTime: "4 min",
+    body: "Registrar bien a tus clientes desde el inicio facilita facturación, cobranza e historial comercial. También reduce retrabajo cuando necesitas repetir ventas o revisar documentos emitidos.",
   },
   {
-    slug: "#",
-    categoria: "Gestión",
-    categoriaColor: "#588100",
-    titulo: "Cómo organizar el área de compras y proveedores de tu negocio",
-    resumen:
-      "Órdenes de compra, recepción de mercancía, facturas de proveedor y cuentas por pagar. Un flujo claro evita errores y mejora tu flujo de caja.",
-    lectura: "5 min",
-    estado: "proximamente",
+    id: "guia-compras",
+    category: "Guía",
+    color: "#588100",
+    title: "Compras y proveedores: un flujo mínimo que sí ordena la operación",
+    excerpt: "Qué registrar y cómo conectar compras con inventario y control interno.",
+    readingTime: "5 min",
+    body: "Aunque tu negocio sea pequeño, separar compra, recepción y control por proveedor ayuda a entender costos, disponibilidad y compromisos pendientes. Ese orden se vuelve clave cuando creces.",
   },
   {
-    slug: "#",
-    categoria: "POS",
-    categoriaColor: "#7f00b2",
-    titulo: "Punto de venta (POS): qué necesitas para empezar a vender rápido",
-    resumen:
-      "Configura tu POS, agrega productos, define formas de pago y emite tu primer comprobante en menos de 10 minutos.",
-    lectura: "4 min",
-    estado: "proximamente",
+    id: "guia-pos",
+    category: "Guía",
+    color: "#7f00b2",
+    title: "Qué debe tener tu POS para vender sin fricción",
+    excerpt: "Velocidad de cobro, búsqueda de productos, medios de pago y conexión con caja e inventario.",
+    readingTime: "4 min",
+    body: "Un POS útil no solo cobra rápido: también debe ayudarte a mantener orden en stock, caja y documentos. Mientras menos pasos separados tengas, más estable se vuelve la operación diaria.",
   },
 ];
 
 export default function BlogPage() {
   return (
     <div>
-      {/* Header */}
-      <section className="bg-white py-20 border-b border-gray-100">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
-          <h1 className="text-4xl sm:text-5xl font-black text-gray-950 mb-5 leading-tight">
-            Guías y recursos para
+      <section className="border-b border-gray-100 bg-white py-20">
+        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
+          <h1 className="mb-5 text-4xl font-black leading-tight text-gray-950 sm:text-5xl">
+            Guías útiles para entender
             <br />
             <span
               style={{
@@ -87,108 +80,80 @@ export default function BlogPage() {
                 backgroundClip: "text",
               }}
             >
-              tu negocio en Ecuador.
+              cómo operar mejor.
             </span>
           </h1>
           <p className="text-lg text-gray-500">
-            Contenido sobre facturación electrónica, SRI, inventario, ventas y gestión empresarial.
-            Escrito para negocios reales, no para auditores.
+            Recursos breves sobre facturación electrónica, SRI, inventario, clientes, compras y POS.
           </p>
         </div>
       </section>
 
-      {/* Artículos */}
       <section className="bg-gray-50 py-20">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          {/* Banner próximamente */}
-          <div
-            className="rounded-2xl p-5 border mb-10 flex items-center gap-4"
-            style={{ borderColor: "#7f00b220", backgroundColor: "#7f00b208" }}
-          >
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-              style={{ backgroundColor: "#7f00b215" }}
-            >
-              <Tag size={16} style={{ color: "#7f00b2" }} />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-gray-900">Contenido en preparación</p>
-              <p className="text-xs text-gray-500">
-                Estamos preparando estos artículos. Podrás leerlos pronto. Si tienes una pregunta urgente, <Link href="/contacto" className="underline" style={{ color: "#7f00b2" }}>escríbenos</Link>.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {articulos.map((a) => (
-              <article
-                key={a.titulo}
-                className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:border-gray-200 hover:shadow-md transition-all group"
-              >
-                <div className="p-7">
-                  {/* Categoria + lectura */}
-                  <div className="flex items-center justify-between mb-4">
-                    <span
-                      className="text-[11px] font-bold px-2.5 py-1 rounded-full"
-                      style={{
-                        backgroundColor: `${a.categoriaColor}12`,
-                        color: a.categoriaColor,
-                      }}
-                    >
-                      {a.categoria}
-                    </span>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                      <Clock size={11} />
-                      {a.lectura} de lectura
-                    </div>
-                  </div>
-
-                  {/* Título */}
-                  <h2 className="text-base font-black text-gray-900 mb-3 leading-snug group-hover:text-[#588100] transition-colors">
-                    {a.titulo}
-                  </h2>
-
-                  {/* Resumen */}
-                  <p className="text-sm text-gray-500 leading-relaxed mb-5">{a.resumen}</p>
-
-                  {/* Link (deshabilitado hasta publicación) */}
-                  <div
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold"
-                    style={{ color: a.categoriaColor }}
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {guides.map((guide) => (
+              <article key={guide.id} className="group rounded-3xl border border-gray-100 bg-white p-7 transition-all hover:border-gray-200 hover:shadow-md">
+                <div className="mb-4 flex items-center justify-between">
+                  <span
+                    className="rounded-full px-2.5 py-1 text-[11px] font-bold"
+                    style={{ backgroundColor: `${guide.color}12`, color: guide.color }}
                   >
-                    Próximamente <ArrowRight size={12} />
+                    {guide.category}
+                  </span>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                    <Clock size={11} />
+                    {guide.readingTime}
                   </div>
                 </div>
+                <h2 className="mb-3 text-base font-black leading-snug text-gray-900 transition-colors group-hover:text-[#588100]">
+                  {guide.title}
+                </h2>
+                <p className="mb-5 text-sm leading-relaxed text-gray-500">{guide.excerpt}</p>
+                <Link href={`/blog#${guide.id}`} className="inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: guide.color }}>
+                  Leer guía
+                  <ArrowRight size={13} />
+                </Link>
               </article>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Newsletter placeholder */}
-      <section className="bg-white py-16 border-t border-gray-100 text-center">
-        <div className="max-w-xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl font-black text-gray-950 mb-4">
-            ¿Quieres recibir estas guías cuando estén listas?
-          </h2>
-          <p className="text-gray-500 mb-8">
-            Por ahora puedes contactarnos directamente si tienes preguntas sobre facturación o gestión de tu negocio.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link
-              href="/contacto"
-              className="flex items-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-bold text-white"
-              style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
-            >
-              Contactarnos <ArrowRight size={15} />
-            </Link>
-            <Link
-              href="/funciones"
-              className="flex items-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-semibold text-gray-700 bg-gray-100"
-            >
-              Ver funciones
-            </Link>
-          </div>
+      <section className="border-t border-gray-100 bg-white py-20">
+        <div className="mx-auto max-w-5xl space-y-6 px-4 sm:px-6">
+          {guides.map((guide) => (
+            <article key={guide.id} id={guide.id} className="scroll-mt-24 rounded-3xl border border-gray-100 bg-gray-50 p-8">
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                <span
+                  className="rounded-full px-2.5 py-1 text-[11px] font-bold"
+                  style={{ backgroundColor: `${guide.color}12`, color: guide.color }}
+                >
+                  <Tag size={11} className="mr-1 inline" />
+                  {guide.category}
+                </span>
+                <span className="text-xs text-gray-400">{guide.readingTime} de lectura</span>
+              </div>
+              <h3 className="mb-4 text-2xl font-black text-gray-950">{guide.title}</h3>
+              <p className="mb-6 text-sm leading-relaxed text-gray-600">{guide.body}</p>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/funciones"
+                  className="inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-white"
+                  style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
+                >
+                  Ver funciones relacionadas
+                  <ArrowRight size={14} />
+                </Link>
+                <Link
+                  href="/contacto"
+                  className="inline-flex items-center rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700"
+                >
+                  Hablar con un asesor
+                </Link>
+              </div>
+            </article>
+          ))}
         </div>
       </section>
     </div>

@@ -1,162 +1,194 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { MessageCircle, Mail, Clock, ArrowRight, Phone, CheckCircle } from "lucide-react";
+import { ArrowRight, CheckCircle, Clock, Mail, MessageCircle } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Contacto",
-  description: "Contacta al equipo de Facturom. Soporte por WhatsApp, correo y atención personalizada.",
+  description: "Contacta al equipo de Facturom por WhatsApp o correo para planes, firma electrónica y soporte comercial.",
 };
 
-const usos = [
+type ContactoPageProps = {
+  searchParams?: Promise<{
+    plan?: string;
+    servicio?: string;
+  }>;
+};
+
+const usageCases = [
   "Preguntas sobre planes y precios",
-  "Soporte técnico de la plataforma",
-  "Configuración de firma electrónica",
-  "Solicitar demo o capacitación",
-  "Información sobre planes Pymes y Corporativo",
-  "Integraciones o necesidades especiales",
+  "Acompañamiento comercial para Pymes o Corporativo",
+  "Información sobre firma electrónica",
+  "Soporte previo a la compra",
+  "Consultas sobre operación, documentos o flujo SRI",
+  "Necesidades de mayor volumen o gestión empresarial",
 ];
 
-export default function ContactoPage() {
-  const whatsapp = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "";
-  const email = process.env.SUPPORT_EMAIL ?? "soporte@facturom.com";
+const intentMap = {
+  emprendedor: {
+    label: "Plan Emprendedor",
+    message: "Hola, quiero información sobre el Plan Emprendedor de Facturom.",
+  },
+  pymes: {
+    label: "Plan Pymes",
+    message: "Hola, quiero información sobre el Plan Pymes de Facturom.",
+  },
+  corporativo: {
+    label: "Plan Corporativo",
+    message: "Hola, quiero información sobre el Plan Corporativo de Facturom.",
+  },
+  "alto-volumen": {
+    label: "una opción de alto volumen",
+    message: "Hola, quiero información sobre una opción de alto volumen en Facturom.",
+  },
+  "gestion-empresarial": {
+    label: "Gestión Empresarial",
+    message: "Hola, quiero información sobre la opción de Gestión Empresarial de Facturom.",
+  },
+  "firma-electronica": {
+    label: "Firma electrónica",
+    message: "Hola, quiero información sobre firma electrónica en Facturom.",
+  },
+} as const;
+
+export default async function ContactoPage({ searchParams }: ContactoPageProps) {
+  const params = (await searchParams) ?? {};
+  const plan = params.plan;
+  const service = params.servicio;
+  const selectedIntent =
+    (plan ? intentMap[plan as keyof typeof intentMap] : undefined) ??
+    (service ? intentMap[service as keyof typeof intentMap] : undefined);
+
+  const whatsappNumber =
+    process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP ??
+    process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ??
+    "593988523538";
+  const email =
+    process.env.NEXT_PUBLIC_SUPPORT_EMAIL ??
+    process.env.SUPPORT_EMAIL ??
+    "soporte@facturom.com";
+  const whatsappMessage = selectedIntent?.message ?? "Hola, quiero información sobre Facturom.";
+  const whatsappHref = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
 
   return (
     <div>
-      {/* Header */}
-      <section className="bg-white py-20 border-b border-gray-100">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
-          <h1 className="text-4xl sm:text-5xl font-black text-gray-950 mb-5 leading-tight">
-            Estamos aquí para ayudarte.
+      <section className="border-b border-gray-100 bg-white py-20">
+        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
+          {selectedIntent ? (
+            <div
+              className="mb-6 inline-flex rounded-full border px-4 py-1.5 text-xs font-semibold"
+              style={{ borderColor: "#58810020", backgroundColor: "#5881000a", color: "#588100" }}
+            >
+              Estás consultando por {selectedIntent.label}
+            </div>
+          ) : null}
+          <h1 className="mb-5 text-4xl font-black leading-tight text-gray-950 sm:text-5xl">
+            Estamos listos para ayudarte.
           </h1>
           <p className="text-lg text-gray-500">
-            Tienes preguntas sobre Facturom, planes, firma electrónica o necesitas soporte.
-            Escríbenos por el canal que prefieras.
+            Escríbenos por WhatsApp o correo si quieres resolver dudas sobre planes, firma electrónica o flujo comercial.
           </p>
         </div>
       </section>
 
-      {/* Canales principales */}
       <section className="bg-gray-50 py-20">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8">
-            {/* WhatsApp */}
-            <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm flex flex-col gap-5">
-              <div
-                className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                style={{ backgroundColor: "#25D36615" }}
-              >
+        <div className="mx-auto max-w-4xl px-4 sm:px-6">
+          <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div className="flex flex-col gap-5 rounded-3xl border border-gray-100 bg-white p-8 shadow-sm">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#25D36615]">
                 <MessageCircle size={22} style={{ color: "#25D366" }} />
               </div>
               <div>
-                <h2 className="text-base font-black text-gray-900 mb-2">WhatsApp</h2>
-                <p className="text-sm text-gray-500 leading-relaxed mb-5">
-                  Respuesta rápida para dudas sobre la plataforma, planes o soporte técnico.
-                  Es el canal más rápido para obtener ayuda.
+                <h2 className="mb-2 text-base font-black text-gray-900">WhatsApp</h2>
+                <p className="mb-5 text-sm leading-relaxed text-gray-500">
+                  El canal más rápido para dudas sobre planes, soporte previo y orientación comercial.
                 </p>
-                {whatsapp ? (
-                  <a
-                    href={`https://wa.me/${whatsapp}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90"
-                    style={{ backgroundColor: "#25D366", color: "white" }}
-                  >
-                    <MessageCircle size={15} /> Escribir por WhatsApp
-                  </a>
-                ) : (
-                  <div
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold"
-                    style={{ backgroundColor: "#f3f4f6", color: "#9ca3af" }}
-                  >
-                    <Phone size={14} /> Disponible pronto
-                  </div>
-                )}
+                <a
+                  href={whatsappHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-white transition-all hover:opacity-90"
+                  style={{ backgroundColor: "#25D366" }}
+                >
+                  <MessageCircle size={15} />
+                  Hablar por WhatsApp
+                </a>
               </div>
             </div>
 
-            {/* Email */}
-            <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm flex flex-col gap-5">
-              <div
-                className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                style={{ backgroundColor: "#58810012" }}
-              >
-                <Mail size={22} style={{ color: "#588100" }} />
+            <div className="flex flex-col gap-5 rounded-3xl border border-gray-100 bg-white p-8 shadow-sm">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#58810012]">
+                <Mail size={22} className="text-[#588100]" />
               </div>
               <div>
-                <h2 className="text-base font-black text-gray-900 mb-2">Correo electrónico</h2>
-                <p className="text-sm text-gray-500 leading-relaxed mb-5">
-                  Para consultas detalladas, reportes de problemas, solicitudes de planes empresariales o integraciones especiales.
+                <h2 className="mb-2 text-base font-black text-gray-900">Correo electrónico</h2>
+                <p className="mb-5 text-sm leading-relaxed text-gray-500">
+                  Útil para consultas detalladas, acompañamiento comercial, firma electrónica o necesidades especiales.
                 </p>
                 <a
-                  href={`mailto:${email}`}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90"
-                  style={{ backgroundColor: "#58810012", color: "#588100" }}
+                  href={`mailto:${email}?subject=${encodeURIComponent("Consulta sobre Facturom")}`}
+                  className="inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-[#588100]"
+                  style={{ backgroundColor: "#58810012" }}
                 >
-                  <Mail size={14} /> {email}
+                  <Mail size={14} />
+                  {email}
                 </a>
               </div>
             </div>
           </div>
 
-          {/* Horario */}
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex items-start gap-4">
-            <div
-              className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
-              style={{ backgroundColor: "#7f00b210" }}
-            >
-              <Clock size={20} style={{ color: "#7f00b2" }} />
-            </div>
-            <div>
-              <h3 className="text-base font-black text-gray-900 mb-1">Horario de atención</h3>
-              <p className="text-sm text-gray-500">
-                Lunes a viernes en horario de oficina (Ecuador, GMT-5). Los mensajes fuera de
-                horario se responden el siguiente día hábil.
-              </p>
+          <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#7f00b210]">
+                <Clock size={20} className="text-[#7f00b2]" />
+              </div>
+              <div>
+                <h3 className="mb-1 text-base font-black text-gray-900">Horario de atención</h3>
+                <p className="text-sm text-gray-500">
+                  Lunes a viernes en horario de oficina de Ecuador (GMT-5). Si escribes fuera de ese horario, respondemos en el siguiente día hábil.
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Para qué contactarnos */}
-      <section className="bg-white py-20 border-t border-gray-100">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl font-black text-gray-950 mb-10 text-center">¿Cuándo contactarnos?</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {usos.map((u) => (
-              <div key={u} className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <CheckCircle size={15} className="shrink-0" style={{ color: "#588100" }} />
-                <span className="text-sm text-gray-700">{u}</span>
+      <section className="border-t border-gray-100 bg-white py-20">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6">
+          <h2 className="mb-10 text-center text-2xl font-black text-gray-950">¿Para qué puedes contactarnos?</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {usageCases.map((item) => (
+              <div key={item} className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                <CheckCircle size={15} className="shrink-0 text-[#588100]" />
+                <span className="text-sm text-gray-700">{item}</span>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA */}
       <section
         className="py-20 text-center"
         style={{ background: "linear-gradient(135deg, #0d1c0a, #1a0d2e)" }}
       >
-        <div className="max-w-xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl font-black text-white mb-4">
-            ¿Prefieres explorar primero?
-          </h2>
-          <p className="text-gray-400 mb-8">
-            Puedes empezar gratis y contactarnos cuando tengas preguntas.
+        <div className="mx-auto max-w-xl px-4 sm:px-6">
+          <h2 className="mb-4 text-2xl font-black text-white">¿Prefieres explorar primero?</h2>
+          <p className="mb-8 text-gray-400">
+            También puedes revisar planes o comenzar una cuenta nueva antes de contactarnos.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link
-              href="/sign-up"
-              className="flex items-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-bold text-white"
-              style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
-            >
-              Empezar gratis <ArrowRight size={15} />
-            </Link>
+          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
               href="/precios"
-              className="flex items-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-semibold border border-gray-700 text-gray-300 hover:border-gray-500 transition-colors"
+              className="inline-flex items-center gap-2 rounded-2xl px-7 py-3.5 text-sm font-bold text-white"
+              style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
             >
-              Ver precios
+              Ver planes
+              <ArrowRight size={15} />
+            </Link>
+            <Link
+              href="/sign-up"
+              className="inline-flex items-center rounded-2xl border border-gray-700 px-7 py-3.5 text-sm font-semibold text-gray-300 transition-colors hover:border-gray-500"
+            >
+              Crear cuenta
             </Link>
           </div>
         </div>
