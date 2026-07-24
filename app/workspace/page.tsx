@@ -11,9 +11,9 @@ import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 
 export default async function WorkspacePage() {
-  const { user } = await requireDashboardSession();
+  const { user, tenant } = await requireDashboardSession();
   const clerkActive = isClerkAuth();
-  const tenantMode = await getTenantModeState(user.tenant);
+  const tenantMode = await getTenantModeState(tenant);
   const operationsCard = tenantMode.canUseAdvancedErp
     ? {
         title: "Facturacion",
@@ -38,7 +38,7 @@ export default async function WorkspacePage() {
       <header className="absolute inset-x-0 top-0 z-10 flex items-center justify-end gap-3 px-6 py-4">
         <span className="hidden text-xs text-slate-400 sm:block">{user.name}</span>
         <div className="rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs text-slate-500 backdrop-blur-sm">
-          {user.tenant.name}
+          {tenant.name}
         </div>
         {clerkActive && <ClerkUserMenu />}
       </header>
@@ -46,7 +46,7 @@ export default async function WorkspacePage() {
       {/* Centered launcher */}
       <div className="flex min-h-screen flex-col items-center justify-center px-6 py-24">
         <div className="mx-auto w-full max-w-5xl">
-          <WorkspaceLauncherHeader tenantName={user.tenant.name} />
+          <WorkspaceLauncherHeader tenantName={tenant.name} />
 
           <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-3">
             <WorkspaceServiceCard

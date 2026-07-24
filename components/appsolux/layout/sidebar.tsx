@@ -38,6 +38,10 @@ type NavGroup = {
 };
 
 export async function Sidebar({ user }: { user: AppsoluxUser }) {
+  if (!user.tenant) {
+    return null;
+  }
+
   const tenantMode = await getTenantModeState(user.tenant);
   const isAdvanced = tenantMode.businessSuiteStatus === "active";
 

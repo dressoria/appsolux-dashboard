@@ -6,6 +6,10 @@ import { ClerkUserMenu } from "./clerk-user-menu";
 import { LogoutButton } from "./logout-button";
 
 export async function Topbar({ user }: { user: AppsoluxUser }) {
+  if (!user.tenant) {
+    return null;
+  }
+
   const tenantMode = await getTenantModeState(user.tenant);
   const clerkActive = isClerkAuth();
 

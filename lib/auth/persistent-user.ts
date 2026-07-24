@@ -94,6 +94,16 @@ function mapUser(user: User, membership: MembershipWithTenant): AppsoluxUser {
   };
 }
 
+function mapUserWithoutTenant(user: User): AppsoluxUser {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: "viewer",
+    tenant: null,
+  };
+}
+
 export const loginUserInclude = {
   memberships: {
     where: { status: "active" },
@@ -186,5 +196,5 @@ export function mapLoginUserToAppsoluxUser(
 ) {
   const membership = user.memberships[0];
 
-  return membership ? mapUser(user, membership) : null;
+  return membership ? mapUser(user, membership) : mapUserWithoutTenant(user);
 }

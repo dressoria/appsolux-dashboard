@@ -7,6 +7,28 @@ import {
   type LoginUserRecord,
 } from "@/lib/auth/persistent-user";
 import type { AppsoluxUser } from "@/types/user";
+import type { User } from "@prisma/client";
+
+function maskEmail(email: string): string {
+  const [localPart, domainPart] = email.toLowerCase().split("@");
+
+  if (!localPart || !domainPart) {
+    return "unknown";
+  }
+
+  const visiblePrefix = localPart.slice(0, 2);
+  return `${visiblePrefix || "*"}***@${domainPart}`;
+}
+
+function mapClerkUserWithoutTenant(user: Pick<User, "id" | "name" | "email">): AppsoluxUser {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: "viewer",
+    tenant: null,
+  };
+}
 
 export type ClerkUserInput = {
   clerkUserId: string;
@@ -34,10 +56,26 @@ export async function findAppsoluxUserByClerkId(
     },
   });
 
-  if (!user || user.status === "disabled" || user.memberships.length === 0) {
+  if (!user || user.status === "disabled") {
     return null;
   }
 
+  if (user.memberships.length === 0) {
+    console.info("[auth][clerk] user resolved without tenant membership", {
+      clerkUserId,
+      userId: user.id,
+      email: maskEmail(user.email),
+      redirectTo: "/onboarding",
+    });
+    return mapClerkUserWithoutTenant(user);
+  }
+
+  console.info("[auth][clerk] user resolved with tenant membership", {
+    clerkUserId,
+    userId: user.id,
+    email: maskEmail(user.email),
+    tenantId: user.memberships[0]?.tenant.id ?? null,
+  });
   return mapLoginUserToAppsoluxUser(user as LoginUserRecord);
 }
 
@@ -75,19 +113,30 @@ export async function findOrCreateAppsoluxUserForClerk(
         include: loginUserInclude,
       });
 
-      return updated ? mapLoginUserToAppsoluxUser(updated as LoginUserRecord) : null;
+      const mapped = updated ? mapLoginUserToAppsoluxUser(updated as LoginUserRecord) : null;
+
+      console.info("[auth][clerk] linked existing user by email", {
+        clerkUserId: input.clerkUserId,
+        userId: existing.id,
+        email: maskEmail(input.email),
+        tenantId: mapped?.tenant?.id ?? null,
+        redirectTo: mapped?.tenant?.id ? null : "/onboarding",
+      });
+
+      return mapped;
     }
 
-    return mapLoginUserToAppsoluxUser(existing);
-  }
+    const mapped = mapLoginUserToAppsoluxUser(existing);
 
-  const tenant = await prisma.tenant.findFirst({
-    where: { status: "active" },
-    orderBy: { createdAt: "asc" },
-  });
+    console.info("[auth][clerk] found existing user by email", {
+      clerkUserId: input.clerkUserId,
+      userId: existing.id,
+      email: maskEmail(input.email),
+      tenantId: mapped?.tenant?.id ?? null,
+      redirectTo: mapped?.tenant?.id ? null : "/onboarding",
+    });
 
-  if (!tenant) {
-    return null;
+    return mapped;
   }
 
   const created = await prisma.user.create({
@@ -97,15 +146,15 @@ export async function findOrCreateAppsoluxUserForClerk(
       clerkUserId: input.clerkUserId,
       status: "active",
       emailVerifiedAt: input.emailVerified ? new Date() : null,
-      memberships: {
-        create: {
-          tenantId: tenant.id,
-          role: "viewer",
-          status: "active",
-        },
-      },
     },
     include: loginUserInclude,
+  });
+
+  console.info("[auth][clerk] created new user without tenant membership", {
+    clerkUserId: input.clerkUserId,
+    userId: created.id,
+    email: maskEmail(input.email),
+    redirectTo: "/onboarding",
   });
 
   return mapLoginUserToAppsoluxUser(created as LoginUserRecord);
@@ -140,15 +189,6 @@ export async function syncClerkUserToDb(input: ClerkUserInput): Promise<void> {
     return;
   }
 
-  const tenant = await prisma.tenant.findFirst({
-    where: { status: "active" },
-    orderBy: { createdAt: "asc" },
-  });
-
-  if (!tenant) {
-    return;
-  }
-
   await prisma.user.create({
     data: {
       name: input.name || input.email.split("@")[0],
@@ -156,14 +196,13 @@ export async function syncClerkUserToDb(input: ClerkUserInput): Promise<void> {
       clerkUserId: input.clerkUserId,
       status: "active",
       emailVerifiedAt: input.emailVerified ? new Date() : null,
-      memberships: {
-        create: {
-          tenantId: tenant.id,
-          role: "viewer",
-          status: "active",
-        },
-      },
     },
+  });
+
+  console.info("[auth][clerk] synced new user without tenant membership", {
+    clerkUserId: input.clerkUserId,
+    email: maskEmail(input.email),
+    redirectTo: "/onboarding",
   });
 }
 

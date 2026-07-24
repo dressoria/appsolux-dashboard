@@ -5,7 +5,7 @@ export function validateTenantAccess(
   user: AppsoluxUser,
   tenantId: string
 ): boolean {
-  return user.tenant.id === tenantId;
+  return user.tenant?.id === tenantId;
 }
 
 export function assertTenantAccess(user: AppsoluxUser, tenantId: string) {

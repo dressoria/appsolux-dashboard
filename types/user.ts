@@ -30,5 +30,5 @@ export type AppsoluxUser = {
   email: string;
   role: AppsoluxUserRole;
   permissions?: AppsoluxPermission[];
-  tenant: AppsoluxTenant;
+  tenant: AppsoluxTenant | null;
 };

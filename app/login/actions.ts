@@ -42,10 +42,6 @@ export async function loginAction(formData: FormData) {
       if (currentResult.ok) {
         redirect(currentResult.redirectTo);
       }
-
-      if (currentResult.code === "NO_ACTIVE_MEMBERSHIP") {
-        redirect("/login?error=membership");
-      }
     }
   } catch (error) {
     if (isRedirectError(error)) {

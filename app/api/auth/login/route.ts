@@ -77,8 +77,7 @@ export async function POST(request: Request) {
           status:
             currentResult.code === "INVALID_LOGIN_INPUT"
               ? 400
-              : currentResult.code === "USER_NOT_ACTIVE" ||
-                  currentResult.code === "NO_ACTIVE_MEMBERSHIP"
+              : currentResult.code === "USER_NOT_ACTIVE"
                 ? 403
                 : currentResult.code === "INVALID_CREDENTIALS"
                   ? 401

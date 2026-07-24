@@ -12,7 +12,6 @@ export type CurrentPasswordLoginResult =
         | "INVALID_LOGIN_INPUT"
         | "INVALID_CREDENTIALS"
         | "USER_NOT_ACTIVE"
-        | "NO_ACTIVE_MEMBERSHIP"
         | "LOGIN_ERROR";
       message: string;
     };
@@ -65,9 +64,8 @@ export async function signInWithCurrentPassword(input: {
 
     if (!membership) {
       return {
-        ok: false,
-        code: "NO_ACTIVE_MEMBERSHIP",
-        message: "Tu usuario no tiene una empresa activa asignada.",
+        ok: true,
+        redirectTo: "/onboarding",
       };
     }
 

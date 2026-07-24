@@ -80,6 +80,21 @@ export async function signInWithSupabasePassword(input: {
       };
     }
 
+    if (!appsoluxUser.tenant?.id) {
+      console.info("[auth] Supabase login resolved user without tenant", {
+        userId: appsoluxUser.id,
+        email: appsoluxUser.email.includes("@")
+          ? `${appsoluxUser.email.slice(0, 2)}***@${appsoluxUser.email.split("@")[1]}`
+          : "unknown",
+        redirectTo: "/onboarding",
+      });
+
+      return {
+        ok: true,
+        redirectTo: "/onboarding",
+      };
+    }
+
     await setAuthSession({
       userId: appsoluxUser.id,
       tenantId: appsoluxUser.tenant.id,
