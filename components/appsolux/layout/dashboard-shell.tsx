@@ -21,14 +21,16 @@ export async function DashboardShell({
   const { user, tenant } = await requireDashboardSession();
   const tenantMode = await getTenantModeState(tenant);
   const navigationGroups = buildSidebarNavigation(tenantMode);
+  const userName = user.name?.trim() || "Usuario";
+  const tenantName = tenant.name?.trim() || "Tu empresa";
 
   return (
     <DashboardFrame
       hideTopbar={hideTopbar}
       mainClassName={mainClassName}
       contentClassName={contentClassName}
-      userName={user.name}
-      tenantName={tenant.name}
+      userName={userName}
+      tenantName={tenantName}
       modeLabel={tenantMode.canUseAdvancedErp ? "Gestión empresarial" : "Plan básico"}
       navigationGroups={navigationGroups}
       clerkActive={isClerkAuth()}

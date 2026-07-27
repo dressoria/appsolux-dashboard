@@ -3,14 +3,38 @@
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import {
+  Archive,
+  BarChart3,
+  BookOpen,
+  Building2,
+  CreditCard,
+  FileCheck,
+  FileText,
+  FolderTree,
+  LayoutGrid,
+  Menu,
+  MessageSquareText,
+  Package,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Receipt,
+  Settings2,
+  ShoppingCart,
+  Sparkles,
+  Users,
+  Warehouse,
+  WalletCards,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 
 import { Button } from "@/components/ui/button";
 import { routes } from "@/config/routes";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
-import type { NavGroup } from "./sidebar";
+import type { NavGroup, SidebarIconName } from "./sidebar";
 
 type DashboardFrameProps = {
   children: ReactNode;
@@ -25,6 +49,27 @@ type DashboardFrameProps = {
 };
 
 const SIDEBAR_STORAGE_KEY = "facturom.sidebar.collapsed";
+
+const sidebarIcons: Record<SidebarIconName, LucideIcon> = {
+  archive: Archive,
+  "bar-chart-3": BarChart3,
+  "book-open": BookOpen,
+  "building-2": Building2,
+  "credit-card": CreditCard,
+  "file-check": FileCheck,
+  "file-text": FileText,
+  "folder-tree": FolderTree,
+  "layout-grid": LayoutGrid,
+  "message-square-text": MessageSquareText,
+  package: Package,
+  receipt: Receipt,
+  "settings-2": Settings2,
+  "shopping-cart": ShoppingCart,
+  sparkles: Sparkles,
+  users: Users,
+  warehouse: Warehouse,
+  "wallet-cards": WalletCards,
+};
 
 function FacturomBrand({ collapsed }: { collapsed: boolean }) {
   return (
@@ -131,6 +176,7 @@ export function DashboardFrame({
               <div className="space-y-1">
                 {group.items.map((item) => {
                   const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                  const Icon = sidebarIcons[item.icon];
                   return (
                     <Link
                       key={`${group.title}-${item.href}-${item.title}`}
@@ -152,7 +198,7 @@ export function DashboardFrame({
                             : "bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-[#7f00b2]"
                         )}
                       >
-                        <item.icon className="h-4 w-4" />
+                        <Icon className="h-4 w-4" />
                       </div>
                       <span className={cn("truncate", collapsed && "hidden")}>{item.title}</span>
                       {collapsed ? (
