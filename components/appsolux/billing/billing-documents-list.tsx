@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, FileSearch, Search, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { SriDownloadButton } from "@/components/appsolux/sri/sri-download-button";
@@ -64,15 +65,16 @@ function formatDate(iso: string | null) {
 
 // ── Type filter ───────────────────────────────────────────────────────────────
 
-type TypeFilter = "all" | "receipt" | "sri" | "authorized" | "in_process" | "rejected";
+type TypeFilter = "all" | "receipt" | "sri" | "authorized" | "pending" | "rejected" | "canceled";
 
 const TYPE_FILTER_OPTIONS: { key: TypeFilter; label: string }[] = [
   { key: "all", label: "Todos" },
   { key: "receipt", label: "Recibos" },
   { key: "sri", label: "Facturas SRI" },
   { key: "authorized", label: "Autorizados" },
-  { key: "in_process", label: "En proceso" },
+  { key: "pending", label: "Pendientes" },
   { key: "rejected", label: "Rechazados" },
+  { key: "canceled", label: "Cancelados" },
 ];
 
 function matchesTypeFilter(doc: BillingDocumentListItem, filter: TypeFilter): boolean {
@@ -80,8 +82,18 @@ function matchesTypeFilter(doc: BillingDocumentListItem, filter: TypeFilter): bo
   if (filter === "receipt") return doc.type === "BASIC_SALE" && !doc.sriDocumentId;
   if (filter === "sri") return !!doc.sriDocumentId || doc.type === "SRI_DOCUMENT";
   if (filter === "authorized") return doc.sriStatus === "AUTHORIZED";
-  if (filter === "in_process") return doc.sriStatus === "SIGNED" || doc.sriStatus === "SENT";
+  if (filter === "pending") {
+    return (
+      doc.sriStatus === "DRAFT" ||
+      doc.sriStatus === "READY_FOR_TESTING" ||
+      doc.sriStatus === "SIGNED" ||
+      doc.sriStatus === "SENT" ||
+      doc.internalStatus === "pending" ||
+      doc.internalStatus === "partial"
+    );
+  }
   if (filter === "rejected") return doc.sriStatus === "REJECTED";
+  if (filter === "canceled") return doc.internalStatus === "canceled" || doc.sriStatus === "CANCELLED";
   return true;
 }
 
@@ -101,31 +113,30 @@ function matchesSearch(doc: BillingDocumentListItem, query: string): boolean {
 
 function DocumentRow({ doc }: { doc: BillingDocumentListItem }) {
   const isErpDoc = doc.type === "SRI_DOCUMENT";
+  const isInternalReceipt = doc.type === "BASIC_SALE" && !doc.sriDocumentId;
+  const canDownloadSignedXml =
+    !!doc.sriDocumentId &&
+    (doc.sriStatus === "SIGNED" ||
+      doc.sriStatus === "SENT" ||
+      doc.sriStatus === "AUTHORIZED" ||
+      doc.sriStatus === "REJECTED");
+  const canCheckAuthorization =
+    !!doc.sriDetailHref &&
+    !!doc.accessKey &&
+    (doc.sriStatus === "SENT" || doc.sriStatus === "SIGNED" || doc.sriStatus === "REJECTED");
 
   return (
-    <div className="space-y-3 rounded-[18px] border border-slate-200 bg-white p-4 text-sm shadow-sm">
-      {/* Row 1 — summary */}
+    <div className="space-y-3 rounded-[22px] border border-slate-200 bg-white p-4 text-sm shadow-sm transition-colors hover:border-[#588100]/30 hover:shadow-[0_14px_40px_rgba(88,129,0,0.08)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1.5">
-          {/* Badges — always separated */}
+        <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-1.5">
-            {/* Internal/payment status */}
+            <Badge label={isInternalReceipt ? "Recibo interno" : "Factura SRI"} variant={isInternalReceipt ? "neutral" : "info"} />
             {doc.internalStatusLabel && !isErpDoc && (
-              <Badge
-                label={doc.internalStatusLabel}
-                variant={internalStatusVariant(doc.internalStatus)}
-              />
+              <Badge label={doc.internalStatusLabel} variant={internalStatusVariant(doc.internalStatus)} />
             )}
-            {/* SRI status — shown as its own badge, never concatenated */}
             {doc.sriStatus && (
-              <Badge
-                label={doc.sriStatusLabel ?? doc.sriStatus}
-                variant={sriStatusVariant(doc.sriStatus)}
-              />
+              <Badge label={doc.sriStatusLabel ?? doc.sriStatus} variant={sriStatusVariant(doc.sriStatus)} />
             )}
-            {/* Source label */}
-            <Badge label={doc.sourceLabel} variant="neutral" />
-            {/* Environment */}
             {doc.environment && (
               <Badge
                 label={doc.environment === "TEST" ? "Pruebas" : "Producción"}
@@ -134,22 +145,17 @@ function DocumentRow({ doc }: { doc: BillingDocumentListItem }) {
             )}
           </div>
 
-          {/* Customer + date */}
           <p className="font-medium text-slate-900">
             {doc.customerName ?? "Consumidor Final"}
           </p>
           <p className="text-xs text-slate-500">
             {formatDate(doc.issuedAt)}
           </p>
-
-          {/* Display number */}
           {doc.displayNumber ? (
             <p className="font-mono text-[11px] text-slate-500">{doc.displayNumber}</p>
           ) : (
             <p className="font-mono text-[11px] text-slate-400">ID: {doc.id.slice(-10).toUpperCase()}</p>
           )}
-
-          {/* Items summary — only for CORE */}
           {doc.itemsSummary && (
             <p className="max-w-sm truncate text-xs text-slate-400">{doc.itemsSummary}</p>
           )}
@@ -160,8 +166,8 @@ function DocumentRow({ doc }: { doc: BillingDocumentListItem }) {
           )}
         </div>
 
-        {/* Total + actions */}
         <div className="flex shrink-0 flex-col items-end gap-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Total</p>
           <p className="font-mono text-lg font-semibold text-slate-900">{money(doc.total)}</p>
           <div className="flex flex-wrap items-center justify-end gap-1.5">
             {doc.saleDetailHref && (
@@ -172,12 +178,11 @@ function DocumentRow({ doc }: { doc: BillingDocumentListItem }) {
             {doc.sriDetailHref && (
               <Button asChild variant="outline" size="sm">
                 <Link href={doc.sriDetailHref}>
-                  {doc.type === "SRI_DOCUMENT" ? "Ver documento" : "Factura SRI"}
+                  {doc.type === "SRI_DOCUMENT" ? "Ver factura SRI" : "Ver factura SRI"}
                 </Link>
               </Button>
             )}
-            {/* Receipt download — only basic sales without SRI */}
-            {doc.type === "BASIC_SALE" && !doc.sriDocumentId && (
+            {isInternalReceipt && (
               <SriDownloadButton
                 href={`/api/basic/sales/${doc.id}/download-receipt`}
                 label="Recibo PDF"
@@ -185,14 +190,10 @@ function DocumentRow({ doc }: { doc: BillingDocumentListItem }) {
                 className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               />
             )}
-            {/* SRI downloads */}
-            {doc.sriDocumentId &&
-              (doc.sriStatus === "SIGNED" ||
-                doc.sriStatus === "SENT" ||
-                doc.sriStatus === "AUTHORIZED") && (
+            {canDownloadSignedXml && (
                 <SriDownloadButton
                   href={`/api/sri/documents/${doc.sriDocumentId}/download-signed-xml`}
-                  label="XML firmado"
+                  label="XML"
                   icon="download"
                   className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 />
@@ -201,7 +202,7 @@ function DocumentRow({ doc }: { doc: BillingDocumentListItem }) {
               <>
                 <SriDownloadButton
                   href={`/api/sri/documents/${doc.sriDocumentId}/download-authorized-xml`}
-                  label="XML autorizado"
+                  label="Descargar XML"
                   icon="file-check"
                   className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 />
@@ -213,14 +214,17 @@ function DocumentRow({ doc }: { doc: BillingDocumentListItem }) {
                 />
               </>
             )}
+            {canCheckAuthorization && (
+              <Button asChild variant="outline" size="sm">
+                <Link href={doc.sriDetailHref!}>Consultar autorización</Link>
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Row 2 — SRI data strip when relevant */}
       {doc.sriStatus && (
         <div className="space-y-2 border-t border-slate-100 pt-3">
-          {/* Authorized */}
           {doc.sriStatus === "AUTHORIZED" && doc.authorizationNumber && (
             <div className="grid gap-x-6 gap-y-1 text-xs sm:grid-cols-3">
               <div>
@@ -244,7 +248,6 @@ function DocumentRow({ doc }: { doc: BillingDocumentListItem }) {
             </div>
           )}
 
-          {/* Rejected */}
           {doc.sriStatus === "REJECTED" && (
             <div className="rounded-lg bg-red-50 px-3 py-2 text-xs">
               <p className="font-medium text-red-700">
@@ -252,17 +255,15 @@ function DocumentRow({ doc }: { doc: BillingDocumentListItem }) {
               </p>
             </div>
           )}
-
-          {/* Signed but pending */}
-          {(doc.sriStatus === "SIGNED" || doc.sriStatus === "SENT") && (
+          {(doc.sriStatus === "SIGNED" || doc.sriStatus === "SENT" || doc.sriStatus === "READY_FOR_TESTING" || doc.sriStatus === "DRAFT") && (
             <p className="text-xs text-slate-500">
               {doc.sriStatus === "SENT"
                 ? "Recibido por el SRI — esperando autorización automática."
-                : "Firmado — pendiente de envío al SRI."}
+                : doc.sriStatus === "SIGNED"
+                  ? "Firmado — pendiente de autorización."
+                  : "Documento en preparación antes del envío al SRI."}
             </p>
           )}
-
-          {/* Access key for non-authorized */}
           {doc.accessKey &&
             doc.sriStatus !== "AUTHORIZED" &&
             doc.sriStatus !== "REJECTED" && (
@@ -291,6 +292,8 @@ export function BillingDocumentsList({
   totalItems = 0,
   prevHref,
   nextHref,
+  statusOptions = [],
+  currentStatus = "all",
 }: {
   items: BillingDocumentListItem[];
   mode: "CORE" | "SHARED_ERP";
@@ -299,7 +302,10 @@ export function BillingDocumentsList({
   totalItems?: number;
   prevHref?: string;
   nextHref?: string;
+  statusOptions?: Array<{ key: string; label: string; href: string }>;
+  currentStatus?: string;
 }) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
 
@@ -311,48 +317,66 @@ export function BillingDocumentsList({
 
   return (
     <div className="space-y-4">
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <Input
-          type="search"
-          placeholder="Buscar por cliente, número, autorización o ID…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 pr-9"
-        />
-        {search && (
-          <button
-            type="button"
-            onClick={() => setSearch("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
-      </div>
+      <div className="flex flex-col gap-3 rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              type="search"
+              placeholder="Buscar por cliente, número, autorización, clave o ID…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="border-slate-200 bg-white pl-9 pr-9"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          {statusOptions.length > 0 ? (
+            <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-600">
+              <span className="shrink-0 text-xs font-medium text-slate-500">Estado</span>
+              <select
+                value={currentStatus}
+                onChange={(event) => {
+                  const selected = statusOptions.find((option) => option.key === event.target.value);
+                  if (selected) router.push(selected.href);
+                }}
+                className="h-10 w-full bg-transparent text-sm text-slate-700 outline-none"
+              >
+                {statusOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </div>
 
-      {/* Type filter — only for CORE mode where mix of receipts/SRI exists */}
-      {mode === "CORE" && (
         <div className="flex flex-wrap gap-1.5">
           {TYPE_FILTER_OPTIONS.map(({ key, label }) => (
             <button
               key={key}
               type="button"
               onClick={() => setTypeFilter(key)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                 typeFilter === key
-                  ? "border-[#004080] bg-[#004080] text-white"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                  ? "border-[#588100] bg-[#588100] text-white"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-[#588100]/30 hover:text-[#588100]"
               }`}
             >
               {label}
             </button>
           ))}
         </div>
-      )}
+      </div>
 
-      {/* List */}
       <div className="space-y-2.5">
         {filtered.map((doc) => (
           <DocumentRow key={doc.id} doc={doc} />

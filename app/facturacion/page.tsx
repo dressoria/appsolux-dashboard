@@ -13,10 +13,12 @@ import {
 } from "lucide-react";
 
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
+import { ReportsEmptyState } from "@/components/appsolux/reports/reports-empty-state";
 import { SimpleBarChart } from "@/components/appsolux/reports/simple-bar-chart";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { routes } from "@/config/routes";
+import { getPrismaClient } from "@/lib/db/prisma";
 import { getBasicReports } from "@/lib/core/lightweight-pos";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { getSriDocuments, getSriModuleStatus } from "@/lib/core/sri";
@@ -40,6 +42,189 @@ function getSriReadinessLabel(
   if (sriStatus.readinessLabel === "ready_for_testing") return "SRI en pruebas";
   if (sriStatus.readinessLabel === "incomplete") return "SRI incompleto";
   return "SRI pendiente";
+}
+
+type TrendPoint = {
+  label: string;
+  value: number;
+};
+
+type DistributionPoint = {
+  label: string;
+  value: number;
+  color: string;
+};
+
+async function getBillingAnalytics(tenantId: string): Promise<{
+  salesTrend: TrendPoint[];
+  distribution: DistributionPoint[];
+}> {
+  const prisma = getPrismaClient();
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+
+  const rangeStart = new Date(monthStart.getFullYear(), monthStart.getMonth() - 5, 1);
+
+  const [salesRows, sriRows, receiptCount] = await Promise.all([
+    prisma.lightweightSale.findMany({
+      where: {
+        tenantId,
+        status: { not: "canceled" },
+        createdAt: { gte: rangeStart },
+      },
+      select: { total: true, createdAt: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.sriDocument.findMany({
+      where: { tenantId },
+      select: { status: true },
+    }),
+    prisma.lightweightSale.count({
+      where: { tenantId, status: { not: "canceled" } },
+    }),
+  ]);
+
+  const formatter = new Intl.DateTimeFormat("es-EC", { month: "short" });
+  const monthBuckets = Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(rangeStart.getFullYear(), rangeStart.getMonth() + index, 1);
+    return {
+      key: `${date.getFullYear()}-${date.getMonth()}`,
+      label: formatter
+        .format(date)
+        .replace(".", "")
+        .replace(/^\w/, (char) => char.toUpperCase()),
+      value: 0,
+    };
+  });
+  const bucketMap = new Map(monthBuckets.map((bucket) => [bucket.key, bucket]));
+
+  for (const sale of salesRows) {
+    const createdAt = new Date(sale.createdAt);
+    const bucket = bucketMap.get(`${createdAt.getFullYear()}-${createdAt.getMonth()}`);
+    if (!bucket) continue;
+    bucket.value += Number(sale.total.toString());
+  }
+
+  const statusCounts = sriRows.reduce<Record<string, number>>((accumulator, row) => {
+    accumulator[row.status] = (accumulator[row.status] ?? 0) + 1;
+    return accumulator;
+  }, {});
+  const pendingCount =
+    (statusCounts.DRAFT ?? 0) +
+    (statusCounts.READY_FOR_TESTING ?? 0) +
+    (statusCounts.SIGNED ?? 0) +
+    (statusCounts.SENT ?? 0);
+
+  return {
+    salesTrend: monthBuckets,
+    distribution: [
+      { label: "Recibos", value: receiptCount, color: "#588100" },
+      { label: "Facturas SRI", value: sriRows.length, color: "#8db600" },
+      { label: "Autorizadas", value: statusCounts.AUTHORIZED ?? 0, color: "#0d0f12" },
+      { label: "Pendientes", value: pendingCount, color: "#a3a3a3" },
+      { label: "Rechazadas", value: statusCounts.REJECTED ?? 0, color: "#dc2626" },
+    ],
+  };
+}
+
+function SalesLineChart({ items }: { items: TrendPoint[] }) {
+  const maxValue = Math.max(...items.map((item) => item.value), 0);
+
+  if (items.length === 0 || maxValue <= 0) {
+    return <ReportsEmptyState message="Todavía no hay suficiente actividad para mostrar el historial de ventas." />;
+  }
+
+  const width = 520;
+  const height = 160;
+  const paddingX = 16;
+  const paddingY = 18;
+  const stepX = items.length > 1 ? (width - paddingX * 2) / (items.length - 1) : 0;
+
+  const points = items.map((item, index) => {
+    const x = paddingX + stepX * index;
+    const ratio = item.value / maxValue;
+    const y = height - paddingY - ratio * (height - paddingY * 2);
+    return { ...item, x, y };
+  });
+
+  const path = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+  const area = `${path} L ${points[points.length - 1]?.x ?? width - paddingX} ${height - paddingY} L ${paddingX} ${height - paddingY} Z`;
+
+  return (
+    <div className="space-y-4">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-40 w-full">
+        <defs>
+          <linearGradient id="facturomSalesFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="rgba(88,129,0,0.26)" />
+            <stop offset="100%" stopColor="rgba(88,129,0,0.02)" />
+          </linearGradient>
+        </defs>
+        <line x1={paddingX} x2={width - paddingX} y1={height - paddingY} y2={height - paddingY} stroke="#e2e8f0" strokeWidth="1" />
+        <path d={area} fill="url(#facturomSalesFill)" />
+        <path d={path} fill="none" stroke="#588100" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((point) => (
+          <g key={point.label}>
+            <circle cx={point.x} cy={point.y} r="4.5" fill="#ffffff" stroke="#588100" strokeWidth="2" />
+          </g>
+        ))}
+      </svg>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+        {items.map((item) => (
+          <div key={item.label} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{item.label}</p>
+            <p className="mt-1 text-sm font-bold text-slate-900">{formatMoney(item.value)}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DonutSummaryChart({ items }: { items: DistributionPoint[] }) {
+  const visibleItems = items.filter((item) => item.value > 0);
+  const total = visibleItems.reduce((sum, item) => sum + item.value, 0);
+
+  if (total <= 0) {
+    return <ReportsEmptyState message="Aún no hay suficientes documentos para resumir la distribución actual." />;
+  }
+
+  let accumulated = 0;
+  const gradient = visibleItems
+    .map((item) => {
+      const start = (accumulated / total) * 100;
+      accumulated += item.value;
+      const end = (accumulated / total) * 100;
+      return `${item.color} ${start}% ${end}%`;
+    })
+    .join(", ");
+
+  return (
+    <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
+      <div className="flex items-center justify-center">
+        <div
+          className="relative h-40 w-40 rounded-full"
+          style={{ background: `conic-gradient(${gradient})` }}
+        >
+          <div className="absolute inset-[18px] flex flex-col items-center justify-center rounded-full bg-white text-center">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Total</span>
+            <span className="mt-1 text-2xl font-black text-slate-950">{total}</span>
+          </div>
+        </div>
+      </div>
+      <div className="grid flex-1 gap-2">
+        {visibleItems.map((item) => (
+          <div key={item.label} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+              <span className="text-sm font-medium text-slate-700">{item.label}</span>
+            </div>
+            <span className="text-sm font-black text-slate-950">{item.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function MetricCard({
@@ -126,11 +311,12 @@ function QuickAccessCard({
 
 export default async function FacturacionPage() {
   const { tenant } = await requireDashboardSession();
-  const [tenantMode, reports, sriStatus, sriDocs] = await Promise.all([
+  const [tenantMode, reports, sriStatus, sriDocs, analytics] = await Promise.all([
     getTenantModeState(tenant),
     getBasicReports(tenant.id),
     getSriModuleStatus(tenant.id),
     getSriDocuments(tenant.id, { take: 6 }),
+    getBillingAnalytics(tenant.id),
   ]);
   const appRouting = resolveTenantAppRouting(tenantMode);
   const operatingModeLabel = getOperatingModeLabel(tenantMode.effectiveOperatingMode);
@@ -283,21 +469,46 @@ export default async function FacturacionPage() {
           </div>
         </section>
 
-        <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           <Card className="rounded-[28px] border-slate-200 bg-white shadow-sm">
             <CardContent className="p-5">
               <div className="mb-4 flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                    Resumen de ingresos
-                  </p>
-                  <h3 className="mt-1 text-xl font-black text-slate-950">Tendencia mensual</h3>
-                  <p className="mt-1 text-sm text-slate-500">Ventas recientes con base en la actividad actual.</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Historial de ventas</p>
+                  <h3 className="mt-1 text-xl font-black text-slate-950">Evolución mensual de ventas registradas</h3>
                 </div>
                 <div className="rounded-2xl border border-[#588100]/12 bg-[#588100]/6 px-3 py-2 text-right">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#588100]">Ingresos</p>
                   <p className="text-lg font-black text-slate-950">{formatMoney(reports.salesMonth)}</p>
                 </div>
+              </div>
+              <SalesLineChart items={analytics.salesTrend} />
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[28px] border-slate-200 bg-white shadow-sm">
+            <CardContent className="p-5">
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Resumen de ingresos</p>
+                <h3 className="mt-1 text-xl font-black text-slate-950">Distribución actual de documentos</h3>
+                <p className="mt-1 text-sm text-slate-500">Recibos, facturas SRI y estados con datos reales del tenant.</p>
+              </div>
+              <DonutSummaryChart items={analytics.distribution} />
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+          <Card className="rounded-[28px] border-slate-200 bg-white shadow-sm">
+            <CardContent className="p-5">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Visualización</p>
+                  <h3 className="mt-1 text-xl font-black text-slate-950">Actividad operativa actual</h3>
+                </div>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-500">
+                  Resumen rápido
+                </span>
               </div>
               <SimpleBarChart
                 items={chartItems}
