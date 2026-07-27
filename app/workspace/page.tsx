@@ -60,49 +60,24 @@ export default async function WorkspacePage() {
 
       <div className="px-4 py-8 sm:px-6 sm:py-10">
         <div className="mx-auto max-w-7xl space-y-8">
-          <section className="rounded-[32px] border border-slate-200 bg-white px-6 py-8 shadow-[0_16px_48px_rgba(15,23,42,0.06)] sm:px-8">
-            <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
-              <WorkspaceLauncherHeader userName={userName} tenantName={tenantName} />
-              <div className="rounded-[28px] border border-slate-200 bg-[#0d0f12] p-6 text-white shadow-[0_18px_48px_rgba(13,15,18,0.18)]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8db600]">
-                  Acceso principal
-                </p>
-                <h2 className="mt-3 text-2xl font-black tracking-tight">Facturación lista para abrir</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-300">
-                  Ventas, clientes, productos, inventario y comprobantes SRI en un mismo flujo.
-                </p>
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-slate-200">
-                    {workspaceMode}
-                  </span>
-                  <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-slate-200">
-                    Empresa: {tenantName}
-                  </span>
-                </div>
-              </div>
-            </div>
+          <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-7 shadow-[0_12px_36px_rgba(15,23,42,0.05)] sm:px-8">
+            <WorkspaceLauncherHeader userName={userName} />
           </section>
 
-          <section className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <WorkspaceServiceCard
               icon={ReceiptText}
               title="Facturación"
-              description="Ventas, clientes, productos, inventario y comprobantes SRI."
-              tags={["Ventas", "SRI", "POS", "Inventario"]}
-              badge="Principal"
-              eyebrow="Facturom"
+              description="Ventas, clientes, inventario y comprobantes SRI."
               ctaLabel="Abrir"
               href={routes.facturacion}
               tone="facturacion"
-              featured
-              className="lg:col-span-2"
+              eyebrow={workspaceMode}
             />
             <WorkspaceServiceCard
               icon={MessageCircle}
               title="Chats"
               description="Conversa con clientes y centraliza canales de atención."
-              tags={["Atención", "Canales"]}
-              badge="Disponible"
               eyebrow="Comunicación"
               ctaLabel="Abrir"
               href={routes.conversations}
@@ -112,8 +87,6 @@ export default async function WorkspacePage() {
               icon={Bot}
               title="Automatizaciones"
               description="Conecta procesos y tareas repetitivas de tu operación."
-              tags={["Procesos", "Flujos"]}
-              badge="Disponible"
               eyebrow="Operación"
               ctaLabel="Abrir"
               href={routes.automations}
