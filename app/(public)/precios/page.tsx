@@ -129,8 +129,8 @@ export default function PreciosPage() {
                 key={plan.name}
                 className="flex flex-col rounded-3xl border bg-white p-7"
                 style={{
-                  borderColor: plan.featured ? "#7f00b2" : "#e5e7eb",
-                  boxShadow: plan.featured ? "0 0 0 1px #7f00b220, 0 12px 36px #7f00b212" : undefined,
+                  borderColor: plan.featured ? "#588100" : "#e5e7eb",
+                  boxShadow: plan.featured ? "0 0 0 1px #58810020, 0 12px 36px #58810012" : undefined,
                 }}
               >
                 <div className="mb-5">
@@ -138,7 +138,7 @@ export default function PreciosPage() {
                     className="inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold"
                     style={
                       plan.featured
-                        ? { backgroundColor: "#7f00b212", color: "#7f00b2" }
+                        ? { backgroundColor: "#58810012", color: "#588100" }
                         : { backgroundColor: "#58810010", color: "#588100" }
                     }
                   >
@@ -167,7 +167,7 @@ export default function PreciosPage() {
                   style={
                     plan.featured
                       ? {
-                          background: "linear-gradient(135deg, #7f00b2 0%, #bc4ed8 100%)",
+                          background: "linear-gradient(135deg, #588100 0%, #8db600 100%)",
                           color: "white",
                         }
                       : { backgroundColor: "#f3f4f6", color: "#374151" }

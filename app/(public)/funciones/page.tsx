@@ -189,7 +189,7 @@ export default function FuncionesPage() {
             <br />
             <span
               style={{
-                background: "linear-gradient(120deg, #588100, #7f00b2)",
+                background: "linear-gradient(120deg, #588100, #8db600)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
@@ -254,7 +254,7 @@ export default function FuncionesPage() {
                     <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       {section.benefits.map((benefit) => (
                         <li key={benefit} className="flex items-start gap-2 text-sm text-gray-700">
-                          <CheckCircle size={14} className="mt-0.5 shrink-0 text-[#7f00b2]" />
+                          <CheckCircle size={14} className="mt-0.5 shrink-0 text-[#588100]" />
                           {benefit}
                         </li>
                       ))}
@@ -285,7 +285,7 @@ export default function FuncionesPage() {
 
       <section
         className="border-t border-gray-100 py-20"
-        style={{ background: "linear-gradient(135deg, #0d1c0a, #1a0d2e)" }}
+        style={{ background: "linear-gradient(135deg, #0d0f12, #12230a)" }}
       >
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
           <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">

@@ -5,7 +5,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   return (
     <>
       <PublicHeader />
-      <main className="pt-16">{children}</main>
+      <main className="pt-[72px]">{children}</main>
       <PublicFooter />
     </>
   );

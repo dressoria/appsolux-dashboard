@@ -1,6 +1,7 @@
 import { SignIn } from "@clerk/nextjs";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle } from "lucide-react";
+import { FacturomBrand } from "@/components/public/facturom-brand";
 
 const benefits = [
   "Factura, vende y controla tu negocio desde un solo lugar.",
@@ -14,7 +15,7 @@ export default function SignInPage() {
     <main className="flex min-h-screen">
       <div
         className="relative hidden flex-col justify-between overflow-hidden p-10 lg:flex lg:w-[44%] xl:w-2/5 xl:p-12"
-        style={{ background: "linear-gradient(145deg, #0d1c0a 0%, #1a0d2e 60%, #0d1c0a 100%)" }}
+        style={{ background: "linear-gradient(145deg, #0d0f12 0%, #112108 58%, #0d0f12 100%)" }}
       >
         <div
           className="pointer-events-none absolute top-0 right-0 h-[350px] w-[350px] rounded-full blur-[100px] opacity-20"
@@ -22,18 +23,16 @@ export default function SignInPage() {
         />
         <div
           className="pointer-events-none absolute bottom-0 left-0 h-[280px] w-[280px] rounded-full blur-[80px] opacity-15"
-          style={{ background: "radial-gradient(circle, #bc4ed8, transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, #588100, transparent 70%)" }}
         />
 
         <div className="relative z-10 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-black text-white"
-              style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
-            >
-              F
-            </div>
-            <span className="text-base font-bold text-white">Facturom</span>
+          <Link href="/" className="inline-flex items-center">
+            <FacturomBrand
+              variant="white"
+              imageClassName="h-11 w-auto"
+              textClassName="text-[1.45rem]"
+            />
           </Link>
           <Link href="/" className="flex items-center gap-1.5 text-xs text-gray-500 transition-colors hover:text-gray-300">
             <ArrowLeft size={13} />
@@ -51,7 +50,7 @@ export default function SignInPage() {
               <br />
               <span
                 style={{
-                  background: "linear-gradient(120deg, #8db600, #bc4ed8)",
+                  background: "linear-gradient(120deg, #8db600, #d7f28d)",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
                   backgroundClip: "text",
@@ -96,14 +95,8 @@ export default function SignInPage() {
 
       <div className="flex w-full items-center justify-center bg-gray-50 px-5 py-12 lg:w-[56%] xl:w-3/5">
         <div className="flex w-full max-w-sm flex-col items-center gap-6">
-          <Link href="/" className="mb-2 flex items-center gap-2 lg:hidden">
-            <div
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-black text-white"
-              style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
-            >
-              F
-            </div>
-            <span className="text-base font-bold text-gray-900">Facturom</span>
+          <Link href="/" className="mb-2 inline-flex items-center lg:hidden">
+            <FacturomBrand imageClassName="h-10 w-auto" textClassName="text-[1.35rem]" />
           </Link>
 
           <div className="flex flex-wrap justify-center gap-3 text-xs text-gray-500 lg:hidden">

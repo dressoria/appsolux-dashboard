@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
@@ -12,6 +14,9 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+
+const facturomIconPath = path.join(process.cwd(), "public", "brand", "facturom-icon.svg");
+const hasFacturomIcon = existsSync(facturomIconPath);
 
 export const metadata: Metadata = {
   title: {
@@ -34,6 +39,15 @@ export const metadata: Metadata = {
     title: "Facturom",
     description: "Facturación electrónica simple para negocios en Ecuador.",
   },
+  ...(hasFacturomIcon
+    ? {
+        icons: {
+          icon: "/brand/facturom-icon.svg",
+          shortcut: "/brand/facturom-icon.svg",
+          apple: "/brand/facturom-icon.svg",
+        },
+      }
+    : {}),
 };
 
 export default function RootLayout({

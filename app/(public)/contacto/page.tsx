@@ -138,8 +138,8 @@ export default async function ContactoPage({ searchParams }: ContactoPageProps) 
 
           <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
             <div className="flex items-start gap-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#7f00b210]">
-                <Clock size={20} className="text-[#7f00b2]" />
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#58810012]">
+                <Clock size={20} className="text-[#588100]" />
               </div>
               <div>
                 <h3 className="mb-1 text-base font-black text-gray-900">Horario de atención</h3>
@@ -168,7 +168,7 @@ export default async function ContactoPage({ searchParams }: ContactoPageProps) 
 
       <section
         className="py-20 text-center"
-        style={{ background: "linear-gradient(135deg, #0d1c0a, #1a0d2e)" }}
+        style={{ background: "linear-gradient(135deg, #0d0f12, #12230a)" }}
       >
         <div className="mx-auto max-w-xl px-4 sm:px-6">
           <h2 className="mb-4 text-2xl font-black text-white">¿Prefieres explorar primero?</h2>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
+import { FacturomBrand } from "@/components/public/facturom-brand";
 
 const navLinks = [
   { label: "Funciones", href: "/funciones" },
@@ -17,17 +18,13 @@ export function PublicHeader() {
 
   return (
     <header className="fixed left-0 right-0 top-0 z-50 border-b border-gray-100/80 bg-white/96 shadow-[0_1px_3px_rgba(0,0,0,0.04)] backdrop-blur-md">
-      <div className="mx-auto flex h-[62px] max-w-7xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="group flex shrink-0 items-center gap-2">
-          <div
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-xs font-black text-white"
-            style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
-          >
-            F
-          </div>
-          <span className="text-[17px] font-bold tracking-tight text-gray-900 transition-colors group-hover:text-[#588100]">
-            Facturom
-          </span>
+      <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4 sm:px-6">
+        <Link href="/" className="group flex shrink-0 items-center">
+          <FacturomBrand
+            className="transition-opacity group-hover:opacity-90"
+            imageClassName="h-11 w-auto"
+            textClassName="text-[1.45rem]"
+          />
         </Link>
 
         <nav className="hidden items-center gap-6 md:flex">
@@ -43,7 +40,7 @@ export function PublicHeader() {
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
-          <Link href="/login" className="px-3 py-1.5 text-sm font-semibold text-gray-700 transition-colors hover:text-gray-900">
+          <Link href="/sign-in" className="px-3 py-1.5 text-sm font-semibold text-gray-700 transition-colors hover:text-gray-900">
             Entrar
           </Link>
           <Link
@@ -56,7 +53,7 @@ export function PublicHeader() {
         </div>
 
         <div className="flex items-center gap-2 md:hidden">
-          <Link href="/login" className="px-3 py-1.5 text-sm font-semibold text-gray-700">
+          <Link href="/sign-in" className="px-3 py-1.5 text-sm font-semibold text-gray-700">
             Entrar
           </Link>
           <button

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FacturomBrand } from "@/components/public/facturom-brand";
 
 const columns = {
   producto: [
@@ -8,7 +9,7 @@ const columns = {
     { label: "Blog", href: "/blog" },
   ],
   acceso: [
-    { label: "Entrar", href: "/login" },
+    { label: "Entrar", href: "/sign-in" },
     { label: "Crear cuenta", href: "/sign-up" },
     { label: "Contacto", href: "/contacto" },
   ],
@@ -25,14 +26,12 @@ export function PublicFooter() {
       <div className="mx-auto max-w-7xl px-4 pb-10 pt-16 sm:px-6">
         <div className="mb-12 grid grid-cols-1 gap-10 md:grid-cols-5">
           <div className="md:col-span-2">
-            <Link href="/" className="mb-4 flex items-center gap-2">
-              <div
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-xs font-black text-white"
-                style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
-              >
-                F
-              </div>
-              <span className="text-base font-bold text-white">Facturom</span>
+            <Link href="/" className="mb-4 inline-flex items-center">
+              <FacturomBrand
+                variant="white"
+                imageClassName="h-10 w-auto"
+                textClassName="text-[1.35rem]"
+              />
             </Link>
             <p className="max-w-xs text-sm leading-relaxed text-gray-500">
               Facturación electrónica, POS, inventario, clientes y gestión comercial para negocios en Ecuador.

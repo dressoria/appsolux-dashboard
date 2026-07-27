@@ -150,7 +150,7 @@ export default async function LandingPage() {
   return (
     <>
       <PublicHeader />
-      <main className="pt-[62px]">
+      <main className="pt-[72px]">
         <HeroSection />
         <ModulesSection />
         <PlansSection />
@@ -172,7 +172,7 @@ function HeroSection() {
       />
       <div
         className="pointer-events-none absolute top-10 right-0 h-[420px] w-[420px] rounded-full blur-[110px] opacity-10"
-        style={{ background: "radial-gradient(circle, #bc4ed8, transparent 70%)" }}
+        style={{ background: "radial-gradient(circle, #dbe8ba, transparent 70%)" }}
       />
 
       <div className="relative mx-auto flex max-w-7xl flex-col gap-12 px-4 pb-20 pt-24 sm:px-6 md:pb-24 md:pt-32 lg:flex-row lg:items-center">
@@ -195,7 +195,7 @@ function HeroSection() {
             <br />
             <span
               style={{
-                background: "linear-gradient(120deg, #588100 0%, #8db600 45%, #7f00b2 100%)",
+                background: "linear-gradient(120deg, #588100 0%, #8db600 55%, #a4c943 100%)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
@@ -225,6 +225,12 @@ function HeroSection() {
               className="inline-flex items-center justify-center rounded-2xl border border-gray-200 bg-gray-100 px-8 py-4 text-base font-semibold text-gray-700 transition-colors hover:bg-gray-200"
             >
               Ver planes
+            </Link>
+            <Link
+              href="/contacto"
+              className="inline-flex items-center justify-center rounded-2xl border border-[#58810030] bg-[#58810008] px-8 py-4 text-base font-semibold text-[#588100] transition-colors hover:bg-[#58810012]"
+            >
+              Hablar con asesor
             </Link>
           </div>
           <Link href="/funciones" className="inline-flex items-center gap-2 text-sm font-semibold text-[#588100]">
@@ -279,7 +285,7 @@ function ModulesSection() {
                 </div>
                 <h3 className="mb-2 text-base font-black text-gray-900">{module.title}</h3>
                 <p className="mb-4 text-sm leading-relaxed text-gray-500">{module.description}</p>
-                <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#7f00b2]">
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#588100]">
                   Ir a esta sección
                   <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
                 </span>
@@ -311,8 +317,8 @@ function PlansSection() {
               key={plan.name}
               className="flex flex-col rounded-3xl border bg-white p-6"
               style={{
-                borderColor: plan.featured ? "#7f00b2" : "#e5e7eb",
-                boxShadow: plan.featured ? "0 0 0 1px #7f00b220, 0 16px 40px #7f00b212" : undefined,
+                borderColor: plan.featured ? "#588100" : "#e5e7eb",
+                boxShadow: plan.featured ? "0 0 0 1px #58810020, 0 16px 40px #58810012" : undefined,
               }}
             >
               <div className="mb-4 flex items-start justify-between gap-3">
@@ -321,7 +327,7 @@ function PlansSection() {
                   <p className="mt-1 text-sm text-gray-500">{plan.summary}</p>
                 </div>
                 {plan.featured ? (
-                  <span className="rounded-full bg-[#7f00b212] px-2.5 py-1 text-[11px] font-bold text-[#7f00b2]">
+                  <span className="rounded-full bg-[#58810012] px-2.5 py-1 text-[11px] font-bold text-[#588100]">
                     Recomendado
                   </span>
                 ) : null}
@@ -344,7 +350,7 @@ function PlansSection() {
                 style={
                   plan.featured
                     ? {
-                        background: "linear-gradient(135deg, #7f00b2 0%, #bc4ed8 100%)",
+                        background: "linear-gradient(135deg, #588100 0%, #8db600 100%)",
                         color: "white",
                       }
                     : {
@@ -361,7 +367,7 @@ function PlansSection() {
         </div>
 
         <div className="mt-8 text-center">
-          <Link href="/precios" className="inline-flex items-center gap-2 text-sm font-semibold text-[#7f00b2]">
+          <Link href="/precios" className="inline-flex items-center gap-2 text-sm font-semibold text-[#588100]">
             Comparar todos los planes
             <ArrowRight size={15} />
           </Link>
@@ -375,7 +381,7 @@ function SriSection() {
   return (
     <section
       className="relative overflow-hidden py-24"
-      style={{ background: "linear-gradient(135deg, #0d1c0a 0%, #1a0d2e 100%)" }}
+      style={{ background: "linear-gradient(135deg, #0d0f12 0%, #112108 100%)" }}
     >
       <div
         className="pointer-events-none absolute -top-20 right-0 h-[380px] w-[380px] rounded-full blur-[100px] opacity-10"
@@ -447,8 +453,8 @@ function TrustSection() {
             const Icon = card.icon;
             return (
               <div key={card.title} className="rounded-3xl border border-gray-100 bg-white p-6">
-                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-[#7f00b210]">
-                  <Icon size={18} className="text-[#7f00b2]" />
+                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-[#58810012]">
+                  <Icon size={18} className="text-[#588100]" />
                 </div>
                 <h3 className="mb-2 text-sm font-black text-gray-900">{card.title}</h3>
                 <p className="text-sm leading-relaxed text-gray-500">{card.description}</p>

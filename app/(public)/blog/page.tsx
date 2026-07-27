@@ -20,7 +20,7 @@ const guides = [
   {
     id: "guia-sri",
     category: "Guía",
-    color: "#7f00b2",
+    color: "#8db600",
     title: "Qué revisar del flujo SRI antes de emitir",
     excerpt: "Ambiente, establecimiento, punto de emisión y seguimiento documental: lo esencial para no perder contexto.",
     readingTime: "4 min",
@@ -38,7 +38,7 @@ const guides = [
   {
     id: "guia-clientes",
     category: "Guía",
-    color: "#7f00b2",
+    color: "#8db600",
     title: "Cómo organizar clientes y documentos sin duplicar trabajo",
     excerpt: "Reutiliza información comercial y fiscal para facturar más rápido y sostener el seguimiento de cobros.",
     readingTime: "4 min",
@@ -56,7 +56,7 @@ const guides = [
   {
     id: "guia-pos",
     category: "Guía",
-    color: "#7f00b2",
+    color: "#8db600",
     title: "Qué debe tener tu POS para vender sin fricción",
     excerpt: "Velocidad de cobro, búsqueda de productos, medios de pago y conexión con caja e inventario.",
     readingTime: "4 min",
@@ -74,7 +74,7 @@ export default function BlogPage() {
             <br />
             <span
               style={{
-                background: "linear-gradient(120deg, #588100, #7f00b2)",
+                background: "linear-gradient(120deg, #588100, #8db600)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",

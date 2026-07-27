@@ -65,7 +65,7 @@ export default function FirmaPage() {
     <div>
       <section
         className="relative overflow-hidden py-24"
-        style={{ background: "linear-gradient(145deg, #0d1c0a 0%, #1a0d2e 100%)" }}
+        style={{ background: "linear-gradient(145deg, #0d0f12 0%, #112108 100%)" }}
       >
         <div
           className="pointer-events-none absolute top-0 right-0 h-[400px] w-[400px] rounded-full blur-[100px] opacity-15"
@@ -143,7 +143,7 @@ export default function FirmaPage() {
                   </div>
                   <div className="flex-1">
                     <div className="mb-2 flex items-center gap-2">
-                      <Icon size={15} className="text-[#7f00b2]" />
+                      <Icon size={15} className="text-[#588100]" />
                       <h3 className="text-base font-bold text-gray-900">{step.title}</h3>
                     </div>
                     <p className="text-sm leading-relaxed text-gray-500">{step.description}</p>
@@ -174,7 +174,7 @@ export default function FirmaPage() {
               const Icon = item.icon;
               return (
                 <div key={item.text} className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-4">
-                  <Icon size={15} className="mt-0.5 shrink-0 text-[#7f00b2]" />
+                  <Icon size={15} className="mt-0.5 shrink-0 text-[#588100]" />
                   <span className="text-sm text-gray-700">{item.text}</span>
                 </div>
               );
