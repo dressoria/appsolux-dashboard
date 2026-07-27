@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
-import type { AppsoluxUser } from "@/types/user";
-import { Sidebar } from "./sidebar";
-import { Topbar } from "./topbar";
+import { isClerkAuth } from "@/lib/auth/provider";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
+import { DashboardFrame } from "./dashboard-frame";
+import { buildSidebarNavigation } from "./sidebar";
 
 type DashboardShellProps = {
   children: ReactNode;
@@ -17,21 +18,22 @@ export async function DashboardShell({
   mainClassName = "px-6 py-8",
   contentClassName = "mx-auto max-w-6xl",
 }: DashboardShellProps) {
-  const { user } = await requireDashboardSession();
+  const { user, tenant } = await requireDashboardSession();
+  const tenantMode = await getTenantModeState(tenant);
+  const navigationGroups = buildSidebarNavigation(tenantMode);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="flex">
-        <Sidebar user={user as AppsoluxUser} />
-
-        <div className="min-h-screen flex-1">
-          {hideTopbar ? null : <Topbar user={user} />}
-
-          <main className={mainClassName}>
-            <div className={contentClassName}>{children}</div>
-          </main>
-        </div>
-      </div>
-    </div>
+    <DashboardFrame
+      hideTopbar={hideTopbar}
+      mainClassName={mainClassName}
+      contentClassName={contentClassName}
+      userName={user.name}
+      tenantName={tenant.name}
+      modeLabel={tenantMode.canUseAdvancedErp ? "Gestión empresarial" : "Plan básico"}
+      navigationGroups={navigationGroups}
+      clerkActive={isClerkAuth()}
+    >
+      {children}
+    </DashboardFrame>
   );
 }
