@@ -60,24 +60,24 @@ export function ProductForm({ disabled = false }: { disabled?: boolean }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      {/* Información principal */}
       <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
           Información principal
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-1.5">
-            <Label htmlFor="name">Nombre del producto</Label>
+            <Label htmlFor="name" className="text-slate-700">Nombre del producto</Label>
             <Input
               id="name"
               name="name"
               placeholder="Ej. Camisa talla M"
               required
               disabled={fieldDisabled}
+              className="h-11 rounded-2xl border-slate-200 bg-white"
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="price">Precio de venta</Label>
+            <Label htmlFor="price" className="text-slate-700">Precio de venta</Label>
             <Input
               id="price"
               name="price"
@@ -87,6 +87,7 @@ export function ProductForm({ disabled = false }: { disabled?: boolean }) {
               placeholder="0.00"
               required
               disabled={fieldDisabled}
+              className="h-11 rounded-2xl border-slate-200 bg-white"
             />
           </div>
           <div className="space-y-1.5">
@@ -102,19 +103,19 @@ export function ProductForm({ disabled = false }: { disabled?: boolean }) {
               min="0"
               placeholder="0.00"
               disabled={fieldDisabled}
+              className="h-11 rounded-2xl border-slate-200 bg-white"
             />
           </div>
         </div>
 
-        {/* IVA por producto */}
         <div className="mt-3 space-y-1.5">
-          <Label htmlFor="taxRate">IVA del producto</Label>
+          <Label htmlFor="taxRate" className="text-slate-700">IVA del producto</Label>
           <select
             id="taxRate"
             name="taxRate"
             defaultValue="0"
             disabled={fieldDisabled}
-            className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm sm:max-w-[200px]"
+            className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm sm:max-w-[220px]"
           >
             <option value="0">0% — Exento / no gravado</option>
             <option value="8">8% — Tarifa reducida</option>
@@ -126,14 +127,13 @@ export function ProductForm({ disabled = false }: { disabled?: boolean }) {
         </div>
       </div>
 
-      {/* Inventario */}
       <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
           Inventario
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="stock">Stock inicial</Label>
+            <Label htmlFor="stock" className="text-slate-700">Stock inicial</Label>
             <Input
               id="stock"
               name="stock"
@@ -141,6 +141,7 @@ export function ProductForm({ disabled = false }: { disabled?: boolean }) {
               min="0"
               defaultValue="0"
               disabled={fieldDisabled}
+              className="h-11 rounded-2xl border-slate-200 bg-white"
             />
           </div>
           <div className="space-y-1.5">
@@ -155,14 +156,14 @@ export function ProductForm({ disabled = false }: { disabled?: boolean }) {
               min="0"
               placeholder="Ej. 5"
               disabled={fieldDisabled}
+              className="h-11 rounded-2xl border-slate-200 bg-white"
             />
           </div>
         </div>
       </div>
 
-      {/* Catálogo */}
       <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
           Catálogo
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -176,6 +177,7 @@ export function ProductForm({ disabled = false }: { disabled?: boolean }) {
               name="barcode"
               placeholder="Ej. 7501000000000"
               disabled={fieldDisabled}
+              className="h-11 rounded-2xl border-slate-200 bg-white"
             />
           </div>
           <div className="space-y-1.5">
@@ -188,13 +190,18 @@ export function ProductForm({ disabled = false }: { disabled?: boolean }) {
               name="expiresAt"
               type="date"
               disabled={fieldDisabled}
+              className="h-11 rounded-2xl border-slate-200 bg-white"
             />
           </div>
         </div>
       </div>
 
       <div className="flex items-center gap-3 pt-1">
-        <Button type="submit" disabled={fieldDisabled} className="bg-[#004080] hover:bg-[#003060]">
+        <Button
+          type="submit"
+          disabled={fieldDisabled}
+          className="rounded-full bg-[#588100] px-5 text-white hover:bg-[#4b6f00]"
+        >
           {isLoading ? "Guardando..." : "Crear producto"}
         </Button>
         {message && <p className="text-sm text-emerald-600">{message}</p>}

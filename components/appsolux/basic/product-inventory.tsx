@@ -15,6 +15,7 @@ type Product = {
   stock: number;
   minStock?: number | null;
   barcode?: string | null;
+  taxRate?: string | null;
 };
 
 function stockStatus(product: Product) {
@@ -126,7 +127,7 @@ export function ProductInventory({ products }: { products: Product[] }) {
 
   return (
     <div className="space-y-3">
-      {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+      {message ? <p className="text-sm text-emerald-600">{message}</p> : null}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       {products.map((product) => {
@@ -136,27 +137,36 @@ export function ProductInventory({ products }: { products: Product[] }) {
         const isConfirmingDelete = deleteConfirmId === product.id;
 
         return (
-          <div key={product.id} className="space-y-3 rounded-md border p-3 text-sm">
+          <div key={product.id} className="space-y-3 rounded-[22px] border border-slate-200 bg-white p-4 text-sm shadow-sm transition-colors hover:border-[#588100]/30 hover:shadow-[0_14px_40px_rgba(88,129,0,0.08)]">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="font-medium">{product.name}</p>
-                <p className="text-muted-foreground">
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-base font-semibold text-slate-950">{product.name}</p>
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                    {Number(product.cost ?? 0) > 0 ? `Costo $${Number(product.cost).toFixed(2)}` : "Sin costo"}
+                  </span>
+                  <span className="rounded-full border px-2.5 py-1 text-[11px] font-medium border-slate-200 bg-slate-50 text-slate-600">
+                    {product.taxRate && Number(product.taxRate) > 0 ? "Con IVA" : "Exento"}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-500">
                   ${Number(product.price).toFixed(2)} · stock {product.stock}
                   {product.minStock !== null && product.minStock !== undefined
                     ? ` · minimo ${product.minStock}`
                     : ""}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-slate-400">
                   Codigo: {product.barcode || "sin codigo"}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className={`rounded-full border px-2 py-1 text-xs ${status.className}`}>
+                <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${status.className}`}>
                   {status.label}
                 </span>
                 <Button
                   type="button"
                   variant="outline"
+                  className="rounded-full border-slate-200 hover:border-[#588100]/30 hover:text-[#588100]"
                   onClick={() => {
                     setEditingId(isEditing ? "" : product.id);
                     setAdjustingId("");
@@ -168,6 +178,7 @@ export function ProductInventory({ products }: { products: Product[] }) {
                 <Button
                   type="button"
                   variant="outline"
+                  className="rounded-full border-slate-200 hover:border-[#588100]/30 hover:text-[#588100]"
                   onClick={() => {
                     setAdjustingId(isAdjusting ? "" : product.id);
                     setEditingId("");
@@ -179,7 +190,7 @@ export function ProductInventory({ products }: { products: Product[] }) {
                 <Button
                   type="button"
                   variant="outline"
-                  className="text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                  className="rounded-full text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
                   onClick={() => {
                     setDeleteConfirmId(isConfirmingDelete ? "" : product.id);
                     setEditingId("");
@@ -219,45 +230,50 @@ export function ProductInventory({ products }: { products: Product[] }) {
             ) : null}
 
             {isEditing ? (
-              <form onSubmit={(event) => updateProduct(event, product.id)} className="grid gap-3 md:grid-cols-5">
-                <div className="space-y-1">
-                  <Label>Nombre</Label>
-                  <Input name="name" defaultValue={product.name} required />
+              <form onSubmit={(event) => updateProduct(event, product.id)} className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-5">
+                <div className="space-y-1.5">
+                  <Label className="text-slate-700">Nombre</Label>
+                  <Input name="name" defaultValue={product.name} required className="h-10 rounded-xl border-slate-200 bg-white" />
                 </div>
-                <div className="space-y-1">
-                  <Label>Precio</Label>
-                  <Input name="price" type="number" step="0.01" min="0" defaultValue={product.price} required />
+                <div className="space-y-1.5">
+                  <Label className="text-slate-700">Precio</Label>
+                  <Input name="price" type="number" step="0.01" min="0" defaultValue={product.price} required className="h-10 rounded-xl border-slate-200 bg-white" />
                 </div>
-                <div className="space-y-1">
-                  <Label>Costo</Label>
-                  <Input name="cost" type="number" step="0.01" min="0" defaultValue={product.cost ?? ""} />
+                <div className="space-y-1.5">
+                  <Label className="text-slate-700">Costo</Label>
+                  <Input name="cost" type="number" step="0.01" min="0" defaultValue={product.cost ?? ""} className="h-10 rounded-xl border-slate-200 bg-white" />
                 </div>
-                <div className="space-y-1">
-                  <Label>Minimo</Label>
-                  <Input name="minStock" type="number" min="0" defaultValue={product.minStock ?? ""} />
+                <div className="space-y-1.5">
+                  <Label className="text-slate-700">Minimo</Label>
+                  <Input name="minStock" type="number" min="0" defaultValue={product.minStock ?? ""} className="h-10 rounded-xl border-slate-200 bg-white" />
                 </div>
-                <div className="space-y-1">
-                  <Label>Codigo</Label>
-                  <Input name="barcode" defaultValue={product.barcode ?? ""} />
+                <div className="space-y-1.5">
+                  <Label className="text-slate-700">Codigo</Label>
+                  <Input name="barcode" defaultValue={product.barcode ?? ""} className="h-10 rounded-xl border-slate-200 bg-white" />
                 </div>
-                <div className="md:col-span-5">
-                  <Button type="submit">Guardar cambios</Button>
+                <div className="md:col-span-5 flex items-center gap-3">
+                  <Button type="submit" className="rounded-full bg-[#588100] px-5 text-white hover:bg-[#4b6f00]">
+                    Guardar cambios
+                  </Button>
+                  <Button type="button" variant="outline" className="rounded-full" onClick={() => setEditingId("")}>
+                    Cancelar
+                  </Button>
                 </div>
               </form>
             ) : null}
 
             {isAdjusting ? (
-              <form onSubmit={(event) => adjustStock(event, product.id)} className="grid gap-3 md:grid-cols-[160px_1fr_auto]">
-                <div className="space-y-1">
-                  <Label>Ajuste</Label>
-                  <Input name="quantity" type="number" placeholder="+5 o -2" required />
+              <form onSubmit={(event) => adjustStock(event, product.id)} className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-[160px_1fr_auto]">
+                <div className="space-y-1.5">
+                  <Label className="text-slate-700">Ajuste</Label>
+                  <Input name="quantity" type="number" placeholder="+5 o -2" required className="h-10 rounded-xl border-slate-200 bg-white" />
                 </div>
-                <div className="space-y-1">
-                  <Label>Motivo</Label>
-                  <Input name="reason" placeholder="Conteo, compra, merma" />
+                <div className="space-y-1.5">
+                  <Label className="text-slate-700">Motivo</Label>
+                  <Input name="reason" placeholder="Conteo, compra, merma" className="h-10 rounded-xl border-slate-200 bg-white" />
                 </div>
                 <div className="flex items-end">
-                  <Button type="submit">Aplicar</Button>
+                  <Button type="submit" className="rounded-full bg-[#588100] px-5 text-white hover:bg-[#4b6f00]">Aplicar</Button>
                 </div>
               </form>
             ) : null}
@@ -266,7 +282,9 @@ export function ProductInventory({ products }: { products: Product[] }) {
       })}
 
       {products.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No hay productos para mostrar.</p>
+        <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+          No hay productos para mostrar.
+        </div>
       ) : null}
     </div>
   );

@@ -54,30 +54,60 @@ export function CustomerForm({ disabled = false }: { disabled?: boolean }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-3 md:grid-cols-2">
+    <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
       <div className="space-y-2">
-        <Label htmlFor="name">Cliente</Label>
-        <Input id="name" name="name" required disabled={isLoading || disabled} />
+        <Label htmlFor="name" className="text-slate-700">Cliente</Label>
+        <Input
+          id="name"
+          name="name"
+          required
+          disabled={isLoading || disabled}
+          className="h-11 rounded-2xl border-slate-200 bg-white"
+          placeholder="Nombre del cliente"
+        />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="phone">Telefono</Label>
-        <Input id="phone" name="phone" disabled={isLoading || disabled} />
+        <Label htmlFor="phone" className="text-slate-700">Telefono</Label>
+        <Input
+          id="phone"
+          name="phone"
+          disabled={isLoading || disabled}
+          className="h-11 rounded-2xl border-slate-200 bg-white"
+          placeholder="0999999999"
+        />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="email">Correo</Label>
-        <Input id="email" name="email" type="email" disabled={isLoading || disabled} />
+        <Label htmlFor="email" className="text-slate-700">Correo</Label>
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          disabled={isLoading || disabled}
+          className="h-11 rounded-2xl border-slate-200 bg-white"
+          placeholder="cliente@correo.com"
+        />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="address">Direccion</Label>
-        <Input id="address" name="address" disabled={isLoading || disabled} />
+        <Label htmlFor="address" className="text-slate-700">Direccion</Label>
+        <Input
+          id="address"
+          name="address"
+          disabled={isLoading || disabled}
+          className="h-11 rounded-2xl border-slate-200 bg-white"
+          placeholder="Dirección del cliente"
+        />
       </div>
-      <div className="flex items-end">
-        <Button type="submit" disabled={isLoading || disabled}>
+      <div className="md:col-span-2 flex flex-wrap items-center gap-3 pt-1">
+        <Button
+          type="submit"
+          disabled={isLoading || disabled}
+          className="rounded-full bg-[#588100] px-5 text-white hover:bg-[#4b6f00]"
+        >
           {isLoading ? "Guardando..." : "Crear cliente"}
         </Button>
+        {message ? <p className="text-sm text-emerald-600">{message}</p> : null}
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
       </div>
-      {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
     </form>
   );
 }
