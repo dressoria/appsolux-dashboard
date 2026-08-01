@@ -168,11 +168,11 @@ function HeroSection() {
     <section className="relative overflow-hidden bg-white">
       <div
         className="pointer-events-none absolute -top-32 -left-32 h-[560px] w-[560px] rounded-full blur-[120px] opacity-10"
-        style={{ background: "radial-gradient(circle, #8db600, transparent 70%)" }}
+        style={{ background: `radial-gradient(circle, var(--facturom-primary-soft), transparent 70%)` }}
       />
       <div
         className="pointer-events-none absolute top-10 right-0 h-[420px] w-[420px] rounded-full blur-[110px] opacity-10"
-        style={{ background: "radial-gradient(circle, #dbe8ba, transparent 70%)" }}
+        style={{ background: `radial-gradient(circle, var(--facturom-yellow), transparent 70%)` }}
       />
 
       <div className="relative mx-auto flex max-w-7xl flex-col gap-12 px-4 pb-20 pt-24 sm:px-6 md:pb-24 md:pt-32 lg:flex-row lg:items-center">
@@ -180,12 +180,12 @@ function HeroSection() {
           <span
             className="mb-6 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-semibold"
             style={{
-              borderColor: "#58810030",
-              backgroundColor: "#5881000a",
-              color: "#588100",
+              borderColor: "var(--facturom-primary)33",
+              backgroundColor: "var(--facturom-primary)0a",
+              color: "var(--facturom-primary)",
             }}
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-[#8db600]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-facturom-primary" />
             Facturación electrónica y gestión comercial para Ecuador
           </span>
           <h1 className="mb-6 text-5xl font-black leading-[1.04] tracking-tight text-gray-950 sm:text-6xl md:text-7xl">
@@ -195,7 +195,7 @@ function HeroSection() {
             <br />
             <span
               style={{
-                background: "linear-gradient(120deg, #588100 0%, #8db600 55%, #a4c943 100%)",
+                background: "linear-gradient(120deg, var(--facturom-primary) 0%, var(--facturom-primary-soft) 55%, var(--facturom-accent) 100%)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
@@ -213,8 +213,8 @@ function HeroSection() {
               href="/sign-up"
               className="inline-flex items-center justify-center gap-2 rounded-2xl px-8 py-4 text-base font-bold text-white shadow-xl transition-all hover:scale-[1.02]"
               style={{
-                background: "linear-gradient(135deg, #588100 0%, #8db600 100%)",
-                boxShadow: "0 8px 32px #58810045",
+                background: "linear-gradient(135deg, var(--facturom-primary) 0%, var(--facturom-primary-soft) 100%)",
+                boxShadow: "0 8px 32px var(--facturom-primary)33",
               }}
             >
               Comenzar gratis
@@ -228,12 +228,12 @@ function HeroSection() {
             </Link>
             <Link
               href="/contacto"
-              className="inline-flex items-center justify-center rounded-2xl border border-[#58810030] bg-[#58810008] px-8 py-4 text-base font-semibold text-[#588100] transition-colors hover:bg-[#58810012]"
+              className="inline-flex items-center justify-center rounded-2xl border border-facturom-primary/20 bg-facturom-primary/5 px-8 py-4 text-base font-semibold text-facturom-primary transition-colors hover:bg-facturom-primary/10"
             >
               Hablar con asesor
             </Link>
           </div>
-          <Link href="/funciones" className="inline-flex items-center gap-2 text-sm font-semibold text-[#588100]">
+          <Link href="/funciones" className="inline-flex items-center gap-2 text-sm font-semibold text-facturom-primary">
             Explorar funciones
             <ArrowRight size={15} />
           </Link>
@@ -280,8 +280,8 @@ function ModulesSection() {
                 href={module.href}
                 className="group rounded-3xl border border-gray-100 bg-white p-6 transition-all hover:-translate-y-0.5 hover:border-gray-200 hover:shadow-lg"
               >
-                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#58810010]">
-                  <Icon size={20} className="text-[#588100]" />
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-facturom-primary/10">
+                  <Icon size={20} className="text-facturom-primary" />
                 </div>
                 <h3 className="mb-2 text-base font-black text-gray-900">{module.title}</h3>
                 <p className="mb-4 text-sm leading-relaxed text-gray-500">{module.description}</p>

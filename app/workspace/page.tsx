@@ -24,12 +24,12 @@ export default async function WorkspacePage() {
   const tenantName = tenant.name?.trim() || "Tu empresa";
 
   return (
-    <main className="min-h-screen bg-[#f7f8f4] text-[#0d0f12]">
+    <main className="min-h-screen bg-facturom-bg text-facturom-text">
       <header className="relative z-10 border-b border-slate-200/80 bg-white/92 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-4">
             <Link href={routes.workspace} className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-[18px] bg-[#588100] text-white shadow-md shadow-[#588100]/20">
+              <div className="flex h-11 w-11 items-center justify-center rounded-[18px] bg-facturom-primary text-white shadow-md">
                 <span className="text-[11px] font-black uppercase tracking-[0.22em]">FT</span>
               </div>
               <div className="min-w-0">
@@ -40,7 +40,7 @@ export default async function WorkspacePage() {
               </div>
             </Link>
             <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-500 md:inline-flex">
-              <Building2 className="h-3.5 w-3.5 text-[#588100]" />
+              <Building2 className="h-3.5 w-3.5 text-facturom-primary" />
               {tenantName}
             </div>
           </div>
@@ -102,7 +102,7 @@ export default async function WorkspacePage() {
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button asChild className="rounded-full bg-[#588100] px-5 text-white shadow-md shadow-[#588100]/20 hover:bg-[#4b6f00]">
+              <Button asChild className="rounded-full bg-facturom-primary px-5 text-white shadow-md hover:bg-facturom-primary-soft">
                 <Link href={routes.facturacion}>Abrir facturación</Link>
               </Button>
               <Button asChild variant="outline" className="rounded-full border-slate-200 bg-white px-5 text-slate-700 hover:bg-slate-50">

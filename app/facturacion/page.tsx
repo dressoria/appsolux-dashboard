@@ -119,9 +119,9 @@ async function getBillingAnalytics(tenantId: string): Promise<{
   return {
     salesTrend: monthBuckets,
     distribution: [
-      { label: "Recibos", value: receiptCount, color: "#588100" },
-      { label: "Facturas SRI", value: sriRows.length, color: "#8db600" },
-      { label: "Autorizadas", value: statusCounts.AUTHORIZED ?? 0, color: "#0d0f12" },
+      { label: "Recibos", value: receiptCount, color: "var(--facturom-primary)" },
+      { label: "Facturas SRI", value: sriRows.length, color: "var(--facturom-primary-soft)" },
+      { label: "Autorizadas", value: statusCounts.AUTHORIZED ?? 0, color: "#588100" },
       { label: "Pendientes", value: pendingCount, color: "#a3a3a3" },
       { label: "Rechazadas", value: statusCounts.REJECTED ?? 0, color: "#dc2626" },
     ],
@@ -156,18 +156,18 @@ function SalesLineChart({ items }: { items: TrendPoint[] }) {
       <svg viewBox={`0 0 ${width} ${height}`} className="h-40 w-full">
         <defs>
           <linearGradient id="facturomSalesFill" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="rgba(88,129,0,0.26)" />
-            <stop offset="100%" stopColor="rgba(88,129,0,0.02)" />
+            <stop offset="0%" stopColor="var(--facturom-primary)" stopOpacity="0.26" />
+            <stop offset="100%" stopColor="var(--facturom-primary)" stopOpacity="0.02" />
           </linearGradient>
         </defs>
         <line x1={paddingX} x2={width - paddingX} y1={height - paddingY} y2={height - paddingY} stroke="#e2e8f0" strokeWidth="1" />
         <path d={area} fill="url(#facturomSalesFill)" />
-        <path d={path} fill="none" stroke="#588100" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={path} fill="none" stroke="var(--facturom-primary)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         {points.map((point) => (
           <g key={point.label}>
-            <circle cx={point.x} cy={point.y} r="4.5" fill="#ffffff" stroke="#588100" strokeWidth="2" />
+            <circle cx={point.x} cy={point.y} r="4.5" fill="#ffffff" stroke="var(--facturom-primary)" strokeWidth="2" />
           </g>
-        ))}
+        ))} 
       </svg>
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
         {items.map((item) => (
@@ -242,9 +242,9 @@ function MetricCard({
 }) {
   const toneClasses = {
     green: {
-      shell: "border-[#588100]/15 bg-white",
-      icon: "bg-[#588100] text-white",
-      helper: "text-[#588100]",
+      shell: "border-facturom-primary/15 bg-white",
+      icon: "bg-facturom-primary text-white",
+      helper: "text-facturom-primary",
     },
     dark: {
       shell: "border-slate-900/10 bg-[#0d0f12] text-white",
@@ -293,7 +293,7 @@ function QuickAccessCard({
   return (
     <Link
       href={href}
-      className="group flex h-full min-h-[148px] flex-col justify-between rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-[#588100] hover:bg-[#588100] hover:text-white hover:shadow-[0_16px_40px_rgba(88,129,0,0.16)]"
+      className="group flex h-full min-h-[148px] flex-col justify-between rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-facturom-primary hover:bg-facturom-primary hover:text-white"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-700 shadow-sm transition-colors group-hover:bg-white/15 group-hover:text-white">

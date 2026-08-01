@@ -32,7 +32,7 @@ export function PublicHeader() {
             <Link
               key={link.href}
               href={link.href}
-              className="text-sm font-medium text-gray-600 transition-colors hover:text-[#588100]"
+              className="text-sm font-medium text-gray-600 transition-colors hover:text-facturom-primary"
             >
               {link.label}
             </Link>
@@ -46,7 +46,7 @@ export function PublicHeader() {
           <Link
             href="/sign-up"
             className="rounded-lg px-5 py-2 text-sm font-bold text-white transition-all hover:opacity-90 hover:shadow-md"
-            style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
+            style={{ background: "linear-gradient(135deg, var(--facturom-primary), var(--facturom-primary-soft))" }}
           >
             Comenzar gratis
           </Link>

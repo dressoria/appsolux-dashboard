@@ -74,7 +74,7 @@ const sidebarIcons: Record<SidebarIconName, LucideIcon> = {
 function FacturomBrand({ collapsed }: { collapsed: boolean }) {
   return (
     <Link href={routes.facturacion} className="flex items-center gap-3">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-[#588100] text-white shadow-md shadow-[#588100]/15">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-facturom-primary text-white shadow-md">
         <span className="text-[11px] font-black uppercase tracking-[0.22em]">FT</span>
       </div>
       <div className={cn("min-w-0", collapsed && "hidden")}>
@@ -171,8 +171,8 @@ export function DashboardFrame({
                       className={cn(
                         "group relative flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition-all",
                         active
-                          ? "bg-[#588100]/10 text-[#0d0f12] shadow-sm"
-                          : "text-slate-600 hover:bg-[#588100] hover:text-white",
+                            ? "bg-facturom-primary-soft/10 text-facturom-text shadow-sm"
+                              : "text-slate-600 hover:bg-facturom-primary hover:text-white",
                         collapsed && "justify-center px-2"
                       )}
                     >
@@ -180,8 +180,8 @@ export function DashboardFrame({
                         className={cn(
                           "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
                           active
-                            ? "bg-white text-[#588100] shadow-sm"
-                            : "bg-slate-100 text-slate-500 group-hover:bg-white/15 group-hover:text-white"
+                            ? "bg-white text-facturom-primary shadow-sm"
+                              : "bg-slate-100 text-slate-500 group-hover:bg-white/15 group-hover:text-white"
                         )}
                       >
                         <Icon className="h-4 w-4" />

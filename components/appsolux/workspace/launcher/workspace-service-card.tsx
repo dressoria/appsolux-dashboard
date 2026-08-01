@@ -7,14 +7,14 @@ import { cn } from "@/lib/utils";
 const toneClasses = {
   facturacion: {
     shell:
-      "border-[#588100]/15 bg-white text-[#0d0f12] shadow-[0_12px_32px_rgba(88,129,0,0.08)] hover:border-[#588100] hover:bg-[#588100] hover:text-white hover:shadow-[0_16px_40px_rgba(88,129,0,0.18)]",
-    icon: "bg-[#588100] text-white group-hover:bg-white/15",
-    label: "text-[#588100] group-hover:text-white/80",
-    cta: "text-[#588100] group-hover:text-white",
+      "border-facturom-primary/15 bg-white text-[#0d0f12] shadow-[0_12px_32px_rgba(15,23,42,0.06)] hover:border-facturom-primary hover:bg-facturom-primary hover:text-white",
+    icon: "bg-facturom-primary text-white group-hover:bg-white/15",
+    label: "text-facturom-primary group-hover:text-white/80",
+    cta: "text-facturom-primary group-hover:text-white",
   },
   neutral: {
     shell:
-      "border-slate-200 bg-white text-[#0d0f12] shadow-[0_12px_28px_rgba(15,23,42,0.06)] hover:border-[#588100] hover:bg-[#588100] hover:text-white hover:shadow-[0_16px_40px_rgba(88,129,0,0.16)]",
+      "border-slate-200 bg-white text-[#0d0f12] shadow-[0_12px_28px_rgba(15,23,42,0.06)] hover:border-facturom-primary hover:bg-facturom-primary hover:text-white",
     icon: "bg-slate-100 text-slate-700 group-hover:bg-white/15 group-hover:text-white",
     label: "text-slate-500 group-hover:text-white/80",
     cta: "text-slate-900 group-hover:text-white",

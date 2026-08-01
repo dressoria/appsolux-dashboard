@@ -12,6 +12,16 @@
   --brand-purple-light: #bc4ed8;
   --brand-dark: #0d1c0a;
   --brand-dark-purple: #1a0d2e;
+
+  /* Facturom (purple) visual identity tokens */
+  --facturom-primary: #3B0A67; /* main purple */
+  --facturom-primary-dark: #2A0648; /* sidebar / dark */
+  --facturom-primary-soft: #5B13A8; /* active / highlight */
+  --facturom-accent: #FF9F1C; /* warm accent / CTA secondary */
+  --facturom-yellow: #FFE847; /* soft yellow accent */
+  --facturom-bg: #F6F4FA; /* app background */
+  --facturom-surface: #FFFFFF; /* cards / surfaces */
+  --facturom-text: #111111; /* main text */
 }
 
 @theme inline {

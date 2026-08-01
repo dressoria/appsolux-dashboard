@@ -22,7 +22,7 @@ const columns = {
 
 export function PublicFooter() {
   return (
-    <footer className="bg-[#0d0f12] text-gray-400">
+    <footer className="bg-facturom-primary-dark text-gray-200">
       <div className="mx-auto max-w-7xl px-4 pb-10 pt-16 sm:px-6">
         <div className="mb-12 grid grid-cols-1 gap-10 md:grid-cols-5">
           <div className="md:col-span-2">
@@ -87,8 +87,8 @@ export function PublicFooter() {
         </div>
 
         <div className="flex flex-col items-center justify-between gap-4 border-t border-gray-800/60 pt-8 sm:flex-row">
-          <p className="text-xs text-gray-700">© {new Date().getFullYear()} Facturom. Todos los derechos reservados.</p>
-          <p className="text-xs text-gray-800">Ecuador · Cumplimiento SRI</p>
+          <p className="text-xs text-gray-200">© {new Date().getFullYear()} Facturom. Todos los derechos reservados.</p>
+          <p className="text-xs text-gray-200">Ecuador · Cumplimiento SRI</p>
         </div>
       </div>
     </footer>
