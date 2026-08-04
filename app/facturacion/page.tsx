@@ -121,7 +121,7 @@ async function getBillingAnalytics(tenantId: string): Promise<{
     distribution: [
       { label: "Recibos", value: receiptCount, color: "var(--facturom-primary)" },
       { label: "Facturas SRI", value: sriRows.length, color: "var(--facturom-primary-soft)" },
-      { label: "Autorizadas", value: statusCounts.AUTHORIZED ?? 0, color: "#588100" },
+      { label: "Autorizadas", value: statusCounts.AUTHORIZED ?? 0, color: "var(--facturom-primary)" },
       { label: "Pendientes", value: pendingCount, color: "#a3a3a3" },
       { label: "Rechazadas", value: statusCounts.REJECTED ?? 0, color: "#dc2626" },
     ],
@@ -398,7 +398,7 @@ export default async function FacturacionPage() {
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button
                 asChild
-                className="rounded-full bg-[#588100] px-5 text-white shadow-md shadow-[#588100]/20 hover:bg-[#4b6f00]"
+                className="rounded-full bg-facturom-primary px-5 text-white shadow-md shadow-facturom-primary/20 hover:bg-facturom-primary-soft"
               >
                 <Link href={appRouting.sales.href}>
                   <ShoppingCart className="mr-2 h-4 w-4" />
@@ -477,8 +477,8 @@ export default async function FacturacionPage() {
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Historial de ventas</p>
                   <h3 className="mt-1 text-xl font-black text-slate-950">Evolución mensual de ventas registradas</h3>
                 </div>
-                <div className="rounded-2xl border border-[#588100]/12 bg-[#588100]/6 px-3 py-2 text-right">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#588100]">Ingresos</p>
+                <div className="rounded-2xl border border-facturom-primary/12 bg-facturom-primary/10 px-3 py-2 text-right">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-facturom-primary">Ingresos</p>
                   <p className="text-lg font-black text-slate-950">{formatMoney(reports.salesMonth)}</p>
                 </div>
               </div>
@@ -557,7 +557,7 @@ export default async function FacturacionPage() {
 
             <Card className="rounded-[28px] border-slate-200 bg-white shadow-sm">
               <CardContent className="p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#588100]">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-facturom-primary">
                   Seguimiento reciente
                 </p>
                 <h3 className="mt-1 text-xl font-black text-slate-950">Comprobantes recientes</h3>

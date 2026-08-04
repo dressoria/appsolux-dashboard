@@ -76,7 +76,7 @@ export default async function ContactoPage({ searchParams }: ContactoPageProps) 
           {selectedIntent ? (
             <div
               className="mb-6 inline-flex rounded-full border px-4 py-1.5 text-xs font-semibold"
-              style={{ borderColor: "#58810020", backgroundColor: "#5881000a", color: "#588100" }}
+              style={{ borderColor: "var(--facturom-primary)20", backgroundColor: "var(--facturom-primary)0a", color: "var(--facturom-primary)" }}
             >
               Estás consultando por {selectedIntent.label}
             </div>
@@ -94,8 +94,8 @@ export default async function ContactoPage({ searchParams }: ContactoPageProps) 
         <div className="mx-auto max-w-4xl px-4 sm:px-6">
           <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div className="flex flex-col gap-5 rounded-3xl border border-gray-100 bg-white p-8 shadow-sm">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#25D36615]">
-                <MessageCircle size={22} style={{ color: "#25D366" }} />
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-facturom-primary/10">
+              <MessageCircle size={22} className="text-facturom-primary" />
               </div>
               <div>
                 <h2 className="mb-2 text-base font-black text-gray-900">WhatsApp</h2>
@@ -107,7 +107,7 @@ export default async function ContactoPage({ searchParams }: ContactoPageProps) 
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-white transition-all hover:opacity-90"
-                  style={{ backgroundColor: "#25D366" }}
+                  style={{ backgroundColor: "var(--facturom-primary)" }}
                 >
                   <MessageCircle size={15} />
                   Hablar por WhatsApp
@@ -116,8 +116,8 @@ export default async function ContactoPage({ searchParams }: ContactoPageProps) 
             </div>
 
             <div className="flex flex-col gap-5 rounded-3xl border border-gray-100 bg-white p-8 shadow-sm">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#58810012]">
-                <Mail size={22} className="text-[#588100]" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-facturom-primary/10">
+                <Mail size={22} className="text-facturom-primary" />
               </div>
               <div>
                 <h2 className="mb-2 text-base font-black text-gray-900">Correo electrónico</h2>
@@ -126,8 +126,8 @@ export default async function ContactoPage({ searchParams }: ContactoPageProps) 
                 </p>
                 <a
                   href={`mailto:${email}?subject=${encodeURIComponent("Consulta sobre Facturom")}`}
-                  className="inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-[#588100]"
-                  style={{ backgroundColor: "#58810012" }}
+                  className="inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-facturom-primary"
+                  style={{ backgroundColor: "var(--facturom-primary)10" }}
                 >
                   <Mail size={14} />
                   {email}
@@ -138,8 +138,8 @@ export default async function ContactoPage({ searchParams }: ContactoPageProps) 
 
           <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
             <div className="flex items-start gap-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#58810012]">
-                <Clock size={20} className="text-[#588100]" />
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-facturom-primary/10">
+                <Clock size={20} className="text-facturom-primary" />
               </div>
               <div>
                 <h3 className="mb-1 text-base font-black text-gray-900">Horario de atención</h3>
@@ -158,7 +158,7 @@ export default async function ContactoPage({ searchParams }: ContactoPageProps) 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {usageCases.map((item) => (
               <div key={item} className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-4">
-                <CheckCircle size={15} className="shrink-0 text-[#588100]" />
+                <CheckCircle size={15} className="shrink-0 text-facturom-primary" />
                 <span className="text-sm text-gray-700">{item}</span>
               </div>
             ))}
@@ -168,7 +168,7 @@ export default async function ContactoPage({ searchParams }: ContactoPageProps) 
 
       <section
         className="py-20 text-center"
-        style={{ background: "linear-gradient(135deg, #0d0f12, #12230a)" }}
+        style={{ background: "linear-gradient(135deg, var(--facturom-primary-dark), #2e0b52)" }}
       >
         <div className="mx-auto max-w-xl px-4 sm:px-6">
           <h2 className="mb-4 text-2xl font-black text-white">¿Prefieres explorar primero?</h2>
@@ -179,7 +179,7 @@ export default async function ContactoPage({ searchParams }: ContactoPageProps) 
             <Link
               href="/precios"
               className="inline-flex items-center gap-2 rounded-2xl px-7 py-3.5 text-sm font-bold text-white"
-              style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
+              style={{ background: "linear-gradient(135deg, var(--facturom-primary), var(--facturom-primary-soft))" }}
             >
               Ver planes
               <ArrowRight size={15} />

@@ -75,13 +75,13 @@ export default async function BasicProductsPage({ searchParams }: BasicProductsP
                 </p>
                 <p className="mt-1 text-sm text-slate-500">Modo básico activo para tu catálogo principal.</p>
               </div>
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#588100] text-white">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-facturom-primary text-white">
                 <Boxes className="h-5 w-5" />
               </div>
             </div>
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[#588100] to-[#8db600] transition-all"
+                className="h-full rounded-full bg-gradient-to-r from-facturom-primary to-facturom-primary-soft transition-all"
                 style={{ width: `${usagePercent}%` }}
               />
             </div>
@@ -108,7 +108,7 @@ export default async function BasicProductsPage({ searchParams }: BasicProductsP
         <Card id="nuevo-producto" className="rounded-[28px] border-slate-200 bg-white py-0 shadow-sm">
           <CardHeader className="px-6 pt-6 pb-3">
             <div className="flex items-start gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#588100] text-white">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-facturom-primary text-white">
                 <PackagePlus className="h-5 w-5" />
               </div>
               <div>

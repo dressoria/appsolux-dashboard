@@ -15,15 +15,15 @@ export default function SignUpPage() {
     <main className="flex min-h-screen">
       <div
         className="relative hidden flex-col justify-between overflow-hidden p-10 lg:flex lg:w-[44%] xl:w-2/5 xl:p-12"
-        style={{ background: "linear-gradient(145deg, #0d0f12 0%, #12230a 58%, #0d0f12 100%)" }}
+        style={{ background: `linear-gradient(145deg, var(--facturom-primary-dark) 0%, #2e0b52 58%, var(--facturom-primary-dark) 100%)` }}
       >
         <div
           className="pointer-events-none absolute top-0 left-0 h-[350px] w-[350px] rounded-full blur-[100px] opacity-20"
-          style={{ background: "radial-gradient(circle, #588100, transparent 70%)" }}
+          style={{ background: `radial-gradient(circle, rgba(91,19,168,0.9), transparent 70%)` }}
         />
         <div
           className="pointer-events-none absolute bottom-0 right-0 h-[300px] w-[300px] rounded-full blur-[80px] opacity-15"
-          style={{ background: "radial-gradient(circle, #8db600, transparent 70%)" }}
+          style={{ background: `radial-gradient(circle, var(--facturom-accent), transparent 70%)` }}
         />
 
         <div className="relative z-10 flex items-center justify-between">
@@ -42,7 +42,7 @@ export default function SignUpPage() {
 
         <div className="relative z-10 space-y-8">
           <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[#8db600]">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-facturom-yellow">
               Empieza gratis
             </p>
             <h1 className="mb-4 text-3xl font-black leading-tight text-white xl:text-4xl">
@@ -50,7 +50,7 @@ export default function SignUpPage() {
               <br />
               <span
                 style={{
-                  background: "linear-gradient(120deg, #8db600, #d7f28d)",
+                  background: "linear-gradient(120deg, var(--facturom-primary-soft), var(--facturom-accent))",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
                   backgroundClip: "text",
@@ -67,7 +67,7 @@ export default function SignUpPage() {
           <ul className="space-y-3">
             {benefits.map((benefit) => (
               <li key={benefit} className="flex items-start gap-3 text-sm text-gray-300">
-                <CheckCircle size={15} className="mt-0.5 shrink-0 text-[#8db600]" />
+                <CheckCircle size={15} className="mt-0.5 shrink-0 text-facturom-primary-soft" />
                 {benefit}
               </li>
             ))}

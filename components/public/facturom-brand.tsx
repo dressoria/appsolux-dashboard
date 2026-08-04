@@ -20,9 +20,9 @@ export function FacturomBrand({
   const [hasImageError, setHasImageError] = useState(false);
 
   const logoSrc =
-    variant === "white" ? "/brand/facturom-logo-white.svg" : "/brand/facturom-logo.svg";
+    variant === "white" ? "/brand/facturom-logo-white.png" : "/brand/facturom-logo.png";
   const iconSrc =
-    variant === "white" ? "/brand/facturom-icon-white.svg" : "/brand/facturom-icon.svg";
+    variant === "white" ? "/brand/facturom-icon-white.png" : "/brand/facturom-icon.png";
   const fallbackTextClassName = variant === "white" ? "text-white" : "text-gray-950";
 
   if (hasImageError) {

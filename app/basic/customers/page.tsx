@@ -61,10 +61,10 @@ export default async function BasicCustomersPage({
           <Card className="rounded-[24px] border-slate-200 bg-white shadow-sm">
             <CardContent className="p-4">
               <div className="flex items-start justify-between gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#588100] text-white">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-facturom-primary text-white">
                   <Users className="h-4.5 w-4.5" />
                 </div>
-                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#588100]">Clientes</span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-facturom-primary">Clientes</span>
               </div>
               <p className="mt-4 text-sm text-slate-500">Total registrados</p>
               <p className="mt-1 text-2xl font-black text-slate-950">{counts.customers}</p>
@@ -116,7 +116,7 @@ export default async function BasicCustomersPage({
         <Card className="rounded-[28px] border-slate-200 bg-white shadow-sm">
           <CardHeader className="px-6 pt-6 pb-3">
             <div className="flex items-start gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#588100] text-white">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-facturom-primary text-white">
                 <Plus className="h-5 w-5" />
               </div>
               <div>
@@ -155,7 +155,7 @@ export default async function BasicCustomersPage({
                 placeholder="Buscar por nombre, teléfono o correo"
                 className="rounded-2xl border-slate-200 bg-white"
               />
-              <Button type="submit" className="rounded-full bg-[#588100] text-white hover:bg-[#4b6f00]">
+              <Button type="submit" className="rounded-full bg-facturom-primary text-white hover:bg-facturom-primary-soft">
                 Buscar
               </Button>
             </form>

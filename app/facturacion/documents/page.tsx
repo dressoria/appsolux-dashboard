@@ -62,7 +62,7 @@ function MetricPill({
   tone: "green" | "neutral" | "warning" | "danger";
 }) {
   const toneClasses = {
-    green: "border-[#588100]/15 bg-[#588100]/6 text-[#588100]",
+    green: "border-facturom-primary/15 bg-facturom-primary/10 text-facturom-primary",
     neutral: "border-slate-200 bg-slate-50 text-slate-700",
     warning: "border-amber-200 bg-amber-50 text-amber-700",
     danger: "border-red-200 bg-red-50 text-red-700",
@@ -175,7 +175,7 @@ export default async function FacturacionDocumentsPage({ searchParams }: Props) 
         <Card className="rounded-[28px] border-slate-200 bg-white shadow-sm">
           <CardContent className="p-5 sm:p-6">
             <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-              <AlertCircle className="h-3.5 w-3.5 text-[#588100]" />
+              <AlertCircle className="h-3.5 w-3.5 text-facturom-primary" />
               Documentos y seguimiento
             </div>
             <BillingDocumentsList

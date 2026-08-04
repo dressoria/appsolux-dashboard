@@ -247,7 +247,7 @@ function HeroSection() {
             "Reportes para operar con orden",
           ].map((item) => (
             <div key={item} className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
-              <CheckCircle size={18} className="mb-3 text-[#588100]" />
+              <CheckCircle size={18} className="mb-3 text-facturom-primary" />
               <p className="text-sm font-semibold text-gray-800">{item}</p>
             </div>
           ))}
@@ -285,7 +285,7 @@ function ModulesSection() {
                 </div>
                 <h3 className="mb-2 text-base font-black text-gray-900">{module.title}</h3>
                 <p className="mb-4 text-sm leading-relaxed text-gray-500">{module.description}</p>
-                <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#588100]">
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-facturom-primary">
                   Ir a esta sección
                   <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
                 </span>
@@ -317,8 +317,8 @@ function PlansSection() {
               key={plan.name}
               className="flex flex-col rounded-3xl border bg-white p-6"
               style={{
-                borderColor: plan.featured ? "#588100" : "#e5e7eb",
-                boxShadow: plan.featured ? "0 0 0 1px #58810020, 0 16px 40px #58810012" : undefined,
+                borderColor: plan.featured ? "var(--facturom-primary)" : "#e5e7eb",
+                boxShadow: plan.featured ? "0 0 0 1px var(--facturom-primary)20, 0 16px 40px var(--facturom-primary)12" : undefined,
               }}
             >
               <div className="mb-4 flex items-start justify-between gap-3">
@@ -327,7 +327,7 @@ function PlansSection() {
                   <p className="mt-1 text-sm text-gray-500">{plan.summary}</p>
                 </div>
                 {plan.featured ? (
-                  <span className="rounded-full bg-[#58810012] px-2.5 py-1 text-[11px] font-bold text-[#588100]">
+                  <span className="rounded-full bg-facturom-primary/10 px-2.5 py-1 text-[11px] font-bold text-facturom-primary">
                     Recomendado
                   </span>
                 ) : null}
@@ -339,7 +339,7 @@ function PlansSection() {
               <ul className="mb-6 flex-1 space-y-2.5">
                 {plan.features.map((feature) => (
                   <li key={feature} className="flex items-start gap-2 text-sm text-gray-700">
-                    <CheckCircle size={14} className="mt-0.5 shrink-0 text-[#588100]" />
+                      <CheckCircle size={14} className="mt-0.5 shrink-0 text-facturom-primary" />
                     {feature}
                   </li>
                 ))}
@@ -350,7 +350,7 @@ function PlansSection() {
                 style={
                   plan.featured
                     ? {
-                        background: "linear-gradient(135deg, #588100 0%, #8db600 100%)",
+                        background: "linear-gradient(135deg, var(--facturom-primary) 0%, var(--facturom-primary-soft) 100%)",
                         color: "white",
                       }
                     : {
@@ -367,7 +367,7 @@ function PlansSection() {
         </div>
 
         <div className="mt-8 text-center">
-          <Link href="/precios" className="inline-flex items-center gap-2 text-sm font-semibold text-[#588100]">
+          <Link href="/precios" className="inline-flex items-center gap-2 text-sm font-semibold text-facturom-primary">
             Comparar todos los planes
             <ArrowRight size={15} />
           </Link>
@@ -385,11 +385,11 @@ function SriSection() {
     >
       <div
         className="pointer-events-none absolute -top-20 right-0 h-[380px] w-[380px] rounded-full blur-[100px] opacity-10"
-        style={{ background: "radial-gradient(circle, #8db600, transparent 70%)" }}
+        style={{ background: "radial-gradient(circle, var(--facturom-primary-soft), transparent 70%)" }}
       />
       <div className="relative mx-auto grid max-w-7xl grid-cols-1 gap-10 px-4 sm:px-6 lg:grid-cols-2 lg:items-center">
         <div>
-          <span className="mb-5 inline-flex rounded-full bg-[#8db60018] px-3 py-1 text-xs font-bold text-[#8db600]">
+          <span className="mb-5 inline-flex rounded-full bg-facturom-primary/10 px-3 py-1 text-xs font-bold text-facturom-primary">
             SRI Ecuador
           </span>
           <h2 className="mb-5 text-3xl font-black leading-tight text-white sm:text-4xl">
@@ -403,7 +403,7 @@ function SriSection() {
             <Link
               href="/funciones#sri"
               className="inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold text-white"
-              style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
+                style={{ background: "linear-gradient(135deg, var(--facturom-primary), var(--facturom-primary-soft))" }}
             >
               Ver funciones SRI
               <ArrowRight size={15} />
@@ -427,7 +427,7 @@ function SriSection() {
               "Control de establecimientos y puntos de emisión",
             ].map((item) => (
               <li key={item} className="flex items-start gap-3 text-sm text-gray-300">
-                <CheckCircle size={16} className="mt-0.5 shrink-0 text-[#8db600]" />
+                <CheckCircle size={16} className="mt-0.5 shrink-0 text-facturom-primary" />
                 {item}
               </li>
             ))}
@@ -453,8 +453,8 @@ function TrustSection() {
             const Icon = card.icon;
             return (
               <div key={card.title} className="rounded-3xl border border-gray-100 bg-white p-6">
-                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-[#58810012]">
-                  <Icon size={18} className="text-[#588100]" />
+                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-2xl bg-facturom-primary/10">
+                  <Icon size={18} className="text-facturom-primary" />
                 </div>
                 <h3 className="mb-2 text-sm font-black text-gray-900">{card.title}</h3>
                 <p className="text-sm leading-relaxed text-gray-500">{card.description}</p>
@@ -473,7 +473,7 @@ function FinalCtaSection() {
       <div
         className="pointer-events-none absolute inset-0 opacity-20"
         style={{
-          backgroundImage: "radial-gradient(ellipse 70% 55% at 50% 0%, #588100, transparent)",
+          backgroundImage: "radial-gradient(ellipse 70% 55% at 50% 0%, var(--facturom-primary), transparent)",
         }}
       />
       <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
@@ -490,8 +490,8 @@ function FinalCtaSection() {
             href="/sign-up"
             className="inline-flex items-center gap-2 rounded-2xl px-8 py-4 text-base font-bold text-white"
             style={{
-              background: "linear-gradient(135deg, #588100 0%, #8db600 100%)",
-              boxShadow: "0 8px 32px #58810055",
+              background: "linear-gradient(135deg, var(--facturom-primary) 0%, var(--facturom-primary-soft) 100%)",
+              boxShadow: "0 8px 32px var(--facturom-primary)55",
             }}
           >
             Crear cuenta

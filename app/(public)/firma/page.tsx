@@ -65,21 +65,21 @@ export default function FirmaPage() {
     <div>
       <section
         className="relative overflow-hidden py-24"
-        style={{ background: "linear-gradient(145deg, #0d0f12 0%, #112108 100%)" }}
+        style={{ background: "linear-gradient(145deg, var(--facturom-primary-dark) 0%, #2e0b52 100%)" }}
       >
         <div
           className="pointer-events-none absolute top-0 right-0 h-[400px] w-[400px] rounded-full blur-[100px] opacity-15"
-          style={{ background: "radial-gradient(circle, #8db600, transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, var(--facturom-accent), transparent 70%)" }}
         />
         <div className="relative mx-auto max-w-4xl px-4 text-center sm:px-6">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-[#8db60018] px-3 py-1.5 text-xs font-bold text-[#8db600]">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-facturom-accent/10 px-3 py-1.5 text-xs font-bold text-facturom-accent">
             <Shield size={12} />
             Firma electrónica para emisión SRI
           </div>
           <h1 className="mb-5 text-4xl font-black leading-tight text-white sm:text-5xl md:text-6xl">
             Conecta tu firma con un flujo
             <br />
-            <span style={{ color: "#8db600" }}>más claro y más útil.</span>
+            <span className="text-facturom-primary-soft">más claro y más útil.</span>
           </h1>
           <p className="mx-auto mb-10 max-w-2xl text-lg leading-relaxed text-gray-400">
             Te guiamos para preparar y conectar tu firma electrónica según el flujo disponible, de modo que puedas usarla en la emisión de comprobantes electrónicos.
@@ -88,7 +88,7 @@ export default function FirmaPage() {
             <Link
               href="/contacto?servicio=firma-electronica"
               className="inline-flex items-center gap-2 rounded-2xl px-7 py-3.5 text-sm font-bold text-white"
-              style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
+              style={{ background: "linear-gradient(135deg, var(--facturom-primary), var(--facturom-primary-soft))" }}
             >
               Solicitar firma
               <ArrowRight size={15} />
@@ -119,7 +119,7 @@ export default function FirmaPage() {
             <ul className="space-y-4">
               {highlights.map((item) => (
                 <li key={item} className="flex items-start gap-3">
-                  <CheckCircle size={15} className="mt-0.5 shrink-0 text-[#588100]" />
+                  <CheckCircle size={15} className="mt-0.5 shrink-0 text-facturom-primary" />
                   <span className="text-sm text-gray-700">{item}</span>
                 </li>
               ))}
@@ -137,13 +137,13 @@ export default function FirmaPage() {
               return (
                 <div key={step.number} className="flex gap-5 rounded-3xl border border-gray-100 bg-white p-7">
                   <div className="shrink-0">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#58810012] text-xs font-black text-[#588100]">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-facturom-primary/10 text-xs font-black text-facturom-primary">
                       {step.number}
                     </div>
                   </div>
                   <div className="flex-1">
                     <div className="mb-2 flex items-center gap-2">
-                      <Icon size={15} className="text-[#588100]" />
+                      <Icon size={15} className="text-facturom-primary" />
                       <h3 className="text-base font-bold text-gray-900">{step.title}</h3>
                     </div>
                     <p className="text-sm leading-relaxed text-gray-500">{step.description}</p>
@@ -174,7 +174,7 @@ export default function FirmaPage() {
               const Icon = item.icon;
               return (
                 <div key={item.text} className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-4">
-                  <Icon size={15} className="mt-0.5 shrink-0 text-[#588100]" />
+                    <Icon size={15} className="mt-0.5 shrink-0 text-facturom-primary" />
                   <span className="text-sm text-gray-700">{item.text}</span>
                 </div>
               );
@@ -193,7 +193,7 @@ export default function FirmaPage() {
             <Link
               href="/contacto?servicio=firma-electronica"
               className="inline-flex items-center gap-2 rounded-2xl px-7 py-3.5 text-sm font-bold text-white"
-              style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
+              style={{ background: "linear-gradient(135deg, var(--facturom-primary), var(--facturom-primary-soft))" }}
             >
               Solicitar información de firma
               <ArrowRight size={15} />

@@ -92,7 +92,7 @@ export default async function OnboardingPage() {
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button type="submit" className="bg-[#588100] hover:bg-[#466800]">
+                  <Button type="submit" className="bg-facturom-primary hover:bg-facturom-primary-soft text-white">
                     Crear empresa
                   </Button>
                   <Button asChild type="button" variant="outline">

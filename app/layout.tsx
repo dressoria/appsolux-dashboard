@@ -1,19 +1,8 @@
 import type { Metadata } from "next";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 const facturomIconPath = path.join(process.cwd(), "public", "brand", "facturom-icon.svg");
 const hasFacturomIcon = existsSync(facturomIconPath);
@@ -57,10 +46,7 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html
-        lang="es"
-        className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-      >
+      <html lang="es" className="h-full antialiased">
         <body className="min-h-full flex flex-col">{children}</body>
       </html>
     </ClerkProvider>

@@ -11,7 +11,7 @@ const guides = [
   {
     id: "guia-facturacion-electronica",
     category: "Guía",
-    color: "#588100",
+    color: "var(--facturom-primary)",
     title: "Cómo empezar con facturación electrónica en Ecuador",
     excerpt: "Qué preparar antes de emitir, qué datos revisar y cómo ordenar tu operación desde el primer día.",
     readingTime: "5 min",
@@ -20,7 +20,7 @@ const guides = [
   {
     id: "guia-sri",
     category: "Guía",
-    color: "#8db600",
+    color: "var(--facturom-primary-soft)",
     title: "Qué revisar del flujo SRI antes de emitir",
     excerpt: "Ambiente, establecimiento, punto de emisión y seguimiento documental: lo esencial para no perder contexto.",
     readingTime: "4 min",
@@ -29,7 +29,7 @@ const guides = [
   {
     id: "guia-inventario",
     category: "Guía",
-    color: "#588100",
+    color: "var(--facturom-primary)",
     title: "Control de inventario para vender con más claridad",
     excerpt: "Stock actualizado, movimientos y catálogo bien estructurado para evitar ventas desordenadas.",
     readingTime: "5 min",
@@ -38,7 +38,7 @@ const guides = [
   {
     id: "guia-clientes",
     category: "Guía",
-    color: "#8db600",
+    color: "var(--facturom-primary-soft)",
     title: "Cómo organizar clientes y documentos sin duplicar trabajo",
     excerpt: "Reutiliza información comercial y fiscal para facturar más rápido y sostener el seguimiento de cobros.",
     readingTime: "4 min",
@@ -47,7 +47,7 @@ const guides = [
   {
     id: "guia-compras",
     category: "Guía",
-    color: "#588100",
+    color: "var(--facturom-primary)",
     title: "Compras y proveedores: un flujo mínimo que sí ordena la operación",
     excerpt: "Qué registrar y cómo conectar compras con inventario y control interno.",
     readingTime: "5 min",
@@ -56,7 +56,7 @@ const guides = [
   {
     id: "guia-pos",
     category: "Guía",
-    color: "#8db600",
+    color: "var(--facturom-primary-soft)",
     title: "Qué debe tener tu POS para vender sin fricción",
     excerpt: "Velocidad de cobro, búsqueda de productos, medios de pago y conexión con caja e inventario.",
     readingTime: "4 min",
@@ -74,7 +74,7 @@ export default function BlogPage() {
             <br />
             <span
               style={{
-                background: "linear-gradient(120deg, #588100, #8db600)",
+                background: "linear-gradient(120deg, var(--facturom-primary), var(--facturom-primary-soft))",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
@@ -95,10 +95,7 @@ export default function BlogPage() {
             {guides.map((guide) => (
               <article key={guide.id} className="group rounded-3xl border border-gray-100 bg-white p-7 transition-all hover:border-gray-200 hover:shadow-md">
                 <div className="mb-4 flex items-center justify-between">
-                  <span
-                    className="rounded-full px-2.5 py-1 text-[11px] font-bold"
-                    style={{ backgroundColor: `${guide.color}12`, color: guide.color }}
-                  >
+                  <span className="rounded-full bg-facturom-primary/10 px-2.5 py-1 text-[11px] font-bold text-facturom-primary">
                     {guide.category}
                   </span>
                   <div className="flex items-center gap-1.5 text-xs text-gray-400">
@@ -106,11 +103,11 @@ export default function BlogPage() {
                     {guide.readingTime}
                   </div>
                 </div>
-                <h2 className="mb-3 text-base font-black leading-snug text-gray-900 transition-colors group-hover:text-[#588100]">
+                <h2 className="mb-3 text-base font-black leading-snug text-gray-900 transition-colors group-hover:text-facturom-primary">
                   {guide.title}
                 </h2>
                 <p className="mb-5 text-sm leading-relaxed text-gray-500">{guide.excerpt}</p>
-                <Link href={`/blog#${guide.id}`} className="inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: guide.color }}>
+                <Link href={`/blog#${guide.id}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-facturom-primary">
                   Leer guía
                   <ArrowRight size={13} />
                 </Link>
@@ -125,10 +122,7 @@ export default function BlogPage() {
           {guides.map((guide) => (
             <article key={guide.id} id={guide.id} className="scroll-mt-24 rounded-3xl border border-gray-100 bg-gray-50 p-8">
               <div className="mb-4 flex flex-wrap items-center gap-3">
-                <span
-                  className="rounded-full px-2.5 py-1 text-[11px] font-bold"
-                  style={{ backgroundColor: `${guide.color}12`, color: guide.color }}
-                >
+                <span className="rounded-full bg-facturom-primary/10 px-2.5 py-1 text-[11px] font-bold text-facturom-primary">
                   <Tag size={11} className="mr-1 inline" />
                   {guide.category}
                 </span>
@@ -140,7 +134,7 @@ export default function BlogPage() {
                 <Link
                   href="/funciones"
                   className="inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold text-white"
-                  style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
+                  style={{ background: "linear-gradient(135deg, var(--facturom-primary), var(--facturom-primary-soft))" }}
                 >
                   Ver funciones relacionadas
                   <ArrowRight size={14} />

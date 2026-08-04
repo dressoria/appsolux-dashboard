@@ -105,7 +105,7 @@ export default function PreciosPage() {
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
           <div
             className="mb-6 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold"
-            style={{ borderColor: "#58810020", backgroundColor: "#5881000a", color: "#588100" }}
+            style={{ borderColor: "var(--facturom-primary)20", backgroundColor: "var(--facturom-primary)0a", color: "var(--facturom-primary)" }}
           >
             <Zap size={12} />
             Prueba gratis disponible
@@ -129,8 +129,8 @@ export default function PreciosPage() {
                 key={plan.name}
                 className="flex flex-col rounded-3xl border bg-white p-7"
                 style={{
-                  borderColor: plan.featured ? "#588100" : "#e5e7eb",
-                  boxShadow: plan.featured ? "0 0 0 1px #58810020, 0 12px 36px #58810012" : undefined,
+                  borderColor: plan.featured ? "var(--facturom-primary)" : "#e5e7eb",
+                  boxShadow: plan.featured ? "0 0 0 1px var(--facturom-primary)20, 0 12px 36px var(--facturom-primary)12" : undefined,
                 }}
               >
                 <div className="mb-5">
@@ -138,8 +138,8 @@ export default function PreciosPage() {
                     className="inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold"
                     style={
                       plan.featured
-                        ? { backgroundColor: "#58810012", color: "#588100" }
-                        : { backgroundColor: "#58810010", color: "#588100" }
+                        ? { backgroundColor: "var(--facturom-primary)12", color: "var(--facturom-primary)" }
+                        : { backgroundColor: "var(--facturom-primary)10", color: "var(--facturom-primary)" }
                     }
                   >
                     {plan.badge}
@@ -155,7 +155,7 @@ export default function PreciosPage() {
                 <ul className="mb-6 flex-1 space-y-2.5">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-2 text-sm text-gray-700">
-                      <CheckCircle size={14} className="mt-0.5 shrink-0 text-[#588100]" />
+                      <CheckCircle size={14} className="mt-0.5 shrink-0 text-facturom-primary" />
                       {feature}
                     </li>
                   ))}
@@ -167,7 +167,7 @@ export default function PreciosPage() {
                   style={
                     plan.featured
                       ? {
-                          background: "linear-gradient(135deg, #588100 0%, #8db600 100%)",
+                          background: "linear-gradient(135deg, var(--facturom-primary) 0%, var(--facturom-primary-soft) 100%)",
                           color: "white",
                         }
                       : { backgroundColor: "#f3f4f6", color: "#374151" }
@@ -191,7 +191,7 @@ export default function PreciosPage() {
           <Link
             href="/contacto?plan=alto-volumen"
             className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold text-white"
-            style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
+            style={{ background: "linear-gradient(135deg, var(--facturom-primary), var(--facturom-primary-soft))" }}
           >
             Solicitar opción de alto volumen
             <ArrowRight size={14} />
@@ -223,7 +223,7 @@ export default function PreciosPage() {
             <Link
               href="/sign-up"
               className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold text-white"
-              style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
+              style={{ background: "linear-gradient(135deg, var(--facturom-primary), var(--facturom-primary-soft))" }}
             >
               Comenzar gratis
               <ArrowRight size={14} />
