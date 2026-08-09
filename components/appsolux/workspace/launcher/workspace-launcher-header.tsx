@@ -4,11 +4,12 @@ export function WorkspaceLauncherHeader({
   userName: string;
 }) {
   return (
-    <div className="max-w-3xl space-y-2">
-      <h1 className="text-4xl font-black tracking-tight text-[#0d0f12] sm:text-[2.8rem]">
-        Bienvenido, {userName}
+    <div className="relative max-w-3xl space-y-1.5">
+      <p className="text-xs font-bold uppercase tracking-[0.22em] text-facturom-yellow">Tu espacio de trabajo</p>
+      <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">
+        Hola, {userName} <span aria-hidden="true">👋</span>
       </h1>
-      <p className="text-base text-slate-600 sm:text-lg">Elige qué quieres hacer hoy.</p>
+      <p className="text-base text-white/72 sm:text-lg">¿Qué quieres hacer hoy?</p>
     </div>
   );
 }

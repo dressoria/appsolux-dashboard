@@ -7,17 +7,24 @@ import { cn } from "@/lib/utils";
 const toneClasses = {
   facturacion: {
     shell:
-      "border-facturom-primary/15 bg-white text-[#0d0f12] shadow-[0_12px_32px_rgba(15,23,42,0.06)] hover:border-facturom-primary hover:bg-facturom-primary hover:text-white",
-    icon: "bg-facturom-primary text-white group-hover:bg-white/15",
-    label: "text-facturom-primary group-hover:text-white/80",
-    cta: "text-facturom-primary group-hover:text-white",
+      "border-transparent bg-facturom-primary text-white shadow-[0_14px_34px_rgba(59,10,103,0.2)] hover:bg-facturom-primary-soft",
+    icon: "bg-white/15 text-white",
+    label: "text-facturom-yellow",
+    cta: "text-white",
   },
-  neutral: {
+  chats: {
     shell:
-      "border-slate-200 bg-white text-[#0d0f12] shadow-[0_12px_28px_rgba(15,23,42,0.06)] hover:border-facturom-primary hover:bg-facturom-primary hover:text-white",
-    icon: "bg-slate-100 text-slate-700 group-hover:bg-white/15 group-hover:text-white",
-    label: "text-slate-500 group-hover:text-white/80",
-    cta: "text-slate-900 group-hover:text-white",
+      "border-transparent bg-[#eee5f7] text-facturom-text shadow-[0_12px_28px_rgba(59,10,103,0.09)] hover:bg-[#e4d4f3]",
+    icon: "bg-facturom-primary-soft text-white",
+    label: "text-facturom-primary-soft",
+    cta: "text-facturom-primary",
+  },
+  automation: {
+    shell:
+      "border-transparent bg-[#fff6de] text-facturom-text shadow-[0_12px_28px_rgba(96,55,0,0.08)] hover:bg-[#ffefc2]",
+    icon: "bg-facturom-accent text-facturom-primary-dark",
+    label: "text-[#9a5600]",
+    cta: "text-facturom-primary",
   },
   soon: {
     shell:
@@ -57,7 +64,7 @@ function WorkspaceServiceCardInner({
         <div className={cn("rounded-[18px] p-2.5 transition-colors", currentTone.icon)}>
           <Icon className="h-4.5 w-4.5" />
         </div>
-        <ArrowRight className="h-4 w-4 text-slate-300 transition-colors group-hover:text-white" />
+        <ArrowRight className="h-5 w-5 opacity-55 transition-transform group-hover:translate-x-1" />
       </div>
 
       <div className="space-y-1.5">
@@ -67,7 +74,7 @@ function WorkspaceServiceCardInner({
           </p>
         ) : null}
         <h3 className="text-xl font-black tracking-tight">{title}</h3>
-        <p className="text-sm leading-5 text-slate-600 group-hover:text-white/82">{description}</p>
+        <p className="text-sm leading-5 opacity-70">{description}</p>
       </div>
 
       <div className={cn("mt-auto inline-flex items-center gap-2 text-sm font-semibold", currentTone.cta)}>
@@ -84,7 +91,7 @@ export function WorkspaceServiceCard({
   ...props
 }: WorkspaceServiceCardProps) {
   const shellClassName = cn(
-    "flex h-full min-h-[220px] flex-col gap-5 rounded-[24px] border p-5 transition-all duration-300",
+    "flex h-full min-h-[176px] flex-col gap-4 rounded-[24px] border p-5 transition-all duration-300",
     toneClasses[props.tone].shell,
     !disabled && "hover:-translate-y-0.5",
     disabled && "cursor-default opacity-90",

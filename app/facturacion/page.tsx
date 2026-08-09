@@ -121,8 +121,8 @@ async function getBillingAnalytics(tenantId: string): Promise<{
     distribution: [
       { label: "Recibos", value: receiptCount, color: "var(--facturom-primary)" },
       { label: "Facturas SRI", value: sriRows.length, color: "var(--facturom-primary-soft)" },
-      { label: "Autorizadas", value: statusCounts.AUTHORIZED ?? 0, color: "var(--facturom-primary)" },
-      { label: "Pendientes", value: pendingCount, color: "#a3a3a3" },
+      { label: "Autorizadas", value: statusCounts.AUTHORIZED ?? 0, color: "#16a34a" },
+      { label: "Pendientes", value: pendingCount, color: "var(--facturom-accent)" },
       { label: "Rechazadas", value: statusCounts.REJECTED ?? 0, color: "#dc2626" },
     ],
   };
@@ -189,15 +189,20 @@ function DonutSummaryChart({ items }: { items: DistributionPoint[] }) {
     return <ReportsEmptyState message="Aún no hay suficientes documentos para resumir la distribución actual." />;
   }
 
-  let accumulated = 0;
   const gradient = visibleItems
-    .map((item) => {
-      const start = (accumulated / total) * 100;
-      accumulated += item.value;
-      const end = (accumulated / total) * 100;
-      return `${item.color} ${start}% ${end}%`;
-    })
-    .join(", ");
+    .reduce<{ stops: string[]; accumulated: number }>(
+      (result, item) => {
+        const start = (result.accumulated / total) * 100;
+        const accumulated = result.accumulated + item.value;
+        const end = (accumulated / total) * 100;
+        return {
+          stops: [...result.stops, `${item.color} ${start}% ${end}%`],
+          accumulated,
+        };
+      },
+      { stops: [], accumulated: 0 }
+    )
+    .stops.join(", ");
 
   return (
     <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
@@ -238,18 +243,18 @@ function MetricCard({
   value: string;
   helper: string;
   icon: typeof ShoppingCart;
-  tone: "green" | "dark" | "neutral";
+  tone: "primary" | "accent" | "neutral";
 }) {
   const toneClasses = {
-    green: {
-      shell: "border-facturom-primary/15 bg-white",
+    primary: {
+      shell: "border-transparent bg-[#eee5f7]",
       icon: "bg-facturom-primary text-white",
       helper: "text-facturom-primary",
     },
-    dark: {
-      shell: "border-slate-900/10 bg-[#0d0f12] text-white",
-      icon: "bg-white/10 text-white",
-      helper: "text-slate-300",
+    accent: {
+      shell: "border-transparent bg-[#fff5dc]",
+      icon: "bg-facturom-accent text-facturom-primary-dark",
+      helper: "text-[#9a5600]",
     },
     neutral: {
       shell: "border-slate-200 bg-white",
@@ -271,9 +276,9 @@ function MetricCard({
             KPI
           </span>
         </div>
-        <p className={`mt-4 text-sm font-medium ${tone === "dark" ? "text-slate-300" : "text-slate-500"}`}>{title}</p>
-        <p className={`mt-1 text-2xl font-black tracking-tight ${tone === "dark" ? "text-white" : "text-slate-950"}`}>{value}</p>
-        <p className={`mt-1 text-xs leading-5 ${tone === "dark" ? "text-slate-300" : "text-slate-500"}`}>{helper}</p>
+        <p className="mt-4 text-sm font-medium text-slate-600">{title}</p>
+        <p className="mt-1 text-2xl font-black tracking-tight text-slate-950">{value}</p>
+        <p className="mt-1 text-xs leading-5 text-slate-500">{helper}</p>
       </CardContent>
     </Card>
   );
@@ -284,26 +289,33 @@ function QuickAccessCard({
   title,
   description,
   icon: Icon,
+  tone,
 }: {
   href: string;
   title: string;
   description: string;
   icon: typeof ShoppingCart;
+  tone: "purple" | "lavender" | "orange";
 }) {
+  const colors = {
+    purple: "bg-facturom-primary text-white group-hover:bg-facturom-primary-soft",
+    lavender: "bg-[#eee5f7] text-facturom-primary group-hover:bg-[#e4d4f3]",
+    orange: "bg-[#fff2d1] text-[#9a5600] group-hover:bg-[#ffe5a8]",
+  } as const;
   return (
     <Link
       href={href}
-      className="group flex h-full min-h-[148px] flex-col justify-between rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-facturom-primary hover:bg-facturom-primary hover:text-white"
+      className={`group flex h-full min-h-[136px] flex-col justify-between rounded-[22px] border border-transparent p-4 shadow-[0_8px_24px_rgba(59,10,103,0.07)] transition-all duration-300 hover:-translate-y-0.5 ${colors[tone]}`}
     >
       <div className="flex items-start justify-between gap-4">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-700 shadow-sm transition-colors group-hover:bg-white/15 group-hover:text-white">
-          <Icon className="h-4 w-4" />
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/75 text-current shadow-sm">
+          <Icon className="h-5 w-5" />
         </div>
-        <ArrowRight className="h-4 w-4 text-slate-300 transition-all duration-300 group-hover:translate-x-0.5 group-hover:text-white" />
+        <ArrowRight className="h-5 w-5 opacity-50 transition-all duration-300 group-hover:translate-x-1" />
       </div>
       <div className="mt-4 space-y-1.5">
-        <h3 className="text-base font-black text-slate-950 group-hover:text-white">{title}</h3>
-        <p className="text-sm leading-5 text-slate-600 group-hover:text-white/82">{description}</p>
+        <h3 className="text-base font-black">{title}</h3>
+        <p className="text-sm leading-5 opacity-70">{description}</p>
       </div>
     </Link>
   );
@@ -338,67 +350,73 @@ export default async function FacturacionPage() {
       title: "Nueva venta",
       description: "Inicia una venta y cobra rápido.",
       icon: ShoppingCart,
+      tone: "purple" as const,
     },
     {
       href: appRouting.invoicing.href,
       title: "Documentos",
       description: "Revisa comprobantes y estados.",
       icon: ReceiptText,
+      tone: "lavender" as const,
     },
     {
       href: routes.facturacionCustomers,
       title: "Clientes",
       description: "Consulta tu cartera y su historial.",
       icon: Users,
+      tone: "lavender" as const,
     },
     {
       href: routes.sriDocuments,
       title: "Facturas SRI",
       description: "Supervisa el estado de tus comprobantes.",
       icon: FileCheck2,
+      tone: "orange" as const,
     },
     {
       href: routes.facturacionCash,
       title: "Caja y cierre",
       description: "Revisa cobros y movimientos diarios.",
       icon: Wallet,
+      tone: "orange" as const,
     },
     {
       href: appRouting.reports.href,
       title: "Reportes",
       description: "Consulta ventas e inventario.",
       icon: BarChart3,
+      tone: "lavender" as const,
     },
   ];
 
   return (
-    <DashboardShell mainClassName="px-4 py-6 sm:px-6 sm:py-8" contentClassName="mx-auto max-w-7xl">
+    <DashboardShell mainClassName="px-4 py-5 sm:px-6 sm:py-6" contentClassName="mx-auto max-w-7xl">
       <div className="space-y-6">
-        <section className="rounded-[28px] border border-slate-200 bg-white px-6 py-6 shadow-sm sm:px-7">
+        <section className="rounded-[28px] bg-facturom-primary px-6 py-6 text-white shadow-[0_16px_36px_rgba(59,10,103,0.18)] sm:px-7">
           <div className="space-y-4">
             <div className="space-y-2">
-              <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+              <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">
                 Centro de facturación
               </h1>
-              <p className="max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
+              <p className="max-w-3xl text-sm leading-6 text-white/70 sm:text-base">
                 Ventas, clientes, inventario y comprobantes electrónicos.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/75">
                 {operatingModeLabel}
               </span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/75">
                 {sriReadinessLabel}
               </span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/75">
                 {tenant.name}
               </span>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button
                 asChild
-                className="rounded-full bg-facturom-primary px-5 text-white shadow-md shadow-facturom-primary/20 hover:bg-facturom-primary-soft"
+                className="rounded-full bg-facturom-accent px-5 text-facturom-primary-dark shadow-md hover:bg-facturom-yellow"
               >
                 <Link href={appRouting.sales.href}>
                   <ShoppingCart className="mr-2 h-4 w-4" />
@@ -408,7 +426,7 @@ export default async function FacturacionPage() {
               <Button
                 asChild
                 variant="outline"
-                className="rounded-full border-slate-200 bg-white px-5 text-slate-700 hover:bg-slate-50"
+                className="rounded-full border-white/20 bg-white/10 px-5 text-white hover:bg-white/20 hover:text-white"
               >
                 <Link href={appRouting.invoicing.href}>
                   <FileText className="mr-2 h-4 w-4" />
@@ -425,14 +443,14 @@ export default async function FacturacionPage() {
             title="Ventas de hoy"
             value={formatMoney(reports.salesToday)}
             helper="Monto vendido y registrado hoy en el módulo."
-            tone="green"
+            tone="primary"
           />
           <MetricCard
             icon={CreditCard}
             title="Total del mes"
             value={formatMoney(reports.salesMonth)}
             helper="Acumulado del mes actual."
-            tone="green"
+            tone="primary"
           />
           <MetricCard
             icon={Boxes}
@@ -446,7 +464,7 @@ export default async function FacturacionPage() {
             title="Pendientes SRI"
             value={String(pendingSriCount)}
             helper="Comprobantes que requieren seguimiento."
-            tone="dark"
+            tone="accent"
           />
           <MetricCard
             icon={ReceiptText}

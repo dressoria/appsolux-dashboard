@@ -5,6 +5,7 @@ export type SidebarItem = {
   title: string;
   href: string;
   icon: SidebarIconName;
+  exact?: boolean;
 };
 
 export type NavGroup = {
@@ -37,7 +38,8 @@ export function buildSidebarNavigation(tenantMode: TenantModeState): NavGroup[] 
 
   const operationItems: SidebarItem[] = isAdvanced
     ? [
-        { title: "POS / Ventas", href: routes.facturacionPos, icon: "shopping-cart" },
+        { title: "Inicio", href: routes.facturacion, icon: "layout-grid", exact: true },
+        { title: "Nueva venta", href: routes.facturacionPos, icon: "shopping-cart" },
         { title: "Facturador rápido", href: routes.facturacionQuickInvoice, icon: "file-text" },
         { title: "Documentos", href: routes.facturacionDocuments, icon: "file-check" },
         { title: "Clientes", href: routes.facturacionCustomers, icon: "users" },
@@ -48,7 +50,8 @@ export function buildSidebarNavigation(tenantMode: TenantModeState): NavGroup[] 
         { title: "Reportes", href: routes.facturacionReports, icon: "bar-chart-3" },
       ]
     : [
-        { title: "POS / Ventas", href: routes.facturacionPos, icon: "shopping-cart" },
+        { title: "Inicio", href: routes.facturacion, icon: "layout-grid", exact: true },
+        { title: "Nueva venta", href: routes.facturacionPos, icon: "shopping-cart" },
         { title: "Documentos", href: routes.facturacionDocuments, icon: "file-check" },
         { title: "Clientes", href: routes.facturacionCustomers, icon: "users" },
         { title: "Productos", href: routes.facturacionProducts, icon: "package" },

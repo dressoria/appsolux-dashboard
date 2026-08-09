@@ -26,11 +26,13 @@ import {
   Warehouse,
   WalletCards,
   X,
+  ArrowLeft,
   type LucideIcon,
 } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 
 import { Button } from "@/components/ui/button";
+import { FacturomBrand as FacturomBrandLogo } from "@/components/public/facturom-brand";
 import { routes } from "@/config/routes";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
@@ -73,16 +75,12 @@ const sidebarIcons: Record<SidebarIconName, LucideIcon> = {
 
 function FacturomBrand({ collapsed }: { collapsed: boolean }) {
   return (
-    <Link href={routes.facturacion} className="flex items-center gap-3">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-facturom-primary text-white shadow-md">
-        <span className="text-[11px] font-black uppercase tracking-[0.22em]">FT</span>
-      </div>
-      <div className={cn("min-w-0", collapsed && "hidden")}>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-          Facturom
-        </p>
-        <p className="truncate text-base font-black text-slate-950">Facturación</p>
-      </div>
+    <Link href={routes.facturacion} className="flex min-w-0 items-center" aria-label="Ir al inicio de Facturom">
+      <FacturomBrandLogo
+        variant="white"
+        iconOnly={collapsed}
+        imageClassName={cn("w-auto object-contain", collapsed ? "h-9" : "h-9 max-w-[150px]")}
+      />
     </Link>
   );
 }
@@ -121,7 +119,7 @@ export function DashboardFrame({
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
-      <div className="border-b border-slate-200/80 px-4 py-4">
+      <div className="border-b border-white/10 px-4 py-4">
         <div className="flex items-center justify-between gap-3">
           <FacturomBrand collapsed={collapsed} />
           <Button
@@ -129,7 +127,7 @@ export function DashboardFrame({
             variant="ghost"
             size="icon-sm"
             onClick={() => setCollapsed((value) => !value)}
-            className="hidden rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900 lg:inline-flex"
+            className="hidden rounded-full text-white/65 hover:bg-white/10 hover:text-white lg:inline-flex"
             aria-label={collapsed ? "Expandir sidebar" : "Contraer sidebar"}
           >
             {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
@@ -139,7 +137,7 @@ export function DashboardFrame({
             variant="ghost"
             size="icon-sm"
             onClick={() => setMobileOpen(false)}
-            className="rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900 lg:hidden"
+            className="rounded-full text-white/65 hover:bg-white/10 hover:text-white lg:hidden"
             aria-label="Cerrar menú"
           >
             <X className="h-4 w-4" />
@@ -153,7 +151,7 @@ export function DashboardFrame({
             <div key={group.title} className="space-y-2">
               <p
                 className={cn(
-                  "px-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400",
+                  "px-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/40",
                   collapsed && "sr-only"
                 )}
               >
@@ -161,7 +159,9 @@ export function DashboardFrame({
               </p>
               <div className="space-y-1">
                 {group.items.map((item) => {
-                  const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+                  const active = item.exact
+                    ? pathname === item.href
+                    : pathname === item.href || pathname.startsWith(`${item.href}/`);
                   const Icon = sidebarIcons[item.icon];
                   return (
                     <Link
@@ -171,8 +171,8 @@ export function DashboardFrame({
                       className={cn(
                         "group relative flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition-all",
                         active
-                            ? "bg-facturom-primary-soft/10 text-facturom-text shadow-sm"
-                              : "text-slate-600 hover:bg-facturom-primary hover:text-white",
+                            ? "bg-facturom-primary-soft text-white shadow-sm"
+                              : "text-white/72 hover:bg-white/10 hover:text-white",
                         collapsed && "justify-center px-2"
                       )}
                     >
@@ -181,14 +181,14 @@ export function DashboardFrame({
                           "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
                           active
                             ? "bg-white text-facturom-primary shadow-sm"
-                              : "bg-slate-100 text-slate-500 group-hover:bg-white/15 group-hover:text-white"
+                              : "bg-white/8 text-white/72 group-hover:bg-white/15 group-hover:text-white"
                         )}
                       >
                         <Icon className="h-4 w-4" />
                       </div>
                       <span className={cn("truncate", collapsed && "hidden")}>{item.title}</span>
                       {collapsed ? (
-                        <span className="pointer-events-none absolute left-full top-1/2 z-20 ml-3 hidden -translate-y-1/2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-lg group-hover:block">
+                        <span className="pointer-events-none absolute left-full top-1/2 z-20 ml-3 hidden -translate-y-1/2 rounded-xl bg-facturom-primary-dark px-3 py-1.5 text-xs font-medium text-white shadow-lg ring-1 ring-white/15 group-hover:block">
                           {item.title}
                         </span>
                       ) : null}
@@ -200,13 +200,19 @@ export function DashboardFrame({
           ))}
         </nav>
       </div>
+      <div className="border-t border-white/10 p-3">
+        <Link href={routes.workspace} title={collapsed ? "Volver al workspace" : undefined} className={cn("flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-white/65 transition hover:bg-white/10 hover:text-white", collapsed && "justify-center px-2")}>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/8"><ArrowLeft className="h-4 w-4" /></span>
+          <span className={cn(collapsed && "hidden")}>Volver al workspace</span>
+        </Link>
+      </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,_#f8fafc_0%,_#ffffff_52%,_#f5f7fb_100%)]">
+    <div className="min-h-screen bg-facturom-bg">
       <div className="lg:flex">
-        <div className="hidden border-r border-slate-200/80 bg-white/80 backdrop-blur-xl lg:block">
+        <div className="hidden bg-facturom-primary-dark lg:block">
           <aside className={cn("min-h-screen transition-[width] duration-300", sidebarWidth)}>
             {sidebarContent}
           </aside>
@@ -218,7 +224,7 @@ export function DashboardFrame({
 
         <aside
           className={cn(
-            "fixed inset-y-0 left-0 z-50 w-[88vw] max-w-[320px] border-r border-slate-200/80 bg-white/95 backdrop-blur-xl transition-transform duration-300 lg:hidden",
+            "fixed inset-y-0 left-0 z-50 w-[88vw] max-w-[320px] bg-facturom-primary-dark shadow-2xl transition-transform duration-300 lg:hidden",
             mobileOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
@@ -227,7 +233,7 @@ export function DashboardFrame({
 
         <div className="min-h-screen min-w-0 flex-1">
           {hideTopbar ? null : (
-            <header className="sticky top-0 z-30 border-b border-white/70 bg-white/80 backdrop-blur-xl">
+            <header className="sticky top-0 z-30 border-b border-facturom-primary/10 bg-white/88 backdrop-blur-xl">
               <div className="flex min-h-16 items-center justify-between gap-4 px-4 py-3 sm:px-6">
                 <div className="flex min-w-0 items-center gap-3">
                   <Button
@@ -251,7 +257,7 @@ export function DashboardFrame({
                     {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
                   </Button>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-facturom-primary-soft">
                       Facturom
                     </p>
                     <p className="truncate text-sm font-semibold text-slate-900">
@@ -269,7 +275,7 @@ export function DashboardFrame({
                   </div>
                   <div className="hidden text-right lg:block">
                     <p className="text-sm font-semibold text-slate-900">{userName}</p>
-                    <p className="text-xs text-slate-500">Espacio interno</p>
+                    <p className="text-xs text-slate-500">Cuenta activa</p>
                   </div>
                   {clerkActive ? <UserButton appearance={{ elements: { avatarBox: "h-8 w-8" } }} /> : <LogoutButton />}
                 </div>
