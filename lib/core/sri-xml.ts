@@ -1,5 +1,6 @@
 import "@/lib/security/server-only";
 import { buildSriAccessKey, createStableNumericCode } from "./sri-access-key";
+import { mapCustomerIdentificationTypeToSri } from "@/lib/core/customer-fiscal";
 
 export type SriXmlPreviewParams = {
   documentId: string;
@@ -26,6 +27,7 @@ export type SriXmlPreviewParams = {
     documentType: string;
     customerName: string;
     customerIdentification: string | null;
+    customerIdentificationType?: "RUC" | "CEDULA" | "PASSPORT" | "FOREIGN_ID" | null;
     customerEmail?: string | null;
     customerPhone?: string | null;
     subtotal: string | number;
@@ -82,7 +84,7 @@ function resolveAmbiente(env: "TEST" | "PRODUCTION"): string {
   return env === "PRODUCTION" ? "2" : "1";
 }
 
-function resolveIdentificacion(identification: string | null): {
+function resolveIdentificacion(identification: string | null, identificationType?: "RUC" | "CEDULA" | "PASSPORT" | "FOREIGN_ID" | null): {
   tipo: string;
   valor: string;
 } {
@@ -90,10 +92,14 @@ function resolveIdentificacion(identification: string | null): {
     // Consumidor Final
     return { tipo: "07", valor: "9999999999999" };
   }
-  const id = identification.trim();
-  if (/^\d{13}$/.test(id)) return { tipo: "04", valor: id }; // RUC
-  if (/^\d{10}$/.test(id)) return { tipo: "05", valor: id }; // Cedula
-  return { tipo: "06", valor: id }; // Pasaporte u otro
+  const value = identification.trim();
+  if (value === "9999999999999") return { tipo: "07", valor: value };
+  if (!identificationType) {
+    if (/^\d{13}$/.test(value)) return { tipo: "04", valor: value };
+    if (/^\d{10}$/.test(value)) return { tipo: "05", valor: value };
+    return { tipo: "06", valor: value };
+  }
+  return { tipo: mapCustomerIdentificationTypeToSri(identificationType), valor: value };
 }
 
 function resolveIvaCodigoPorcentaje(taxRate: number): string {
@@ -197,7 +203,8 @@ export function buildUnsignedSriInvoiceXmlPreview(
   const ambiente = resolveAmbiente(params.profile.environment);
   const fechaEmision = formatDateEC(params.document.issuedAt ?? params.document.createdAt);
   const { tipo: tipoIdComprador, valor: idComprador } = resolveIdentificacion(
-    params.document.customerIdentification
+    params.document.customerIdentification,
+    params.document.customerIdentificationType
   );
   const linesXml = params.lines.map((l, i) => buildLineXml(l, i)).join("\n");
 

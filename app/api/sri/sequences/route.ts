@@ -55,13 +55,48 @@ export async function POST(req: NextRequest) {
 
   // Validate establishment and issue point belong to this tenant
   const prisma = getPrismaClient();
-  const [establishment, issuePoint] = await Promise.all([
+  const [establishment, issuePoint, existingSequence, localHistory] = await Promise.all([
     prisma.sriEstablishment.findFirst({ where: { id: establishmentId, tenantId: tenant.id } }),
     prisma.sriIssuePoint.findFirst({ where: { id: issuePointId, tenantId: tenant.id, establishmentId } }),
+    isValidDocType(documentType)
+      ? prisma.sriDocumentSequence.findUnique({
+          where: {
+            tenantId_establishmentId_issuePointId_documentType: {
+              tenantId: tenant.id,
+              establishmentId,
+              issuePointId,
+              documentType,
+            },
+          },
+        })
+      : null,
+    isValidDocType(documentType)
+      ? prisma.sriDocument.aggregate({
+          where: {
+            tenantId: tenant.id,
+            establishmentId,
+            issuePointId,
+            documentType,
+            sequentialNumber: { not: null },
+          },
+          _max: { sequentialNumber: true },
+        })
+      : null,
   ]);
 
   if (!establishment) return NextResponse.json({ error: "Establecimiento no encontrado." }, { status: 404 });
   if (!issuePoint) return NextResponse.json({ error: "Punto de emision no encontrado." }, { status: 404 });
+
+  const minimumNextNumber = Math.max(
+    (localHistory?._max.sequentialNumber ?? 0) + 1,
+    existingSequence?.currentNumber ?? 1
+  );
+  if (!Number.isFinite(currentNumber) || currentNumber < minimumNextNumber) {
+    return NextResponse.json(
+      { error: `La numeración no puede retroceder. Continúa desde ${String(minimumNextNumber).padStart(9, "0")} o un número mayor.` },
+      { status: 422 }
+    );
+  }
 
   const sequence = await upsertSriSequence(tenant.id, {
     establishmentId,

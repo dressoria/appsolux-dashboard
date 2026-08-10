@@ -34,6 +34,30 @@ enum MembershipStatus {
   disabled
 }
 
+enum LightweightProductType {
+  PRODUCT
+  SERVICE
+  COMBO
+}
+
+enum LightweightProductUnit {
+  UNIT
+  KILOGRAM
+  GRAM
+  LITER
+  MILLILITER
+  METER
+  HOUR
+  SERVICE
+}
+
+enum LightweightCustomerIdentificationType {
+  RUC
+  CEDULA
+  PASSPORT
+  FOREIGN_ID
+}
+
 enum IntegrationProvider {
   chatwoot
   erpnext
@@ -285,56 +309,64 @@ model User {
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
-  memberships               Membership[]
-  onboardingRequests        OnboardingRequest[]
-  auditLogs                 AuditLog[]
-  requestedProvisioningJobs ProvisioningJob[]   @relation("RequestedByUser")
-  requestedPlanUpgrades     PlanUpgradeRequest[] @relation("RequestedPlanUpgrades")
-  reviewedPlanUpgrades      PlanUpgradeRequest[] @relation("ReviewedPlanUpgrades")
-  conversationNotes ConversationNote[]
-  cashClosings              CashClosing[]       @relation("CashClosingCreatedBy")
-  tenantFeatureOverridesCreated TenantFeatureOverride[]
+  memberships                          Membership[]
+  onboardingRequests                   OnboardingRequest[]
+  auditLogs                            AuditLog[]
+  requestedProvisioningJobs            ProvisioningJob[]            @relation("RequestedByUser")
+  requestedPlanUpgrades                PlanUpgradeRequest[]         @relation("RequestedPlanUpgrades")
+  reviewedPlanUpgrades                 PlanUpgradeRequest[]         @relation("ReviewedPlanUpgrades")
+  conversationNotes                    ConversationNote[]
+  cashClosings                         CashClosing[]                @relation("CashClosingCreatedBy")
+  tenantFeatureOverridesCreated        TenantFeatureOverride[]
   requestedBusinessSuiteActivationJobs BusinessSuiteActivationJob[] @relation("RequestedBusinessSuiteActivationJobs")
 }
 
 model Tenant {
-  id        String       @id @default(cuid())
-  name      String
-  slug      String       @unique
-  legalName String?
-  country   String?
-  currency  String?
-  status    TenantStatus @default(provisioning)
-  planKey   String?
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id                     String       @id @default(cuid())
+  name                   String
+  slug                   String       @unique
+  legalName              String?
+  taxIdentificationType  String?
+  taxIdentificationValue String?
+  phone                  String?
+  contactEmail           String?
+  province               String?
+  city                   String?
+  address                String?
+  country                String?
+  currency               String?
+  status                 TenantStatus @default(provisioning)
+  planKey                String?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
 
-  memberships               Membership[]
-  integrations              TenantIntegration[]
-  onboardingRequests        OnboardingRequest[]
-  auditLogs                 AuditLog[]
-  provisioningJobs          ProvisioningJob[]
-  subscriptions             TenantSubscription[]
-  planUpgradeRequests       PlanUpgradeRequest[]
-  lightweightProducts       LightweightProduct[]
-  lightweightCustomers      LightweightCustomer[]
-  lightweightSales          LightweightSale[]
-  lightweightStockMovements LightweightStockMovement[]
-  conversationNotes         ConversationNote[]
-  cashClosings              CashClosing[]
-  sriProfile                SriTaxpayerProfile?
-  sriEstablishments         SriEstablishment[]
-  sriIssuePoints            SriIssuePoint[]
-  sriDocumentSequences      SriDocumentSequence[]
-  sriSignatureConfig        SriSignatureConfig?
-  sriDocuments              SriDocument[]
-  sriSigningJobs            SriSigningJob[]
-  sriSubmissionJobs         SriSubmissionJob[]
-  operationalConfig         TenantOperationalConfig?
-  featureOverrides          TenantFeatureOverride[]
-  businessSuiteActivationJobs BusinessSuiteActivationJob[]
-  erpProductPricings          ErpProductPricing[]
-  quickInvoiceDrafts          QuickInvoiceDraft[]
+  memberships                  Membership[]
+  integrations                 TenantIntegration[]
+  onboardingRequests           OnboardingRequest[]
+  auditLogs                    AuditLog[]
+  provisioningJobs             ProvisioningJob[]
+  subscriptions                TenantSubscription[]
+  planUpgradeRequests          PlanUpgradeRequest[]
+  lightweightProducts          LightweightProduct[]
+  lightweightProductCategories LightweightProductCategory[]
+  lightweightCustomers         LightweightCustomer[]
+  lightweightSales             LightweightSale[]
+  lightweightStockMovements    LightweightStockMovement[]
+  conversationNotes            ConversationNote[]
+  cashClosings                 CashClosing[]
+  sriProfile                   SriTaxpayerProfile?
+  sriEstablishments            SriEstablishment[]
+  sriIssuePoints               SriIssuePoint[]
+  sriDocumentSequences         SriDocumentSequence[]
+  sriSignatureConfig           SriSignatureConfig?
+  sriDocuments                 SriDocument[]
+  sriSigningJobs               SriSigningJob[]
+  sriSubmissionJobs            SriSubmissionJob[]
+  operationalConfig            TenantOperationalConfig?
+  featureOverrides             TenantFeatureOverride[]
+  businessSuiteActivationJobs  BusinessSuiteActivationJob[]
+  erpProductPricings           ErpProductPricing[]
+  quickInvoiceDrafts           QuickInvoiceDraft[]
 }
 
 model Plan {
@@ -480,44 +512,99 @@ model Membership {
 }
 
 model LightweightProduct {
-  id        String    @id @default(cuid())
-  tenantId  String
-  name      String
-  price     Decimal   @db.Decimal(12, 2)
-  cost      Decimal?  @db.Decimal(12, 2)
-  stock     Int       @default(0)
-  minStock  Int?
-  barcode   String?
-  expiresAt DateTime?
-  taxRate   Decimal   @default(0) @db.Decimal(5, 2)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id             String                 @id @default(cuid())
+  tenantId       String
+  name           String
+  price          Decimal                @db.Decimal(12, 2)
+  cost           Decimal?               @db.Decimal(12, 2)
+  stock          Int                    @default(0)
+  minStock       Int?
+  barcode        String?
+  expiresAt      DateTime?
+  taxRate        Decimal                @default(0) @db.Decimal(5, 2)
+  type           LightweightProductType @default(PRODUCT)
+  primaryCode    String?
+  auxiliaryCode  String?
+  description    String?
+  price2         Decimal?               @db.Decimal(12, 2)
+  price3         Decimal?               @db.Decimal(12, 2)
+  isActive       Boolean                @default(true)
+  trackInventory Boolean                @default(true)
+  unit           LightweightProductUnit @default(UNIT)
+  categoryId     String?
+  iceEnabled     Boolean                @default(false)
+  iceCode        String?
+  iceRate        Decimal?               @db.Decimal(7, 4)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
 
-  tenant         Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant         Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   saleItems      LightweightSaleItem[]
   stockMovements LightweightStockMovement[]
+  category       LightweightProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  comboItems     LightweightComboItem[]      @relation("ComboProduct")
+  componentOf    LightweightComboItem[]      @relation("ComboComponent")
 
+  @@unique([tenantId, primaryCode])
+  @@unique([tenantId, barcode])
   @@index([tenantId])
   @@index([tenantId, name])
   @@index([tenantId, barcode])
+  @@index([tenantId, type, isActive])
 }
 
-model LightweightCustomer {
+model LightweightProductCategory {
   id        String   @id @default(cuid())
   tenantId  String
   name      String
-  phone     String?
-  email     String?
-  address   String?
-  balance   Decimal  @default(0) @db.Decimal(12, 2)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products LightweightProduct[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model LightweightComboItem {
+  id                 String   @id @default(cuid())
+  comboProductId     String
+  componentProductId String
+  quantity           Int
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  comboProduct     LightweightProduct @relation("ComboProduct", fields: [comboProductId], references: [id], onDelete: Cascade)
+  componentProduct LightweightProduct @relation("ComboComponent", fields: [componentProductId], references: [id], onDelete: Restrict)
+
+  @@unique([comboProductId, componentProductId])
+  @@index([componentProductId])
+}
+
+model LightweightCustomer {
+  id                 String                                 @id @default(cuid())
+  tenantId           String
+  name               String
+  phone              String?
+  email              String?
+  additionalEmails   String[]                               @default([])
+  address            String?
+  identificationType LightweightCustomerIdentificationType?
+  identification     String?
+  notes              String?
+  isActive           Boolean                                @default(true)
+  balance            Decimal                                @default(0) @db.Decimal(12, 2)
+  createdAt          DateTime                               @default(now())
+  updatedAt          DateTime                               @updatedAt
 
   tenant Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sales  LightweightSale[]
 
+  @@unique([tenantId, identification])
   @@index([tenantId])
   @@index([tenantId, name])
+  @@index([tenantId, isActive])
 }
 
 model LightweightSale {
@@ -763,24 +850,24 @@ model ErpProductPricing {
 }
 
 model QuickInvoiceDraft {
-  id              String                 @id @default(cuid())
-  tenantId        String
-  createdByUserId String?
-  status          QuickInvoiceDraftStatus @default(ANALYZED)
-  rawMessage      String
-  parsedData      Json
-  warnings        Json?
-  salesOrderName  String?
+  id               String                  @id @default(cuid())
+  tenantId         String
+  createdByUserId  String?
+  status           QuickInvoiceDraftStatus @default(ANALYZED)
+  rawMessage       String
+  parsedData       Json
+  warnings         Json?
+  salesOrderName   String?
   salesInvoiceName String?
-  customerName    String?
-  customerTaxId   String?
-  customerPhone   String?
-  customerAddress String?
-  companyName     String?
-  priceChannel    ErpPriceChannel?
-  totalAmount     Decimal?               @db.Decimal(12, 2)
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
+  customerName     String?
+  customerTaxId    String?
+  customerPhone    String?
+  customerAddress  String?
+  companyName      String?
+  priceChannel     ErpPriceChannel?
+  totalAmount      Decimal?                @db.Decimal(12, 2)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -807,7 +894,7 @@ model SriTaxpayerProfile {
   createdAt                  DateTime        @default(now())
   updatedAt                  DateTime        @updatedAt
 
-  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   establishments  SriEstablishment[]
   signatureConfig SriSignatureConfig?
 
@@ -816,19 +903,19 @@ model SriTaxpayerProfile {
 }
 
 model SriEstablishment {
-  id        String          @id @default(cuid())
+  id        String   @id @default(cuid())
   tenantId  String
   profileId String
   code      String
   name      String
   address   String
-  isMain    Boolean         @default(false)
-  isActive  Boolean         @default(true)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  isMain    Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  profile     SriTaxpayerProfile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  tenant      Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  profile     SriTaxpayerProfile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
   issuePoints SriIssuePoint[]
   sequences   SriDocumentSequence[]
   documents   SriDocument[]
@@ -848,8 +935,8 @@ model SriIssuePoint {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  establishment SriEstablishment @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
+  tenant        Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  establishment SriEstablishment      @relation(fields: [establishmentId], references: [id], onDelete: Cascade)
   sequences     SriDocumentSequence[]
   documents     SriDocument[]
 
@@ -882,9 +969,9 @@ model SriDocumentSequence {
 }
 
 model SriSignatureConfig {
-  id                    String             @id @default(cuid())
-  tenantId              String             @unique
-  profileId             String             @unique
+  id                             String             @id @default(cuid())
+  tenantId                       String             @unique
+  profileId                      String             @unique
   status                         SriSignatureStatus @default(NOT_UPLOADED)
   certificateFileName            String?
   certificateUploadedAt          DateTime?
@@ -897,7 +984,7 @@ model SriSignatureConfig {
   encryptedCertificatePassword   String?
   encryptionKeyVersion           String?
   createdAt                      DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+  updatedAt                      DateTime           @updatedAt
 
   tenant  Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   profile SriTaxpayerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
@@ -906,37 +993,38 @@ model SriSignatureConfig {
 }
 
 model SriDocument {
-  id                     String                @id @default(cuid())
-  tenantId               String
-  sourceType             SriDocumentSourceType
-  sourceId               String?
-  documentType           SriDocumentType
-  status                 SriDocumentStatus     @default(DRAFT)
-  environment            SriEnvironment        @default(TEST)
-  establishmentId        String
-  issuePointId           String
-  sequenceId             String?
-  sequentialNumber       Int?
-  accessKey              String?
-  ridePdfStorageKey      String?
-  customerName           String
-  customerIdentification String?
-  customerEmail          String?
-  customerPhone          String?
-  subtotal               Decimal               @db.Decimal(12, 2)
-  taxTotal               Decimal               @default(0) @db.Decimal(12, 2)
-  discountTotal          Decimal               @default(0) @db.Decimal(12, 2)
-  grandTotal             Decimal               @db.Decimal(12, 2)
-  currency               String                @default("USD")
-  issuedAt               DateTime?
-  createdAt              DateTime              @default(now())
-  updatedAt              DateTime              @updatedAt
+  id                         String                                 @id @default(cuid())
+  tenantId                   String
+  sourceType                 SriDocumentSourceType
+  sourceId                   String?
+  documentType               SriDocumentType
+  status                     SriDocumentStatus                      @default(DRAFT)
+  environment                SriEnvironment                         @default(TEST)
+  establishmentId            String
+  issuePointId               String
+  sequenceId                 String?
+  sequentialNumber           Int?
+  accessKey                  String?
+  ridePdfStorageKey          String?
+  customerName               String
+  customerIdentification     String?
+  customerIdentificationType LightweightCustomerIdentificationType?
+  customerEmail              String?
+  customerPhone              String?
+  subtotal                   Decimal                                @db.Decimal(12, 2)
+  taxTotal                   Decimal                                @default(0) @db.Decimal(12, 2)
+  discountTotal              Decimal                                @default(0) @db.Decimal(12, 2)
+  grandTotal                 Decimal                                @db.Decimal(12, 2)
+  currency                   String                                 @default("USD")
+  issuedAt                   DateTime?
+  createdAt                  DateTime                               @default(now())
+  updatedAt                  DateTime                               @updatedAt
 
-  tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  establishment SriEstablishment @relation(fields: [establishmentId], references: [id])
-  issuePoint    SriIssuePoint    @relation(fields: [issuePointId], references: [id])
-  lines         SriDocumentLine[]
-  signingJobs   SriSigningJob[]
+  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  establishment  SriEstablishment   @relation(fields: [establishmentId], references: [id])
+  issuePoint     SriIssuePoint      @relation(fields: [issuePointId], references: [id])
+  lines          SriDocumentLine[]
+  signingJobs    SriSigningJob[]
   submissionJobs SriSubmissionJob[]
 
   @@index([tenantId])
@@ -948,25 +1036,25 @@ model SriDocument {
 }
 
 model SriSigningJob {
-  id                    String              @id @default(cuid())
-  tenantId              String
-  documentId            String
-  status                SriSigningJobStatus @default(QUEUED)
-  priority              Int                 @default(0)
-  attempts              Int                 @default(0)
-  maxAttempts           Int                 @default(3)
-  lockedAt              DateTime?
-  lockedBy              String?
-  runAfter              DateTime?
-  startedAt             DateTime?
-  finishedAt            DateTime?
-  errorCode             String?
-  errorMessage          String?
-  unsignedXmlHash       String?
-  signedXmlStorageKey   String?
-  signedXmlHash         String?
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
+  id                  String              @id @default(cuid())
+  tenantId            String
+  documentId          String
+  status              SriSigningJobStatus @default(QUEUED)
+  priority            Int                 @default(0)
+  attempts            Int                 @default(0)
+  maxAttempts         Int                 @default(3)
+  lockedAt            DateTime?
+  lockedBy            String?
+  runAfter            DateTime?
+  startedAt           DateTime?
+  finishedAt          DateTime?
+  errorCode           String?
+  errorMessage        String?
+  unsignedXmlHash     String?
+  signedXmlStorageKey String?
+  signedXmlHash       String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
   tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   document SriDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
@@ -981,31 +1069,31 @@ model SriSigningJob {
 }
 
 model SriSubmissionJob {
-  id                     String                 @id @default(cuid())
-  tenantId               String
-  documentId             String
-  status                 SriSubmissionJobStatus @default(QUEUED)
-  environment            SriEnvironment         @default(TEST)
-  priority               Int                    @default(0)
-  attempts               Int                    @default(0)
-  maxAttempts            Int                    @default(3)
-  lockedAt               DateTime?
-  lockedBy               String?
-  runAfter               DateTime?
-  startedAt              DateTime?
-  finishedAt             DateTime?
-  receivedAt             DateTime?
-  authorizedAt           DateTime?
-  sriReceiptStatus       String?
-  sriAuthorizationStatus String?
-  sriAuthorizationNumber String?
-  sriAccessKey           String?
-  sriResponseRaw         Json?
+  id                      String                 @id @default(cuid())
+  tenantId                String
+  documentId              String
+  status                  SriSubmissionJobStatus @default(QUEUED)
+  environment             SriEnvironment         @default(TEST)
+  priority                Int                    @default(0)
+  attempts                Int                    @default(0)
+  maxAttempts             Int                    @default(3)
+  lockedAt                DateTime?
+  lockedBy                String?
+  runAfter                DateTime?
+  startedAt               DateTime?
+  finishedAt              DateTime?
+  receivedAt              DateTime?
+  authorizedAt            DateTime?
+  sriReceiptStatus        String?
+  sriAuthorizationStatus  String?
+  sriAuthorizationNumber  String?
+  sriAccessKey            String?
+  sriResponseRaw          Json?
   authorizedXmlStorageKey String?
-  errorCode              String?
-  errorMessage           String?
-  createdAt              DateTime               @default(now())
-  updatedAt              DateTime               @updatedAt
+  errorCode               String?
+  errorMessage            String?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
 
   tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   document SriDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)

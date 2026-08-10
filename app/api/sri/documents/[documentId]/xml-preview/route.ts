@@ -77,6 +77,7 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
       documentType: doc.documentType,
       customerName: doc.customerName,
       customerIdentification: doc.customerIdentification,
+      customerIdentificationType: doc.customerIdentificationType,
       customerEmail: doc.customerEmail,
       customerPhone: doc.customerPhone,
       subtotal: doc.subtotal.toString(),

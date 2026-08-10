@@ -1,28 +1,49 @@
 import "@/lib/security/server-only";
 
 import {
+  LightweightCustomerIdentificationType,
   LightweightPaymentMethod,
   LightweightPaymentStatus,
+  LightweightProductType,
+  LightweightProductUnit,
   LightweightSaleStatus,
   Prisma,
 } from "@prisma/client";
 
 import { getPrismaClient } from "@/lib/db/prisma";
 import { getLimit } from "@/lib/core/plans";
+import {
+  normalizeCustomerIdentification,
+  validateCustomerIdentification,
+} from "@/lib/core/customer-fiscal";
 
-type CreateProductInput = {
+export type ProductCatalogInput = {
   tenantId: string;
   name: string;
+  type?: LightweightProductType;
+  primaryCode: string;
+  auxiliaryCode?: string;
+  description?: string;
   price: number;
+  price2?: number;
+  price3?: number;
   cost?: number;
+  isActive?: boolean;
+  trackInventory?: boolean;
+  unit?: LightweightProductUnit;
+  categoryId?: string;
   stock?: number;
   minStock?: number;
   barcode?: string;
   expiresAt?: Date;
   taxRate?: number;
+  iceEnabled?: boolean;
+  iceCode?: string;
+  iceRate?: number;
+  comboItems?: Array<{ componentProductId: string; quantity: number }>;
 };
 
-type UpdateProductInput = Partial<Omit<CreateProductInput, "tenantId">> & {
+type UpdateProductInput = Partial<Omit<ProductCatalogInput, "tenantId">> & {
   tenantId: string;
   productId: string;
 };
@@ -39,7 +60,12 @@ type CreateCustomerInput = {
   name: string;
   phone?: string;
   email?: string;
+  additionalEmails?: string[];
   address?: string;
+  identificationType?: LightweightCustomerIdentificationType | null;
+  identification?: string;
+  notes?: string;
+  isActive?: boolean;
 };
 
 type UpdateCustomerInput = Partial<Omit<CreateCustomerInput, "tenantId">> & {
@@ -62,6 +88,17 @@ export type CreateSaleInput = {
 type ListInput = {
   search?: string;
   take?: number;
+  type?: LightweightProductType;
+  status?: "active" | "inactive";
+  categoryId?: string;
+  stock?: "low" | "out";
+};
+
+type CustomerListInput = {
+  search?: string;
+  take?: number;
+  status?: "active" | "inactive";
+  fiscalStatus?: "ready" | "pending";
 };
 
 type AddSalePaymentInput = {
@@ -114,27 +151,87 @@ export async function listProducts(tenantId: string, input: ListInput = {}) {
   return prisma.lightweightProduct.findMany({
     where: {
       tenantId,
+      ...(input.type ? { type: input.type } : {}),
+      ...(input.status ? { isActive: input.status === "active" } : {}),
+      ...(input.categoryId ? { categoryId: input.categoryId } : {}),
+      ...(input.stock === "out" ? { trackInventory: true, stock: { lte: 0 } } : {}),
+      ...(input.stock === "low" ? { trackInventory: true, stock: { gt: 0 } } : {}),
       ...(search
         ? {
             OR: [
               { name: { contains: search, mode: "insensitive" } },
               { barcode: { contains: search, mode: "insensitive" } },
+              { primaryCode: { contains: search, mode: "insensitive" } },
+              { auxiliaryCode: { contains: search, mode: "insensitive" } },
             ],
           }
         : {}),
     },
-    orderBy: { createdAt: "desc" },
+    include: {
+      category: true,
+      comboItems: { include: { componentProduct: true } },
+    },
+    orderBy: { name: "asc" },
     take: clampTake(input.take),
   });
 }
 
-export async function createProduct(input: CreateProductInput) {
+async function validateProductReferences(input: ProductCatalogInput, productId?: string) {
+  const prisma = getPrismaClient();
+  if (!Object.values(LightweightProductType).includes(input.type ?? "PRODUCT")) throw new Error("El tipo de item no es valido.");
+  if (!Object.values(LightweightProductUnit).includes(input.unit ?? "UNIT")) throw new Error("La unidad no es valida.");
+  assertPositiveMoney(input.price, "El PVP1");
+  if (input.price2 !== undefined) assertPositiveMoney(input.price2, "El PVP2");
+  if (input.price3 !== undefined) assertPositiveMoney(input.price3, "El PVP3");
+  if (input.cost !== undefined) assertPositiveMoney(input.cost, "El costo");
+  if (input.stock !== undefined && (!Number.isInteger(input.stock) || input.stock < 0)) throw new Error("El stock debe ser un entero mayor o igual a cero.");
+  if (input.minStock !== undefined && (!Number.isInteger(input.minStock) || input.minStock < 0)) throw new Error("El stock minimo debe ser un entero mayor o igual a cero.");
+  if (![0, 8, 15].includes(input.taxRate ?? 0)) throw new Error("La tarifa de IVA no es valida para el catalogo actual.");
+  if (input.iceEnabled) {
+    if (!input.iceCode?.trim()) throw new Error("El codigo ICE es requerido cuando aplica ICE.");
+    if (input.iceRate === undefined) throw new Error("La tarifa ICE es requerida cuando aplica ICE.");
+    assertPositiveMoney(input.iceRate, "La tarifa ICE");
+  }
+  const primaryCode = input.primaryCode.trim();
+  if (!primaryCode) throw new Error("El codigo principal es requerido.");
+  const duplicate = await prisma.lightweightProduct.findFirst({
+    where: {
+      tenantId: input.tenantId,
+      ...(productId ? { id: { not: productId } } : {}),
+      OR: [
+        { primaryCode },
+        ...(input.barcode?.trim() ? [{ barcode: input.barcode.trim() }] : []),
+      ],
+    },
+    select: { primaryCode: true, barcode: true },
+  });
+  if (duplicate?.primaryCode === primaryCode) throw new Error("El codigo principal ya existe.");
+  if (duplicate) throw new Error("El codigo de barras ya existe.");
+  if (input.categoryId) {
+    const category = await prisma.lightweightProductCategory.findFirst({ where: { id: input.categoryId, tenantId: input.tenantId } });
+    if (!category) throw new Error("La categoria no pertenece a este negocio.");
+  }
+  if ((input.type ?? "PRODUCT") === "COMBO") {
+    if (!input.comboItems?.length) throw new Error("Agrega al menos un componente al combo.");
+    const ids = [...new Set(input.comboItems.map((item) => item.componentProductId))];
+    if (ids.length !== input.comboItems.length) throw new Error("No repitas componentes dentro del combo.");
+    if (ids.includes(productId ?? "")) throw new Error("Un combo no puede contenerse a si mismo.");
+    input.comboItems.forEach((item) => {
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0) throw new Error("La cantidad de cada componente debe ser un entero mayor a cero.");
+    });
+    const count = await prisma.lightweightProduct.count({ where: { tenantId: input.tenantId, id: { in: ids }, type: { not: "COMBO" }, isActive: true } });
+    if (count !== ids.length) throw new Error("Uno o mas componentes no son validos para este negocio.");
+  }
+}
+
+export async function createProduct(input: ProductCatalogInput) {
   const prisma = getPrismaClient();
   const name = input.name.trim();
 
   if (!name) {
     throw new Error("El nombre del producto es requerido.");
   }
+  await validateProductReferences(input);
 
   assertPositiveMoney(input.price, "El precio");
 
@@ -151,19 +248,35 @@ export async function createProduct(input: CreateProductInput) {
   });
   await assertLimitAvailable(input.tenantId, "products", count);
 
+  const type = input.type ?? "PRODUCT";
   return prisma.lightweightProduct.create({
     data: {
       tenantId: input.tenantId,
       name,
+      type,
+      primaryCode: input.primaryCode.trim(),
+      auxiliaryCode: input.auxiliaryCode?.trim() || undefined,
+      description: input.description?.trim() || undefined,
       price: new Prisma.Decimal(input.price),
+      price2: input.price2 === undefined ? undefined : new Prisma.Decimal(input.price2),
+      price3: input.price3 === undefined ? undefined : new Prisma.Decimal(input.price3),
       cost:
         input.cost === undefined ? undefined : new Prisma.Decimal(input.cost),
-      stock: input.stock ?? 0,
+      isActive: input.isActive ?? true,
+      trackInventory: type === "PRODUCT" ? input.trackInventory ?? true : false,
+      unit: input.unit ?? (type === "SERVICE" ? "SERVICE" : "UNIT"),
+      categoryId: input.categoryId || undefined,
+      stock: type === "PRODUCT" && (input.trackInventory ?? true) ? input.stock ?? 0 : 0,
       minStock: input.minStock,
       barcode: input.barcode?.trim() || undefined,
       expiresAt: input.expiresAt,
       taxRate: new Prisma.Decimal(input.taxRate ?? 0),
+      iceEnabled: input.iceEnabled ?? false,
+      iceCode: input.iceEnabled ? input.iceCode?.trim() || undefined : undefined,
+      iceRate: input.iceEnabled && input.iceRate !== undefined ? new Prisma.Decimal(input.iceRate) : undefined,
+      comboItems: type === "COMBO" ? { create: input.comboItems!.map((item) => ({ componentProductId: item.componentProductId, quantity: item.quantity })) } : undefined,
     },
+    include: { category: true, comboItems: true },
   });
 }
 
@@ -174,14 +287,43 @@ export async function updateProduct(input: UpdateProductInput) {
       id: input.productId,
       tenantId: input.tenantId,
     },
-    select: { id: true },
+    include: { comboItems: true },
   });
 
   if (!existing) {
     throw new Error("Producto no encontrado.");
   }
 
+  const merged: ProductCatalogInput = {
+    ...input,
+    tenantId: input.tenantId,
+    name: input.name ?? existing.name,
+    type: input.type ?? existing.type,
+    primaryCode: input.primaryCode ?? existing.primaryCode ?? "",
+    price: input.price ?? Number(existing.price),
+    price2: input.price2 ?? (existing.price2 === null ? undefined : Number(existing.price2)),
+    price3: input.price3 ?? (existing.price3 === null ? undefined : Number(existing.price3)),
+    cost: input.cost ?? (existing.cost === null ? undefined : Number(existing.cost)),
+    stock: input.stock ?? existing.stock,
+    minStock: input.minStock ?? existing.minStock ?? undefined,
+    taxRate: input.taxRate ?? Number(existing.taxRate),
+    unit: input.unit ?? existing.unit,
+    iceEnabled: input.iceEnabled ?? existing.iceEnabled,
+    iceCode: input.iceCode ?? existing.iceCode ?? undefined,
+    iceRate: input.iceRate ?? (existing.iceRate === null ? undefined : Number(existing.iceRate)),
+    comboItems: input.comboItems ?? existing.comboItems.map((item) => ({ componentProductId: item.componentProductId, quantity: item.quantity })),
+  };
+  await validateProductReferences(merged, input.productId);
+
   const data: Prisma.LightweightProductUpdateInput = {};
+
+  if (input.type !== undefined) data.type = input.type;
+  if (input.primaryCode !== undefined) data.primaryCode = input.primaryCode.trim();
+  if (input.auxiliaryCode !== undefined) data.auxiliaryCode = input.auxiliaryCode.trim() || null;
+  if (input.description !== undefined) data.description = input.description.trim() || null;
+  if (input.isActive !== undefined) data.isActive = input.isActive;
+  if (input.unit !== undefined) data.unit = input.unit;
+  if (input.categoryId !== undefined) data.category = input.categoryId ? { connect: { id: input.categoryId } } : { disconnect: true };
 
   if (input.name !== undefined) {
     const name = input.name.trim();
@@ -202,6 +344,8 @@ export async function updateProduct(input: UpdateProductInput) {
     assertPositiveMoney(input.cost, "El costo");
     data.cost = new Prisma.Decimal(input.cost);
   }
+  if (input.price2 !== undefined) data.price2 = new Prisma.Decimal(input.price2);
+  if (input.price3 !== undefined) data.price3 = new Prisma.Decimal(input.price3);
 
   if (input.minStock !== undefined) {
     if (input.minStock < 0) {
@@ -224,9 +368,22 @@ export async function updateProduct(input: UpdateProductInput) {
     data.taxRate = new Prisma.Decimal(input.taxRate);
   }
 
+  if (input.iceEnabled !== undefined) data.iceEnabled = input.iceEnabled;
+  if (input.iceCode !== undefined) data.iceCode = input.iceCode.trim() || null;
+  if (input.iceRate !== undefined) data.iceRate = new Prisma.Decimal(input.iceRate);
+  const finalType = input.type ?? existing.type;
+  data.trackInventory = finalType === "PRODUCT" ? input.trackInventory ?? existing.trackInventory : false;
+  if (finalType !== "PRODUCT") data.stock = 0;
+  if (finalType === "COMBO" && input.comboItems) {
+    data.comboItems = { deleteMany: {}, create: input.comboItems.map((item) => ({ componentProductId: item.componentProductId, quantity: item.quantity })) };
+  } else if (finalType !== "COMBO") {
+    data.comboItems = { deleteMany: {} };
+  }
+
   return prisma.lightweightProduct.update({
     where: { id: input.productId },
     data,
+    include: { category: true, comboItems: true },
   });
 }
 
@@ -271,24 +428,58 @@ export async function adjustProductStock(input: AdjustStockInput) {
   });
 }
 
-export async function listCustomers(tenantId: string, input: ListInput = {}) {
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function normalizeCustomerEmails(primary: string | undefined, additional: string[] | undefined) {
+  const emails = [primary, ...(additional ?? [])]
+    .map((email) => email?.trim().toLowerCase())
+    .filter((email): email is string => Boolean(email));
+  if (emails.length > 5) throw new Error("Puedes registrar un maximo de 5 correos.");
+  if (new Set(emails).size !== emails.length) throw new Error("No repitas correos dentro del mismo cliente.");
+  if (emails.some((email) => !EMAIL_PATTERN.test(email))) throw new Error("Uno o mas correos no tienen un formato valido.");
+  return emails;
+}
+
+async function validateCustomerFiscalInput(
+  tenantId: string,
+  type: LightweightCustomerIdentificationType | null | undefined,
+  value: string | undefined,
+  customerId?: string
+) {
+  if (!type && !value?.trim()) return null;
+  if (!type || !value?.trim()) throw new Error("Completa el tipo y la identificacion fiscal.");
+  const identification = validateCustomerIdentification(type, value);
+  const duplicate = await getPrismaClient().lightweightCustomer.findFirst({
+    where: { tenantId, identification, ...(customerId ? { id: { not: customerId } } : {}) },
+    select: { id: true },
+  });
+  if (duplicate) throw new Error("Ya existe un cliente con esta identificacion.");
+  return normalizeCustomerIdentification(type, identification);
+}
+
+export async function listCustomers(tenantId: string, input: CustomerListInput = {}) {
   const prisma = getPrismaClient();
   const search = normalizeSearch(input.search);
 
   return prisma.lightweightCustomer.findMany({
     where: {
       tenantId,
+      ...(input.status ? { isActive: input.status === "active" } : {}),
+      ...(input.fiscalStatus === "ready" ? { identificationType: { not: null }, identification: { not: null } } : {}),
+      ...(input.fiscalStatus === "pending" ? { NOT: { identificationType: { not: null }, identification: { not: null } } } : {}),
       ...(search
         ? {
             OR: [
               { name: { contains: search, mode: "insensitive" } },
               { phone: { contains: search, mode: "insensitive" } },
               { email: { contains: search, mode: "insensitive" } },
+              { identification: { contains: search, mode: "insensitive" } },
+              { additionalEmails: { has: search.toLowerCase() } },
             ],
           }
         : {}),
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { name: "asc" },
     take: clampTake(input.take),
   });
 }
@@ -301,6 +492,9 @@ export async function createCustomer(input: CreateCustomerInput) {
     throw new Error("El nombre del cliente es requerido.");
   }
 
+  const emails = normalizeCustomerEmails(input.email, input.additionalEmails);
+  const identification = await validateCustomerFiscalInput(input.tenantId, input.identificationType, input.identification);
+
   const count = await prisma.lightweightCustomer.count({
     where: { tenantId: input.tenantId },
   });
@@ -311,8 +505,13 @@ export async function createCustomer(input: CreateCustomerInput) {
       tenantId: input.tenantId,
       name,
       phone: input.phone?.trim() || undefined,
-      email: input.email?.trim() || undefined,
+      email: emails[0],
+      additionalEmails: emails.slice(1),
       address: input.address?.trim() || undefined,
+      identificationType: input.identificationType ?? undefined,
+      identification,
+      notes: input.notes?.trim() || undefined,
+      isActive: input.isActive ?? true,
     },
   });
 }
@@ -324,7 +523,7 @@ export async function updateCustomer(input: UpdateCustomerInput) {
       id: input.customerId,
       tenantId: input.tenantId,
     },
-    select: { id: true },
+    select: { id: true, identificationType: true, identification: true, email: true, additionalEmails: true },
   });
 
   if (!existing) {
@@ -332,6 +531,12 @@ export async function updateCustomer(input: UpdateCustomerInput) {
   }
 
   const data: Prisma.LightweightCustomerUpdateInput = {};
+
+  if (input.identificationType !== undefined || input.identification !== undefined) {
+    const type = input.identificationType === undefined ? existing.identificationType : input.identificationType;
+    data.identificationType = type;
+    data.identification = await validateCustomerFiscalInput(input.tenantId, type, input.identification ?? existing.identification ?? undefined, input.customerId);
+  }
 
   if (input.name !== undefined) {
     const name = input.name.trim();
@@ -347,13 +552,17 @@ export async function updateCustomer(input: UpdateCustomerInput) {
     data.phone = input.phone.trim() || null;
   }
 
-  if (input.email !== undefined) {
-    data.email = input.email.trim() || null;
+  if (input.email !== undefined || input.additionalEmails !== undefined) {
+    const emails = normalizeCustomerEmails(input.email ?? existing.email ?? undefined, input.additionalEmails ?? existing.additionalEmails);
+    data.email = emails[0] ?? null;
+    data.additionalEmails = emails.slice(1);
   }
 
   if (input.address !== undefined) {
     data.address = input.address.trim() || null;
   }
+  if (input.notes !== undefined) data.notes = input.notes.trim() || null;
+  if (input.isActive !== undefined) data.isActive = input.isActive;
 
   return prisma.lightweightCustomer.update({
     where: { id: input.customerId },
@@ -490,7 +699,9 @@ export async function createSale(input: CreateSaleInput) {
       where: {
         tenantId: input.tenantId,
         id: { in: productIds },
+        isActive: true,
       },
+      include: { comboItems: { include: { componentProduct: true } } },
     });
     const productById = new Map(products.map((product) => [product.id, product]));
 
@@ -523,8 +734,17 @@ export async function createSale(input: CreateSaleInput) {
         throw new Error("Producto no encontrado.");
       }
 
-      if (product.stock < item.quantity) {
+      if (product.type === "PRODUCT" && product.trackInventory && product.stock < item.quantity) {
         throw new Error(`Stock insuficiente para ${product.name}.`);
+      }
+
+      if (product.type === "COMBO") {
+        for (const comboItem of product.comboItems) {
+          const required = Number(comboItem.quantity) * item.quantity;
+          if (comboItem.componentProduct.trackInventory && comboItem.componentProduct.stock < required) {
+            throw new Error(`Stock insuficiente para ${comboItem.componentProduct.name}, componente de ${product.name}.`);
+          }
+        }
       }
 
       const grossAmount = product.price.mul(item.quantity);
@@ -604,21 +824,45 @@ export async function createSale(input: CreateSaleInput) {
       },
     });
 
+    const inventoryDemand = new Map<string, number>();
     for (const item of saleItems) {
+      if (item.product.type === "PRODUCT" && item.product.trackInventory) {
+        inventoryDemand.set(item.product.id, (inventoryDemand.get(item.product.id) ?? 0) + item.quantity);
+      }
+      if (item.product.type === "COMBO") {
+        for (const component of item.product.comboItems) {
+          if (component.componentProduct.trackInventory) {
+            inventoryDemand.set(component.componentProductId, (inventoryDemand.get(component.componentProductId) ?? 0) + Number(component.quantity) * item.quantity);
+          }
+        }
+      }
+    }
+
+    const inventoryProducts = await tx.lightweightProduct.findMany({
+      where: { tenantId: input.tenantId, id: { in: [...inventoryDemand.keys()] } },
+      select: { id: true, name: true, stock: true },
+    });
+    for (const product of inventoryProducts) {
+      if (product.stock < (inventoryDemand.get(product.id) ?? 0)) {
+        throw new Error(`Stock insuficiente para ${product.name}.`);
+      }
+    }
+
+    for (const [productId, quantity] of inventoryDemand) {
       await tx.lightweightProduct.update({
-        where: { id: item.product.id },
+        where: { id: productId },
         data: {
           stock: {
-            decrement: item.quantity,
+            decrement: quantity,
           },
         },
       });
       await tx.lightweightStockMovement.create({
         data: {
           tenantId: input.tenantId,
-          productId: item.product.id,
+          productId,
           type: "sale",
-          quantity: -item.quantity,
+          quantity: -quantity,
         },
       });
     }
@@ -648,7 +892,7 @@ export async function cancelSale(tenantId: string, saleId: string) {
         tenantId,
       },
       include: {
-        items: true,
+        items: { include: { product: { include: { comboItems: { include: { componentProduct: true } } } } } },
         payments: true,
       },
     });
@@ -667,21 +911,35 @@ export async function cancelSale(tenantId: string, saleId: string) {
     );
     const balanceImpact = sale.total.sub(paidAmount);
 
+    const inventoryRestore = new Map<string, number>();
     for (const item of sale.items) {
+      if (item.product.type === "PRODUCT" && item.product.trackInventory) {
+        inventoryRestore.set(item.productId, (inventoryRestore.get(item.productId) ?? 0) + item.quantity);
+      }
+      if (item.product.type === "COMBO") {
+        for (const component of item.product.comboItems) {
+          if (component.componentProduct.trackInventory) {
+            inventoryRestore.set(component.componentProductId, (inventoryRestore.get(component.componentProductId) ?? 0) + component.quantity * item.quantity);
+          }
+        }
+      }
+    }
+
+    for (const [productId, quantity] of inventoryRestore) {
       await tx.lightweightProduct.update({
-        where: { id: item.productId },
+        where: { id: productId },
         data: {
           stock: {
-            increment: item.quantity,
+            increment: quantity,
           },
         },
       });
       await tx.lightweightStockMovement.create({
         data: {
           tenantId,
-          productId: item.productId,
+          productId,
           type: "adjustment",
-          quantity: item.quantity,
+          quantity,
         },
       });
     }

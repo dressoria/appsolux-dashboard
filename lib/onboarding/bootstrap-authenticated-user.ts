@@ -3,15 +3,21 @@ import "@/lib/security/server-only";
 import type { Prisma } from "@prisma/client";
 
 import { getPrismaClient } from "@/lib/db/prisma";
+import type { TaxIdentificationType } from "@/lib/onboarding/ecuador-identification";
 
 type BootstrapAuthenticatedUserInput = {
   userId: string;
   email: string;
   name: string;
   companyName: string;
-  ruc?: string;
+  legalName?: string;
+  taxIdentificationType: TaxIdentificationType;
+  taxIdentificationValue?: string;
   phone?: string;
-  businessType?: string;
+  contactEmail?: string;
+  province?: string;
+  city?: string;
+  address?: string;
 };
 
 function slugify(value: string) {
@@ -46,17 +52,20 @@ function buildPayload(input: BootstrapAuthenticatedUserInput): Prisma.InputJsonO
     source: "clerk_authenticated_onboarding",
   };
 
-  if (input.ruc) {
-    payload.ruc = input.ruc;
+  payload.tax_identification_type = input.taxIdentificationType;
+
+  if (input.taxIdentificationValue) {
+    payload.tax_identification_value = input.taxIdentificationValue;
   }
 
   if (input.phone) {
     payload.phone = input.phone;
   }
 
-  if (input.businessType) {
-    payload.business_type = input.businessType;
-  }
+  if (input.contactEmail) payload.contact_email = input.contactEmail;
+  if (input.province) payload.province = input.province;
+  if (input.city) payload.city = input.city;
+  if (input.address) payload.address = input.address;
 
   return payload;
 }
@@ -95,7 +104,14 @@ export async function bootstrapAuthenticatedUserTenant(
       data: {
         name: input.companyName,
         slug: tenantSlug,
-        legalName: input.companyName,
+        legalName: input.legalName,
+        taxIdentificationType: input.taxIdentificationType,
+        taxIdentificationValue: input.taxIdentificationValue,
+        phone: input.phone,
+        contactEmail: input.contactEmail,
+        province: input.province,
+        city: input.city,
+        address: input.address,
         country: "Ecuador",
         currency: "USD",
         status: "active",

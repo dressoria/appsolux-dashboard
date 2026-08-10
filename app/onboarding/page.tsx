@@ -1,124 +1,65 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Check, LockKeyhole } from "lucide-react";
 
 import { LogoutButton } from "@/components/appsolux/layout/logout-button";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { OnboardingBusinessForm } from "@/components/appsolux/onboarding/onboarding-business-form";
+import { FacturomBrand } from "@/components/public/facturom-brand";
 import { routes } from "@/config/routes";
 import { requireAppUser } from "@/lib/auth/require-app-user";
-import { bootstrapAuthenticatedUserTenant } from "@/lib/onboarding/bootstrap-authenticated-user";
-
-async function createTenantAction(formData: FormData) {
-  "use server";
-
-  const user = await requireAppUser();
-
-  if (user.tenant?.id) {
-    redirect(routes.workspace);
-  }
-
-  const companyName = String(formData.get("company_name") ?? "").trim();
-  const ruc = String(formData.get("ruc") ?? "").trim();
-  const phone = String(formData.get("phone") ?? "").trim();
-  const businessType = String(formData.get("business_type") ?? "").trim();
-
-  if (!companyName) {
-    throw new Error("El nombre de empresa es requerido.");
-  }
-
-  await bootstrapAuthenticatedUserTenant({
-    userId: user.id,
-    email: user.email,
-    name: user.name,
-    companyName,
-    ruc: ruc || undefined,
-    phone: phone || undefined,
-    businessType: businessType || undefined,
-  });
-
-  redirect(routes.workspace);
-}
 
 export default async function OnboardingPage() {
   const user = await requireAppUser();
 
-  if (user.tenant?.id) {
-    redirect(routes.workspace);
-  }
+  if (user.tenant?.id) redirect(routes.workspace);
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-sky-50 px-4 py-12">
-      <div className="mx-auto flex max-w-5xl flex-col gap-8">
-        <div className="flex items-center justify-between gap-4">
-          <Link href={routes.home} className="text-sm font-semibold text-slate-700 hover:text-slate-900">
-            Facturom
+    <main className="min-h-screen bg-facturom-bg text-facturom-text">
+      <header className="bg-facturom-primary-dark text-white shadow-[0_10px_30px_rgba(42,6,72,0.18)]">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6">
+          <Link href={routes.home} aria-label="Ir al inicio de Facturom">
+            <FacturomBrand variant="white" imageClassName="h-9 w-auto sm:h-10" />
           </Link>
-          <LogoutButton />
+          <LogoutButton inverted />
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 sm:py-10">
+        <div className="mb-6 max-w-2xl">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#eee5f7] px-3 py-1 text-xs font-bold text-facturom-primary">
+            <span className="h-2 w-2 rounded-full bg-facturom-accent" />
+            Configuración inicial
+          </div>
+          <h1 className="text-3xl font-black tracking-tight sm:text-4xl">Configura tu negocio</h1>
+          <p className="mt-2 text-base text-slate-600 sm:text-lg">Solo te tomará un minuto. Podrás completar la configuración fiscal después.</p>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <Card className="border-slate-200 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-3xl font-black tracking-tight text-slate-950">
-                Bienvenido a Facturom
-              </CardTitle>
-              <p className="text-sm text-slate-500">
-                Para continuar, crea tu empresa o solicita acceso a una empresa existente.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <form action={createTenantAction} className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="company_name">Nombre de empresa o negocio</Label>
-                  <Input id="company_name" name="company_name" placeholder="Ej. Comercial Andrade" required />
-                </div>
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <section className="rounded-[28px] bg-white p-5 shadow-[0_16px_42px_rgba(59,10,103,0.09)] sm:p-7">
+            <OnboardingBusinessForm defaultEmail={user.email} />
+          </section>
 
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="ruc">RUC</Label>
-                    <Input id="ruc" name="ruc" placeholder="Opcional" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Teléfono</Label>
-                    <Input id="phone" name="phone" placeholder="Opcional" />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="business_type">Tipo de negocio</Label>
-                  <Input id="business_type" name="business_type" placeholder="Opcional" />
-                </div>
-
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button type="submit" className="bg-facturom-primary hover:bg-facturom-primary-soft text-white">
-                    Crear empresa
-                  </Button>
-                  <Button asChild type="button" variant="outline">
-                    <Link href={`${routes.contacto}?servicio=acceso-empresa`}>Contactar soporte</Link>
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-200 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-xl font-black text-slate-950">Acceso seguro por tenant</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm text-slate-600">
-              <p>
-                Tu cuenta autenticada aún no está vinculada a una empresa. Por seguridad, no te mostramos módulos,
-                documentos, productos ni datos de otro tenant.
-              </p>
-              <ul className="space-y-2">
-                <li>Crear empresa: genera tu tenant propio y te asigna como owner.</li>
-                <li>Contactar soporte: si debes entrar a una empresa existente, te ayudamos a vincularte correctamente.</li>
-                <li>Cerrar sesión: sales sin tocar ningún workspace interno.</li>
-              </ul>
-            </CardContent>
-          </Card>
+          <aside className="rounded-[24px] bg-facturom-primary p-5 text-white shadow-[0_14px_34px_rgba(59,10,103,0.16)] lg:sticky lg:top-6">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/12 text-facturom-yellow">
+              <LockKeyhole className="h-5 w-5" />
+            </span>
+            <h2 className="mt-4 text-xl font-black">Tu espacio será privado</h2>
+            <p className="mt-2 text-sm leading-6 text-white/70">Tu información comienza limpia y permanece separada de otros negocios.</p>
+            <ul className="mt-5 space-y-3 text-sm">
+              {["Empresa independiente", "Datos separados", "Tú serás propietario"].map((item) => (
+                <li key={item} className="flex items-center gap-2.5">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/12 text-facturom-yellow"><Check className="h-3.5 w-3.5" /></span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-6 border-t border-white/12 pt-5">
+              <p className="text-xs text-white/55">¿Ya perteneces a una empresa?</p>
+              <Link href={`${routes.contacto}?servicio=acceso-empresa`} className="mt-1 inline-flex text-sm font-bold text-white underline decoration-white/35 underline-offset-4 hover:decoration-white">
+                Solicitar acceso
+              </Link>
+            </div>
+          </aside>
         </div>
       </div>
     </main>

@@ -32,7 +32,6 @@ export async function POST(req: NextRequest) {
   const data = body as Record<string, unknown>;
   const legalName = typeof data.legalName === "string" ? data.legalName.trim() : "";
   const ruc = typeof data.ruc === "string" ? data.ruc.trim() : "";
-  const environment = data.environment === "PRODUCTION" ? "PRODUCTION" : "TEST";
 
   if (!legalName) {
     return NextResponse.json({ error: "La razon social es obligatoria." }, { status: 422 });
@@ -50,7 +49,7 @@ export async function POST(req: NextRequest) {
     accountingRequired: data.accountingRequired === true || data.accountingRequired === "true",
     specialTaxpayerNumber: typeof data.specialTaxpayerNumber === "string" && data.specialTaxpayerNumber.trim() ? data.specialTaxpayerNumber.trim() : null,
     withholdingAgentResolution: typeof data.withholdingAgentResolution === "string" && data.withholdingAgentResolution.trim() ? data.withholdingAgentResolution.trim() : null,
-    environment,
+    environment: "PRODUCTION",
   });
 
   return NextResponse.json({ profile }, { status: 200 });

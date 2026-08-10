@@ -9,6 +9,10 @@ function getString(body: Record<string, unknown>, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function getEmails(body: Record<string, unknown>) {
+  return Array.isArray(body.emails) ? body.emails.filter((value): value is string => typeof value === "string") : [];
+}
+
 export async function GET(request: Request) {
   const user = await getCurrentUser();
 
@@ -20,6 +24,8 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const customers = await listCustomers(tenant.id, {
     search: searchParams.get("q") ?? undefined,
+    status: (searchParams.get("status") || undefined) as "active" | "inactive" | undefined,
+    fiscalStatus: (searchParams.get("fiscalStatus") || undefined) as "ready" | "pending" | undefined,
   });
 
   return NextResponse.json({ ok: true, customers });
@@ -39,8 +45,13 @@ export async function POST(request: Request) {
       tenantId: tenant.id,
       name: getString(body, "name"),
       phone: getString(body, "phone") || undefined,
-      email: getString(body, "email") || undefined,
+      email: getEmails(body)[0] || getString(body, "email") || undefined,
+      additionalEmails: getEmails(body).slice(1),
       address: getString(body, "address") || undefined,
+      identificationType: (getString(body, "identificationType") || null) as never,
+      identification: getString(body, "identification") || undefined,
+      notes: getString(body, "notes") || undefined,
+      isActive: typeof body.isActive === "boolean" ? body.isActive : undefined,
     });
 
     return NextResponse.json({ ok: true, customer });

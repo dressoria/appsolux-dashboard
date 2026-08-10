@@ -58,6 +58,7 @@ type Customer = {
   phone?: string | null;
   email?: string | null;
   address?: string | null;
+  identification?: string | null;
 };
 
 type WarehouseOption = {
@@ -208,7 +209,7 @@ export function BasicPosClient({
       const found = customers.find((c) => c.id === customerId);
       if (found) {
         setInvoiceCustomerName(found.name);
-        setInvoiceCustomerIdentification("");
+        setInvoiceCustomerIdentification(found.identification ?? "");
         setInvoiceCustomerPhone(found.phone ?? "");
         setInvoiceCustomerEmail(found.email ?? "");
         setInvoiceCustomerAddress(found.address ?? "");

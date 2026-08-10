@@ -16,17 +16,13 @@ export function SriModuleShell({
   action,
   appName = "Configuración SRI",
   appDescription = "Centro de configuración, firma, secuenciales, ambiente y monitoreo tributario.",
-  activeHref: _activeHref,
-  title: _title,
-  badge: _badge,
-  badgeVariant: _badgeVariant,
 }: SriModuleShellProps) {
   return (
     <>
-      <div className="border-b border-slate-200 bg-white px-8 py-5">
+      <div className="border-b border-facturom-primary/10 bg-white px-4 py-5 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-[#004080]">{appName}</h1>
+            <h1 className="text-2xl font-black tracking-tight text-facturom-primary">{appName}</h1>
             <p className="mt-0.5 text-sm text-slate-500">
               {description || appDescription}
             </p>
@@ -36,7 +32,7 @@ export function SriModuleShell({
           )}
         </div>
       </div>
-      <main className="flex-1 overflow-auto p-8">
+      <main className="flex-1 overflow-auto bg-facturom-bg p-4 sm:p-6 lg:p-8">
         <div className="mx-auto max-w-6xl">{children}</div>
       </main>
     </>

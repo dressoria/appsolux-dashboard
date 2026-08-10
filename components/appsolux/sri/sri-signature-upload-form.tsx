@@ -48,8 +48,8 @@ export function SriSignatureUploadForm() {
         phase: "success",
         message:
           data.status === "READY_FOR_TESTING"
-            ? "Certificado cargado y listo para pruebas."
-            : "Certificado cargado. Revisa metadata y vencimiento antes de firmar.",
+            ? "Firma electrónica lista."
+            : "Certificado cargado. Revisa el titular y vencimiento antes de emitir.",
       });
       router.refresh();
     } catch {
@@ -58,10 +58,9 @@ export function SriSignatureUploadForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 rounded-md border p-4">
-      <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
-        Sube un certificado .p12 o .pfx para pruebas controladas. El archivo y la contrasena se
-        cifran del lado servidor y no se devuelven al navegador.
+    <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-slate-200 p-4">
+      <div className="rounded-xl bg-[#eee5f7] p-3 text-xs text-facturom-primary">
+        Sube tu certificado .p12 o .pfx. El archivo y la contraseña se cifran en el servidor y no se devuelven al navegador.
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
@@ -99,7 +98,7 @@ export function SriSignatureUploadForm() {
       {state.phase === "success" && <p className="text-sm text-emerald-700">{state.message}</p>}
 
       <Button type="submit" size="sm" disabled={state.phase === "loading"}>
-        {state.phase === "loading" ? "Cargando..." : "Cargar certificado para pruebas"}
+        {state.phase === "loading" ? "Guardando…" : "Guardar firma electrónica"}
       </Button>
     </form>
   );

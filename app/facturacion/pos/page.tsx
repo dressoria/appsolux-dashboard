@@ -155,8 +155,8 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
 
   // ── CORE: existing logic ──────────────────────────────────────────────────
   const [coreProducts, coreCustomers, sriStatus] = await Promise.all([
-    listProducts(tenant.id),
-    listCustomers(tenant.id),
+    listProducts(tenant.id, { status: "active" }),
+    listCustomers(tenant.id, { status: "active" }),
     getSriModuleStatus(tenant.id),
   ]);
 
@@ -195,7 +195,9 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
               id: product.id,
               name: product.name,
               price: product.price.toString(),
-              stock: product.stock,
+              stock: product.type === "COMBO"
+                ? Math.max(0, Math.min(...product.comboItems.filter((item) => item.componentProduct.trackInventory).map((item) => Math.floor(item.componentProduct.stock / Number(item.quantity))), 999999))
+                : product.trackInventory ? product.stock : 999999,
               barcode: product.barcode,
               taxRate: product.taxRate.toString(),
             }))}
@@ -205,6 +207,7 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
               phone: customer.phone,
               email: customer.email,
               address: customer.address,
+              identification: customer.identification,
             }))}
           />
         </div>

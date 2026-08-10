@@ -30,6 +30,10 @@ function getNumber(body: Record<string, unknown>, key: string) {
   return undefined;
 }
 
+function getBoolean(body: Record<string, unknown>, key: string) {
+  return typeof body[key] === "boolean" ? body[key] as boolean : undefined;
+}
+
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const user = await getCurrentUser();
@@ -46,7 +50,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
       where: { id: productId, tenantId: tenant.id },
       select: {
         id: true,
-        _count: { select: { saleItems: true, stockMovements: true } },
+        _count: { select: { saleItems: true, stockMovements: true, componentOf: true } },
       },
     });
 
@@ -54,9 +58,9 @@ export async function DELETE(_request: Request, context: RouteContext) {
       return NextResponse.json({ ok: false, message: "Producto no encontrado." }, { status: 404 });
     }
 
-    if (product._count.saleItems > 0 || product._count.stockMovements > 0) {
+    if (product._count.saleItems > 0 || product._count.stockMovements > 0 || product._count.componentOf > 0) {
       return NextResponse.json(
-        { ok: false, message: "No se puede eliminar un producto con ventas o movimientos asociados." },
+        { ok: false, message: "Este producto tiene historial o pertenece a un combo. Desactivalo para conservar la trazabilidad." },
         { status: 400 }
       );
     }
@@ -90,12 +94,29 @@ export async function PATCH(request: Request, context: RouteContext) {
       tenantId: tenant.id,
       productId,
       name: getString(body, "name"),
+      type: getString(body, "type") as never,
+      primaryCode: getString(body, "primaryCode"),
+      auxiliaryCode: getString(body, "auxiliaryCode"),
+      description: getString(body, "description"),
       price: getNumber(body, "price"),
+      price2: getNumber(body, "price2"),
+      price3: getNumber(body, "price3"),
       cost: getNumber(body, "cost"),
+      isActive: getBoolean(body, "isActive"),
+      trackInventory: getBoolean(body, "trackInventory"),
+      unit: getString(body, "unit") as never,
+      categoryId: getString(body, "categoryId"),
       minStock: getNumber(body, "minStock"),
       barcode: getString(body, "barcode"),
       expiresAt: expiresAt ? new Date(expiresAt) : undefined,
       taxRate: getNumber(body, "taxRate"),
+      iceEnabled: getBoolean(body, "iceEnabled"),
+      iceCode: getString(body, "iceCode"),
+      iceRate: getNumber(body, "iceRate"),
+      comboItems: Array.isArray(body.comboItems) ? body.comboItems.map((item) => {
+        const value = item as Record<string, unknown>;
+        return { componentProductId: String(value.componentProductId ?? ""), quantity: Number(value.quantity) };
+      }) : undefined,
     });
 
     return NextResponse.json({ ok: true, product });

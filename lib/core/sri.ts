@@ -1,6 +1,7 @@
 import "@/lib/security/server-only";
 import { Prisma, SriDocumentType } from "@prisma/client";
 import { getPrismaClient } from "@/lib/db/prisma";
+import { validateCustomerForSriInvoice } from "@/lib/core/customer-fiscal";
 import { buildSriAccessKey, createStableNumericCode } from "./sri-access-key";
 
 export type SriModuleStatus = {
@@ -477,12 +478,13 @@ export async function createDraftSriDocumentFromBasicSale({
   const sale = await prisma.lightweightSale.findFirst({
     where: { id: saleId, tenantId },
     include: {
-      customer: { select: { name: true, email: true, phone: true } },
+      customer: { select: { name: true, email: true, phone: true, identificationType: true, identification: true } },
       items: { include: { product: { select: { name: true, barcode: true } } } },
     },
   });
   if (!sale) throw new Error("Venta no encontrada.");
   if (sale.status === "canceled") throw new Error("La venta esta cancelada y no puede prepararse como comprobante.");
+  const fiscalCustomer = validateCustomerForSriInvoice(sale.customer);
 
   const profile = await prisma.sriTaxpayerProfile.findUnique({ where: { tenantId } });
   if (!profile) throw new Error("No existe configuracion SRI. Configura la empresa y RUC primero.");
@@ -544,8 +546,9 @@ export async function createDraftSriDocumentFromBasicSale({
       environment: profile.environment,
       establishmentId: establishment.id,
       issuePointId: issuePoint.id,
-      customerName: sale.customer?.name ?? "Consumidor Final",
-      customerIdentification: null,
+      customerName: fiscalCustomer.name,
+      customerIdentification: fiscalCustomer.identification,
+      customerIdentificationType: fiscalCustomer.identificationType,
       customerEmail: sale.customer?.email ?? null,
       customerPhone: sale.customer?.phone ?? null,
       subtotal: new Prisma.Decimal(sriSubtotal),
