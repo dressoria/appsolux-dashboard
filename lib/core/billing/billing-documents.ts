@@ -8,6 +8,7 @@ export type BillingDocumentListItem = {
   type: "BASIC_SALE" | "SRI_DOCUMENT";
   displayNumber: string | null;
   customerName: string | null;
+  customerIdentification: string | null;
   total: string | null;
   issuedAt: string | null;
   source: "CORE" | "SHARED_ERP" | "SRI" | "BASIC_HISTORY";
@@ -59,7 +60,6 @@ function formatDisplayNumber(
   return `${estCode}-${ipCode}-${String(seq).padStart(9, "0")}`;
 }
 
-const VALID_CORE_STATUSES = ["paid", "pending", "canceled"] as const;
 const VALID_SRI_STATUSES = [
   "DRAFT",
   "READY_FOR_TESTING",
@@ -80,7 +80,7 @@ async function loadBasicHistoryItems(
   const sales = await prisma.lightweightSale.findMany({
     where: { tenantId, status: { not: "canceled" } },
     include: {
-      customer: { select: { name: true } },
+      customer: { select: { name: true, identification: true } },
       items: { include: { product: { select: { name: true } } }, take: 4 },
     },
     orderBy: { createdAt: "desc" },
@@ -98,6 +98,7 @@ async function loadBasicHistoryItems(
       status: true,
       environment: true,
       accessKey: true,
+      customerIdentification: true,
       establishment: { select: { code: true } },
       issuePoint: { select: { code: true } },
       sequentialNumber: true,
@@ -139,6 +140,7 @@ async function loadBasicHistoryItems(
       type: "BASIC_SALE" as const,
       displayNumber,
       customerName: sale.customer?.name ?? null,
+      customerIdentification: sri?.customerIdentification ?? sale.customer?.identification ?? null,
       total: sale.total.toString(),
       issuedAt: sale.createdAt.toISOString(),
       source: "BASIC_HISTORY" as const,
@@ -163,16 +165,68 @@ async function loadBasicHistoryItems(
 
 export async function loadCoreDocuments(
   tenantId: string,
-  options: { status?: string; page?: number; perPage?: number } = {}
+  options: {
+    status?: string;
+    type?: "all" | "receipt" | "sri" | "authorized" | "pending" | "rejected" | "canceled";
+    search?: string;
+    from?: Date;
+    to?: Date;
+    page?: number;
+    perPage?: number;
+    sort?: "date" | "total";
+  } = {}
 ): Promise<{ items: BillingDocumentListItem[]; total: number }> {
   const prisma = getPrismaClient();
   const perPage = Math.min(options.perPage ?? 20, 50);
   const page = Math.max(options.page ?? 1, 1);
 
   // Mirror buildSalesWhere logic: "paid" → paymentStatus, "pending" → not-canceled + paymentStatus, "canceled" → status
-  function buildWhere(): Prisma.LightweightSaleWhereInput {
+  async function buildWhere(): Promise<Prisma.LightweightSaleWhereInput> {
     const s = options.status;
-    const base: Prisma.LightweightSaleWhereInput = { tenantId };
+    const search = options.search?.trim();
+    const sequentialCandidate = search?.split("-").at(-1)?.replace(/^0+/, "");
+    const sequentialNumber = sequentialCandidate && /^\d{1,9}$/.test(sequentialCandidate) ? Number(sequentialCandidate) : undefined;
+    const sriFilter = options.type;
+    const sriStatuses = sriFilter === "authorized" ? ["AUTHORIZED"] : sriFilter === "rejected" ? ["REJECTED"] : sriFilter === "pending" ? ["DRAFT", "READY_FOR_TESTING", "SIGNED", "SENT"] : undefined;
+    const needsSriLookup = Boolean(search || sriFilter === "receipt" || sriFilter === "sri" || sriStatuses);
+    const matchingSri = needsSriLookup ? await prisma.sriDocument.findMany({
+      where: {
+        tenantId,
+        sourceType: "BASIC_SALE",
+        ...(sriStatuses ? { status: { in: sriStatuses as never[] } } : {}),
+        ...(search ? { OR: [
+          { customerName: { contains: search, mode: "insensitive" } },
+          { customerIdentification: { contains: search, mode: "insensitive" } },
+          { accessKey: { contains: search, mode: "insensitive" } },
+          { id: { contains: search, mode: "insensitive" } },
+          ...(sequentialNumber !== undefined ? [{ sequentialNumber }] : []),
+          { submissionJobs: { some: { sriAuthorizationNumber: { contains: search, mode: "insensitive" } } } },
+        ] } : {}),
+      },
+      select: { sourceId: true },
+    }) : [];
+    const sriSaleIds = matchingSri.flatMap((document) => document.sourceId ? [document.sourceId] : []);
+    const base: Prisma.LightweightSaleWhereInput = {
+      tenantId,
+      ...(options.from || options.to ? { createdAt: { ...(options.from ? { gte: options.from } : {}), ...(options.to ? { lte: options.to } : {}) } } : {}),
+      ...(search ? { OR: [
+        { id: { contains: search, mode: "insensitive" } },
+        { customer: { is: { OR: [
+          { name: { contains: search, mode: "insensitive" } },
+          { identification: { contains: search, mode: "insensitive" } },
+          { phone: { contains: search, mode: "insensitive" } },
+          { email: { contains: search, mode: "insensitive" } },
+        ] } } },
+        ...(sriSaleIds.length ? [{ id: { in: sriSaleIds } }] : []),
+      ] } : {}),
+      ...(sriFilter === "receipt" ? { id: { notIn: sriSaleIds } } : {}),
+      ...(sriFilter === "sri" || (sriStatuses && sriFilter !== "pending") ? { id: { in: sriSaleIds } } : {}),
+      ...(sriFilter === "pending" ? { AND: [{ OR: [
+        { id: { in: sriSaleIds } },
+        { status: { not: "canceled" as LightweightSaleStatus }, paymentStatus: { in: ["pending", "partial"] as LightweightPaymentStatus[] } },
+      ] }] } : {}),
+      ...(sriFilter === "canceled" ? { status: "canceled" as LightweightSaleStatus } : {}),
+    };
     if (s === "paid") return { ...base, paymentStatus: "paid" as LightweightPaymentStatus };
     if (s === "pending") return {
       ...base,
@@ -183,16 +237,16 @@ export async function loadCoreDocuments(
     return base;
   }
 
-  const where = buildWhere();
+  const where = await buildWhere();
 
   const [sales, total] = await Promise.all([
     prisma.lightweightSale.findMany({
       where,
       include: {
-        customer: { select: { name: true } },
+        customer: { select: { name: true, identification: true } },
         items: { include: { product: { select: { name: true } } }, take: 4 },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: options.sort === "total" ? { total: "desc" } : { createdAt: "desc" },
       skip: (page - 1) * perPage,
       take: perPage,
     }),
@@ -210,6 +264,7 @@ export async function loadCoreDocuments(
       status: true,
       environment: true,
       accessKey: true,
+      customerIdentification: true,
       establishment: { select: { code: true } },
       issuePoint: { select: { code: true } },
       sequentialNumber: true,
@@ -256,12 +311,13 @@ export async function loadCoreDocuments(
         type: "BASIC_SALE" as const,
         displayNumber,
         customerName: sale.customer?.name ?? null,
+        customerIdentification: sri?.customerIdentification ?? sale.customer?.identification ?? null,
         total: sale.total.toString(),
         issuedAt: sale.createdAt.toISOString(),
         source: "CORE" as const,
         sourceLabel: "Venta básica",
-        internalStatus: sale.status,
-        internalStatusLabel: INTERNAL_STATUS_LABELS[sale.status] ?? sale.status,
+        internalStatus: sale.status === "canceled" ? "canceled" : sale.paymentStatus,
+        internalStatusLabel: INTERNAL_STATUS_LABELS[sale.status === "canceled" ? "canceled" : sale.paymentStatus] ?? sale.paymentStatus,
         sriStatus: sri?.status ?? null,
         sriStatusLabel: sri ? sriLabel(sri.status) : null,
         sriDocumentId: sri?.id ?? null,
@@ -356,6 +412,7 @@ export async function loadErpDocuments(
         doc.sequentialNumber
       ),
       customerName: doc.customerName ?? null,
+      customerIdentification: doc.customerIdentification ?? null,
       total: doc.grandTotal.toString(),
       issuedAt: doc.createdAt.toISOString(),
       source: "SRI" as const,
