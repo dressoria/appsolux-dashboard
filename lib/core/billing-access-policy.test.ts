@@ -5,6 +5,7 @@ import {
   calculateGraceEndsAt,
   canStartTrial,
   evaluateBillingAccess,
+  isUnlimitedCommercialVolume,
   isWithinPlanLimit,
 } from "./billing-access-policy.ts";
 
@@ -70,6 +71,12 @@ test("SUSPENDED y canceled solo permiten lectura", () => {
 test("cálculo de límites bloquea el siguiente registro", () => {
   assert.equal(isWithinPlanLimit(199, 200), true);
   assert.equal(isWithinPlanLimit(200, 200), false);
+});
+
+test("clientes y facturas no tienen límite comercial por volumen", () => {
+  assert.equal(isUnlimitedCommercialVolume("customers"), true);
+  assert.equal(isUnlimitedCommercialVolume("receipts"), true);
+  assert.equal(isUnlimitedCommercialVolume("products"), false);
 });
 
 test("segundo trial queda bloqueado por consumo o membresía", () => {

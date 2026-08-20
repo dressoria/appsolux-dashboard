@@ -12,6 +12,7 @@ import {
 
 import { getPrismaClient } from "@/lib/db/prisma";
 import { getLimit } from "@/lib/core/plans";
+import { isUnlimitedCommercialVolume } from "@/lib/core/billing-access-policy";
 import { requireTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
 import {
   normalizeCustomerIdentification,
@@ -126,6 +127,7 @@ async function assertLimitAvailable(
   limitKey: "products" | "customers" | "receipts",
   currentCount: number
 ) {
+  if (isUnlimitedCommercialVolume(limitKey)) return;
   const limit = await getLimit(tenantId, limitKey);
 
   if (currentCount >= limit) {

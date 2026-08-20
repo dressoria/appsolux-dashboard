@@ -114,6 +114,10 @@ export function isWithinPlanLimit(current: number, limit: number) {
   return limit < 0 || current < limit;
 }
 
+export function isUnlimitedCommercialVolume(limitKey: string) {
+  return limitKey === "customers" || limitKey === "receipts";
+}
+
 export function canStartTrial(input: {
   trialConsumedAt?: Date | null;
   activeMemberships: number;

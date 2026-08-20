@@ -62,7 +62,7 @@ export const defaultPlanDefinitions: Record<
   free: {
     key: "free",
     name: "Básico",
-    description: "Modo basico para iniciar ventas, clientes y stock simple.",
+    description: "Todo lo necesario para facturar y controlar un pequeño negocio.",
     limits: {
       products: 200,
       customers: 20,
@@ -80,15 +80,15 @@ export const defaultPlanDefinitions: Record<
       basic_sales: true,
       basic_credit: true,
       dedicated_erp: false,
-      sri: false,
+      sri: true,
       advanced_reports: false,
       automations: false,
     },
   },
   trial: {
     key: "trial",
-    name: "Prueba gratuita",
-    description: "Prueba del modo basico antes de activar un plan pagado.",
+    name: "Básico",
+    description: "Plan Básico completo durante el periodo de prueba.",
     limits: {
       products: 200,
       customers: 50,
@@ -106,7 +106,7 @@ export const defaultPlanDefinitions: Record<
       basic_sales: true,
       basic_credit: true,
       dedicated_erp: false,
-      sri: false,
+      sri: true,
       advanced_reports: false,
       automations: false,
     },
@@ -132,15 +132,15 @@ export const defaultPlanDefinitions: Record<
       basic_sales: true,
       basic_credit: true,
       dedicated_erp: true,
-      sri: "future",
+      sri: true,
       advanced_reports: true,
       automations: true,
     },
   },
   enterprise: {
     key: "enterprise",
-    name: "Enterprise",
-    description: "Plan con limites altos, ERP dedicado y soporte manual.",
+    name: "Empresarial",
+    description: "Gestión avanzada para equipos y operaciones más grandes.",
     limits: {
       products: 100000,
       customers: 100000,
@@ -158,7 +158,7 @@ export const defaultPlanDefinitions: Record<
       basic_sales: true,
       basic_credit: true,
       dedicated_erp: true,
-      sri: "manual",
+      sri: true,
       advanced_reports: true,
       automations: true,
     },
@@ -311,7 +311,7 @@ export async function getTenantPlanState(
   const isPaidLike = planKey === "pro" || planKey === "enterprise";
   // Feature visibility is read access. Billing write enforcement is resolved by
   // requireTenantOperationalAccess so suspension never hides or deletes history.
-  const effectiveFeatures: PlanFeatures = features;
+  const effectiveFeatures: PlanFeatures = { ...features, sri: true };
 
   return {
     planKey,
