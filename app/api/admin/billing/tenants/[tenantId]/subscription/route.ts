@@ -53,6 +53,14 @@ export async function PATCH(request: Request, context: Context) {
     const planKey = body.planKey;
     const status = body.status;
     const billingMode = body.billingMode;
+    const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+
+    if (reason.length < 5) {
+      return NextResponse.json(
+        { ok: false, message: "Indica una razón para el cambio administrativo." },
+        { status: 400 }
+      );
+    }
 
     if (!isManualBillingPlanKey(planKey)) {
       return NextResponse.json(
@@ -83,6 +91,7 @@ export async function PATCH(request: Request, context: Context) {
       billingMode: isTenantBillingModeValue(billingMode) ? billingMode : undefined,
       trialEndsAt: readOptionalDate(body, "trialEndsAt"),
       currentPeriodEndsAt: readOptionalDate(body, "currentPeriodEndsAt"),
+      reason,
     });
 
     return NextResponse.json({ ok: true, subscription });

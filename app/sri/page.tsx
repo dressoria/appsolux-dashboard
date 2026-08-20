@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { getSriModuleStatus, getSriProfile, getSriSignatureConfig, listSriEstablishments, listSriIssuePoints, listSriSequences } from "@/lib/core/sri";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { getSriSignatureReadiness } from "@/lib/core/sri-signature-readiness";
 
 export default async function SriPage() {
   const user = await getCurrentUser();
@@ -47,14 +48,9 @@ export default async function SriPage() {
   const localNextNumber = (localHistory._max.sequentialNumber ?? 0) + 1;
   const nextNumber = Math.max(invoiceSequence?.currentNumber ?? 1, localNextNumber);
   const now = new Date();
-  const signatureExpired = Boolean(sigConfigRaw?.expiresAt && sigConfigRaw.expiresAt < now);
-  const signatureReady = Boolean(
-    sigConfigRaw?.status === "READY_FOR_TESTING" &&
-    sigConfigRaw.encryptedCertificateStorageKey &&
-    sigConfigRaw.encryptedCertificatePassword &&
-    sigConfigRaw.expiresAt &&
-    sigConfigRaw.expiresAt >= now
-  );
+  const signatureReadiness = getSriSignatureReadiness(sigConfigRaw, now);
+  const signatureExpired = signatureReadiness.isExpired;
+  const signatureReady = signatureReadiness.isReady;
   const profileReady = Boolean(profile && profile.status === "CONFIGURED" && profile.ruc && profile.dirMatriz);
   const emissionReady = Boolean(establishment && issuePoint && invoiceSequence);
 
@@ -101,6 +97,7 @@ export default async function SriPage() {
         profileReady={profileReady}
         signatureReady={signatureReady}
         signatureExpired={signatureExpired}
+        signatureExpiresSoon={signatureReadiness.expiresSoon}
         emissionReady={emissionReady}
         ruc={status.ruc}
         legalName={profile?.legalName ?? null}

@@ -40,6 +40,7 @@ export type SriActionCenterProps = {
   profileReady: boolean;
   signatureReady: boolean;
   signatureExpired: boolean;
+  signatureExpiresSoon: boolean;
   emissionReady: boolean;
   ruc: string | null;
   legalName: string | null;
@@ -52,12 +53,12 @@ export type SriActionCenterProps = {
 function StepModal({ title, description, onClose, children }: { title: string; description: string; onClose: () => void; children: ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-facturom-primary-dark/55 p-4 pt-10 backdrop-blur-sm sm:pt-16">
-      <div className="w-full max-w-2xl rounded-[28px] bg-white shadow-2xl">
+      <div className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:px-6">
           <div><h2 className="text-xl font-black text-slate-950">{title}</h2><p className="mt-1 text-sm text-slate-500">{description}</p></div>
           <button type="button" onClick={onClose} aria-label="Cerrar" className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="h-4 w-4" /></button>
         </div>
-        <div className="p-5 sm:p-6">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-5 sm:p-6">{children}</div>
       </div>
     </div>
   );
@@ -88,7 +89,7 @@ function StepCard({ number, title, description, summary, ready, error, icon: Ico
   );
 }
 
-export function SriActionCenter({ profileReady, signatureReady, signatureExpired, emissionReady, ruc, legalName, initialProfile, companyPrefill, sigConfig, emissionDefaults }: SriActionCenterProps) {
+export function SriActionCenter({ profileReady, signatureReady, signatureExpired, signatureExpiresSoon, emissionReady, ruc, legalName, initialProfile, companyPrefill, sigConfig, emissionDefaults }: SriActionCenterProps) {
   const [activeStep, setActiveStep] = useState<ActiveStep>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const allReady = profileReady && signatureReady && emissionReady && !signatureExpired;
@@ -97,6 +98,9 @@ export function SriActionCenter({ profileReady, signatureReady, signatureExpired
     : signatureReady
       ? `Certificado${sigConfig?.expiresAt ? ` válido hasta ${new Date(sigConfig.expiresAt).toLocaleDateString("es-EC")}` : " guardado correctamente"}.`
       : "Sube un certificado .p12 o .pfx y confirma su vigencia.";
+  const signatureSummaryWithWarning = signatureExpiresSoon && sigConfig?.expiresAt
+    ? `Firma lista. El certificado vence pronto: ${new Date(sigConfig.expiresAt).toLocaleDateString("es-EC")}.`
+    : signatureSummary;
   const emissionSummary = emissionReady
     ? `Est. ${emissionDefaults.establishmentCode} · Punto ${emissionDefaults.issuePointCode} · Próxima ${String(emissionDefaults.nextNumber).padStart(9, "0")}`
     : "Configura establecimiento, punto y la próxima factura.";
@@ -112,7 +116,7 @@ export function SriActionCenter({ profileReady, signatureReady, signatureExpired
 
       <div className="mt-5 space-y-4">
         <StepCard number={1} title="Datos fiscales" description="Confirma la información con la que emitirás tus comprobantes." summary={profileReady ? `${ruc} · ${legalName}` : "RUC, nombre fiscal y dirección matriz pendientes."} ready={profileReady} icon={ReceiptText} actionLabel={profileReady ? "Editar" : "Configurar"} onClick={() => setActiveStep("fiscal")} />
-        <StepCard number={2} title="Firma electrónica" description="Sube tu certificado y la contraseña para firmar tus facturas." summary={signatureSummary} ready={signatureReady && !signatureExpired} error={signatureExpired} icon={FileKey2} actionLabel={signatureReady ? "Revisar" : "Cargar firma"} onClick={() => setActiveStep("signature")} />
+        <StepCard number={2} title="Firma electrónica" description="Sube tu certificado y la contraseña para firmar tus facturas." summary={signatureSummaryWithWarning} ready={signatureReady && !signatureExpired} error={signatureExpired} icon={FileKey2} actionLabel={signatureReady ? "Revisar" : "Cargar firma"} onClick={() => setActiveStep("signature")} />
         <StepCard number={3} title="Configura tu emisión" description="Define desde dónde facturas y desde qué número continuará Facturom." summary={emissionSummary} ready={emissionReady} icon={MapPinned} actionLabel={emissionReady ? "Revisar" : "Configurar"} onClick={() => setActiveStep("emission")} />
       </div>
 

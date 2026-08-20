@@ -10,7 +10,11 @@ import {
   normalizeEcuadorIdentification,
   type TaxIdentificationType,
 } from "@/lib/onboarding/ecuador-identification";
-import { bootstrapAuthenticatedUserTenant } from "@/lib/onboarding/bootstrap-authenticated-user";
+import {
+  bootstrapAuthenticatedUserTenant,
+  OnboardingCompanyAlreadyRegisteredError,
+  OnboardingTrialAlreadyConsumedError,
+} from "@/lib/onboarding/bootstrap-authenticated-user";
 
 export type OnboardingActionState = {
   message?: string;
@@ -99,6 +103,17 @@ export async function createTenantAction(
       address: address || undefined,
     });
   } catch (error) {
+    if (error instanceof OnboardingCompanyAlreadyRegisteredError) {
+      return {
+        message: "Esta empresa ya está registrada en Facturom. Solicita acceso al equipo de soporte.",
+        fieldErrors: {
+          tax_identification_value: "Esta empresa ya está registrada.",
+        },
+      };
+    }
+    if (error instanceof OnboardingTrialAlreadyConsumedError) {
+      return { message: error.message };
+    }
     console.error("[onboarding] tenant creation failed", error);
     return { message: "No pudimos crear tu negocio. Inténtalo nuevamente." };
   }

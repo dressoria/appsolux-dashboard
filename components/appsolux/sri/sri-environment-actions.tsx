@@ -58,7 +58,7 @@ export function SriEnvironmentActions() {
               No generan obligaciones tributarias. Recomendado para validar la configuracion.
             </p>
             <ul className="space-y-1 text-sm text-muted-foreground">
-              <li>• Certificado de firma para pruebas</li>
+              <li>• Certificado de firma electrónica</li>
               <li>• Sin efectos tributarios reales</li>
               <li>• Ideal para verificar datos y secuenciales</li>
             </ul>

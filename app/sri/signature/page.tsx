@@ -6,6 +6,7 @@ import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getSriSignatureConfig } from "@/lib/core/sri";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { getSriSignatureReadiness } from "@/lib/core/sri-signature-readiness";
 
 const STATUS_LABELS: Record<string, { label: string; dotClass: string; textClass: string }> = {
   NOT_UPLOADED: {
@@ -19,7 +20,7 @@ const STATUS_LABELS: Record<string, { label: string; dotClass: string; textClass
     textClass: "text-blue-700",
   },
   READY_FOR_TESTING: {
-    label: "Lista para pruebas",
+    label: "Firma electrónica lista",
     dotClass: "bg-emerald-400",
     textClass: "text-emerald-700",
   },
@@ -47,12 +48,15 @@ export default async function SriSignaturePage() {
 
   const tenant = await getCurrentTenant(user);
   const sigConfig = await getSriSignatureConfig(tenant.id);
+  const readiness = getSriSignatureReadiness(sigConfig);
   const statusInfo =
-    sigConfig
+    readiness.isReady
+      ? STATUS_LABELS.READY_FOR_TESTING
+      : sigConfig
       ? (STATUS_LABELS[sigConfig.status] ?? STATUS_LABELS.NOT_UPLOADED)
       : STATUS_LABELS.NOT_UPLOADED;
 
-  const isExpired = sigConfig?.expiresAt && sigConfig.expiresAt < new Date();
+  const isExpired = readiness.isExpired;
   const hasEncryptedCertificate = Boolean(sigConfig?.encryptedCertificateStorageKey);
   const hasEncryptedPassword = Boolean(sigConfig?.encryptedCertificatePassword);
 

@@ -78,7 +78,7 @@ export default async function WorkspacePanelPage() {
       : sriStatus.readinessLabel === "incomplete"
         ? "Incompleto"
         : sriStatus.readinessLabel === "ready_for_testing"
-          ? "Listo para pruebas"
+          ? "Firma lista"
           : "Configurado para produccion";
   const sriConfigurationComplete =
     sriStatus.profileStatus === "CONFIGURED" &&

@@ -248,11 +248,12 @@ export default async function DashboardPage() {
               </p>
             ) : null}
             {tenantMode.subscriptionStatus === "past_due" ||
+            tenantMode.subscriptionStatus === "suspended" ||
             tenantMode.subscriptionStatus === "canceled" ? (
               <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-                Tu plan esta {tenantMode.subscriptionStatus}. Puedes seguir
-                operando el modo basico, pero las nuevas activaciones de Sistema
-                Dedicado estan bloqueadas durante este estado.
+                Tu plan está {tenantMode.subscriptionStatus}. Durante la gracia
+                puedes operar; al terminar, conservarás acceso de lectura a tus
+                datos y billing, sin nuevas operaciones.
               </p>
             ) : null}
           </CardContent>

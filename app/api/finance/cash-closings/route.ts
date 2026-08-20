@@ -9,6 +9,7 @@ import {
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { requireTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
 
 function getStringField(body: Record<string, unknown>, field: string) {
   const value = body[field];
@@ -71,6 +72,7 @@ export async function POST(request: Request) {
     }
 
     const tenant = await getCurrentTenant(user);
+    await requireTenantOperationalAccess(tenant.id);
     const tenantMode = await getTenantModeState(tenant);
 
     if (!tenantMode.canUseAdvancedErp) {

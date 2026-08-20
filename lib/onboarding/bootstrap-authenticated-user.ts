@@ -4,6 +4,26 @@ import type { Prisma } from "@prisma/client";
 
 import { getPrismaClient } from "@/lib/db/prisma";
 import type { TaxIdentificationType } from "@/lib/onboarding/ecuador-identification";
+import { normalizeEcuadorIdentification } from "@/lib/onboarding/ecuador-identification";
+import { canStartTrial } from "@/lib/core/billing-access-policy";
+
+export class OnboardingCompanyAlreadyRegisteredError extends Error {
+  readonly code = "COMPANY_ALREADY_REGISTERED";
+
+  constructor() {
+    super("Esta empresa ya está registrada en Facturom.");
+  }
+}
+
+export class OnboardingTrialAlreadyConsumedError extends Error {
+  readonly code = "TRIAL_ALREADY_CONSUMED";
+
+  constructor() {
+    super("Ya utilizaste una prueba gratuita. Usa tu empresa existente o elige un plan.");
+  }
+}
+
+const TRIAL_DURATION_DAYS = 7;
 
 type BootstrapAuthenticatedUserInput = {
   userId: string;
@@ -76,6 +96,9 @@ export async function bootstrapAuthenticatedUserTenant(
   const prisma = getPrismaClient();
 
   return prisma.$transaction(async (tx) => {
+    const normalizedTaxIdentification = input.taxIdentificationValue
+      ? normalizeEcuadorIdentification(input.taxIdentificationValue)
+      : undefined;
     const existingMembership = await tx.membership.findFirst({
       where: {
         userId: input.userId,
@@ -99,6 +122,39 @@ export async function bootstrapAuthenticatedUserTenant(
       };
     }
 
+    const identity = await tx.user.findUnique({
+      where: { id: input.userId },
+      select: { trialConsumedAt: true, memberships: { where: { status: "active" }, select: { id: true } } },
+    });
+
+    if (!identity || !canStartTrial({
+      trialConsumedAt: identity.trialConsumedAt,
+      activeMemberships: identity.memberships.length,
+    })) {
+      throw new OnboardingTrialAlreadyConsumedError();
+    }
+
+    if (normalizedTaxIdentification) {
+      const registeredCompany = await tx.tenant.findFirst({
+        where: {
+          OR: [
+            { taxIdentificationNormalized: normalizedTaxIdentification },
+            { taxIdentificationValue: normalizedTaxIdentification },
+          ],
+        },
+        select: { id: true },
+      });
+
+      if (registeredCompany) {
+        throw new OnboardingCompanyAlreadyRegisteredError();
+      }
+    }
+
+    const trialPlan = await tx.plan.findUnique({ where: { key: "trial" } });
+    if (!trialPlan) {
+      throw new Error("El plan de prueba no está configurado.");
+    }
+
     const tenantSlug = await getUniqueTenantSlug(tx, input.companyName);
     const tenant = await tx.tenant.create({
       data: {
@@ -107,6 +163,7 @@ export async function bootstrapAuthenticatedUserTenant(
         legalName: input.legalName,
         taxIdentificationType: input.taxIdentificationType,
         taxIdentificationValue: input.taxIdentificationValue,
+        taxIdentificationNormalized: normalizedTaxIdentification,
         phone: input.phone,
         contactEmail: input.contactEmail,
         province: input.province,
@@ -115,7 +172,7 @@ export async function bootstrapAuthenticatedUserTenant(
         country: "Ecuador",
         currency: "USD",
         status: "active",
-        planKey: "free",
+        planKey: "trial",
       },
       select: {
         id: true,
@@ -128,6 +185,35 @@ export async function bootstrapAuthenticatedUserTenant(
         tenantId: tenant.id,
         role: "owner",
         status: "active",
+      },
+    });
+
+    const trialEndsAt = new Date(
+      Date.now() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
+    );
+    const subscription = await tx.tenantSubscription.create({
+      data: {
+        tenantId: tenant.id,
+        planId: trialPlan.id,
+        status: "trialing",
+        billingMode: "trial",
+        trialEndsAt,
+      },
+    });
+
+    await tx.user.update({
+      where: { id: input.userId },
+      data: { trialConsumedAt: new Date() },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        userId: input.userId,
+        action: "trial_started",
+        entityType: "TenantSubscription",
+        entityId: subscription.id,
+        metadata: { trialEndsAt: trialEndsAt.toISOString() },
       },
     });
 
@@ -151,7 +237,7 @@ export async function bootstrapAuthenticatedUserTenant(
         phone: input.phone,
         country: "Ecuador",
         currency: "USD",
-        planKey: "free",
+        planKey: "trial",
         status: "ready",
         tenantId: tenant.id,
         userId: input.userId,

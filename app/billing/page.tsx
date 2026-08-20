@@ -1,17 +1,19 @@
 import Link from "next/link";
 
 import { UpgradeRequestCard } from "@/components/appsolux/billing/upgrade-request-card";
+import { StripeBillingActions } from "@/components/appsolux/billing/stripe-billing-actions";
 import { ErpDedicatedProvisionCard } from "@/components/appsolux/dashboard/erp-dedicated-provision-card";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { routes } from "@/config/routes";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { canManageSettings } from "@/lib/auth/permissions";
-import { defaultPlanDefinitions } from "@/lib/core/plans";
+import { canManageSettings, isTenantOwner } from "@/lib/auth/permissions";
+import { defaultPlanDefinitions, getTenantSubscription } from "@/lib/core/plans";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getTenantUpgradeRequests } from "@/lib/core/upgrade-requests";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { getStripeBillingAvailability } from "@/lib/core/billing/stripe-config";
 
 function formatFeature(value: boolean | "manual" | "future") {
   if (value === true) {
@@ -49,11 +51,15 @@ function getSubscriptionNotice(status: string) {
   }
 
   if (status === "past_due") {
-    return "Tu suscripcion esta vencida. Las nuevas activaciones de Sistema Dedicado estan bloqueadas hasta regularizar el plan.";
+    return "No pudimos procesar tu pago. Tu cuenta conserva acceso durante el periodo de gracia.";
+  }
+
+  if (status === "suspended") {
+    return "Plan requerido. Tus datos anteriores siguen disponibles en modo lectura.";
   }
 
   if (status === "canceled") {
-    return "Tu suscripcion esta cancelada. El modo basico sigue disponible, pero las funciones pagadas no pueden activarse.";
+    return "Tu suscripcion esta cancelada. Tus datos anteriores siguen disponibles en modo lectura.";
   }
 
   return "Durante la beta, la activacion y cambios de plan se realizan manualmente por Appsolux.";
@@ -65,11 +71,15 @@ function getTrialWarning(status: string, trialEndsAt?: Date | null) {
   }
 
   return trialEndsAt.getTime() < Date.now()
-    ? "Tu trial ya vencio. No haremos downgrade automatico en este bloque, pero conviene solicitar activacion Pro."
+    ? "Tu prueba terminó. Elige un plan para continuar usando Facturom."
     : null;
 }
 
-export default async function BillingPage() {
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ checkout?: string }>;
+}) {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -88,9 +98,11 @@ export default async function BillingPage() {
   }
 
   const tenant = await getCurrentTenant(user);
-  const [tenantMode, upgradeRequests] = await Promise.all([
+  const [tenantMode, upgradeRequests, subscription, query] = await Promise.all([
     getTenantModeState(tenant),
     getTenantUpgradeRequests(tenant.id),
+    getTenantSubscription(tenant.id),
+    searchParams,
   ]);
   const erpProvisioning = tenantMode.erpProvisioning;
   const pendingUpgrade = upgradeRequests.find(
@@ -100,16 +112,23 @@ export default async function BillingPage() {
     tenantMode.subscriptionStatus,
     tenantMode.trialEndsAt
   );
+  const stripeAvailable = getStripeBillingAvailability().configured;
 
   return (
     <DashboardShell>
       <div className="space-y-6">
+        {query.checkout === "success" ? (
+          <p className="rounded-xl border border-primary/25 bg-primary/5 p-4 text-sm">
+            Estamos confirmando tu pago. El plan se activará cuando Stripe envíe la confirmación segura.
+          </p>
+        ) : query.checkout === "cancelled" ? (
+          <p className="rounded-xl border bg-muted/40 p-4 text-sm">Checkout cancelado. No se realizó ningún cambio.</p>
+        ) : null}
         <div>
           <p className="text-sm text-muted-foreground">Appsolux</p>
           <h1 className="text-3xl font-semibold tracking-tight">Mi plan</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Controla tu plan, limites y activacion de Sistema Dedicado. Durante la
-            beta, la activacion se realiza manualmente por Appsolux.
+            Controla tu plan, ciclo de cobro y suscripción segura con Stripe.
           </p>
         </div>
 
@@ -126,11 +145,19 @@ export default async function BillingPage() {
               <p>
                 Fin de periodo: {formatDate(tenantMode.currentPeriodEndsAt)}
               </p>
+              {subscription?.cancelAtPeriodEnd ? (
+                <p>Cancelación programada · activo hasta {formatDate(subscription.currentPeriodEndsAt)}</p>
+              ) : null}
             </div>
             {trialWarning ? (
-              <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">
-                {trialWarning}
-              </p>
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">
+                <p>{trialWarning}</p>
+                {!stripeAvailable ? (
+                  <Button asChild className="mt-3" size="sm" variant="outline">
+                    <Link href="/contacto">Contactar soporte</Link>
+                  </Button>
+                ) : null}
+              </div>
             ) : null}
             {pendingUpgrade ? (
               <p className="rounded-md border bg-muted/40 p-3">
@@ -178,6 +205,7 @@ export default async function BillingPage() {
               <p>Creditos activos: {tenantMode.limits.activeCredits}</p>
               <p>Usuarios: {tenantMode.limits.users}</p>
               <p>Bodegas/locales: {tenantMode.limits.warehouses}</p>
+              <p>Puntos de emisión: {tenantMode.limits.issuePoints}</p>
             </CardContent>
           </Card>
 
@@ -204,6 +232,35 @@ export default async function BillingPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Planes Facturom</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isTenantOwner(user) ? (
+              <StripeBillingActions
+                currentPlanCode={
+                  tenantMode.planKey === "free"
+                    ? "BASIC"
+                    : tenantMode.planKey === "pro"
+                      ? "BUSINESS"
+                      : tenantMode.planKey === "enterprise"
+                        ? "ENTERPRISE"
+                        : null
+                }
+                currentInterval={subscription?.billingInterval ?? null}
+                hasActiveStripeSubscription={Boolean(
+                  tenantMode.subscriptionStatus === "active" && subscription?.stripeSubscriptionId
+                )}
+                hasStripeCustomer={Boolean(subscription?.stripeCustomerId)}
+                onlinePaymentsAvailable={stripeAvailable}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">Solo el owner puede contratar o cambiar el plan.</p>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

@@ -22,7 +22,8 @@ export type PlanLimitKey =
   | "openOrders"
   | "activeCredits"
   | "users"
-  | "warehouses";
+  | "warehouses"
+  | "issuePoints";
 
 export type PlanFeatures = Record<PlanFeatureKey, boolean | "manual" | "future">;
 export type PlanLimits = Record<PlanLimitKey, number>;
@@ -30,7 +31,7 @@ export type PlanLimits = Record<PlanLimitKey, number>;
 export type TenantPlanGateState = {
   planKey: PlanKey;
   planName: string;
-  status: "active" | "trialing" | "past_due" | "canceled" | "manual";
+  status: "active" | "trialing" | "past_due" | "suspended" | "canceled" | "manual";
   subscription: Awaited<ReturnType<typeof getTenantSubscription>> | null;
   trialEndsAt?: Date | null;
   currentPeriodEndsAt?: Date | null;
@@ -60,16 +61,17 @@ export const defaultPlanDefinitions: Record<
 > = {
   free: {
     key: "free",
-    name: "Free",
+    name: "Básico",
     description: "Modo basico para iniciar ventas, clientes y stock simple.",
     limits: {
-      products: 20,
+      products: 200,
       customers: 20,
       receipts: 20,
       openOrders: 10,
       activeCredits: 5,
       users: 1,
       warehouses: 1,
+      issuePoints: 1,
     },
     features: {
       basic_pos: true,
@@ -85,16 +87,17 @@ export const defaultPlanDefinitions: Record<
   },
   trial: {
     key: "trial",
-    name: "Trial",
+    name: "Prueba gratuita",
     description: "Prueba del modo basico antes de activar un plan pagado.",
     limits: {
-      products: 50,
+      products: 200,
       customers: 50,
       receipts: 50,
       openOrders: 20,
       activeCredits: 10,
       users: 1,
       warehouses: 1,
+      issuePoints: 1,
     },
     features: {
       basic_pos: true,
@@ -110,7 +113,7 @@ export const defaultPlanDefinitions: Record<
   },
   pro: {
     key: "pro",
-    name: "Pro",
+    name: "Negocio",
     description: "Plan operativo con ERP dedicado y reportes avanzados.",
     limits: {
       products: 5000,
@@ -118,8 +121,9 @@ export const defaultPlanDefinitions: Record<
       receipts: 10000,
       openOrders: 1000,
       activeCredits: 500,
-      users: 10,
-      warehouses: 5,
+      users: 5,
+      warehouses: 3,
+      issuePoints: 3,
     },
     features: {
       basic_pos: true,
@@ -145,6 +149,7 @@ export const defaultPlanDefinitions: Record<
       activeCredits: 10000,
       users: 100,
       warehouses: 50,
+      issuePoints: 50,
     },
     features: {
       basic_pos: true,
@@ -258,7 +263,7 @@ export async function getTenantPlanState(
   const fallbackPlanKey = getDefaultPlanKey();
   let planKey: PlanKey = fallbackPlanKey;
   let planName = defaultPlanDefinitions[fallbackPlanKey].name;
-  let status: TenantPlanGateState["status"] = "active";
+  let status: TenantPlanGateState["status"] = "suspended";
   let subscription: Awaited<ReturnType<typeof getTenantSubscription>> | null = null;
   let trialEndsAt: Date | null | undefined;
   let currentPeriodEndsAt: Date | null | undefined;
@@ -304,15 +309,9 @@ export async function getTenantPlanState(
 
   const isFreeLike = planKey === "free" || planKey === "trial";
   const isPaidLike = planKey === "pro" || planKey === "enterprise";
-  const effectiveFeatures: PlanFeatures =
-    status === "past_due" || status === "canceled"
-      ? {
-          ...features,
-          dedicated_erp: false,
-          advanced_reports: false,
-          automations: false,
-        }
-      : features;
+  // Feature visibility is read access. Billing write enforcement is resolved by
+  // requireTenantOperationalAccess so suspension never hides or deletes history.
+  const effectiveFeatures: PlanFeatures = features;
 
   return {
     planKey,

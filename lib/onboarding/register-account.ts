@@ -99,12 +99,19 @@ export async function registerAccountFromOnboardingRequest(
     }
 
     const tenantSlug = await getUniqueTenantSlug(tx, request.company_name);
+    const trialPlan = await tx.plan.findUnique({ where: { key: "trial" }, select: { id: true } });
+    if (!trialPlan) {
+      throw new RegisterAccountError("El plan de prueba no está configurado.", "TRIAL_PLAN_UNAVAILABLE", 503);
+    }
+    const trialStartedAt = new Date();
+    const trialEndsAt = new Date(trialStartedAt.getTime() + 7 * 86_400_000);
     const user = await tx.user.create({
       data: {
         name: request.user_name,
         email: request.email,
         passwordHash,
         status: "active",
+        trialConsumedAt: trialStartedAt,
       },
       select: { id: true },
     });
@@ -116,7 +123,7 @@ export async function registerAccountFromOnboardingRequest(
         country: request.country,
         currency: request.base_currency ?? "USD",
         status: tenantStatus,
-        planKey: request.initial_plan,
+        planKey: "trial",
       },
       select: { id: true },
     });
@@ -130,6 +137,27 @@ export async function registerAccountFromOnboardingRequest(
       },
     });
 
+    await tx.tenantSubscription.create({
+      data: {
+        tenantId: tenant.id,
+        planId: trialPlan.id,
+        status: "trialing",
+        billingMode: "trial",
+        startedAt: trialStartedAt,
+        trialEndsAt,
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        tenantId: tenant.id,
+        userId: user.id,
+        action: "trial_started",
+        entityType: "TenantSubscription",
+        metadata: { trialEndsAt: trialEndsAt.toISOString() },
+      },
+    });
+
     const onboardingRequest = await tx.onboardingRequest.create({
       data: {
         email: request.email,
@@ -138,7 +166,7 @@ export async function registerAccountFromOnboardingRequest(
         phone: request.phone,
         country: request.country,
         currency: request.base_currency,
-        planKey: request.initial_plan,
+        planKey: "trial",
         status: "provisioning",
         tenantId: tenant.id,
         userId: user.id,

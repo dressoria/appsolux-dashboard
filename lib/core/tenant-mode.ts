@@ -25,7 +25,7 @@ import type { AppsoluxTenant } from "@/types/tenant";
 export type TenantModeState = {
   planKey: "free" | "trial" | "pro" | "enterprise";
   planName: string;
-  subscriptionStatus: "active" | "trialing" | "past_due" | "canceled" | "manual";
+  subscriptionStatus: "active" | "trialing" | "past_due" | "suspended" | "canceled" | "manual";
   billingMode: TenantBillingMode;
   trialEndsAt?: Date | null;
   currentPeriodEndsAt?: Date | null;

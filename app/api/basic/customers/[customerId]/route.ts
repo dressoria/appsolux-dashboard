@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { updateCustomer } from "@/lib/core/lightweight-pos";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { getPrismaClient } from "@/lib/db/prisma";
+import { requireTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
 
 type RouteContext = {
   params: Promise<{
@@ -32,6 +33,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const tenant = await getCurrentTenant(user);
+    await requireTenantOperationalAccess(tenant.id);
     const { customerId } = await context.params;
     const body = (await request.json()) as Record<string, unknown>;
     const emails = getEmails(body);
@@ -68,6 +70,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ ok: false, message: "Sesion requerida." }, { status: 401 });
     const tenant = await getCurrentTenant(user);
+    await requireTenantOperationalAccess(tenant.id);
     const { customerId } = await context.params;
     const prisma = getPrismaClient();
     const customer = await prisma.lightweightCustomer.findFirst({

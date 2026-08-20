@@ -34,7 +34,8 @@ export function createOnboardingRequest(
     business_type: normalizeOptional(getStringField(record, "business_type")),
     country: normalizeOptional(getStringField(record, "country")),
     base_currency: normalizeOptional(getStringField(record, "base_currency")),
-    initial_plan: normalizeOptional(getStringField(record, "initial_plan")),
+    // Commercial plan selection is never accepted from a public request body.
+    initial_plan: "free",
     source: normalizeOptional(getStringField(record, "source")),
   };
 

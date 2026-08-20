@@ -1,8 +1,11 @@
 import "@/lib/security/server-only";
 import { Prisma, SriDocumentType } from "@prisma/client";
 import { getPrismaClient } from "@/lib/db/prisma";
+import { getLimit } from "@/lib/core/plans";
+import { requireTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
 import { validateCustomerForSriInvoice } from "@/lib/core/customer-fiscal";
 import { buildSriAccessKey, createStableNumericCode } from "./sri-access-key";
+import { getSriSignatureReadiness } from "./sri-signature-readiness";
 
 export type SriModuleStatus = {
   hasProfile: boolean;
@@ -37,6 +40,8 @@ export async function getSriModuleStatus(tenantId: string): Promise<SriModuleSta
           status: true,
           encryptedCertificateStorageKey: true,
           encryptedCertificatePassword: true,
+          encryptionKeyVersion: true,
+          expiresAt: true,
         },
       },
     },
@@ -82,11 +87,12 @@ export async function getSriModuleStatus(tenantId: string): Promise<SriModuleSta
   const signatureHasEncryptedPassword = Boolean(
     profile.signatureConfig?.encryptedCertificatePassword
   );
+  const signatureReadiness = getSriSignatureReadiness(profile.signatureConfig);
 
   let readinessLabel: SriModuleStatus["readinessLabel"] = "incomplete";
   if (profile.status === "CONFIGURED" && establishmentCount > 0 && issuePointCount > 0 && sequenceCount > 0) {
     readinessLabel =
-      signatureStatus === "READY_FOR_TESTING"
+      signatureReadiness.isReady
         ? profile.environment === "PRODUCTION"
           ? "production_ready"
           : "ready_for_testing"
@@ -182,7 +188,15 @@ export async function createSriIssuePoint(
   data: { establishmentId: string; code: string; name: string }
 ) {
   const prisma = getPrismaClient();
-  return prisma.sriIssuePoint.create({ data: { tenantId, ...data } });
+  await requireTenantOperationalAccess(tenantId);
+  const limit = await getLimit(tenantId, "issuePoints");
+  return prisma.$transaction(async (tx) => {
+    const currentCount = await tx.sriIssuePoint.count({ where: { tenantId } });
+    if (currentCount >= limit) {
+      throw new Error(`Alcanzaste el límite de ${limit} puntos de emisión de tu plan.`);
+    }
+    return tx.sriIssuePoint.create({ data: { tenantId, ...data } });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 export async function listSriSequences(tenantId: string) {
@@ -246,17 +260,19 @@ export async function updateSriSignatureMetadata(
   });
   if (!profile) throw new Error("Perfil SRI no configurado. Configura el RUC y razón social primero.");
 
+  const current = await prisma.sriSignatureConfig.findUnique({ where: { tenantId } });
+  const readiness = getSriSignatureReadiness(current ? { ...current, expiresAt: data.expiresAt } : null);
   return prisma.sriSignatureConfig.upsert({
     where: { tenantId },
     create: {
       tenantId,
       profileId: profile.id,
-      status: "UPLOADED_METADATA_ONLY",
+      status: readiness.isReady ? "READY_FOR_TESTING" : data.expiresAt < new Date() ? "EXPIRED" : "UPLOADED_METADATA_ONLY",
       certificateUploadedAt: new Date(),
       ...data,
     },
     update: {
-      status: "UPLOADED_METADATA_ONLY",
+      status: readiness.isReady ? "READY_FOR_TESTING" : data.expiresAt < new Date() ? "EXPIRED" : "UPLOADED_METADATA_ONLY",
       certificateUploadedAt: new Date(),
       ...data,
     },
@@ -465,6 +481,7 @@ export async function createDraftSriDocumentFromBasicSale({
   tenantId: string;
   saleId: string;
 }): Promise<{ documentId: string; alreadyExists: boolean }> {
+  await requireTenantOperationalAccess(tenantId);
   const prisma = getPrismaClient();
 
   const existing = await prisma.sriDocument.findFirst({
@@ -595,6 +612,7 @@ export async function reserveSriDocumentNumberingForTesting(params: {
   tenantId: string;
   documentId: string;
 }): Promise<ReservedSriDocumentNumbering> {
+  await requireTenantOperationalAccess(params.tenantId);
   const prisma = getPrismaClient();
 
   return prisma.$transaction(async (tx) => {

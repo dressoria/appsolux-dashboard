@@ -12,6 +12,7 @@ import {
 
 import { getPrismaClient } from "@/lib/db/prisma";
 import { getLimit } from "@/lib/core/plans";
+import { requireTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
 import {
   normalizeCustomerIdentification,
   validateCustomerIdentification,
@@ -128,7 +129,10 @@ async function assertLimitAvailable(
   const limit = await getLimit(tenantId, limitKey);
 
   if (currentCount >= limit) {
-    throw new Error(`Limite del plan alcanzado para ${limitKey}: ${limit}.`);
+    if (limitKey === "products") {
+      throw new Error(`Alcanzaste el límite de ${limit} productos de tu plan.`);
+    }
+    throw new Error(`Alcanzaste el límite de ${limit} registros de tu plan.`);
   }
 }
 
@@ -225,6 +229,7 @@ async function validateProductReferences(input: ProductCatalogInput, productId?:
 }
 
 export async function createProduct(input: ProductCatalogInput) {
+  await requireTenantOperationalAccess(input.tenantId);
   const prisma = getPrismaClient();
   const name = input.name.trim();
 
@@ -243,13 +248,14 @@ export async function createProduct(input: ProductCatalogInput) {
     throw new Error("El stock no puede ser negativo.");
   }
 
-  const count = await prisma.lightweightProduct.count({
-    where: { tenantId: input.tenantId },
-  });
-  await assertLimitAvailable(input.tenantId, "products", count);
-
   const type = input.type ?? "PRODUCT";
-  return prisma.lightweightProduct.create({
+  return prisma.$transaction(async (tx) => {
+    const count = await tx.lightweightProduct.count({
+      where: { tenantId: input.tenantId },
+    });
+    await assertLimitAvailable(input.tenantId, "products", count);
+
+    return tx.lightweightProduct.create({
     data: {
       tenantId: input.tenantId,
       name,
@@ -277,10 +283,12 @@ export async function createProduct(input: ProductCatalogInput) {
       comboItems: type === "COMBO" ? { create: input.comboItems!.map((item) => ({ componentProductId: item.componentProductId, quantity: item.quantity })) } : undefined,
     },
     include: { category: true, comboItems: true },
-  });
+    });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 export async function updateProduct(input: UpdateProductInput) {
+  await requireTenantOperationalAccess(input.tenantId);
   const prisma = getPrismaClient();
   const existing = await prisma.lightweightProduct.findFirst({
     where: {
@@ -388,6 +396,7 @@ export async function updateProduct(input: UpdateProductInput) {
 }
 
 export async function adjustProductStock(input: AdjustStockInput) {
+  await requireTenantOperationalAccess(input.tenantId);
   assertPositiveInteger(Math.abs(input.quantity), "El ajuste");
 
   const prisma = getPrismaClient();
@@ -485,6 +494,7 @@ export async function listCustomers(tenantId: string, input: CustomerListInput =
 }
 
 export async function createCustomer(input: CreateCustomerInput) {
+  await requireTenantOperationalAccess(input.tenantId);
   const prisma = getPrismaClient();
   const name = input.name.trim();
 
@@ -517,6 +527,7 @@ export async function createCustomer(input: CreateCustomerInput) {
 }
 
 export async function updateCustomer(input: UpdateCustomerInput) {
+  await requireTenantOperationalAccess(input.tenantId);
   const prisma = getPrismaClient();
   const existing = await prisma.lightweightCustomer.findFirst({
     where: {
@@ -675,6 +686,7 @@ function resolveSaleStatus(
 }
 
 export async function createSale(input: CreateSaleInput) {
+  await requireTenantOperationalAccess(input.tenantId);
   const prisma = getPrismaClient();
 
   if (input.items.length === 0) {
@@ -883,6 +895,7 @@ export async function createSale(input: CreateSaleInput) {
 }
 
 export async function cancelSale(tenantId: string, saleId: string) {
+  await requireTenantOperationalAccess(tenantId);
   const prisma = getPrismaClient();
 
   return prisma.$transaction(async (tx) => {
@@ -970,6 +983,7 @@ export async function cancelSale(tenantId: string, saleId: string) {
 }
 
 export async function addSalePayment(input: AddSalePaymentInput) {
+  await requireTenantOperationalAccess(input.tenantId);
   assertPositiveMoney(input.amount, "El abono");
 
   if (input.amount <= 0) {

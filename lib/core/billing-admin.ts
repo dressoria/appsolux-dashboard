@@ -29,6 +29,7 @@ import {
   mapLegacyPlanKeyToCommercialPlan,
 } from "@/lib/core/commercial-plans";
 import { getErpProvisioningState } from "@/lib/core/erp-provisioning-status";
+import { calculateGraceEndsAt } from "@/lib/core/billing-access-policy";
 import { getTenantPlanState, type PlanKey } from "@/lib/core/plans";
 import {
   resolveEffectiveTenantAccess,
@@ -47,6 +48,7 @@ export const manualBillingStatuses = [
   "active",
   "trialing",
   "past_due",
+  "suspended",
   "canceled",
   "manual",
 ] as const;
@@ -554,6 +556,7 @@ export async function setTenantPlanManually(input: {
   billingMode?: TenantBillingMode;
   trialEndsAt?: Date | null;
   currentPeriodEndsAt?: Date | null;
+  reason: string;
 }) {
   const prisma = getPrismaClient();
 
@@ -571,6 +574,9 @@ export async function setTenantPlanManually(input: {
       include: { plan: true },
       orderBy: { startedAt: "desc" },
     });
+    const graceEndsAt = input.status === "past_due"
+      ? current?.graceEndsAt ?? calculateGraceEndsAt(new Date())
+      : null;
     const subscription = current
       ? await tx.tenantSubscription.update({
           where: { id: current.id },
@@ -580,6 +586,8 @@ export async function setTenantPlanManually(input: {
             billingMode: input.billingMode ?? current.billingMode,
             trialEndsAt: input.trialEndsAt,
             currentPeriodEndsAt: input.currentPeriodEndsAt,
+            graceEndsAt,
+            suspendedAt: input.status === "suspended" ? new Date() : null,
           },
           include: { plan: true },
         })
@@ -591,6 +599,8 @@ export async function setTenantPlanManually(input: {
             billingMode: input.billingMode ?? "manual",
             trialEndsAt: input.trialEndsAt,
             currentPeriodEndsAt: input.currentPeriodEndsAt,
+            graceEndsAt,
+            suspendedAt: input.status === "suspended" ? new Date() : null,
           },
           include: { plan: true },
         });
@@ -616,9 +626,36 @@ export async function setTenantPlanManually(input: {
           nextBillingMode: input.billingMode ?? current?.billingMode ?? "manual",
           trialEndsAt: input.trialEndsAt?.toISOString() ?? null,
           currentPeriodEndsAt: input.currentPeriodEndsAt?.toISOString() ?? null,
+          reason: input.reason,
         },
       },
     });
+
+    const lifecycleActions = [
+      ...(current?.plan.key !== input.planKey ? ["plan_changed"] : []),
+      ...(input.status === "past_due" && current?.status !== "past_due" ? ["payment_failed"] : []),
+      ...(input.status === "active" && current?.status !== "active"
+        ? [current?.status === "suspended" || current?.status === "past_due"
+            ? "subscription_reactivated"
+            : "subscription_activated"]
+        : []),
+      ...(input.status === "suspended" && current?.status !== "suspended"
+        ? ["subscription_suspended"]
+        : []),
+    ];
+
+    if (lifecycleActions.length > 0) {
+      await tx.auditLog.createMany({
+        data: lifecycleActions.map((action) => ({
+          tenantId: input.tenantId,
+          userId: input.actorUserId,
+          action,
+          entityType: "TenantSubscription",
+          entityId: subscription.id,
+          metadata: { reason: input.reason },
+        })),
+      });
+    }
 
     return subscription;
   });

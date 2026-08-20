@@ -103,6 +103,7 @@ enum TenantSubscriptionStatus {
   active
   trialing
   past_due
+  suspended
   canceled
   manual
 }
@@ -112,6 +113,17 @@ enum TenantBillingMode {
   manual
   internal
   trial
+}
+
+enum BillingInterval {
+  MONTHLY
+  YEARLY
+}
+
+enum BillingWebhookStatus {
+  processing
+  processed
+  failed
 }
 
 enum PlanUpgradeRequestStatus {
@@ -306,6 +318,7 @@ model User {
   passwordHash       String?
   status             UserStatus @default(invited)
   emailVerifiedAt    DateTime?
+  trialConsumedAt    DateTime?
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
@@ -328,6 +341,7 @@ model Tenant {
   legalName              String?
   taxIdentificationType  String?
   taxIdentificationValue String?
+  taxIdentificationNormalized String? @unique
   phone                  String?
   contactEmail           String?
   province               String?
@@ -392,6 +406,15 @@ model TenantSubscription {
   startedAt           DateTime                 @default(now())
   trialEndsAt         DateTime?
   currentPeriodEndsAt DateTime?
+  graceEndsAt         DateTime?
+  suspendedAt         DateTime?
+  stripeCustomerId    String?                  @unique
+  stripeSubscriptionId String?                 @unique
+  stripePriceId       String?
+  billingInterval     BillingInterval?
+  currentPeriodStartsAt DateTime?
+  cancelAtPeriodEnd   Boolean                  @default(false)
+  lastStripeEventCreatedAt Int?
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
 
@@ -401,6 +424,22 @@ model TenantSubscription {
   @@index([tenantId])
   @@index([planId])
   @@index([status])
+}
+
+model BillingWebhookEvent {
+  id              String               @id @default(cuid())
+  provider        String
+  externalEventId String
+  eventType       String
+  status          BillingWebhookStatus @default(processing)
+  errorMessage    String?
+  processedAt     DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@unique([provider, externalEventId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model TenantOperationalConfig {

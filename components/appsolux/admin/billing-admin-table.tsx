@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type LegacyPlanKey = "free" | "trial" | "pro" | "enterprise";
-type SubscriptionStatus = "active" | "trialing" | "past_due" | "canceled" | "manual";
+type SubscriptionStatus = "active" | "trialing" | "past_due" | "suspended" | "canceled" | "manual";
 type BillingMode = "stripe" | "manual" | "internal" | "trial";
 type CommercialPlan = "BASIC" | "PLUS" | "ADVANCED" | "ENTERPRISE";
 type OperatingMode = "CORE" | "SHARED_ERP" | "DEDICATED_ERP";
@@ -147,6 +147,7 @@ const statusOptions: SubscriptionStatus[] = [
   "trialing",
   "manual",
   "past_due",
+  "suspended",
   "canceled",
 ];
 const billingModeOptions: BillingMode[] = ["manual", "internal", "trial", "stripe"];
@@ -331,6 +332,11 @@ export function BillingAdminTable({
 
   async function savePlan(tenantId: string) {
     setMessage(null);
+    const reason = window.prompt("Razón del cambio de plan (queda en auditoría):")?.trim();
+    if (!reason) {
+      setMessage("El cambio requiere una razón de auditoría.");
+      return;
+    }
     const value = planState[tenantId];
     const response = await fetch(
       `/api/admin/billing/tenants/${tenantId}/subscription`,
@@ -343,6 +349,7 @@ export function BillingAdminTable({
           billingMode: value.billingMode,
           trialEndsAt: value.trialEndsAt || null,
           currentPeriodEndsAt: value.currentPeriodEndsAt || null,
+          reason,
         }),
       }
     );

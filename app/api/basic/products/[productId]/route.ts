@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { updateProduct } from "@/lib/core/lightweight-pos";
+import { requireTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 type RouteContext = {
@@ -43,6 +44,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     }
 
     const tenant = await getCurrentTenant(user);
+    await requireTenantOperationalAccess(tenant.id);
     const { productId } = await context.params;
     const prisma = getPrismaClient();
 

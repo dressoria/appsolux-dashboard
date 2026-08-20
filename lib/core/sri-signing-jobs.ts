@@ -1,5 +1,6 @@
 import "@/lib/security/server-only";
 import { getPrismaClient } from "@/lib/db/prisma";
+import { requireTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
 import { getSriDocumentReadinessForSigning } from "./sri-technical-checklist";
 import type { SriSigningJobStatus } from "@prisma/client";
 
@@ -36,6 +37,7 @@ export async function createSriSigningJobForDocument(params: {
   documentId: string;
   requestedByUserId?: string;
 }): Promise<CreateSriSigningJobResult> {
+  await requireTenantOperationalAccess(params.tenantId);
   const prisma = getPrismaClient();
   const readiness = await getSriDocumentReadinessForSigning(params.tenantId, params.documentId);
   const doc = readiness?.document ?? null;

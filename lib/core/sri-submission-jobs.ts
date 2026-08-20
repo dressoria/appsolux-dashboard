@@ -1,4 +1,5 @@
 import "@/lib/security/server-only";
+import { requireTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
 
 import { Prisma, type SriSubmissionJobStatus } from "@prisma/client";
 
@@ -138,6 +139,7 @@ export async function createSriSubmissionJobForDocument(params: {
   tenantId: string;
   documentId: string;
 }): Promise<CreateSriSubmissionJobResult> {
+  await requireTenantOperationalAccess(params.tenantId);
   const prisma = getPrismaClient();
 
   const doc = await prisma.sriDocument.findFirst({

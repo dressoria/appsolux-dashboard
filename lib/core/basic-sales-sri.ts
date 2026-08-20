@@ -1,6 +1,7 @@
 import "@/lib/security/server-only";
 
 import { getPrismaClient } from "@/lib/db/prisma";
+import { requireTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
 import { createSriSigningJobForDocument } from "@/lib/core/sri-signing-jobs";
 import { createSriSubmissionJobForDocument } from "@/lib/core/sri-submission-jobs";
 import {
@@ -62,6 +63,7 @@ export async function startSriFlowFromBasicSale(params: {
   saleId: string;
   requestedByUserId?: string;
 }): Promise<StartSriFlowFromBasicSaleResult> {
+  await requireTenantOperationalAccess(params.tenantId);
   const prisma = getPrismaClient();
 
   const draft = await createDraftSriDocumentFromBasicSale({
