@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:billing": "node --test --experimental-strip-types lib/core/billing-access-policy.test.ts lib/core/billing/stripe-billing.test.ts",
+    "test:ecuador-tax-id": "node --test --experimental-strip-types lib/core/ecuador-tax-id.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",

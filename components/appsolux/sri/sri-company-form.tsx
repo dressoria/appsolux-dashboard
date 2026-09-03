@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { isValidEcuadorRuc } from "@/lib/core/ecuador-tax-id";
 
 export type SriCompanyFormProfile = {
   legalName: string;
@@ -51,7 +52,7 @@ export function SriCompanyForm({
     const dirMatriz = String(form.get("dirMatriz") ?? "").trim();
 
     if (!legalName) return setError("Escribe la razón social o nombre fiscal.");
-    if (!/^\d{13}$/.test(ruc)) return setError("Para emitir electrónicamente necesitas un RUC válido de 13 dígitos.");
+    if (!isValidEcuadorRuc(ruc)) return setError("Para emitir electrónicamente necesitas un RUC válido de 13 dígitos.");
     if (!dirMatriz) return setError("Escribe la dirección matriz.");
 
     setSaving(true);

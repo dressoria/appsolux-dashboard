@@ -7,6 +7,7 @@ import {
 import type { SriSigningJobStatus } from "@prisma/client";
 
 import { getPrismaClient } from "@/lib/db/prisma";
+import { isValidEcuadorRuc } from "@/lib/core/ecuador-tax-id";
 
 export type SriChecklistItemStatus = "PASS" | "WARN" | "FAIL";
 
@@ -102,7 +103,7 @@ export function runSriTechnicalChecklist(
   // ── Emisor ───────────────────────────────────────────────────────────────────
   if (input.profile) {
     pass("profile_exists", "Perfil tributario configurado");
-    if (/^\d{13}$/.test(input.profile.ruc)) {
+    if (isValidEcuadorRuc(input.profile.ruc)) {
       pass("ruc_valid", `RUC del emisor válido (${input.profile.ruc})`);
     } else {
       fail(

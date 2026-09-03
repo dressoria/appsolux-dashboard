@@ -4,6 +4,7 @@ import { getPrismaClient } from "@/lib/db/prisma";
 import { getLimit } from "@/lib/core/plans";
 import { requireTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
 import { validateCustomerForSriInvoice } from "@/lib/core/customer-fiscal";
+import { isValidEcuadorRuc } from "@/lib/core/ecuador-tax-id";
 import { buildSriAccessKey, createStableNumericCode } from "./sri-access-key";
 import { getSriSignatureReadiness } from "./sri-signature-readiness";
 
@@ -334,7 +335,7 @@ export async function updateSriSignatureSecureMaterial(
 }
 
 export function validateRuc(ruc: string): boolean {
-  return /^\d{13}$/.test(ruc.trim());
+  return isValidEcuadorRuc(ruc);
 }
 
 export function validateThreeDigitCode(code: string): boolean {

@@ -4,43 +4,15 @@ import type { LightweightCustomerIdentificationType } from "@prisma/client";
 
 import {
   isValidEcuadorCedula,
+  isValidEcuadorRuc,
   normalizeEcuadorIdentification,
-} from "@/lib/onboarding/ecuador-identification";
+} from "@/lib/core/ecuador-tax-id";
 
 export type CustomerFiscalData = {
   name: string;
   identificationType: LightweightCustomerIdentificationType | null;
   identification: string | null;
 };
-
-function validateSpecialRuc(digits: string) {
-  const third = Number(digits[2]);
-  const modulus = 11;
-
-  if (third === 9) {
-    const weights = [4, 3, 2, 7, 6, 5, 4, 3, 2];
-    const sum = weights.reduce((total, weight, index) => total + Number(digits[index]) * weight, 0);
-    const verifier = modulus - (sum % modulus);
-    return (verifier === 11 ? 0 : verifier) === Number(digits[9]);
-  }
-
-  if (third === 6) {
-    const weights = [3, 2, 7, 6, 5, 4, 3, 2];
-    const sum = weights.reduce((total, weight, index) => total + Number(digits[index]) * weight, 0);
-    const verifier = modulus - (sum % modulus);
-    return (verifier === 11 ? 0 : verifier) === Number(digits[8]);
-  }
-
-  return false;
-}
-
-export function isValidEcuadorRuc(value: string) {
-  const digits = normalizeEcuadorIdentification(value);
-  if (!/^\d{13}$/.test(digits) || digits.endsWith("000")) return false;
-  const third = Number(digits[2]);
-  if (third <= 5) return isValidEcuadorCedula(digits.slice(0, 10));
-  return validateSpecialRuc(digits);
-}
 
 export function normalizeCustomerIdentification(
   type: LightweightCustomerIdentificationType,
@@ -55,13 +27,13 @@ export function validateCustomerIdentification(
   type: LightweightCustomerIdentificationType,
   value: string
 ) {
-  const normalized = normalizeCustomerIdentification(type, value);
-  if (type === "RUC" && !isValidEcuadorRuc(normalized)) {
+  if (type === "RUC" && !isValidEcuadorRuc(value)) {
     throw new Error("Ingresa un RUC ecuatoriano valido de 13 digitos.");
   }
-  if (type === "CEDULA" && !isValidEcuadorCedula(normalized)) {
+  if (type === "CEDULA" && !isValidEcuadorCedula(value)) {
     throw new Error("Ingresa una cedula ecuatoriana valida de 10 digitos.");
   }
+  const normalized = normalizeCustomerIdentification(type, value);
   if ((type === "PASSPORT" || type === "FOREIGN_ID") && !/^[A-Z0-9][A-Z0-9 .\/-]{2,29}$/.test(normalized)) {
     throw new Error("La identificacion debe tener entre 3 y 30 caracteres validos.");
   }
