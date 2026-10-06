@@ -11,11 +11,11 @@ import { requireAppUser } from "@/lib/auth/require-app-user";
 export default async function OnboardingPage() {
   const user = await requireAppUser();
 
-  if (user.tenant?.id) redirect(routes.workspace);
+  if (user.tenant?.id) redirect(routes.facturacion);
 
   return (
     <main className="min-h-screen bg-facturom-bg text-facturom-text">
-      <header className="bg-facturom-primary-dark text-white shadow-[0_10px_30px_rgba(42,6,72,0.18)]">
+      <header className="bg-facturom-sidebar text-white shadow-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6">
           <Link href={routes.home} aria-label="Ir al inicio de Facturom">
             <FacturomBrand variant="white" imageClassName="h-9 w-auto sm:h-10" />
@@ -26,7 +26,7 @@ export default async function OnboardingPage() {
 
       <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 sm:py-10">
         <div className="mb-6 max-w-2xl">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#eee5f7] px-3 py-1 text-xs font-bold text-facturom-primary">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-facturom-primary-soft px-3 py-1 text-xs font-bold text-facturom-primary">
             <span className="h-2 w-2 rounded-full bg-facturom-accent" />
             Configuración inicial
           </div>
@@ -35,11 +35,11 @@ export default async function OnboardingPage() {
         </div>
 
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <section className="rounded-[28px] bg-white p-5 shadow-[0_16px_42px_rgba(59,10,103,0.09)] sm:p-7">
+          <section className="rounded-2xl border border-facturom-border bg-white p-5 shadow-sm sm:p-7">
             <OnboardingBusinessForm defaultEmail={user.email} />
           </section>
 
-          <aside className="rounded-[24px] bg-facturom-primary p-5 text-white shadow-[0_14px_34px_rgba(59,10,103,0.16)] lg:sticky lg:top-6">
+          <aside className="rounded-2xl bg-facturom-primary p-5 text-white shadow-sm lg:sticky lg:top-6">
             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/12 text-facturom-yellow">
               <LockKeyhole className="h-5 w-5" />
             </span>

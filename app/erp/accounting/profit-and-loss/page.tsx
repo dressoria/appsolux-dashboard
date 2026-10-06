@@ -45,7 +45,7 @@ export default async function ErpAccountingProfitAndLossPage({ searchParams }: P
       <DashboardShell>
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
-            <p>El ERP dedicado es necesario para ver el estado de resultados.</p>
+            <p>Esta función requiere completar la configuración del sistema.</p>
           </CardContent>
         </Card>
       </DashboardShell>

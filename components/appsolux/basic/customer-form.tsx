@@ -101,7 +101,7 @@ export function CustomerForm({ disabled = false }: { disabled?: boolean }) {
         <Button
           type="submit"
           disabled={isLoading || disabled}
-          className="rounded-full bg-[#588100] px-5 text-white hover:bg-[#4b6f00]"
+          className="rounded-full bg-facturom-primary px-5 text-white hover:bg-facturom-primary-strong"
         >
           {isLoading ? "Guardando..." : "Crear cliente"}
         </Button>

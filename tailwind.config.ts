@@ -12,14 +12,18 @@ const config: Config = {
       colors: {
         facturom: {
           primary: 'var(--facturom-primary)',
+          'primary-strong': 'var(--facturom-primary-strong)',
           'primary-dark': 'var(--facturom-primary-dark)',
           'primary-soft': 'var(--facturom-primary-soft)',
+          'primary-soft-2': 'var(--facturom-primary-soft-2)',
           accent: 'var(--facturom-accent)',
           yellow: 'var(--facturom-yellow)',
           bg: 'var(--facturom-bg)',
           surface: 'var(--facturom-surface)',
+          border: 'var(--facturom-border)',
           text: 'var(--facturom-text)',
-          sidebar: 'var(--facturom-primary-dark)'
+          'text-muted': 'var(--facturom-text-muted)',
+          sidebar: 'var(--facturom-sidebar)'
         },
       },
     },

@@ -67,9 +67,9 @@ function StepModal({ title, description, onClose, children }: { title: string; d
 function StepCard({ number, title, description, summary, ready, error, icon: Icon, actionLabel, onClick }: { number: number; title: string; description: string; summary: string; ready: boolean; error?: boolean; icon: typeof ReceiptText; actionLabel: string; onClick: () => void }) {
   const statusClass = error ? "bg-red-50 text-red-700" : ready ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700";
   return (
-    <article className="rounded-[24px] bg-white p-5 shadow-[0_10px_30px_rgba(59,10,103,0.07)] ring-1 ring-facturom-primary/8">
+    <article className="rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-facturom-primary/8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl", ready ? "bg-emerald-100 text-emerald-700" : error ? "bg-red-100 text-red-700" : "bg-[#eee5f7] text-facturom-primary")}>
+        <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl", ready ? "bg-emerald-100 text-emerald-700" : error ? "bg-red-100 text-red-700" : "bg-facturom-primary-soft text-facturom-primary")}>
           {ready ? <Check className="h-6 w-6" /> : <Icon className="h-6 w-6" />}
         </div>
         <div className="min-w-0 flex-1">
@@ -81,7 +81,7 @@ function StepCard({ number, title, description, summary, ready, error, icon: Ico
           <p className="mt-0.5 text-sm text-slate-500">{description}</p>
           <p className="mt-2 text-sm font-semibold text-slate-700">{summary}</p>
         </div>
-        <Button type="button" variant="outline" onClick={onClick} className="shrink-0 rounded-xl border-facturom-primary/20 text-facturom-primary hover:bg-[#eee5f7] hover:text-facturom-primary">
+        <Button type="button" variant="outline" onClick={onClick} className="shrink-0 rounded-xl border-facturom-primary/20 text-facturom-primary hover:bg-facturom-primary-soft hover:text-facturom-primary">
           {actionLabel}
         </Button>
       </div>
@@ -110,7 +110,7 @@ export function SriActionCenter({ profileReady, signatureReady, signatureExpired
       <div className="grid gap-3 sm:grid-cols-3">
         {["Datos fiscales", "Firma", "Emisión"].map((label, index) => {
           const ready = [profileReady, signatureReady && !signatureExpired, emissionReady][index];
-          return <div key={label} className={cn("flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold", ready ? "bg-emerald-50 text-emerald-700" : "bg-white text-slate-500")}><span className={cn("flex h-7 w-7 items-center justify-center rounded-full", ready ? "bg-emerald-600 text-white" : "bg-[#eee5f7] text-facturom-primary")}>{ready ? <Check className="h-4 w-4" /> : index + 1}</span>{label}</div>;
+          return <div key={label} className={cn("flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold", ready ? "bg-emerald-50 text-emerald-700" : "bg-white text-slate-500")}><span className={cn("flex h-7 w-7 items-center justify-center rounded-full", ready ? "bg-emerald-600 text-white" : "bg-facturom-primary-soft text-facturom-primary")}>{ready ? <Check className="h-4 w-4" /> : index + 1}</span>{label}</div>;
         })}
       </div>
 
@@ -132,8 +132,8 @@ export function SriActionCenter({ profileReady, signatureReady, signatureExpired
         {advancedOpen ? (
           <div className="grid gap-3 border-t border-slate-100 p-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
             {[
-              ["Empresa fiscal", routes.sriCompany], ["Firma y detalles técnicos", routes.sriSignature], ["Establecimientos", routes.sriEstablishments], ["Puntos de emisión", routes.sriIssuePoints], ["Secuencias completas", routes.sriSequences], ["Ambiente técnico", routes.sriEnvironment],
-            ].map(([label, href]) => <Link key={href} href={href} className="rounded-xl bg-slate-50 px-4 py-3 font-medium text-slate-600 hover:bg-[#eee5f7] hover:text-facturom-primary">{label}</Link>)}
+              ["Empresa fiscal", routes.facturacionSriCompany], ["Firma y detalles técnicos", routes.facturacionSriSignature], ["Establecimientos", routes.facturacionSriEstablishments], ["Puntos de emisión", routes.facturacionSriIssuePoints], ["Secuencias completas", routes.facturacionSriSequences], ["Ambiente técnico", routes.facturacionSriEnvironment],
+            ].map(([label, href]) => <Link key={href} href={href} className="rounded-xl bg-slate-50 px-4 py-3 font-medium text-slate-600 hover:bg-facturom-primary-soft hover:text-facturom-primary">{label}</Link>)}
           </div>
         ) : null}
       </div>

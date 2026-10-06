@@ -40,7 +40,7 @@ export async function createTenantAction(
 ): Promise<OnboardingActionState> {
   const user = await requireAppUser();
 
-  if (user.tenant?.id) redirect(routes.workspace);
+  if (user.tenant?.id) redirect(routes.facturacion);
 
   const rawType = valueOf(formData, "tax_identification_type");
   const taxIdentificationType = allowedIdentificationTypes.has(rawType as TaxIdentificationType)
@@ -118,5 +118,5 @@ export async function createTenantAction(
     return { message: "No pudimos crear tu negocio. Inténtalo nuevamente." };
   }
 
-  redirect(routes.workspace);
+  redirect(routes.facturacion);
 }

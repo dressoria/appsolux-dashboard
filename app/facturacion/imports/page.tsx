@@ -60,7 +60,7 @@ export default async function FacturacionImportsPage({ searchParams }: Props) {
       <DashboardShell mainClassName="" contentClassName="">
         <BasicModuleShell
           title="Cargas masivas"
-          description="Importa productos y clientes en bloque cuando Gestión Empresarial está activa."
+          description="Importa productos y clientes en bloque cuando la fuente operativa está configurada."
           activeHref={routes.facturacionImports}
           action={
             <Button asChild variant="outline" size="sm">
@@ -70,10 +70,10 @@ export default async function FacturacionImportsPage({ searchParams }: Props) {
         >
           <Card>
             <CardHeader>
-              <CardTitle>Gestión Empresarial requerida</CardTitle>
+              <CardTitle>Configuración requerida</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-slate-600">
-              Las cargas masivas están disponibles en Gestión Empresarial.
+              Completa la configuración operativa para habilitar las cargas masivas.
             </CardContent>
           </Card>
         </BasicModuleShell>

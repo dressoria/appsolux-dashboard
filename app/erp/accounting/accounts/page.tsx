@@ -76,7 +76,7 @@ export default async function ErpAccountingAccountsPage() {
       <DashboardShell>
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
-            <p>El ERP dedicado es necesario para ver el plan de cuentas.</p>
+            <p>Esta función requiere completar la configuración del sistema.</p>
           </CardContent>
         </Card>
       </DashboardShell>

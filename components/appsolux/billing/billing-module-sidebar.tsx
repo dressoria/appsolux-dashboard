@@ -286,8 +286,8 @@ export function BillingModuleSidebar() {
 
         <div className="shrink-0 border-t border-slate-100 p-2">
           <Link
-            href="/workspace"
-            title="Volver al workspace"
+            href="/facturacion"
+            title="Ir al inicio"
             className="flex items-center justify-center rounded-xl px-3 py-2.5 text-slate-500 transition hover:bg-slate-50 hover:text-[#004080]"
           >
             <ArrowLeft className="h-4 w-4 shrink-0" />
@@ -386,11 +386,11 @@ export function BillingModuleSidebar() {
       {/* Back to workspace */}
       <div className="shrink-0 border-t border-slate-100 p-2">
         <Link
-          href="/workspace"
+          href="/facturacion"
           className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-500 transition hover:bg-slate-50 hover:text-[#004080]"
         >
           <ArrowLeft className="h-4 w-4 shrink-0" />
-          <span>Volver al workspace</span>
+          <span>Ir al inicio</span>
         </Link>
       </div>
     </aside>

@@ -181,7 +181,7 @@ export function SriSigningJobSection({ documentId, documentStatus, readiness }: 
             ))}
           </ul>
           <Link
-            href="/sri/signature"
+            href="/facturacion/sri/signature"
             className="mt-2 inline-block text-xs underline underline-offset-4"
           >
             Ir a configuracion de firma →
@@ -259,7 +259,7 @@ export function SriSigningJobSection({ documentId, documentStatus, readiness }: 
             <>
               <p>{requestError}</p>
               <Link
-                href="/sri/signature"
+                href="/facturacion/sri/signature"
                 className="text-xs underline underline-offset-4 mt-1 inline-block"
               >
                 Ir a configuración de firma →

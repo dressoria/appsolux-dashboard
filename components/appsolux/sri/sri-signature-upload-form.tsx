@@ -59,7 +59,7 @@ export function SriSignatureUploadForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-slate-200 p-4">
-      <div className="rounded-xl bg-[#eee5f7] p-3 text-xs text-facturom-primary">
+      <div className="rounded-xl bg-facturom-primary-soft p-3 text-xs text-facturom-primary">
         Sube tu certificado .p12 o .pfx. El archivo y la contraseña se cifran en el servidor y no se devuelven al navegador.
       </div>
 

@@ -81,7 +81,7 @@ export function SriEmissionSetupForm({ defaults }: { defaults: EmissionDefaults 
           <Label htmlFor="issuePointCode">Punto de emisión *</Label>
           <Input id="issuePointCode" inputMode="numeric" value={issuePointCode} onChange={(event) => setIssuePointCode(event.target.value.replace(/\D/g, "").slice(0, 3))} required className="h-11 rounded-xl" />
         </div>
-        <div className="rounded-2xl bg-[#eee5f7] p-4">
+        <div className="rounded-2xl bg-facturom-primary-soft p-4">
           <p className="text-xs font-bold uppercase tracking-wide text-facturom-primary-soft">Tu próxima factura</p>
           <p className="mt-2 font-mono text-lg font-black text-facturom-primary">{formattedNumber}</p>
         </div>

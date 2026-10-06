@@ -102,7 +102,7 @@ export async function signInWithSupabasePassword(input: {
 
     return {
       ok: true,
-      redirectTo: "/workspace",
+      redirectTo: "/facturacion",
     };
   } catch (error) {
     console.error("[auth] Supabase password login failed", {

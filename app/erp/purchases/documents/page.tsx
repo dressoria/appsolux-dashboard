@@ -103,9 +103,9 @@ export default async function ErpPurchasesDocumentsPage() {
           </div>
           <Card>
             <CardContent className="p-6 text-sm text-muted-foreground">
-              <p>El ERP dedicado es necesario para ver documentos de compra.</p>
+              <p>Esta función requiere completar la configuración del sistema.</p>
               <Button asChild variant="outline" size="sm" className="mt-3">
-                <Link href={routes.erp}>Ir al ERP</Link>
+                <Link href={routes.facturacionSettings}>Revisar configuración</Link>
               </Button>
             </CardContent>
           </Card>

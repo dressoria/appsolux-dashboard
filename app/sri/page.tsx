@@ -91,7 +91,7 @@ export default async function SriPage() {
       description="Configura Facturom en tres pasos. No necesitas conocer términos técnicos para comenzar."
       activeHref={routes.sri}
       appName="Facturación electrónica"
-      action={<Button asChild variant="outline" size="sm" className="rounded-xl"><Link href={routes.sriDocuments}><FileText className="mr-2 h-4 w-4" />Ver comprobantes</Link></Button>}
+      action={<Button asChild variant="outline" size="sm" className="rounded-xl"><Link href={routes.facturacionDocuments}><FileText className="mr-2 h-4 w-4" />Ver comprobantes</Link></Button>}
     >
       <SriActionCenter
         profileReady={profileReady}

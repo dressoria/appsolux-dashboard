@@ -54,7 +54,7 @@ export default async function PosOrdersPage() {
       <DashboardShell>
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
-            El ERP dedicado real debe estar activo para usar el POS avanzado.
+            Esta función requiere completar la configuración del sistema.
           </CardContent>
         </Card>
       </DashboardShell>

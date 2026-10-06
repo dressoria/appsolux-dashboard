@@ -15,11 +15,11 @@ export default function SignInPage() {
     <main className="flex min-h-screen">
       <div
         className="relative hidden flex-col justify-between overflow-hidden p-10 lg:flex lg:w-[44%] xl:w-2/5 xl:p-12"
-        style={{ background: `linear-gradient(145deg, var(--facturom-primary-dark) 0%, #2b093c 58%, var(--facturom-primary-dark) 100%)` }}
+        style={{ background: "var(--facturom-sidebar)" }}
       >
         <div
           className="pointer-events-none absolute top-0 right-0 h-[350px] w-[350px] rounded-full blur-[100px] opacity-20"
-          style={{ background: `radial-gradient(circle, rgba(91,19,168,0.9), transparent 70%)` }}
+          style={{ background: "radial-gradient(circle, rgba(29,114,243,0.55), transparent 70%)" }}
         />
         <div
           className="pointer-events-none absolute bottom-0 left-0 h-[280px] w-[280px] rounded-full blur-[80px] opacity-15"
@@ -104,7 +104,7 @@ export default function SignInPage() {
             <Link href="/contacto">Contactar soporte</Link>
           </div>
 
-          <SignIn />
+          <SignIn fallbackRedirectUrl="/facturacion" />
         </div>
       </div>
     </main>

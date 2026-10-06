@@ -151,7 +151,7 @@ export default async function ErpPage() {
       <DashboardShell>
         <div className="space-y-6">
           <Link
-            href={routes.workspace}
+            href={routes.facturacion}
             className="inline-flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
           >
             ← Volver a mis apps
@@ -380,7 +380,7 @@ export default async function ErpPage() {
     <DashboardShell>
       <div className="space-y-6">
         <Link
-          href={routes.workspace}
+          href={routes.facturacion}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
         >
           ← Volver a mis apps

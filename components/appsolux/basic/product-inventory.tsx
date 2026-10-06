@@ -137,7 +137,7 @@ export function ProductInventory({ products }: { products: Product[] }) {
         const isConfirmingDelete = deleteConfirmId === product.id;
 
         return (
-          <div key={product.id} className="space-y-3 rounded-[22px] border border-slate-200 bg-white p-4 text-sm shadow-sm transition-colors hover:border-[#588100]/30 hover:shadow-[0_14px_40px_rgba(88,129,0,0.08)]">
+          <div key={product.id} className="space-y-3 rounded-[22px] border border-slate-200 bg-white p-4 text-sm shadow-sm transition-colors hover:border-facturom-primary/30 hover:shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2">
@@ -166,7 +166,7 @@ export function ProductInventory({ products }: { products: Product[] }) {
                 <Button
                   type="button"
                   variant="outline"
-                  className="rounded-full border-slate-200 hover:border-[#588100]/30 hover:text-[#588100]"
+                  className="rounded-full border-slate-200 hover:border-facturom-primary/30 hover:text-facturom-primary"
                   onClick={() => {
                     setEditingId(isEditing ? "" : product.id);
                     setAdjustingId("");
@@ -178,7 +178,7 @@ export function ProductInventory({ products }: { products: Product[] }) {
                 <Button
                   type="button"
                   variant="outline"
-                  className="rounded-full border-slate-200 hover:border-[#588100]/30 hover:text-[#588100]"
+                  className="rounded-full border-slate-200 hover:border-facturom-primary/30 hover:text-facturom-primary"
                   onClick={() => {
                     setAdjustingId(isAdjusting ? "" : product.id);
                     setEditingId("");
@@ -252,7 +252,7 @@ export function ProductInventory({ products }: { products: Product[] }) {
                   <Input name="barcode" defaultValue={product.barcode ?? ""} className="h-10 rounded-xl border-slate-200 bg-white" />
                 </div>
                 <div className="md:col-span-5 flex items-center gap-3">
-                  <Button type="submit" className="rounded-full bg-[#588100] px-5 text-white hover:bg-[#4b6f00]">
+                  <Button type="submit" className="rounded-full bg-facturom-primary px-5 text-white hover:bg-facturom-primary-strong">
                     Guardar cambios
                   </Button>
                   <Button type="button" variant="outline" className="rounded-full" onClick={() => setEditingId("")}>
@@ -273,7 +273,7 @@ export function ProductInventory({ products }: { products: Product[] }) {
                   <Input name="reason" placeholder="Conteo, compra, merma" className="h-10 rounded-xl border-slate-200 bg-white" />
                 </div>
                 <div className="flex items-end">
-                  <Button type="submit" className="rounded-full bg-[#588100] px-5 text-white hover:bg-[#4b6f00]">Aplicar</Button>
+                  <Button type="submit" className="rounded-full bg-facturom-primary px-5 text-white hover:bg-facturom-primary-strong">Aplicar</Button>
                 </div>
               </form>
             ) : null}

@@ -116,7 +116,7 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
       erpError =
         err instanceof Error
           ? err.message
-          : "No se pudo conectar con Gestión Empresarial.";
+          : "No se pudo conectar con la fuente operativa.";
     }
 
     return (

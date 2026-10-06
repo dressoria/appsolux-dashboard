@@ -76,7 +76,7 @@ export async function signInWithCurrentPassword(input: {
 
     return {
       ok: true,
-      redirectTo: "/workspace",
+      redirectTo: "/facturacion",
     };
   } catch {
     return {

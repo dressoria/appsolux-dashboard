@@ -41,10 +41,10 @@ type SettingsTabId =
   | "sucursales"
   | "pagos"
   | "fiscal"
-  | "usuarios"
-  | "integraciones";
+  | "usuarios";
 
 type SettingsTabsProps = {
+  initialTab?: SettingsTabId;
   company?: ErpnextCompanyDetail;
   companies: ErpnextCompany[];
   warehouses: ErpnextWarehouse[];
@@ -61,10 +61,9 @@ const TABS: Array<{ id: SettingsTabId; label: string }> = [
   { id: "pagos", label: "Pagos" },
   { id: "fiscal", label: "Fiscal / SRI" },
   { id: "usuarios", label: "Usuarios" },
-  { id: "integraciones", label: "Integraciones" },
 ];
 
-function ErpNotActiveCard({
+function ConfigurationPendingCard({
   title,
   what,
   erpDisplayStatus,
@@ -80,17 +79,17 @@ function ErpNotActiveCard({
       </CardHeader>
       <CardContent className="space-y-3 text-sm text-muted-foreground">
         <p>
-          Esta seccion requiere ERP activo. Estado actual:{" "}
+          Esta sección requiere completar la configuración operativa. Estado actual:{" "}
           <span className="font-medium">{erpDisplayStatus}</span>.
         </p>
         <p>
-          Una vez que tu ERP este listo, podras configurar {what} desde aqui.
+          Una vez que la fuente de datos esté lista, podrás configurar {what} desde aquí.
         </p>
         <Link
-          href={routes.erp}
+          href={routes.facturacionSettings}
           className="inline-flex h-8 items-center rounded-lg border bg-background px-3 text-sm transition-colors hover:bg-muted"
         >
-          Ver estado del ERP
+          Ver configuración
         </Link>
       </CardContent>
     </Card>
@@ -205,6 +204,7 @@ function IntegrationsSection({
 }
 
 export function SettingsTabs({
+  initialTab = "empresa",
   company,
   companies,
   warehouses,
@@ -214,7 +214,7 @@ export function SettingsTabs({
   erpDisplayStatus,
   memberships,
 }: SettingsTabsProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTabId>("empresa");
+  const [activeTab, setActiveTab] = useState<SettingsTabId>(initialTab);
 
   return (
     <div className="space-y-4">
@@ -247,7 +247,7 @@ export function SettingsTabs({
             defaultCompany={company?.name}
           />
         ) : (
-          <ErpNotActiveCard
+          <ConfigurationPendingCard
             title="Sucursales y bodegas"
             what="bodegas, ubicaciones y sucursales"
             erpDisplayStatus={erpDisplayStatus}
@@ -271,7 +271,7 @@ export function SettingsTabs({
             />
           </div>
         ) : (
-          <ErpNotActiveCard
+          <ConfigurationPendingCard
             title="Metodos de pago y cuentas"
             what="metodos de pago y cuentas de caja o banco"
             erpDisplayStatus={erpDisplayStatus}
@@ -285,12 +285,6 @@ export function SettingsTabs({
         <UsersPermissionsSettings memberships={memberships} />
       ) : null}
 
-      {activeTab === "integraciones" ? (
-        <IntegrationsSection
-          erpActive={erpActive}
-          erpDisplayStatus={erpDisplayStatus}
-        />
-      ) : null}
     </div>
   );
 }

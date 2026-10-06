@@ -144,7 +144,7 @@ const trustCards = [
 export default async function LandingPage() {
   const user = await getCurrentUser();
   if (user) {
-    redirect(user.tenant?.id ? "/workspace" : "/onboarding");
+    redirect(user.tenant?.id ? "/facturacion" : "/onboarding");
   }
 
   return (

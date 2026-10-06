@@ -7,14 +7,14 @@ import { cn } from "@/lib/utils";
 const toneClasses = {
   facturacion: {
     shell:
-      "border-transparent bg-facturom-primary text-white shadow-[0_14px_34px_rgba(59,10,103,0.2)] hover:bg-facturom-primary-soft",
+      "border-transparent bg-facturom-primary text-white shadow-sm hover:bg-facturom-primary-strong",
     icon: "bg-white/15 text-white",
     label: "text-facturom-yellow",
     cta: "text-white",
   },
   chats: {
     shell:
-      "border-transparent bg-[#eee5f7] text-facturom-text shadow-[0_12px_28px_rgba(59,10,103,0.09)] hover:bg-[#e4d4f3]",
+      "border-transparent bg-facturom-primary-soft text-facturom-text shadow-sm hover:bg-facturom-primary-soft-2",
     icon: "bg-facturom-primary-soft text-white",
     label: "text-facturom-primary-soft",
     cta: "text-facturom-primary",

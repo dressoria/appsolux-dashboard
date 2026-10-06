@@ -6,33 +6,35 @@
 
 /* Facturom brand tokens */
 :root {
-  --brand-green: #588100;
-  --brand-green-light: #8db600;
-  --brand-purple: #7f00b2;
-  --brand-purple-light: #bc4ed8;
-  --brand-dark: #0d1c0a;
-  --brand-dark-purple: #1a0d2e;
-
-  /* Facturom (purple) visual identity tokens */
-  --facturom-primary: #3B0A67; /* main purple */
-  --facturom-primary-dark: #2A0648; /* sidebar / dark */
-  --facturom-primary-soft: #5B13A8; /* active / highlight */
-  --facturom-accent: #FF9F1C; /* warm accent / CTA secondary */
-  --facturom-yellow: #FFE847; /* soft yellow accent */
-  --facturom-bg: #F6F4FA; /* app background */
-  --facturom-surface: #FFFFFF; /* cards / surfaces */
-  --facturom-text: #111111; /* main text */
+  --facturom-primary: #1769E0;
+  --facturom-primary-strong: #1D72F3;
+  --facturom-primary-dark: #0F2A44;
+  --facturom-sidebar: #111C2F;
+  --facturom-primary-soft: #EAF3FF;
+  --facturom-primary-soft-2: #DCEBFF;
+  --facturom-accent: #F59E0B;
+  --facturom-yellow: #FDE68A;
+  --facturom-bg: #F6F8FB;
+  --facturom-surface: #FFFFFF;
+  --facturom-border: #E4E9F0;
+  --facturom-text: #172033;
+  --facturom-text-muted: #667085;
 }
 
 @theme inline {
   --color-facturom-primary: var(--facturom-primary);
+  --color-facturom-primary-strong: var(--facturom-primary-strong);
   --color-facturom-primary-dark: var(--facturom-primary-dark);
   --color-facturom-primary-soft: var(--facturom-primary-soft);
+  --color-facturom-primary-soft-2: var(--facturom-primary-soft-2);
+  --color-facturom-sidebar: var(--facturom-sidebar);
   --color-facturom-accent: var(--facturom-accent);
   --color-facturom-yellow: var(--facturom-yellow);
   --color-facturom-bg: var(--facturom-bg);
   --color-facturom-surface: var(--facturom-surface);
+  --color-facturom-border: var(--facturom-border);
   --color-facturom-text: var(--facturom-text);
+  --color-facturom-text-muted: var(--facturom-text-muted);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -78,38 +80,38 @@
 }
 
 :root {
-  --background: #F6F4FA;
-  --foreground: #111111;
+  --background: #F6F8FB;
+  --foreground: #172033;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: #3B0A67;
+  --primary: #1769E0;
   --primary-foreground: #FFFFFF;
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: #F0E8F7;
-  --accent-foreground: #3B0A67;
+  --accent: #EAF3FF;
+  --accent-foreground: #1769E0;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: #7F00B2;
-  --chart-1: #3B0A67;
-  --chart-2: #7F00B2;
-  --chart-3: #FF9F1C;
-  --chart-4: #FFE847;
-  --chart-5: #B996D4;
+  --border: #E4E9F0;
+  --input: #E4E9F0;
+  --ring: #1769E0;
+  --chart-1: #1769E0;
+  --chart-2: #1D72F3;
+  --chart-3: #F59E0B;
+  --chart-4: #16A34A;
+  --chart-5: #667085;
   --radius: 0.625rem;
-  --sidebar: #2A0648;
+  --sidebar: #111C2F;
   --sidebar-foreground: #FFFFFF;
-  --sidebar-primary: #5B13A8;
+  --sidebar-primary: #1769E0;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #5B13A8;
+  --sidebar-accent: #1769E0;
   --sidebar-accent-foreground: #FFFFFF;
   --sidebar-border: rgb(255 255 255 / 0.12);
-  --sidebar-ring: #FFE847;
+  --sidebar-ring: #1D72F3;
 }
 
 .dark {

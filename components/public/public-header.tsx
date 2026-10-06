@@ -74,7 +74,7 @@ export function PublicHeader() {
                 key={link.href}
                 href={link.href}
                 onClick={() => setOpen(false)}
-                className="border-b border-gray-50 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-[#588100]"
+                className="border-b border-gray-50 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-facturom-primary"
               >
                 {link.label}
               </Link>
@@ -83,8 +83,7 @@ export function PublicHeader() {
           <Link
             href="/sign-up"
             onClick={() => setOpen(false)}
-            className="mt-4 flex justify-center rounded-xl px-5 py-3 text-sm font-bold text-white"
-            style={{ background: "linear-gradient(135deg, #588100, #8db600)" }}
+            className="mt-4 flex justify-center rounded-xl bg-facturom-primary px-5 py-3 text-sm font-bold text-white hover:bg-facturom-primary-strong"
           >
             Comenzar gratis
           </Link>

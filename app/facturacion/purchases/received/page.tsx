@@ -1,5 +1,5 @@
-import ErpFiscalReceivedPage from "@/app/erp/fiscal/received/page";
+import ErpPurchasesReceiptsPage from "@/app/erp/purchases/receipts/page";
 
 export default async function FacturacionPurchasesReceivedPage() {
-  return <ErpFiscalReceivedPage />;
+  return <ErpPurchasesReceiptsPage />;
 }

@@ -23,7 +23,7 @@ export function AdvancedErpNotActivatedState({
         <p className="text-sm text-muted-foreground">{description}</p>
         <div className="flex flex-wrap gap-2">
           <Button asChild>
-            <Link href={routes.workspace}>Ir al panel principal</Link>
+            <Link href={routes.facturacion}>Ir al panel principal</Link>
           </Button>
           <Button asChild variant="outline">
             <Link href={basicHref}>Ir al modulo basico</Link>

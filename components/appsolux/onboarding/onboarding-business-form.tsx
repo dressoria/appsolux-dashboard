@@ -82,7 +82,7 @@ export function OnboardingBusinessForm({ defaultEmail }: { defaultEmail: string 
             const selected = identificationType === option.value;
             const Icon = option.icon;
             return (
-              <label key={option.value} className={cn("cursor-pointer rounded-2xl border p-3.5 transition", selected ? "border-facturom-primary bg-[#eee5f7] shadow-sm" : "border-slate-200 bg-white hover:border-facturom-primary/35 hover:bg-facturom-bg")}>
+              <label key={option.value} className={cn("cursor-pointer rounded-2xl border p-3.5 transition", selected ? "border-facturom-primary bg-facturom-primary-soft shadow-sm" : "border-slate-200 bg-white hover:border-facturom-primary/35 hover:bg-facturom-bg")}>
                 <input
                   type="radio"
                   name="identification_type_control"

@@ -69,7 +69,7 @@ export function CustomerList({ customers }: { customers: Customer[] }) {
         const balance = Number(customer.balance);
 
         return (
-          <div key={customer.id} className="space-y-3 rounded-[22px] border border-slate-200 bg-white p-4 text-sm shadow-sm transition-colors hover:border-[#588100]/30 hover:shadow-[0_14px_40px_rgba(88,129,0,0.08)]">
+          <div key={customer.id} className="space-y-3 rounded-[22px] border border-slate-200 bg-white p-4 text-sm shadow-sm transition-colors hover:border-facturom-primary/30 hover:shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1.5">
                 <p className="text-base font-semibold text-slate-950">{customer.name}</p>
@@ -97,7 +97,7 @@ export function CustomerList({ customers }: { customers: Customer[] }) {
                 <Button
                   type="button"
                   variant="outline"
-                  className="rounded-full border-slate-200 hover:border-[#588100]/30 hover:text-[#588100]"
+                  className="rounded-full border-slate-200 hover:border-facturom-primary/30 hover:text-facturom-primary"
                   onClick={() => setEditingId(isEditing ? "" : customer.id)}
                 >
                   Editar
@@ -124,7 +124,7 @@ export function CustomerList({ customers }: { customers: Customer[] }) {
                   <Input name="address" defaultValue={customer.address ?? ""} className="h-10 rounded-xl border-slate-200 bg-white" />
                 </div>
                 <div className="md:col-span-4 flex items-center gap-3">
-                  <Button type="submit" className="rounded-full bg-[#588100] px-5 text-white hover:bg-[#4b6f00]">
+                  <Button type="submit" className="rounded-full bg-facturom-primary px-5 text-white hover:bg-facturom-primary-strong">
                     Guardar cambios
                   </Button>
                   <Button type="button" variant="outline" className="rounded-full" onClick={() => setEditingId("")}>

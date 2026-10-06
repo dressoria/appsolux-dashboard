@@ -17,11 +17,11 @@ export default async function FacturacionPurchasesPage() {
       <div className="space-y-6">
         <div>
           <p className="text-sm text-muted-foreground">Facturacion</p>
-          <h1 className="text-3xl font-semibold tracking-tight">Compras no disponibles</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Compras pendientes de configuración</h1>
         </div>
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
-            Las compras forman parte de Gestion Empresarial y se habilitan cuando ese motor esta activo.
+            Configura la fuente operativa de la empresa para registrar compras, proveedores y recepciones.
           </CardContent>
         </Card>
       </div>

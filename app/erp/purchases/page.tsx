@@ -1,11 +1,8 @@
 import Link from "next/link";
-import { ErpDedicatedProvisionCard } from "@/components/appsolux/dashboard/erp-dedicated-provision-card";
-import { AdvancedModeBlockedCard } from "@/components/appsolux/dashboard/advanced-mode-blocked-card";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { canManageSettings } from "@/lib/auth/permissions";
 import { getErpProvisioningState } from "@/lib/core/erp-provisioning-status";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
@@ -21,7 +18,7 @@ function getPurchasesBlockedDescription(
     return erpProvisioning.displayStatus;
   }
   if (erpProvisioning.status === "not_configured") {
-    return "El modulo de compras necesita Gestion Empresarial activa para consultar proveedores, compras y facturas recibidas.";
+    return "El módulo de compras requiere completar la configuración técnica para consultar proveedores, compras y facturas recibidas.";
   }
 
   return erpProvisioning.displayStatus;
@@ -71,17 +68,13 @@ export default async function ErpPurchasesPage() {
             </p>
           </div>
 
-          <ErpDedicatedProvisionCard
-            provisioning={erpProvisioning}
-            canManage={canManageSettings(user)}
-            canRequestDedicatedErp={tenantMode.canRequestDedicatedErp}
-          />
-
-          <AdvancedModeBlockedCard
-            title="Modulo de compras bloqueado"
-            erpProvisioning={erpProvisioning}
-            canRequestDedicatedErp={tenantMode.canRequestDedicatedErp}
-          />
+          <Card>
+            <CardHeader><CardTitle>Configuración requerida</CardTitle></CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <p>Esta función aún necesita configuración para operar en esta empresa.</p>
+              <Button asChild variant="outline"><Link href={routes.facturacionSettings}>Revisar configuración</Link></Button>
+            </CardContent>
+          </Card>
         </div>
       </DashboardShell>
     );

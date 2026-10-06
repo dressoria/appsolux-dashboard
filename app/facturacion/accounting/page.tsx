@@ -17,11 +17,11 @@ export default async function FacturacionAccountingPage() {
       <div className="space-y-6">
         <div>
           <p className="text-sm text-muted-foreground">Facturacion</p>
-          <h1 className="text-3xl font-semibold tracking-tight">Contabilidad no disponible</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Contabilidad pendiente de configuración</h1>
         </div>
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
-            La contabilidad forma parte del motor de Gestion Empresarial y no aparece como operacion activa en modo basico.
+            Configura la fuente contable de la empresa para consultar asientos, libros y estados financieros.
           </CardContent>
         </Card>
       </div>

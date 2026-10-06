@@ -54,13 +54,13 @@ function getErpBadge(erp: {
 }): { label: string; className: string } {
   if (erp.isRealActive) {
     return {
-      label: "Gestion Empresarial activa",
+      label: "Configurado",
       className: "border-green-200 bg-green-50 text-green-700",
     };
   }
   if (erp.isPending || erp.isSimulated) {
     return {
-      label: "Gestion Empresarial en preparacion",
+      label: "Pendiente de configuración",
       className: "border-amber-200 bg-amber-50 text-amber-700",
     };
   }
@@ -71,12 +71,15 @@ function getErpBadge(erp: {
     };
   }
   return {
-    label: "Appsolux Basico",
+    label: "Configuración inicial",
     className: "border-slate-200 bg-slate-50 text-slate-600",
   };
 }
 
-export default async function SettingsPage() {
+type SettingsPageProps = { searchParams?: Promise<{ section?: string }> };
+
+export default async function SettingsPage({ searchParams }: SettingsPageProps = {}) {
+  const requestedSection = searchParams ? (await searchParams).section : undefined;
   const user = await getCurrentUser();
 
   if (!user) {
@@ -141,7 +144,7 @@ export default async function SettingsPage() {
           <Card className="border-amber-200 bg-amber-50/60">
             <CardContent className="p-4 text-sm text-amber-800">
               <span className="font-medium">
-                La empresa configurada no coincide con Gestion Empresarial.
+                La empresa configurada no coincide con la fuente de datos activa.
               </span>{" "}
               Se muestra la empresa disponible. Revisa la configuracion del
               tenant.
@@ -150,6 +153,7 @@ export default async function SettingsPage() {
         ) : null}
 
         <SettingsTabs
+          initialTab={requestedSection === "users" ? "usuarios" : "empresa"}
           company={erpData?.company}
           companies={erpData?.companies ?? []}
           warehouses={erpData?.warehouses ?? []}
