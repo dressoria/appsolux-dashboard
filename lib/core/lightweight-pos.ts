@@ -76,6 +76,9 @@ type CreateCustomerInput = {
   customerOrigin?: string;
   groupName?: string;
   assignedSellerId?: string;
+  isRelated?: boolean;
+  isForeign?: boolean;
+  invoiceThirdParty?: boolean;
   identificationType?: LightweightCustomerIdentificationType | null;
   identification?: string;
   taxpayerStatus?: string;
@@ -144,7 +147,7 @@ function assertPositiveInteger(value: number, field: string) {
 async function assertLimitAvailable(
   tenantId: string,
   limitKey: "products" | "customers" | "receipts",
-  currentCount: number
+  currentCount: number,
 ) {
   if (isUnlimitedCommercialVolume(limitKey)) return;
   const limit = await getLimit(tenantId, limitKey);
@@ -179,8 +182,12 @@ export async function listProducts(tenantId: string, input: ListInput = {}) {
       ...(input.type ? { type: input.type } : {}),
       ...(input.status ? { isActive: input.status === "active" } : {}),
       ...(input.categoryId ? { categoryId: input.categoryId } : {}),
-      ...(input.stock === "out" ? { trackInventory: true, stock: { lte: 0 } } : {}),
-      ...(input.stock === "low" ? { trackInventory: true, stock: { gt: 0 } } : {}),
+      ...(input.stock === "out"
+        ? { trackInventory: true, stock: { lte: 0 } }
+        : {}),
+      ...(input.stock === "low"
+        ? { trackInventory: true, stock: { gt: 0 } }
+        : {}),
       ...(search
         ? {
             OR: [
@@ -201,20 +208,36 @@ export async function listProducts(tenantId: string, input: ListInput = {}) {
   });
 }
 
-async function validateProductReferences(input: ProductCatalogInput, productId?: string) {
+async function validateProductReferences(
+  input: ProductCatalogInput,
+  productId?: string,
+) {
   const prisma = getPrismaClient();
-  if (!Object.values(LightweightProductType).includes(input.type ?? "PRODUCT")) throw new Error("El tipo de item no es valido.");
-  if (!Object.values(LightweightProductUnit).includes(input.unit ?? "UNIT")) throw new Error("La unidad no es valida.");
+  if (!Object.values(LightweightProductType).includes(input.type ?? "PRODUCT"))
+    throw new Error("El tipo de item no es valido.");
+  if (!Object.values(LightweightProductUnit).includes(input.unit ?? "UNIT"))
+    throw new Error("La unidad no es valida.");
   assertPositiveMoney(input.price, "El PVP1");
   if (input.price2 !== undefined) assertPositiveMoney(input.price2, "El PVP2");
   if (input.price3 !== undefined) assertPositiveMoney(input.price3, "El PVP3");
   if (input.cost !== undefined) assertPositiveMoney(input.cost, "El costo");
-  if (input.stock !== undefined && (!Number.isInteger(input.stock) || input.stock < 0)) throw new Error("El stock debe ser un entero mayor o igual a cero.");
-  if (input.minStock !== undefined && (!Number.isInteger(input.minStock) || input.minStock < 0)) throw new Error("El stock minimo debe ser un entero mayor o igual a cero.");
-  if (![0, 8, 15].includes(input.taxRate ?? 0)) throw new Error("La tarifa de IVA no es valida para el catalogo actual.");
+  if (
+    input.stock !== undefined &&
+    (!Number.isInteger(input.stock) || input.stock < 0)
+  )
+    throw new Error("El stock debe ser un entero mayor o igual a cero.");
+  if (
+    input.minStock !== undefined &&
+    (!Number.isInteger(input.minStock) || input.minStock < 0)
+  )
+    throw new Error("El stock minimo debe ser un entero mayor o igual a cero.");
+  if (![0, 8, 15].includes(input.taxRate ?? 0))
+    throw new Error("La tarifa de IVA no es valida para el catalogo actual.");
   if (input.iceEnabled) {
-    if (!input.iceCode?.trim()) throw new Error("El codigo ICE es requerido cuando aplica ICE.");
-    if (input.iceRate === undefined) throw new Error("La tarifa ICE es requerida cuando aplica ICE.");
+    if (!input.iceCode?.trim())
+      throw new Error("El codigo ICE es requerido cuando aplica ICE.");
+    if (input.iceRate === undefined)
+      throw new Error("La tarifa ICE es requerida cuando aplica ICE.");
     assertPositiveMoney(input.iceRate, "La tarifa ICE");
   }
   const primaryCode = input.primaryCode.trim();
@@ -230,22 +253,43 @@ async function validateProductReferences(input: ProductCatalogInput, productId?:
     },
     select: { primaryCode: true, barcode: true },
   });
-  if (duplicate?.primaryCode === primaryCode) throw new Error("El codigo principal ya existe.");
+  if (duplicate?.primaryCode === primaryCode)
+    throw new Error("El codigo principal ya existe.");
   if (duplicate) throw new Error("El codigo de barras ya existe.");
   if (input.categoryId) {
-    const category = await prisma.lightweightProductCategory.findFirst({ where: { id: input.categoryId, tenantId: input.tenantId } });
+    const category = await prisma.lightweightProductCategory.findFirst({
+      where: { id: input.categoryId, tenantId: input.tenantId },
+    });
     if (!category) throw new Error("La categoria no pertenece a este negocio.");
   }
   if ((input.type ?? "PRODUCT") === "COMBO") {
-    if (!input.comboItems?.length) throw new Error("Agrega al menos un componente al combo.");
-    const ids = [...new Set(input.comboItems.map((item) => item.componentProductId))];
-    if (ids.length !== input.comboItems.length) throw new Error("No repitas componentes dentro del combo.");
-    if (ids.includes(productId ?? "")) throw new Error("Un combo no puede contenerse a si mismo.");
+    if (!input.comboItems?.length)
+      throw new Error("Agrega al menos un componente al combo.");
+    const ids = [
+      ...new Set(input.comboItems.map((item) => item.componentProductId)),
+    ];
+    if (ids.length !== input.comboItems.length)
+      throw new Error("No repitas componentes dentro del combo.");
+    if (ids.includes(productId ?? ""))
+      throw new Error("Un combo no puede contenerse a si mismo.");
     input.comboItems.forEach((item) => {
-      if (!Number.isInteger(item.quantity) || item.quantity <= 0) throw new Error("La cantidad de cada componente debe ser un entero mayor a cero.");
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0)
+        throw new Error(
+          "La cantidad de cada componente debe ser un entero mayor a cero.",
+        );
     });
-    const count = await prisma.lightweightProduct.count({ where: { tenantId: input.tenantId, id: { in: ids }, type: { not: "COMBO" }, isActive: true } });
-    if (count !== ids.length) throw new Error("Uno o mas componentes no son validos para este negocio.");
+    const count = await prisma.lightweightProduct.count({
+      where: {
+        tenantId: input.tenantId,
+        id: { in: ids },
+        type: { not: "COMBO" },
+        isActive: true,
+      },
+    });
+    if (count !== ids.length)
+      throw new Error(
+        "Uno o mas componentes no son validos para este negocio.",
+      );
   }
 }
 
@@ -270,42 +314,70 @@ export async function createProduct(input: ProductCatalogInput) {
   }
 
   const type = input.type ?? "PRODUCT";
-  return prisma.$transaction(async (tx) => {
-    const count = await tx.lightweightProduct.count({
-      where: { tenantId: input.tenantId },
-    });
-    await assertLimitAvailable(input.tenantId, "products", count);
+  return prisma.$transaction(
+    async (tx) => {
+      const count = await tx.lightweightProduct.count({
+        where: { tenantId: input.tenantId },
+      });
+      await assertLimitAvailable(input.tenantId, "products", count);
 
-    return tx.lightweightProduct.create({
-    data: {
-      tenantId: input.tenantId,
-      name,
-      type,
-      primaryCode: input.primaryCode.trim(),
-      auxiliaryCode: input.auxiliaryCode?.trim() || undefined,
-      description: input.description?.trim() || undefined,
-      price: new Prisma.Decimal(input.price),
-      price2: input.price2 === undefined ? undefined : new Prisma.Decimal(input.price2),
-      price3: input.price3 === undefined ? undefined : new Prisma.Decimal(input.price3),
-      cost:
-        input.cost === undefined ? undefined : new Prisma.Decimal(input.cost),
-      isActive: input.isActive ?? true,
-      trackInventory: type === "PRODUCT" ? input.trackInventory ?? true : false,
-      unit: input.unit ?? (type === "SERVICE" ? "SERVICE" : "UNIT"),
-      categoryId: input.categoryId || undefined,
-      stock: type === "PRODUCT" && (input.trackInventory ?? true) ? input.stock ?? 0 : 0,
-      minStock: input.minStock,
-      barcode: input.barcode?.trim() || undefined,
-      expiresAt: input.expiresAt,
-      taxRate: new Prisma.Decimal(input.taxRate ?? 0),
-      iceEnabled: input.iceEnabled ?? false,
-      iceCode: input.iceEnabled ? input.iceCode?.trim() || undefined : undefined,
-      iceRate: input.iceEnabled && input.iceRate !== undefined ? new Prisma.Decimal(input.iceRate) : undefined,
-      comboItems: type === "COMBO" ? { create: input.comboItems!.map((item) => ({ componentProductId: item.componentProductId, quantity: item.quantity })) } : undefined,
+      return tx.lightweightProduct.create({
+        data: {
+          tenantId: input.tenantId,
+          name,
+          type,
+          primaryCode: input.primaryCode.trim(),
+          auxiliaryCode: input.auxiliaryCode?.trim() || undefined,
+          description: input.description?.trim() || undefined,
+          price: new Prisma.Decimal(input.price),
+          price2:
+            input.price2 === undefined
+              ? undefined
+              : new Prisma.Decimal(input.price2),
+          price3:
+            input.price3 === undefined
+              ? undefined
+              : new Prisma.Decimal(input.price3),
+          cost:
+            input.cost === undefined
+              ? undefined
+              : new Prisma.Decimal(input.cost),
+          isActive: input.isActive ?? true,
+          trackInventory:
+            type === "PRODUCT" ? (input.trackInventory ?? true) : false,
+          unit: input.unit ?? (type === "SERVICE" ? "SERVICE" : "UNIT"),
+          categoryId: input.categoryId || undefined,
+          stock:
+            type === "PRODUCT" && (input.trackInventory ?? true)
+              ? (input.stock ?? 0)
+              : 0,
+          minStock: input.minStock,
+          barcode: input.barcode?.trim() || undefined,
+          expiresAt: input.expiresAt,
+          taxRate: new Prisma.Decimal(input.taxRate ?? 0),
+          iceEnabled: input.iceEnabled ?? false,
+          iceCode: input.iceEnabled
+            ? input.iceCode?.trim() || undefined
+            : undefined,
+          iceRate:
+            input.iceEnabled && input.iceRate !== undefined
+              ? new Prisma.Decimal(input.iceRate)
+              : undefined,
+          comboItems:
+            type === "COMBO"
+              ? {
+                  create: input.comboItems!.map((item) => ({
+                    componentProductId: item.componentProductId,
+                    quantity: item.quantity,
+                  })),
+                }
+              : undefined,
+        },
+        include: { category: true, comboItems: true },
+      });
     },
-    include: { category: true, comboItems: true },
-    });
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  );
 }
 
 export async function updateProduct(input: UpdateProductInput) {
@@ -330,29 +402,48 @@ export async function updateProduct(input: UpdateProductInput) {
     type: input.type ?? existing.type,
     primaryCode: input.primaryCode ?? existing.primaryCode ?? "",
     price: input.price ?? Number(existing.price),
-    price2: input.price2 ?? (existing.price2 === null ? undefined : Number(existing.price2)),
-    price3: input.price3 ?? (existing.price3 === null ? undefined : Number(existing.price3)),
-    cost: input.cost ?? (existing.cost === null ? undefined : Number(existing.cost)),
+    price2:
+      input.price2 ??
+      (existing.price2 === null ? undefined : Number(existing.price2)),
+    price3:
+      input.price3 ??
+      (existing.price3 === null ? undefined : Number(existing.price3)),
+    cost:
+      input.cost ??
+      (existing.cost === null ? undefined : Number(existing.cost)),
     stock: input.stock ?? existing.stock,
     minStock: input.minStock ?? existing.minStock ?? undefined,
     taxRate: input.taxRate ?? Number(existing.taxRate),
     unit: input.unit ?? existing.unit,
     iceEnabled: input.iceEnabled ?? existing.iceEnabled,
     iceCode: input.iceCode ?? existing.iceCode ?? undefined,
-    iceRate: input.iceRate ?? (existing.iceRate === null ? undefined : Number(existing.iceRate)),
-    comboItems: input.comboItems ?? existing.comboItems.map((item) => ({ componentProductId: item.componentProductId, quantity: item.quantity })),
+    iceRate:
+      input.iceRate ??
+      (existing.iceRate === null ? undefined : Number(existing.iceRate)),
+    comboItems:
+      input.comboItems ??
+      existing.comboItems.map((item) => ({
+        componentProductId: item.componentProductId,
+        quantity: item.quantity,
+      })),
   };
   await validateProductReferences(merged, input.productId);
 
   const data: Prisma.LightweightProductUpdateInput = {};
 
   if (input.type !== undefined) data.type = input.type;
-  if (input.primaryCode !== undefined) data.primaryCode = input.primaryCode.trim();
-  if (input.auxiliaryCode !== undefined) data.auxiliaryCode = input.auxiliaryCode.trim() || null;
-  if (input.description !== undefined) data.description = input.description.trim() || null;
+  if (input.primaryCode !== undefined)
+    data.primaryCode = input.primaryCode.trim();
+  if (input.auxiliaryCode !== undefined)
+    data.auxiliaryCode = input.auxiliaryCode.trim() || null;
+  if (input.description !== undefined)
+    data.description = input.description.trim() || null;
   if (input.isActive !== undefined) data.isActive = input.isActive;
   if (input.unit !== undefined) data.unit = input.unit;
-  if (input.categoryId !== undefined) data.category = input.categoryId ? { connect: { id: input.categoryId } } : { disconnect: true };
+  if (input.categoryId !== undefined)
+    data.category = input.categoryId
+      ? { connect: { id: input.categoryId } }
+      : { disconnect: true };
 
   if (input.name !== undefined) {
     const name = input.name.trim();
@@ -373,8 +464,10 @@ export async function updateProduct(input: UpdateProductInput) {
     assertPositiveMoney(input.cost, "El costo");
     data.cost = new Prisma.Decimal(input.cost);
   }
-  if (input.price2 !== undefined) data.price2 = new Prisma.Decimal(input.price2);
-  if (input.price3 !== undefined) data.price3 = new Prisma.Decimal(input.price3);
+  if (input.price2 !== undefined)
+    data.price2 = new Prisma.Decimal(input.price2);
+  if (input.price3 !== undefined)
+    data.price3 = new Prisma.Decimal(input.price3);
 
   if (input.minStock !== undefined) {
     if (input.minStock < 0) {
@@ -399,12 +492,22 @@ export async function updateProduct(input: UpdateProductInput) {
 
   if (input.iceEnabled !== undefined) data.iceEnabled = input.iceEnabled;
   if (input.iceCode !== undefined) data.iceCode = input.iceCode.trim() || null;
-  if (input.iceRate !== undefined) data.iceRate = new Prisma.Decimal(input.iceRate);
+  if (input.iceRate !== undefined)
+    data.iceRate = new Prisma.Decimal(input.iceRate);
   const finalType = input.type ?? existing.type;
-  data.trackInventory = finalType === "PRODUCT" ? input.trackInventory ?? existing.trackInventory : false;
+  data.trackInventory =
+    finalType === "PRODUCT"
+      ? (input.trackInventory ?? existing.trackInventory)
+      : false;
   if (finalType !== "PRODUCT") data.stock = 0;
   if (finalType === "COMBO" && input.comboItems) {
-    data.comboItems = { deleteMany: {}, create: input.comboItems.map((item) => ({ componentProductId: item.componentProductId, quantity: item.quantity })) };
+    data.comboItems = {
+      deleteMany: {},
+      create: input.comboItems.map((item) => ({
+        componentProductId: item.componentProductId,
+        quantity: item.quantity,
+      })),
+    };
   } else if (finalType !== "COMBO") {
     data.comboItems = { deleteMany: {} };
   }
@@ -460,20 +563,33 @@ export async function adjustProductStock(input: AdjustStockInput) {
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function normalizeCustomerEmails(primary: string | undefined, additional: string[] | undefined) {
+function normalizeCustomerEmails(
+  primary: string | undefined,
+  additional: string[] | undefined,
+) {
   const emails = [primary, ...(additional ?? [])]
     .map((email) => email?.trim().toLowerCase())
     .filter((email): email is string => Boolean(email));
-  if (emails.length > 5) throw new Error("Puedes registrar un maximo de 5 correos.");
-  if (new Set(emails).size !== emails.length) throw new Error("No repitas correos dentro del mismo cliente.");
-  if (emails.some((email) => !EMAIL_PATTERN.test(email))) throw new Error("Uno o mas correos no tienen un formato valido.");
+  if (emails.length > 5)
+    throw new Error("Puedes registrar un maximo de 5 correos.");
+  if (new Set(emails).size !== emails.length)
+    throw new Error("No repitas correos dentro del mismo cliente.");
+  if (emails.some((email) => !EMAIL_PATTERN.test(email)))
+    throw new Error("Uno o mas correos no tienen un formato valido.");
   return emails;
 }
 
-function normalizeCustomerPhones(primary: string | undefined, additional: string[] | undefined) {
-  const phones = [primary, ...(additional ?? [])].map((phone) => phone?.trim()).filter((phone): phone is string => Boolean(phone));
-  if (phones.length > 3) throw new Error("Puedes registrar un máximo de 3 teléfonos.");
-  if (new Set(phones).size !== phones.length) throw new Error("No repitas teléfonos dentro del mismo cliente.");
+function normalizeCustomerPhones(
+  primary: string | undefined,
+  additional: string[] | undefined,
+) {
+  const phones = [primary, ...(additional ?? [])]
+    .map((phone) => phone?.trim())
+    .filter((phone): phone is string => Boolean(phone));
+  if (phones.length > 3)
+    throw new Error("Puedes registrar un máximo de 3 teléfonos.");
+  if (new Set(phones).size !== phones.length)
+    throw new Error("No repitas teléfonos dentro del mismo cliente.");
   return phones;
 }
 
@@ -481,20 +597,29 @@ async function validateCustomerFiscalInput(
   tenantId: string,
   type: LightweightCustomerIdentificationType | null | undefined,
   value: string | undefined,
-  customerId?: string
+  customerId?: string,
 ) {
   if (!type && !value?.trim()) return null;
-  if (!type || !value?.trim()) throw new Error("Completa el tipo y la identificacion fiscal.");
+  if (!type || !value?.trim())
+    throw new Error("Completa el tipo y la identificacion fiscal.");
   const identification = validateCustomerIdentification(type, value);
   const duplicate = await getPrismaClient().lightweightCustomer.findFirst({
-    where: { tenantId, identification, ...(customerId ? { id: { not: customerId } } : {}) },
+    where: {
+      tenantId,
+      identification,
+      ...(customerId ? { id: { not: customerId } } : {}),
+    },
     select: { id: true },
   });
-  if (duplicate) throw new Error("Ya existe un cliente con esta identificacion.");
+  if (duplicate)
+    throw new Error("Ya existe un cliente con esta identificacion.");
   return normalizeCustomerIdentification(type, identification);
 }
 
-export async function listCustomers(tenantId: string, input: CustomerListInput = {}) {
+export async function listCustomers(
+  tenantId: string,
+  input: CustomerListInput = {},
+) {
   const prisma = getPrismaClient();
   const search = normalizeSearch(input.search);
 
@@ -502,8 +627,17 @@ export async function listCustomers(tenantId: string, input: CustomerListInput =
     where: {
       tenantId,
       ...(input.status ? { isActive: input.status === "active" } : {}),
-      ...(input.fiscalStatus === "ready" ? { identificationType: { not: null }, identification: { not: null } } : {}),
-      ...(input.fiscalStatus === "pending" ? { NOT: { identificationType: { not: null }, identification: { not: null } } } : {}),
+      ...(input.fiscalStatus === "ready"
+        ? { identificationType: { not: null }, identification: { not: null } }
+        : {}),
+      ...(input.fiscalStatus === "pending"
+        ? {
+            NOT: {
+              identificationType: { not: null },
+              identification: { not: null },
+            },
+          }
+        : {}),
       ...(search
         ? {
             OR: [
@@ -532,7 +666,11 @@ export async function createCustomer(input: CreateCustomerInput) {
 
   const emails = normalizeCustomerEmails(input.email, input.additionalEmails);
   const phones = normalizeCustomerPhones(input.phone, input.phoneNumbers);
-  const identification = await validateCustomerFiscalInput(input.tenantId, input.identificationType, input.identification);
+  const identification = await validateCustomerFiscalInput(
+    input.tenantId,
+    input.identificationType,
+    input.identification,
+  );
 
   const count = await prisma.lightweightCustomer.count({
     where: { tenantId: input.tenantId },
@@ -559,6 +697,9 @@ export async function createCustomer(input: CreateCustomerInput) {
       customerOrigin: input.customerOrigin?.trim() || undefined,
       groupName: input.groupName?.trim() || undefined,
       assignedSellerId: input.assignedSellerId?.trim() || undefined,
+      isRelated: input.isRelated ?? false,
+      isForeign: input.isForeign ?? false,
+      invoiceThirdParty: input.invoiceThirdParty ?? false,
       identificationType: input.identificationType ?? undefined,
       identification,
       taxpayerStatus: input.taxpayerStatus?.trim() || undefined,
@@ -582,7 +723,15 @@ export async function updateCustomer(input: UpdateCustomerInput) {
       id: input.customerId,
       tenantId: input.tenantId,
     },
-    select: { id: true, identificationType: true, identification: true, email: true, additionalEmails: true, phone: true, phoneNumbers: true },
+    select: {
+      id: true,
+      identificationType: true,
+      identification: true,
+      email: true,
+      additionalEmails: true,
+      phone: true,
+      phoneNumbers: true,
+    },
   });
 
   if (!existing) {
@@ -591,10 +740,21 @@ export async function updateCustomer(input: UpdateCustomerInput) {
 
   const data: Prisma.LightweightCustomerUpdateInput = {};
 
-  if (input.identificationType !== undefined || input.identification !== undefined) {
-    const type = input.identificationType === undefined ? existing.identificationType : input.identificationType;
+  if (
+    input.identificationType !== undefined ||
+    input.identification !== undefined
+  ) {
+    const type =
+      input.identificationType === undefined
+        ? existing.identificationType
+        : input.identificationType;
     data.identificationType = type;
-    data.identification = await validateCustomerFiscalInput(input.tenantId, type, input.identification ?? existing.identification ?? undefined, input.customerId);
+    data.identification = await validateCustomerFiscalInput(
+      input.tenantId,
+      type,
+      input.identification ?? existing.identification ?? undefined,
+      input.customerId,
+    );
   }
 
   if (input.name !== undefined) {
@@ -608,13 +768,19 @@ export async function updateCustomer(input: UpdateCustomerInput) {
   }
 
   if (input.phone !== undefined || input.phoneNumbers !== undefined) {
-    const phones = normalizeCustomerPhones(input.phone ?? existing.phone ?? undefined, input.phoneNumbers ?? existing.phoneNumbers);
+    const phones = normalizeCustomerPhones(
+      input.phone ?? existing.phone ?? undefined,
+      input.phoneNumbers ?? existing.phoneNumbers,
+    );
     data.phone = phones[0] ?? null;
     data.phoneNumbers = phones.slice(1);
   }
 
   if (input.email !== undefined || input.additionalEmails !== undefined) {
-    const emails = normalizeCustomerEmails(input.email ?? existing.email ?? undefined, input.additionalEmails ?? existing.additionalEmails);
+    const emails = normalizeCustomerEmails(
+      input.email ?? existing.email ?? undefined,
+      input.additionalEmails ?? existing.additionalEmails,
+    );
     data.email = emails[0] ?? null;
     data.additionalEmails = emails.slice(1);
   }
@@ -622,11 +788,34 @@ export async function updateCustomer(input: UpdateCustomerInput) {
   if (input.address !== undefined) {
     data.address = input.address.trim() || null;
   }
-  if (input.country !== undefined) data.country = input.country.trim() || "Ecuador";
-  for (const field of ["tradeName", "province", "city", "parish", "sector", "zone", "customerType", "customerOrigin", "groupName", "assignedSellerId", "taxpayerStatus", "taxpayerLegalName", "taxpayerTradeName", "taxpayerType", "economicActivity", "taxDataSource"] as const) {
+  if (input.country !== undefined)
+    data.country = input.country.trim() || "Ecuador";
+  for (const field of [
+    "tradeName",
+    "province",
+    "city",
+    "parish",
+    "sector",
+    "zone",
+    "customerType",
+    "customerOrigin",
+    "groupName",
+    "assignedSellerId",
+    "taxpayerStatus",
+    "taxpayerLegalName",
+    "taxpayerTradeName",
+    "taxpayerType",
+    "economicActivity",
+    "taxDataSource",
+  ] as const) {
     if (input[field] !== undefined) data[field] = input[field]?.trim() || null;
   }
-  if (input.taxDataQueriedAt !== undefined) data.taxDataQueriedAt = input.taxDataQueriedAt;
+  if (input.taxDataQueriedAt !== undefined)
+    data.taxDataQueriedAt = input.taxDataQueriedAt;
+  if (input.isRelated !== undefined) data.isRelated = input.isRelated;
+  if (input.isForeign !== undefined) data.isForeign = input.isForeign;
+  if (input.invoiceThirdParty !== undefined)
+    data.invoiceThirdParty = input.invoiceThirdParty;
   if (input.notes !== undefined) data.notes = input.notes.trim() || null;
   if (input.isActive !== undefined) data.isActive = input.isActive;
 
@@ -638,7 +827,10 @@ export async function updateCustomer(input: UpdateCustomerInput) {
 
 function buildSalesWhere(
   tenantId: string,
-  input: { status?: "all" | "paid" | "pending" | "canceled"; customerId?: string }
+  input: {
+    status?: "all" | "paid" | "pending" | "canceled";
+    customerId?: string;
+  },
 ): Prisma.LightweightSaleWhereInput {
   const status = input.status ?? "all";
   return {
@@ -648,7 +840,9 @@ function buildSalesWhere(
     ...(status === "pending"
       ? {
           status: { not: "canceled" as LightweightSaleStatus },
-          paymentStatus: { in: ["pending", "partial"] as LightweightPaymentStatus[] },
+          paymentStatus: {
+            in: ["pending", "partial"] as LightweightPaymentStatus[],
+          },
         }
       : {}),
     ...(status === "canceled" ? { status: "canceled" } : {}),
@@ -657,10 +851,15 @@ function buildSalesWhere(
 
 export async function countSales(
   tenantId: string,
-  input: { status?: "all" | "paid" | "pending" | "canceled"; customerId?: string } = {}
+  input: {
+    status?: "all" | "paid" | "pending" | "canceled";
+    customerId?: string;
+  } = {},
 ): Promise<number> {
   const prisma = getPrismaClient();
-  return prisma.lightweightSale.count({ where: buildSalesWhere(tenantId, input) });
+  return prisma.lightweightSale.count({
+    where: buildSalesWhere(tenantId, input),
+  });
 }
 
 export async function countActiveSales(tenantId: string): Promise<number> {
@@ -677,7 +876,7 @@ export async function listSales(
     customerId?: string;
     page?: number;
     perPage?: number;
-  } = {}
+  } = {},
 ) {
   const prisma = getPrismaClient();
   const perPage = Math.min(input.perPage ?? 20, 50);
@@ -721,7 +920,7 @@ export async function getSaleById(tenantId: string, saleId: string) {
 
 function resolvePaymentStatus(
   total: Prisma.Decimal,
-  paidAmount: Prisma.Decimal
+  paidAmount: Prisma.Decimal,
 ): LightweightPaymentStatus {
   if (paidAmount.equals(0)) {
     return "pending";
@@ -735,7 +934,7 @@ function resolvePaymentStatus(
 }
 
 function resolveSaleStatus(
-  paymentStatus: LightweightPaymentStatus
+  paymentStatus: LightweightPaymentStatus,
 ): LightweightSaleStatus {
   return paymentStatus === "paid" ? "paid" : "open";
 }
@@ -770,7 +969,9 @@ export async function createSale(input: CreateSaleInput) {
       },
       include: { comboItems: { include: { componentProduct: true } } },
     });
-    const productById = new Map(products.map((product) => [product.id, product]));
+    const productById = new Map(
+      products.map((product) => [product.id, product]),
+    );
 
     if (products.length !== productIds.length) {
       throw new Error("Uno o mas productos no pertenecen a este tenant.");
@@ -801,22 +1002,31 @@ export async function createSale(input: CreateSaleInput) {
         throw new Error("Producto no encontrado.");
       }
 
-      if (product.type === "PRODUCT" && product.trackInventory && product.stock < item.quantity) {
+      if (
+        product.type === "PRODUCT" &&
+        product.trackInventory &&
+        product.stock < item.quantity
+      ) {
         throw new Error(`Stock insuficiente para ${product.name}.`);
       }
 
       if (product.type === "COMBO") {
         for (const comboItem of product.comboItems) {
           const required = Number(comboItem.quantity) * item.quantity;
-          if (comboItem.componentProduct.trackInventory && comboItem.componentProduct.stock < required) {
-            throw new Error(`Stock insuficiente para ${comboItem.componentProduct.name}, componente de ${product.name}.`);
+          if (
+            comboItem.componentProduct.trackInventory &&
+            comboItem.componentProduct.stock < required
+          ) {
+            throw new Error(
+              `Stock insuficiente para ${comboItem.componentProduct.name}, componente de ${product.name}.`,
+            );
           }
         }
       }
 
       const grossAmount = product.price.mul(item.quantity);
       const discountAmount = new Prisma.Decimal(
-        Math.max(0, Math.min(item.discountAmount ?? 0, Number(grossAmount)))
+        Math.max(0, Math.min(item.discountAmount ?? 0, Number(grossAmount))),
       );
       const lineSubtotal = grossAmount.sub(discountAmount);
       const taxRate = product.taxRate;
@@ -841,12 +1051,14 @@ export async function createSale(input: CreateSaleInput) {
     const total = subtotal.add(taxTotal);
 
     const requestedPaidAmount =
-      input.paymentMethod === "credit" ? 0 : input.paidAmount ?? Number(total);
+      input.paymentMethod === "credit"
+        ? 0
+        : (input.paidAmount ?? Number(total));
     assertPositiveMoney(requestedPaidAmount, "El pago");
 
     const paidAmount = Prisma.Decimal.min(
       new Prisma.Decimal(requestedPaidAmount),
-      total
+      total,
     );
     const paymentStatus = resolvePaymentStatus(total, paidAmount);
     const status = resolveSaleStatus(paymentStatus);
@@ -894,19 +1106,29 @@ export async function createSale(input: CreateSaleInput) {
     const inventoryDemand = new Map<string, number>();
     for (const item of saleItems) {
       if (item.product.type === "PRODUCT" && item.product.trackInventory) {
-        inventoryDemand.set(item.product.id, (inventoryDemand.get(item.product.id) ?? 0) + item.quantity);
+        inventoryDemand.set(
+          item.product.id,
+          (inventoryDemand.get(item.product.id) ?? 0) + item.quantity,
+        );
       }
       if (item.product.type === "COMBO") {
         for (const component of item.product.comboItems) {
           if (component.componentProduct.trackInventory) {
-            inventoryDemand.set(component.componentProductId, (inventoryDemand.get(component.componentProductId) ?? 0) + Number(component.quantity) * item.quantity);
+            inventoryDemand.set(
+              component.componentProductId,
+              (inventoryDemand.get(component.componentProductId) ?? 0) +
+                Number(component.quantity) * item.quantity,
+            );
           }
         }
       }
     }
 
     const inventoryProducts = await tx.lightweightProduct.findMany({
-      where: { tenantId: input.tenantId, id: { in: [...inventoryDemand.keys()] } },
+      where: {
+        tenantId: input.tenantId,
+        id: { in: [...inventoryDemand.keys()] },
+      },
       select: { id: true, name: true, stock: true },
     });
     for (const product of inventoryProducts) {
@@ -960,7 +1182,13 @@ export async function cancelSale(tenantId: string, saleId: string) {
         tenantId,
       },
       include: {
-        items: { include: { product: { include: { comboItems: { include: { componentProduct: true } } } } } },
+        items: {
+          include: {
+            product: {
+              include: { comboItems: { include: { componentProduct: true } } },
+            },
+          },
+        },
         payments: true,
       },
     });
@@ -975,19 +1203,26 @@ export async function cancelSale(tenantId: string, saleId: string) {
 
     const paidAmount = sale.payments.reduce(
       (sum, payment) => sum.add(payment.amount),
-      new Prisma.Decimal(0)
+      new Prisma.Decimal(0),
     );
     const balanceImpact = sale.total.sub(paidAmount);
 
     const inventoryRestore = new Map<string, number>();
     for (const item of sale.items) {
       if (item.product.type === "PRODUCT" && item.product.trackInventory) {
-        inventoryRestore.set(item.productId, (inventoryRestore.get(item.productId) ?? 0) + item.quantity);
+        inventoryRestore.set(
+          item.productId,
+          (inventoryRestore.get(item.productId) ?? 0) + item.quantity,
+        );
       }
       if (item.product.type === "COMBO") {
         for (const component of item.product.comboItems) {
           if (component.componentProduct.trackInventory) {
-            inventoryRestore.set(component.componentProductId, (inventoryRestore.get(component.componentProductId) ?? 0) + component.quantity * item.quantity);
+            inventoryRestore.set(
+              component.componentProductId,
+              (inventoryRestore.get(component.componentProductId) ?? 0) +
+                component.quantity * item.quantity,
+            );
           }
         }
       }
@@ -1068,7 +1303,7 @@ export async function addSalePayment(input: AddSalePaymentInput) {
 
     const paidAmount = sale.payments.reduce(
       (sum, payment) => sum.add(payment.amount),
-      new Prisma.Decimal(0)
+      new Prisma.Decimal(0),
     );
     const pending = sale.total.sub(paidAmount);
 
@@ -1078,7 +1313,7 @@ export async function addSalePayment(input: AddSalePaymentInput) {
 
     const paymentAmount = Prisma.Decimal.min(
       new Prisma.Decimal(input.amount),
-      pending
+      pending,
     );
     const nextPaid = paidAmount.add(paymentAmount);
     const paymentStatus = resolvePaymentStatus(sale.total, nextPaid);
@@ -1232,10 +1467,10 @@ export async function getBasicReports(tenantId: string) {
         sum.add(
           sale.payments.reduce(
             (paymentSum, payment) => paymentSum.add(payment.amount),
-            new Prisma.Decimal(0)
-          )
+            new Prisma.Decimal(0),
+          ),
         ),
-      new Prisma.Decimal(0)
+      new Prisma.Decimal(0),
     );
 
   const monthTotal = sumSales(monthSales);
@@ -1250,7 +1485,7 @@ export async function getBasicReports(tenantId: string) {
 
       return accumulator;
     },
-    {}
+    {},
   );
   const topProductsMap = new Map<
     string,
@@ -1282,7 +1517,7 @@ export async function getBasicReports(tenantId: string) {
       (product) =>
         product.stock > 0 &&
         product.minStock !== null &&
-        product.stock <= product.minStock
+        product.stock <= product.minStock,
     ),
     outOfStockProducts: products.filter((product) => product.stock <= 0),
     counts: {
@@ -1299,7 +1534,7 @@ export async function listStockMovements(
     productId?: string;
     type?: "sale" | "adjustment";
     take?: number;
-  } = {}
+  } = {},
 ) {
   const prisma = getPrismaClient();
 
@@ -1380,15 +1615,15 @@ export async function getDailyCashSummary(tenantId: string) {
 
       return accumulator;
     },
-    {}
+    {},
   );
   const totalSales = salesToday.reduce(
     (sum, sale) => sum.add(sale.total),
-    new Prisma.Decimal(0)
+    new Prisma.Decimal(0),
   );
   const totalCollected = paymentsToday.reduce(
     (sum, payment) => sum.add(payment.amount),
-    new Prisma.Decimal(0)
+    new Prisma.Decimal(0),
   );
 
   return {

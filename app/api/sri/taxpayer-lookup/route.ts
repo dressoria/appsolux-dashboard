@@ -7,11 +7,28 @@ import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ found: false, message: "Sesión requerida." }, { status: 401 });
+    if (!user)
+      return NextResponse.json(
+        { found: false, message: "Sesión requerida." },
+        { status: 401 },
+      );
     await getCurrentTenant(user);
-    const identification = new URL(request.url).searchParams.get("identification")?.trim() ?? "";
+    const identification =
+      new URL(request.url).searchParams.get("identification")?.trim() ?? "";
     return NextResponse.json(await lookupSriTaxpayer(identification));
   } catch (error) {
-    return NextResponse.json({ found: false, message: error instanceof Error ? error.message : "No se pudo consultar la identificación." }, { status: 400 });
+    const providerFailure =
+      error instanceof Error && error.message.startsWith("TAXPAYER_PROVIDER_");
+    return NextResponse.json(
+      {
+        found: false,
+        message: providerFailure
+          ? "No pudimos consultar la información tributaria en este momento. Puedes continuar manualmente."
+          : error instanceof Error
+            ? error.message
+            : "No se pudo consultar la identificación.",
+      },
+      { status: providerFailure ? 503 : 400 },
+    );
   }
 }

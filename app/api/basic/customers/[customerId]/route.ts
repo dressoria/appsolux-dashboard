@@ -18,11 +18,15 @@ function getString(body: Record<string, unknown>, key: string) {
 }
 
 function getEmails(body: Record<string, unknown>) {
-  return Array.isArray(body.emails) ? body.emails.filter((value): value is string => typeof value === "string") : undefined;
+  return Array.isArray(body.emails)
+    ? body.emails.filter((value): value is string => typeof value === "string")
+    : undefined;
 }
 
 function getStrings(body: Record<string, unknown>, key: string) {
-  return Array.isArray(body[key]) ? body[key].filter((value): value is string => typeof value === "string") : undefined;
+  return Array.isArray(body[key])
+    ? body[key].filter((value): value is string => typeof value === "string")
+    : undefined;
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -32,7 +36,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (!user) {
       return NextResponse.json(
         { ok: false, message: "Sesion requerida." },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -62,7 +66,16 @@ export async function PATCH(request: Request, context: RouteContext) {
       customerOrigin: getString(body, "customerOrigin"),
       groupName: getString(body, "groupName"),
       assignedSellerId: getString(body, "assignedSellerId"),
-      identificationType: identificationType === "" ? null : identificationType as never,
+      isRelated:
+        typeof body.isRelated === "boolean" ? body.isRelated : undefined,
+      isForeign:
+        typeof body.isForeign === "boolean" ? body.isForeign : undefined,
+      invoiceThirdParty:
+        typeof body.invoiceThirdParty === "boolean"
+          ? body.invoiceThirdParty
+          : undefined,
+      identificationType:
+        identificationType === "" ? null : (identificationType as never),
       identification: getString(body, "identification"),
       taxpayerStatus: getString(body, "taxpayerStatus"),
       taxpayerLegalName: getString(body, "taxpayerLegalName"),
@@ -70,7 +83,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       taxpayerType: getString(body, "taxpayerType"),
       economicActivity: getString(body, "economicActivity"),
       taxDataSource: getString(body, "taxDataSource"),
-      taxDataQueriedAt: getString(body, "taxDataQueriedAt") ? new Date(getString(body, "taxDataQueriedAt")!) : undefined,
+      taxDataQueriedAt: getString(body, "taxDataQueriedAt")
+        ? new Date(getString(body, "taxDataQueriedAt")!)
+        : undefined,
       notes: getString(body, "notes"),
       isActive: typeof body.isActive === "boolean" ? body.isActive : undefined,
     });
@@ -83,7 +98,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         message:
           error instanceof Error ? error.message : "No se pudo actualizar.",
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
 }
@@ -91,7 +106,11 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ ok: false, message: "Sesion requerida." }, { status: 401 });
+    if (!user)
+      return NextResponse.json(
+        { ok: false, message: "Sesion requerida." },
+        { status: 401 },
+      );
     const tenant = await getCurrentTenant(user);
     await requireTenantOperationalAccess(tenant.id);
     const { customerId } = await context.params;
@@ -100,13 +119,31 @@ export async function DELETE(_request: Request, context: RouteContext) {
       where: { id: customerId, tenantId: tenant.id },
       select: { id: true, _count: { select: { sales: true } } },
     });
-    if (!customer) return NextResponse.json({ ok: false, message: "Cliente no encontrado." }, { status: 404 });
+    if (!customer)
+      return NextResponse.json(
+        { ok: false, message: "Cliente no encontrado." },
+        { status: 404 },
+      );
     if (customer._count.sales > 0) {
-      return NextResponse.json({ ok: false, message: "Este cliente tiene ventas. Desactivalo para conservar el historial." }, { status: 400 });
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "Este cliente tiene ventas. Desactivalo para conservar el historial.",
+        },
+        { status: 400 },
+      );
     }
     await prisma.lightweightCustomer.delete({ where: { id: customer.id } });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return NextResponse.json({ ok: false, message: error instanceof Error ? error.message : "No se pudo eliminar." }, { status: 400 });
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          error instanceof Error ? error.message : "No se pudo eliminar.",
+      },
+      { status: 400 },
+    );
   }
 }
