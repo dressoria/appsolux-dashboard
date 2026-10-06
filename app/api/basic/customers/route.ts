@@ -13,6 +13,10 @@ function getEmails(body: Record<string, unknown>) {
   return Array.isArray(body.emails) ? body.emails.filter((value): value is string => typeof value === "string") : [];
 }
 
+function getStrings(body: Record<string, unknown>, key: string) {
+  return Array.isArray(body[key]) ? body[key].filter((value): value is string => typeof value === "string") : [];
+}
+
 export async function GET(request: Request) {
   const user = await getCurrentUser();
 
@@ -44,12 +48,31 @@ export async function POST(request: Request) {
     const customer = await createCustomer({
       tenantId: tenant.id,
       name: getString(body, "name"),
+      tradeName: getString(body, "tradeName") || undefined,
       phone: getString(body, "phone") || undefined,
+      phoneNumbers: getStrings(body, "phoneNumbers"),
       email: getEmails(body)[0] || getString(body, "email") || undefined,
       additionalEmails: getEmails(body).slice(1),
       address: getString(body, "address") || undefined,
+      country: getString(body, "country") || "Ecuador",
+      province: getString(body, "province") || undefined,
+      city: getString(body, "city") || undefined,
+      parish: getString(body, "parish") || undefined,
+      sector: getString(body, "sector") || undefined,
+      zone: getString(body, "zone") || undefined,
+      customerType: getString(body, "customerType") || undefined,
+      customerOrigin: getString(body, "customerOrigin") || undefined,
+      groupName: getString(body, "groupName") || undefined,
+      assignedSellerId: getString(body, "assignedSellerId") || undefined,
       identificationType: (getString(body, "identificationType") || null) as never,
       identification: getString(body, "identification") || undefined,
+      taxpayerStatus: getString(body, "taxpayerStatus") || undefined,
+      taxpayerLegalName: getString(body, "taxpayerLegalName") || undefined,
+      taxpayerTradeName: getString(body, "taxpayerTradeName") || undefined,
+      taxpayerType: getString(body, "taxpayerType") || undefined,
+      economicActivity: getString(body, "economicActivity") || undefined,
+      taxDataSource: getString(body, "taxDataSource") || undefined,
+      taxDataQueriedAt: getString(body, "taxDataQueriedAt") ? new Date(getString(body, "taxDataQueriedAt")) : undefined,
       notes: getString(body, "notes") || undefined,
       isActive: typeof body.isActive === "boolean" ? body.isActive : undefined,
     });

@@ -1,0 +1,7 @@
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { validateImportRows, type CustomerImportRow } from "@/lib/core/customer-import";
+import { createCustomer } from "@/lib/core/lightweight-pos";
+import { getPrismaClient } from "@/lib/db/prisma";
+import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+export async function POST(request: Request) { try { const user = await getCurrentUser(); if (!user) return NextResponse.json({ message: "Sesión requerida." }, { status: 401 }); const tenant = await getCurrentTenant(user); const body = await request.json() as { rows?: CustomerImportRow[] }; const rows = body.rows ?? []; const existing = new Set((await getPrismaClient().lightweightCustomer.findMany({ where: { tenantId: tenant.id, identification: { not: null } }, select: { identification: true } })).flatMap((item) => item.identification ? [item.identification] : [])); const validation = validateImportRows(rows, existing); if (validation.errors) return NextResponse.json({ message: "Corrige los errores antes de importar.", ...validation }, { status: 400 }); for (const row of rows) await createCustomer({ tenantId: tenant.id, ...row, identificationType: row.identificationType as "RUC" | "CEDULA" | "PASSPORT" | "FOREIGN_ID", country: row.country || "Ecuador" }); return NextResponse.json({ message: `${rows.length} cliente(s) importado(s).` }); } catch (error) { return NextResponse.json({ message: error instanceof Error ? error.message : "No se pudo importar." }, { status: 400 }); } }

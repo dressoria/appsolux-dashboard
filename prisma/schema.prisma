@@ -625,12 +625,31 @@ model LightweightCustomer {
   id                 String                                 @id @default(cuid())
   tenantId           String
   name               String
+  tradeName          String?
   phone              String?
+  phoneNumbers       String[]                               @default([])
   email              String?
   additionalEmails   String[]                               @default([])
   address            String?
+  country            String                                 @default("Ecuador")
+  province           String?
+  city               String?
+  parish             String?
+  sector             String?
+  zone               String?
+  customerType       String?
+  customerOrigin     String?
+  groupName          String?
+  assignedSellerId   String?
   identificationType LightweightCustomerIdentificationType?
   identification     String?
+  taxpayerStatus     String?
+  taxpayerLegalName  String?
+  taxpayerTradeName  String?
+  taxpayerType       String?
+  economicActivity   String?
+  taxDataSource      String?
+  taxDataQueriedAt   DateTime?
   notes              String?
   isActive           Boolean                                @default(true)
   balance            Decimal                                @default(0) @db.Decimal(12, 2)

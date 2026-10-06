@@ -21,6 +21,10 @@ function getEmails(body: Record<string, unknown>) {
   return Array.isArray(body.emails) ? body.emails.filter((value): value is string => typeof value === "string") : undefined;
 }
 
+function getStrings(body: Record<string, unknown>, key: string) {
+  return Array.isArray(body[key]) ? body[key].filter((value): value is string => typeof value === "string") : undefined;
+}
+
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const user = await getCurrentUser();
@@ -42,12 +46,31 @@ export async function PATCH(request: Request, context: RouteContext) {
       tenantId: tenant.id,
       customerId,
       name: getString(body, "name"),
+      tradeName: getString(body, "tradeName"),
       phone: getString(body, "phone"),
+      phoneNumbers: getStrings(body, "phoneNumbers"),
       email: emails?.[0] ?? getString(body, "email"),
       additionalEmails: emails?.slice(1),
       address: getString(body, "address"),
+      country: getString(body, "country"),
+      province: getString(body, "province"),
+      city: getString(body, "city"),
+      parish: getString(body, "parish"),
+      sector: getString(body, "sector"),
+      zone: getString(body, "zone"),
+      customerType: getString(body, "customerType"),
+      customerOrigin: getString(body, "customerOrigin"),
+      groupName: getString(body, "groupName"),
+      assignedSellerId: getString(body, "assignedSellerId"),
       identificationType: identificationType === "" ? null : identificationType as never,
       identification: getString(body, "identification"),
+      taxpayerStatus: getString(body, "taxpayerStatus"),
+      taxpayerLegalName: getString(body, "taxpayerLegalName"),
+      taxpayerTradeName: getString(body, "taxpayerTradeName"),
+      taxpayerType: getString(body, "taxpayerType"),
+      economicActivity: getString(body, "economicActivity"),
+      taxDataSource: getString(body, "taxDataSource"),
+      taxDataQueriedAt: getString(body, "taxDataQueriedAt") ? new Date(getString(body, "taxDataQueriedAt")!) : undefined,
       notes: getString(body, "notes"),
       isActive: typeof body.isActive === "boolean" ? body.isActive : undefined,
     });

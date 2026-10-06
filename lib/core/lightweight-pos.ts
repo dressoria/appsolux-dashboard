@@ -60,12 +60,31 @@ type AdjustStockInput = {
 type CreateCustomerInput = {
   tenantId: string;
   name: string;
+  tradeName?: string;
   phone?: string;
+  phoneNumbers?: string[];
   email?: string;
   additionalEmails?: string[];
   address?: string;
+  country?: string;
+  province?: string;
+  city?: string;
+  parish?: string;
+  sector?: string;
+  zone?: string;
+  customerType?: string;
+  customerOrigin?: string;
+  groupName?: string;
+  assignedSellerId?: string;
   identificationType?: LightweightCustomerIdentificationType | null;
   identification?: string;
+  taxpayerStatus?: string;
+  taxpayerLegalName?: string;
+  taxpayerTradeName?: string;
+  taxpayerType?: string;
+  economicActivity?: string;
+  taxDataSource?: string;
+  taxDataQueriedAt?: Date | null;
   notes?: string;
   isActive?: boolean;
 };
@@ -451,6 +470,13 @@ function normalizeCustomerEmails(primary: string | undefined, additional: string
   return emails;
 }
 
+function normalizeCustomerPhones(primary: string | undefined, additional: string[] | undefined) {
+  const phones = [primary, ...(additional ?? [])].map((phone) => phone?.trim()).filter((phone): phone is string => Boolean(phone));
+  if (phones.length > 3) throw new Error("Puedes registrar un máximo de 3 teléfonos.");
+  if (new Set(phones).size !== phones.length) throw new Error("No repitas teléfonos dentro del mismo cliente.");
+  return phones;
+}
+
 async function validateCustomerFiscalInput(
   tenantId: string,
   type: LightweightCustomerIdentificationType | null | undefined,
@@ -505,6 +531,7 @@ export async function createCustomer(input: CreateCustomerInput) {
   }
 
   const emails = normalizeCustomerEmails(input.email, input.additionalEmails);
+  const phones = normalizeCustomerPhones(input.phone, input.phoneNumbers);
   const identification = await validateCustomerFiscalInput(input.tenantId, input.identificationType, input.identification);
 
   const count = await prisma.lightweightCustomer.count({
@@ -516,12 +543,31 @@ export async function createCustomer(input: CreateCustomerInput) {
     data: {
       tenantId: input.tenantId,
       name,
-      phone: input.phone?.trim() || undefined,
+      tradeName: input.tradeName?.trim() || undefined,
+      phone: phones[0],
+      phoneNumbers: phones.slice(1),
       email: emails[0],
       additionalEmails: emails.slice(1),
       address: input.address?.trim() || undefined,
+      country: input.country?.trim() || "Ecuador",
+      province: input.province?.trim() || undefined,
+      city: input.city?.trim() || undefined,
+      parish: input.parish?.trim() || undefined,
+      sector: input.sector?.trim() || undefined,
+      zone: input.zone?.trim() || undefined,
+      customerType: input.customerType?.trim() || undefined,
+      customerOrigin: input.customerOrigin?.trim() || undefined,
+      groupName: input.groupName?.trim() || undefined,
+      assignedSellerId: input.assignedSellerId?.trim() || undefined,
       identificationType: input.identificationType ?? undefined,
       identification,
+      taxpayerStatus: input.taxpayerStatus?.trim() || undefined,
+      taxpayerLegalName: input.taxpayerLegalName?.trim() || undefined,
+      taxpayerTradeName: input.taxpayerTradeName?.trim() || undefined,
+      taxpayerType: input.taxpayerType?.trim() || undefined,
+      economicActivity: input.economicActivity?.trim() || undefined,
+      taxDataSource: input.taxDataSource?.trim() || undefined,
+      taxDataQueriedAt: input.taxDataQueriedAt ?? undefined,
       notes: input.notes?.trim() || undefined,
       isActive: input.isActive ?? true,
     },
@@ -536,7 +582,7 @@ export async function updateCustomer(input: UpdateCustomerInput) {
       id: input.customerId,
       tenantId: input.tenantId,
     },
-    select: { id: true, identificationType: true, identification: true, email: true, additionalEmails: true },
+    select: { id: true, identificationType: true, identification: true, email: true, additionalEmails: true, phone: true, phoneNumbers: true },
   });
 
   if (!existing) {
@@ -561,8 +607,10 @@ export async function updateCustomer(input: UpdateCustomerInput) {
     data.name = name;
   }
 
-  if (input.phone !== undefined) {
-    data.phone = input.phone.trim() || null;
+  if (input.phone !== undefined || input.phoneNumbers !== undefined) {
+    const phones = normalizeCustomerPhones(input.phone ?? existing.phone ?? undefined, input.phoneNumbers ?? existing.phoneNumbers);
+    data.phone = phones[0] ?? null;
+    data.phoneNumbers = phones.slice(1);
   }
 
   if (input.email !== undefined || input.additionalEmails !== undefined) {
@@ -574,6 +622,11 @@ export async function updateCustomer(input: UpdateCustomerInput) {
   if (input.address !== undefined) {
     data.address = input.address.trim() || null;
   }
+  if (input.country !== undefined) data.country = input.country.trim() || "Ecuador";
+  for (const field of ["tradeName", "province", "city", "parish", "sector", "zone", "customerType", "customerOrigin", "groupName", "assignedSellerId", "taxpayerStatus", "taxpayerLegalName", "taxpayerTradeName", "taxpayerType", "economicActivity", "taxDataSource"] as const) {
+    if (input[field] !== undefined) data[field] = input[field]?.trim() || null;
+  }
+  if (input.taxDataQueriedAt !== undefined) data.taxDataQueriedAt = input.taxDataQueriedAt;
   if (input.notes !== undefined) data.notes = input.notes.trim() || null;
   if (input.isActive !== undefined) data.isActive = input.isActive;
 

@@ -1,0 +1,6 @@
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { readCustomerImport, validateImportRows } from "@/lib/core/customer-import";
+import { getPrismaClient } from "@/lib/db/prisma";
+import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+export async function POST(request: Request) { try { const user = await getCurrentUser(); if (!user) return NextResponse.json({ message: "Sesión requerida." }, { status: 401 }); const tenant = await getCurrentTenant(user); const file = (await request.formData()).get("file"); if (!(file instanceof File) || !/\.(csv|xlsx)$/i.test(file.name)) return NextResponse.json({ message: "Selecciona un archivo CSV o XLSX." }, { status: 400 }); const rows = await readCustomerImport(file); const existing = new Set((await getPrismaClient().lightweightCustomer.findMany({ where: { tenantId: tenant.id, identification: { not: null } }, select: { identification: true } })).flatMap((item) => item.identification ? [item.identification] : [])); return NextResponse.json(validateImportRows(rows, existing)); } catch (error) { return NextResponse.json({ message: error instanceof Error ? error.message : "No se pudo previsualizar." }, { status: 400 }); } }

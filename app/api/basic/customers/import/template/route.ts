@@ -1,0 +1,5 @@
+import ExcelJS from "exceljs";
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { customerColumns } from "@/lib/core/customer-import";
+export async function GET() { const user = await getCurrentUser(); if (!user) return NextResponse.json({ message: "Sesión requerida." }, { status: 401 }); const workbook = new ExcelJS.Workbook(); const sheet = workbook.addWorksheet("Clientes"); sheet.addRow([...customerColumns]); sheet.getRow(1).font = { bold: true }; sheet.addRow(["RUC", "1790012345001", "Empresa Ejemplo", "Ejemplo", "contacto@ejemplo.com", "+593999999999", "Dirección", "Ecuador", "Pichincha", "Quito", "", "", "", "Empresa", "Referido", "", "Fila de ejemplo: reemplazar o eliminar"]); sheet.columns.forEach((column) => { column.width = 22; }); const buffer = await workbook.xlsx.writeBuffer(); return new Response(Buffer.from(buffer), { headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": 'attachment; filename="formato-clientes.xlsx"' } }); }
