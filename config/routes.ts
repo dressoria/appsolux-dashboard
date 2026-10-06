@@ -79,7 +79,7 @@ export const routes = {
   facturacionQuickInvoice: "/facturacion/quick-invoice",
   facturacionDocuments: "/facturacion/documents",
   facturacionCustomers: "/facturacion/customers",
-  facturacionPurchasesSuppliers: "/facturacion/purchases/suppliers",
+  facturacionPurchasesSuppliers: "/facturacion/suppliers",
   facturacionSalesQuotations: "/facturacion/sales/quotations",
   facturacionSalesOrders: "/facturacion/sales/orders",
   facturacionProducts: "/facturacion/products",

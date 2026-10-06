@@ -364,6 +364,7 @@ model Tenant {
   lightweightProducts          LightweightProduct[]
   lightweightProductCategories LightweightProductCategory[]
   lightweightCustomers         LightweightCustomer[]
+  lightweightSuppliers         LightweightSupplier[]
   lightweightSales             LightweightSale[]
   lightweightStockMovements    LightweightStockMovement[]
   conversationNotes            ConversationNote[]
@@ -711,6 +712,55 @@ model SriTaxpayerImportRun {
 
   @@index([startedAt])
   @@index([status])
+}
+
+model LightweightSupplier {
+  id                     String                                 @id @default(cuid())
+  tenantId               String
+  identificationType     LightweightCustomerIdentificationType?
+  identification         String?
+  name                   String
+  tradeName              String?
+  email                  String?
+  additionalEmails       String[]                               @default([])
+  phone                  String?
+  phoneNumbers           String[]                               @default([])
+  address                String?
+  country                String                                 @default("Ecuador")
+  province               String?
+  city                   String?
+  parish                 String?
+  sector                 String?
+  zone                   String?
+  supplierType           String?
+  supplierOrigin         String?
+  groupName              String?
+  assignedBuyerId        String?
+  isRelated              Boolean                                @default(false)
+  isForeign              Boolean                                @default(false)
+  taxpayerStatus         String?
+  taxpayerLegalName      String?
+  taxpayerTradeName      String?
+  taxpayerClass          String?
+  taxpayerType           String?
+  economicActivity       String?
+  ciiuCode               String?
+  accountingRequired     Boolean?
+  specialTaxpayer        Boolean?
+  withholdingAgent       Boolean?
+  taxDataSource          String?
+  taxDataSourceUpdatedAt DateTime?
+  taxDataQueriedAt       DateTime?
+  isActive               Boolean                                @default(true)
+  createdAt              DateTime                               @default(now())
+  updatedAt              DateTime                               @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, identification])
+  @@index([tenantId])
+  @@index([tenantId, name])
+  @@index([tenantId, isActive])
 }
 
 model LightweightSale {

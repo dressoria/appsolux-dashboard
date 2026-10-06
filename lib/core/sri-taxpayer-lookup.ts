@@ -18,8 +18,13 @@ export type SriTaxpayerLookupResult =
       city?: string;
       parish?: string;
       taxpayerStatus?: string;
+      taxpayerClass?: string;
       taxpayerType?: string;
       economicActivity?: string;
+      ciiuCode?: string;
+      accountingRequired?: boolean;
+      specialTaxpayer?: boolean;
+      withholdingAgent?: boolean;
       sourceUpdatedAt?: string;
       queriedAt: string;
     };
@@ -88,12 +93,26 @@ export function normalizeTaxpayerResponse(
     taxpayerStatus: text(
       data.taxpayerStatus ?? data.estadoContribuyente ?? data.estado,
     ),
+    taxpayerClass: text(data.taxpayerClass ?? data.claseContribuyente),
     taxpayerType: text(
       data.taxpayerType ?? data.tipoContribuyente ?? data.tipo,
     ),
     economicActivity: text(
       data.economicActivity ?? data.actividadEconomica ?? data.actividad,
     ),
+    ciiuCode: text(data.ciiuCode ?? data.codigoCiiu),
+    accountingRequired:
+      typeof data.accountingRequired === "boolean"
+        ? data.accountingRequired
+        : undefined,
+    specialTaxpayer:
+      typeof data.specialTaxpayer === "boolean"
+        ? data.specialTaxpayer
+        : undefined,
+    withholdingAgent:
+      typeof data.withholdingAgent === "boolean"
+        ? data.withholdingAgent
+        : undefined,
     sourceUpdatedAt: text(data.sourceUpdatedAt),
   };
 }
@@ -103,11 +122,16 @@ type IndexedTaxpayerRecord = {
   legalName: string;
   tradeName?: string;
   taxpayerStatus?: string;
+  taxpayerClass?: string;
   taxpayerType?: string;
   economicActivity?: string;
+  ciiuCode?: string;
   province?: string;
   city?: string;
   parish?: string;
+  accountingRequired?: boolean;
+  specialTaxpayer?: boolean;
+  withholdingAgent?: boolean;
   source: string;
   sourceUpdatedAt?: Date;
 };

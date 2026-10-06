@@ -14,6 +14,7 @@ import {
   SRI_OPEN_DATA_CATALOG_API,
   type NormalizedSriTaxpayerRecord,
   type SriTaxpayerDatasetResource,
+  validateSriTaxpayerResource,
 } from "../lib/core/sri-data-service.ts";
 
 const prisma = new PrismaClient();
@@ -56,6 +57,7 @@ async function* recordsFromResource(
 
 async function main() {
   const updateOnly = process.argv.includes("--update");
+  const dryRun = process.argv.includes("--dry-run");
   const resources = await discoverSriTaxpayerResources();
   const uniqueProvinces = new Set(
     resources.map((resource) => resource.province),
@@ -67,6 +69,16 @@ async function main() {
     throw new Error(
       `El catálogo oficial devolvió ${resources.length} recursos y ${uniqueProvinces.size} provincias únicas; se esperaban ${SRI_EXPECTED_PROVINCE_COUNT}. No se inició la importación.`,
     );
+  if (dryRun) {
+    for (const resource of resources) {
+      await validateSriTaxpayerResource(resource);
+      console.log(`${resource.province}: URL y firma ZIP válidas.`);
+    }
+    console.log(
+      `Dry-run completado: ${resources.length} provincias oficiales validadas; no se escribió en PostgreSQL.`,
+    );
+    return;
+  }
   const version = resources
     .map((resource) => `${resource.province}:${resource.modifiedAt ?? ""}`)
     .sort()

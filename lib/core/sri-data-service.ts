@@ -256,6 +256,37 @@ export async function discoverSriTaxpayerResources(
     });
 }
 
+export async function validateSriTaxpayerResource(
+  resource: SriTaxpayerDatasetResource,
+  fetcher: typeof fetch = fetch,
+) {
+  const url = new URL(resource.url);
+  if (
+    !resource.province.trim() ||
+    url.protocol !== "https:" ||
+    url.hostname !== "descargas.sri.gob.ec" ||
+    !url.pathname.toLowerCase().endsWith(".zip")
+  )
+    throw new Error(
+      `Recurso inválido para ${resource.province || "provincia desconocida"}.`,
+    );
+
+  const response = await fetcher(resource.url, {
+    headers: { Range: "bytes=0-3" },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!response.ok || !response.body)
+    throw new Error(
+      `No se pudo validar ${resource.province} (${response.status}).`,
+    );
+  const reader = response.body.getReader();
+  const { value } = await reader.read();
+  await reader.cancel();
+  if (!value || value[0] !== 0x50 || value[1] !== 0x4b)
+    throw new Error(`El recurso de ${resource.province} no es un ZIP válido.`);
+  return true;
+}
+
 export async function importNormalizedRecords(
   records: AsyncIterable<NormalizedSriTaxpayerRecord | null>,
   store: SriTaxpayerStore,

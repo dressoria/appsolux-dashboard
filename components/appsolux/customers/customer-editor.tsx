@@ -29,11 +29,16 @@ type Lookup = {
   tradeName?: string;
   address?: string;
   taxpayerStatus?: string;
+  taxpayerClass?: string;
   taxpayerType?: string;
   province?: string;
   city?: string;
   parish?: string;
   economicActivity?: string;
+  ciiuCode?: string;
+  accountingRequired?: boolean;
+  specialTaxpayer?: boolean;
+  withholdingAgent?: boolean;
   queriedAt?: string;
 };
 
@@ -291,56 +296,52 @@ export function CustomerEditor({ customer }: { customer?: Customer }) {
             ) : null}
           </div>
         ) : null}
-        {lookup ? (
+        {lookup?.found ? (
           <section className="rounded-xl border border-[#E4E9F0] bg-[#F8FAFD] p-4">
-            {lookup.found ? (
-              <>
-                <p className="font-medium text-[#172033]">
-                  Datos tributarios encontrados
-                </p>
-                <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                  {lookup.taxpayerStatus ? (
-                    <Read
-                      label="Estado contribuyente RUC"
-                      value={lookup.taxpayerStatus}
-                    />
-                  ) : null}
-                  {lookup.taxpayerType ? (
-                    <Read
-                      label="Tipo contribuyente"
-                      value={lookup.taxpayerType}
-                    />
-                  ) : null}
-                  {lookup.economicActivity ? (
-                    <Read
-                      label="Actividad económica"
-                      value={lookup.economicActivity}
-                    />
-                  ) : null}
-                  {lookup.source ? (
-                    <Read label="Fuente" value={lookup.source} />
-                  ) : null}
-                  {lookup.queriedAt ? (
-                    <Read
-                      label="Fecha de búsqueda"
-                      value={new Intl.DateTimeFormat("es-EC", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      }).format(new Date(lookup.queriedAt))}
-                    />
-                  ) : null}
-                </div>
-                <p className="mt-3 text-xs text-[#667085]">
-                  Se guardarán como datos de solo lectura. Copia manualmente los
-                  valores que quieras usar en los campos principales.
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-[#667085]">
-                No se encontró información tributaria pública para esta
-                identificación.
+            <>
+              <p className="font-medium text-[#172033]">
+                Datos tributarios encontrados
               </p>
-            )}
+              <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                {lookup.taxpayerStatus ? (
+                  <Read
+                    label="Estado contribuyente RUC"
+                    value={lookup.taxpayerStatus}
+                  />
+                ) : null}
+                {lookup.taxpayerType ? (
+                  <Read
+                    label="Tipo contribuyente"
+                    value={lookup.taxpayerType}
+                  />
+                ) : null}
+                {lookup.economicActivity ? (
+                  <Read
+                    label="Actividad económica"
+                    value={lookup.economicActivity}
+                  />
+                ) : null}
+                {lookup.ciiuCode ? (
+                  <Read label="CIIU" value={lookup.ciiuCode} />
+                ) : null}
+                {lookup.source ? (
+                  <Read label="Fuente" value={lookup.source} />
+                ) : null}
+                {lookup.queriedAt ? (
+                  <Read
+                    label="Fecha de búsqueda"
+                    value={new Intl.DateTimeFormat("es-EC", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    }).format(new Date(lookup.queriedAt))}
+                  />
+                ) : null}
+              </div>
+              <p className="mt-3 text-xs text-[#667085]">
+                Se guardarán como datos de solo lectura. Copia manualmente los
+                valores que quieras usar en los campos principales.
+              </p>
+            </>
           </section>
         ) : null}
         <Section title="Contacto">
