@@ -1,5 +1,4 @@
 import type { PrismaClient } from "@prisma/client";
-import { resolveSriTaxRegime } from "./sri-tax-regime.ts";
 
 export const SRI_OPEN_DATA_CATALOG_API =
   "https://www.datosabiertos.gob.ec/api/3/action/package_search?q=Registro%20Unico%20de%20Contribuyentes&rows=100";
@@ -181,21 +180,17 @@ export class PrismaSriTaxpayerStore implements SriTaxpayerStore {
       });
       const profileRucs = new Set(matchingProfiles.map((profile) => profile.ruc));
       const profileRecords = records.filter((record) => profileRucs.has(record.ruc));
-      const queriedAt = new Date();
       if (profileRecords.length) await this.prisma.$transaction(
         profileRecords.map((record) => {
-          const regime = resolveSriTaxRegime(record);
           return this.prisma.sriTaxpayerProfile.updateMany({
             where: { ruc: record.ruc },
             data: {
               taxpayerStatus: record.taxpayerStatus,
               taxpayerClass: record.taxpayerClass,
               taxpayerType: record.taxpayerType,
-              taxRegimeCode: regime?.code ?? null,
-              contribuyenteRimpe: regime?.label ?? null,
-              taxRegimeSource: record.source,
-              taxRegimeSourceUpdatedAt: record.sourceUpdatedAt,
-              taxRegimeQueriedAt: queriedAt,
+              ...(record.accountingRequired == null
+                ? {}
+                : { accountingRequired: record.accountingRequired }),
             },
           });
         }),

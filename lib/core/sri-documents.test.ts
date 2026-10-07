@@ -10,7 +10,11 @@ import {
   FACTUROM_SYSTEM_NAME,
 } from "./sri-xml";
 
-function buildXml() {
+function buildXml(profileOverrides: {
+  accountingRequired?: boolean;
+  taxRegimeCode?: string | null;
+  contribuyenteRimpe?: string | null;
+} = {}) {
   return buildUnsignedSriInvoiceXmlPreview({
     documentId: "invoice-test",
     profile: {
@@ -18,8 +22,10 @@ function buildXml() {
       tradeName: "Empresa <EC>",
       ruc: "1790012345001",
       environment: "PRODUCTION",
-      accountingRequired: true,
-      contribuyenteRimpe: "RIMPE & EMPRENDEDOR",
+      accountingRequired: profileOverrides.accountingRequired ?? true,
+      taxRegimeCode: profileOverrides.taxRegimeCode ?? "RIMPE_EMPRENDEDOR",
+      contribuyenteRimpe:
+        profileOverrides.contribuyenteRimpe ?? "CONTRIBUYENTE RÉGIMEN RIMPE",
       dirMatriz: "Quito <Centro>",
       companyEmail: "empresa@example.com",
       companyPhone: "022345678",
@@ -70,7 +76,7 @@ test("XML incluye información adicional Facturom escapada y separa forma comerc
   assert.match(xml, /TELEFONO CLIENTE[^>]*>0999999999/);
   assert.match(xml, /FORMA PAGO[^>]*>TRANSFERENCIA/);
   assert.match(xml, /<formaPago>20<\/formaPago>/);
-  assert.match(xml, /RIMPE &amp; EMPRENDEDOR/);
+  assert.match(xml, /CONTRIBUYENTE RÉGIMEN RIMPE/);
   assert.match(xml, /Cliente &amp; Compañía/);
   assert.doesNotMatch(xml, /undefined|null|CONTAMATIC/i);
 });
@@ -92,7 +98,7 @@ test("RIDE usa fecha y pago del XML autorizado y genera PDF real", async () => {
   });
   assert.equal(
     parsed.additionalFields.find((field) => field.name === "REGIMEN")?.value,
-    "RIMPE & EMPRENDEDOR",
+    "CONTRIBUYENTE RÉGIMEN RIMPE",
   );
   const pdf = await generateRidePdfFromAuthorizedXml(parsed);
   assert.equal(pdf.subarray(0, 4).toString(), "%PDF");
@@ -100,6 +106,32 @@ test("RIDE usa fecha y pago del XML autorizado y genera PDF real", async () => {
   if (process.env.RIDE_TEST_OUTPUT) {
     await writeFile(process.env.RIDE_TEST_OUTPUT, pdf);
   }
+});
+
+test("régimen general solo aparece en información adicional", () => {
+  const xml = buildXml({
+    taxRegimeCode: "REGIMEN_GENERAL",
+    contribuyenteRimpe: "CONTRIBUYENTE RÉGIMEN GENERAL",
+  });
+  assert.doesNotMatch(xml, /<contribuyenteRimpe>/);
+  assert.match(
+    xml,
+    /<campoAdicional nombre="REGIMEN">CONTRIBUYENTE RÉGIMEN GENERAL<\/campoAdicional>/,
+  );
+});
+
+test("RIMPE ubica contribuyenteRimpe en infoTributaria y respeta orden SRI", () => {
+  const xml = buildXml();
+  const infoTributaria = xml.match(/<infoTributaria>([\s\S]*?)<\/infoTributaria>/)?.[1] ?? "";
+  const infoFactura = xml.match(/<infoFactura>([\s\S]*?)<\/infoFactura>/)?.[1] ?? "";
+  assert.match(infoTributaria, /<dirMatriz>[\s\S]*<contribuyenteRimpe>/);
+  assert.doesNotMatch(infoFactura, /<contribuyenteRimpe>/);
+  assert.ok(infoFactura.indexOf("<obligadoContabilidad>") < infoFactura.indexOf("<tipoIdentificacionComprador>"));
+});
+
+test("obligadoContabilidad refleja exactamente el perfil sincronizado", () => {
+  assert.match(buildXml({ accountingRequired: false }), /<obligadoContabilidad>NO<\/obligadoContabilidad>/);
+  assert.match(buildXml({ accountingRequired: true }), /<obligadoContabilidad>SI<\/obligadoContabilidad>/);
 });
 
 test("ajustes UI mantienen overflow y select contenido", async () => {

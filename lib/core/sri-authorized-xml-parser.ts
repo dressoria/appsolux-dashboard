@@ -330,7 +330,7 @@ export function parseAuthorizedSriInvoiceXml(
       dirMatriz: findFirstTag(infoTributaria, "dirMatriz"),
       dirEstablecimiento: findFirstTag(infoFactura, "dirEstablecimiento"),
       obligadoContabilidad: findFirstTag(infoFactura, "obligadoContabilidad"),
-      contribuyenteRimpe: findFirstTag(infoFactura, "contribuyenteRimpe"),
+      contribuyenteRimpe: findFirstTag(infoTributaria, "contribuyenteRimpe"),
       agenteRetencion: findFirstTag(infoFactura, "agenteRetencion"),
     },
     authorization: {

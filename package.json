@@ -17,6 +17,7 @@
     "test:sri-documents": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/sri-documents.test.ts",
     "sri:import-taxpayers": "tsx scripts/sri-import-taxpayers.ts",
     "sri:update-taxpayers": "tsx scripts/sri-import-taxpayers.ts --update",
+    "sri:backfill-taxpayer-profiles": "tsx scripts/sri-backfill-taxpayer-profiles.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",

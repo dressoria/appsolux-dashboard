@@ -83,6 +83,7 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
       ruc: profile.ruc,
       environment: profile.environment,
       accountingRequired: profile.accountingRequired,
+      taxRegimeCode: profile.taxRegimeCode,
       contribuyenteRimpe: profile.contribuyenteRimpe,
       dirMatriz: profile.dirMatriz,
       companyEmail: company?.contactEmail,

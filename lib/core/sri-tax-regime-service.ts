@@ -15,6 +15,19 @@ export async function resolveAndPersistSriTaxRegime(tenantId: string) {
   if (!profile) throw new Error("Configura primero el perfil tributario de la empresa.");
 
   const local = await prisma.sriTaxpayerRecord.findUnique({ where: { ruc: profile.ruc } });
+  if (local) {
+    await prisma.sriTaxpayerProfile.update({
+      where: { tenantId },
+      data: {
+        taxpayerStatus: local.taxpayerStatus,
+        taxpayerClass: local.taxpayerClass,
+        taxpayerType: local.taxpayerType,
+        ...(local.accountingRequired == null
+          ? {}
+          : { accountingRequired: local.accountingRequired }),
+      },
+    });
+  }
   const localIsRecent =
     local && Date.now() - local.updatedAt.getTime() <= CACHE_MAX_AGE_MS;
   let sourceData = localIsRecent
@@ -22,6 +35,7 @@ export async function resolveAndPersistSriTaxRegime(tenantId: string) {
         taxpayerStatus: local.taxpayerStatus,
         taxpayerClass: local.taxpayerClass,
         taxpayerType: local.taxpayerType,
+        accountingRequired: local.accountingRequired,
         taxRegime: local.taxRegime,
         contribuyenteRimpe: local.contribuyenteRimpe,
         source: local.source,
@@ -40,6 +54,7 @@ export async function resolveAndPersistSriTaxRegime(tenantId: string) {
         taxpayerStatus: external.taxpayerStatus ?? null,
         taxpayerClass: external.taxpayerClass ?? null,
         taxpayerType: external.taxpayerType ?? null,
+        accountingRequired: external.accountingRequired ?? null,
         taxRegime: external.taxRegime ?? null,
         contribuyenteRimpe: external.contribuyenteRimpe ?? null,
         source: external.source,
@@ -58,9 +73,11 @@ export async function resolveAndPersistSriTaxRegime(tenantId: string) {
         contribuyenteRimpe: profile.contribuyenteRimpe,
       });
       sourceData = {
-        taxpayerStatus: profile.taxpayerStatus,
-        taxpayerClass: profile.taxpayerClass,
-        taxpayerType: profile.taxpayerType,
+        taxpayerStatus: local?.taxpayerStatus ?? profile.taxpayerStatus,
+        taxpayerClass: local?.taxpayerClass ?? profile.taxpayerClass,
+        taxpayerType: local?.taxpayerType ?? profile.taxpayerType,
+        accountingRequired:
+          local?.accountingRequired ?? profile.accountingRequired,
         taxRegime: profile.contribuyenteRimpe,
         contribuyenteRimpe: profile.contribuyenteRimpe,
         source: profile.taxRegimeSource ?? "PROFILE_CACHE",
@@ -68,6 +85,20 @@ export async function resolveAndPersistSriTaxRegime(tenantId: string) {
         queriedAt: profile.taxRegimeQueriedAt,
       };
     }
+  }
+
+  if (sourceData) {
+    await prisma.sriTaxpayerProfile.update({
+      where: { tenantId },
+      data: {
+        taxpayerStatus: sourceData.taxpayerStatus,
+        taxpayerClass: sourceData.taxpayerClass,
+        taxpayerType: sourceData.taxpayerType,
+        ...(sourceData.accountingRequired == null
+          ? {}
+          : { accountingRequired: sourceData.accountingRequired }),
+      },
+    });
   }
 
   if (!resolved || !sourceData) throw new Error(UNKNOWN_SRI_TAX_REGIME_MESSAGE);
@@ -78,6 +109,9 @@ export async function resolveAndPersistSriTaxRegime(tenantId: string) {
       taxpayerStatus: sourceData.taxpayerStatus,
       taxpayerClass: sourceData.taxpayerClass,
       taxpayerType: sourceData.taxpayerType,
+      ...(sourceData.accountingRequired == null
+        ? {}
+        : { accountingRequired: sourceData.accountingRequired }),
       taxRegimeCode: resolved.code,
       contribuyenteRimpe: resolved.label,
       taxRegimeSource: sourceData.source,

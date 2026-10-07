@@ -11,6 +11,7 @@ export type SriXmlPreviewParams = {
     ruc: string;
     environment: "TEST" | "PRODUCTION";
     accountingRequired: boolean;
+    taxRegimeCode?: string | null;
     contribuyenteRimpe?: string | null;
     dirMatriz?: string | null;
     companyEmail?: string | null;
@@ -215,6 +216,28 @@ export function validateSriDocumentForXmlPreview(params: SriXmlPreviewParams): {
   return { valid: errors.length === 0, errors, warnings };
 }
 
+export function validateSriInvoiceXmlStructure(
+  xml: string,
+  taxRegimeCode?: string | null,
+): string[] {
+  const errors: string[] = [];
+  const infoTributaria = xml.match(/<infoTributaria>([\s\S]*?)<\/infoTributaria>/)?.[1] ?? "";
+  const infoFactura = xml.match(/<infoFactura>([\s\S]*?)<\/infoFactura>/)?.[1] ?? "";
+  const isRimpe = ["RIMPE_EMPRENDEDOR", "RIMPE_NEGOCIO_POPULAR"].includes(
+    taxRegimeCode ?? "",
+  );
+
+  if (/<contribuyenteRimpe>/.test(infoFactura))
+    errors.push("contribuyenteRimpe no puede estar dentro de infoFactura.");
+  if (isRimpe && !/<contribuyenteRimpe>/.test(infoTributaria))
+    errors.push("El régimen RIMPE requiere contribuyenteRimpe en infoTributaria.");
+  if (!isRimpe && /<contribuyenteRimpe>/.test(infoTributaria))
+    errors.push("contribuyenteRimpe solo corresponde a contribuyentes RIMPE.");
+  if (!/<obligadoContabilidad>(SI|NO)<\/obligadoContabilidad>/.test(infoFactura))
+    errors.push("obligadoContabilidad debe contener SI o NO dentro de infoFactura.");
+  return errors;
+}
+
 export function buildUnsignedSriInvoiceXmlPreview(
   params: SriXmlPreviewParams,
 ): SriXmlPreviewResult {
@@ -343,6 +366,9 @@ export function buildUnsignedSriInvoiceXmlPreview(
     params.profile.dirMatriz ?? params.establishment.address,
   );
   const contribuyenteRimpeXml = params.profile.contribuyenteRimpe
+    && ["RIMPE_EMPRENDEDOR", "RIMPE_NEGOCIO_POPULAR"].includes(
+      params.profile.taxRegimeCode ?? "",
+    )
     ? `\n    <contribuyenteRimpe>${xmlEscape(params.profile.contribuyenteRimpe)}</contribuyenteRimpe>`
     : "";
 
@@ -360,12 +386,12 @@ export function buildUnsignedSriInvoiceXmlPreview(
     <estab>${xmlEscape(params.establishment.code)}</estab>
     <ptoEmi>${xmlEscape(params.issuePoint.code)}</ptoEmi>
     <secuencial>${pad(params.sequentialNumber, 9)}</secuencial>
-    <dirMatriz>${dirMatriz}</dirMatriz>
+    <dirMatriz>${dirMatriz}</dirMatriz>${contribuyenteRimpeXml}
   </infoTributaria>
   <infoFactura>
     <fechaEmision>${fechaEmision}</fechaEmision>
     <dirEstablecimiento>${xmlEscape(params.establishment.address)}</dirEstablecimiento>
-    <obligadoContabilidad>${params.profile.accountingRequired ? "SI" : "NO"}</obligadoContabilidad>${contribuyenteRimpeXml}
+    <obligadoContabilidad>${params.profile.accountingRequired ? "SI" : "NO"}</obligadoContabilidad>
     <tipoIdentificacionComprador>${tipoIdComprador}</tipoIdentificacionComprador>
     <razonSocialComprador>${xmlEscape(params.document.customerName)}</razonSocialComprador>
     <identificacionComprador>${xmlEscape(idComprador)}</identificacionComprador>
@@ -390,6 +416,10 @@ ${taxGroupsXml}
 ${linesXml}
   </detalles>${infoAdicionalXml}
 </factura>`;
+
+  missingFields.push(
+    ...validateSriInvoiceXmlStructure(xml, params.profile.taxRegimeCode),
+  );
 
   return {
     xml,
