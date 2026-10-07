@@ -59,13 +59,21 @@ type SavedResult = {
 };
 
 const SRI_PAYMENTS = [
-  { code: "01", label: "SIN UTILIZACIÓN DEL SISTEMA FINANCIERO" },
-  { code: "16", label: "TARJETA DE DÉBITO" },
-  { code: "17", label: "DINERO ELECTRÓNICO" },
-  { code: "18", label: "TARJETA PREPAGO" },
-  { code: "19", label: "TARJETA DE CRÉDITO" },
-  { code: "20", label: "OTROS CON UTILIZACIÓN DEL SISTEMA FINANCIERO" },
-  { code: "21", label: "ENDOSO DE TÍTULOS" },
+  {
+    code: "01",
+    shortLabel: "Sin sistema financiero",
+    label: "SIN UTILIZACIÓN DEL SISTEMA FINANCIERO",
+  },
+  { code: "16", shortLabel: "Tarjeta de débito", label: "TARJETA DE DÉBITO" },
+  { code: "17", shortLabel: "Dinero electrónico", label: "DINERO ELECTRÓNICO" },
+  { code: "18", shortLabel: "Tarjeta prepago", label: "TARJETA PREPAGO" },
+  { code: "19", shortLabel: "Tarjeta", label: "TARJETA DE CRÉDITO" },
+  {
+    code: "20",
+    shortLabel: "Otros con sistema financiero",
+    label: "OTROS CON UTILIZACIÓN DEL SISTEMA FINANCIERO",
+  },
+  { code: "21", shortLabel: "Endoso de títulos", label: "ENDOSO DE TÍTULOS" },
 ];
 const money = (value: number) =>
   new Intl.NumberFormat("es-EC", { style: "currency", currency: "USD" }).format(
@@ -517,13 +525,14 @@ export function InvoiceEditor({
               </Field>
               <Field label="Forma de pago SRI">
                 <select
-                  className="h-8 rounded-lg border px-2 text-sm"
+                  className="h-8 min-w-0 w-full truncate rounded-lg border px-2 text-sm"
                   value={sriPaymentCode}
                   onChange={(event) => setSriPaymentCode(event.target.value)}
+                  title={`${sriPaymentCode} · ${SRI_PAYMENTS.find((item) => item.code === sriPaymentCode)?.label ?? ""}`}
                 >
                   {SRI_PAYMENTS.map((item) => (
                     <option key={item.code} value={item.code}>
-                      {item.code} · {item.label}
+                      {item.code} · {item.shortLabel}
                     </option>
                   ))}
                 </select>

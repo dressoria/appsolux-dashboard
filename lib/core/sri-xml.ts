@@ -13,6 +13,8 @@ export type SriXmlPreviewParams = {
     accountingRequired: boolean;
     contribuyenteRimpe?: string | null;
     dirMatriz?: string | null;
+    companyEmail?: string | null;
+    companyPhone?: string | null;
   };
   establishment: {
     code: string;
@@ -31,6 +33,8 @@ export type SriXmlPreviewParams = {
       "RUC" | "CEDULA" | "PASSPORT" | "FOREIGN_ID" | null;
     customerEmail?: string | null;
     customerPhone?: string | null;
+    customerAddress?: string | null;
+    commercialPaymentMethod?: string | null;
     subtotal: string | number;
     taxTotal: string | number;
     discountTotal: string | number;
@@ -73,13 +77,29 @@ function dec(value: string | number, digits = 2): string {
   return Number(value).toFixed(digits);
 }
 
-function xmlEscape(s: string): string {
+export function xmlEscape(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
+}
+
+export const FACTUROM_ELECTRONIC_BILLING_PROVIDER_RUC = "1793242481001";
+export const FACTUROM_SYSTEM_NAME = "FACTUROM COM";
+
+const COMMERCIAL_PAYMENT_LABELS: Record<string, string> = {
+  cash: "EFECTIVO",
+  transfer: "TRANSFERENCIA",
+  card: "TARJETA",
+  credit: "CRÉDITO",
+};
+
+export function resolveCommercialPaymentLabel(method?: string | null) {
+  return method
+    ? (COMMERCIAL_PAYMENT_LABELS[method] ?? method.toUpperCase())
+    : "";
 }
 
 function resolveAmbiente(env: "TEST" | "PRODUCTION"): string {
@@ -262,18 +282,29 @@ export function buildUnsignedSriInvoiceXmlPreview(
     )
     .join("\n");
 
-  // infoAdicional opcional (email, teléfono)
-  const infoAdicionalItems: string[] = [];
-  if (params.document.customerEmail) {
-    infoAdicionalItems.push(
-      `    <campoAdicional nombre="email">${xmlEscape(params.document.customerEmail)}</campoAdicional>`,
+  const additionalValues: Array<[string, string | null | undefined]> = [
+    ["REGIMEN", params.profile.contribuyenteRimpe],
+    [
+      "RUC PROVEEDOR FACTURACIÓN ELECTRONICA",
+      FACTUROM_ELECTRONIC_BILLING_PROVIDER_RUC,
+    ],
+    ["SISTEMA", FACTUROM_SYSTEM_NAME],
+    ["EMAIL EMPRESA", params.profile.companyEmail],
+    ["TELEFONO EMPRESA", params.profile.companyPhone],
+    ["EMAIL CLIENTE", params.document.customerEmail],
+    ["TELEFONO CLIENTE", params.document.customerPhone],
+    ["DIRECCION CLIENTE", params.document.customerAddress],
+    [
+      "FORMA PAGO",
+      resolveCommercialPaymentLabel(params.document.commercialPaymentMethod),
+    ],
+  ];
+  const infoAdicionalItems = additionalValues
+    .filter((item): item is [string, string] => Boolean(item[1]?.trim()))
+    .map(
+      ([name, value]) =>
+        `    <campoAdicional nombre="${xmlEscape(name)}">${xmlEscape(value)}</campoAdicional>`,
     );
-  }
-  if (params.document.customerPhone) {
-    infoAdicionalItems.push(
-      `    <campoAdicional nombre="telefono">${xmlEscape(params.document.customerPhone)}</campoAdicional>`,
-    );
-  }
   const infoAdicionalXml =
     infoAdicionalItems.length > 0
       ? `\n  <infoAdicional>\n${infoAdicionalItems.join("\n")}\n  </infoAdicional>`

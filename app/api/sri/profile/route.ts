@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getSriProfile, upsertSriProfile, validateRuc } from "@/lib/core/sri";
+import { resolveAndPersistSriTaxRegime } from "@/lib/core/sri-tax-regime-service";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
 export async function GET() {
@@ -45,12 +46,22 @@ export async function POST(req: NextRequest) {
     tradeName: typeof data.tradeName === "string" && data.tradeName.trim() ? data.tradeName.trim() : null,
     ruc,
     dirMatriz: typeof data.dirMatriz === "string" && data.dirMatriz.trim() ? data.dirMatriz.trim() : null,
-    contribuyenteRimpe: typeof data.contribuyenteRimpe === "string" && data.contribuyenteRimpe.trim() ? data.contribuyenteRimpe.trim() : null,
     accountingRequired: data.accountingRequired === true || data.accountingRequired === "true",
     specialTaxpayerNumber: typeof data.specialTaxpayerNumber === "string" && data.specialTaxpayerNumber.trim() ? data.specialTaxpayerNumber.trim() : null,
     withholdingAgentResolution: typeof data.withholdingAgentResolution === "string" && data.withholdingAgentResolution.trim() ? data.withholdingAgentResolution.trim() : null,
     environment: "PRODUCTION",
   });
 
-  return NextResponse.json({ profile }, { status: 200 });
+  try {
+    const resolvedProfile = await resolveAndPersistSriTaxRegime(tenant.id);
+    return NextResponse.json({ profile: resolvedProfile }, { status: 200 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        profile,
+        error: error instanceof Error ? error.message : "No fue posible actualizar los datos SRI.",
+      },
+      { status: 422 },
+    );
+  }
 }

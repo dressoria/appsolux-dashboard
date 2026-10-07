@@ -11,7 +11,9 @@ import {
   PrismaSriTaxpayerStore,
   rowFromHeaders,
   SRI_EXPECTED_PROVINCE_COUNT,
-  SRI_OPEN_DATA_CATALOG_API,
+  SRI_DATASETS_URL,
+  SRI_DATA_USER_AGENT,
+  SRI_PROVINCES,
   type NormalizedSriTaxpayerRecord,
   type SriTaxpayerDatasetResource,
   validateSriTaxpayerResource,
@@ -23,7 +25,11 @@ async function* recordsFromResource(
   resource: SriTaxpayerDatasetResource,
 ): AsyncGenerator<NormalizedSriTaxpayerRecord | null> {
   const response = await fetch(resource.url, {
-    signal: AbortSignal.timeout(120_000),
+    headers: {
+      "User-Agent": SRI_DATA_USER_AGENT,
+      Accept: "application/zip,application/octet-stream",
+    },
+    signal: AbortSignal.timeout(10 * 60_000),
   });
   if (!response.ok || !response.body)
     throw new Error(
@@ -62,28 +68,39 @@ async function main() {
   const uniqueProvinces = new Set(
     resources.map((resource) => resource.province),
   );
-  if (
-    resources.length !== SRI_EXPECTED_PROVINCE_COUNT ||
-    uniqueProvinces.size !== SRI_EXPECTED_PROVINCE_COUNT
-  )
-    throw new Error(
-      `El catálogo oficial devolvió ${resources.length} recursos y ${uniqueProvinces.size} provincias únicas; se esperaban ${SRI_EXPECTED_PROVINCE_COUNT}. No se inició la importación.`,
-    );
+  const missingProvinces = SRI_PROVINCES.filter(
+    (province) => !uniqueProvinces.has(province),
+  );
   if (dryRun) {
     for (const resource of resources) {
-      await validateSriTaxpayerResource(resource);
-      console.log(`${resource.province}: URL y firma ZIP válidas.`);
+      try {
+        const metadata = await validateSriTaxpayerResource(resource);
+        const size = metadata.sizeBytes
+          ? `${(metadata.sizeBytes / 1024 / 1024).toFixed(2)} MiB`
+          : "no informado";
+        console.log(
+          `${resource.province}: ${resource.url} | ${metadata.fileType} | ${size}`,
+        );
+      } catch (error) {
+        console.error(
+          `${resource.province}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
-    console.log(
-      `Dry-run completado: ${resources.length} provincias oficiales validadas; no se escribió en PostgreSQL.`,
-    );
+    console.log(`Fuentes encontradas: ${uniqueProvinces.size}/${SRI_EXPECTED_PROVINCE_COUNT}`);
+    if (missingProvinces.length)
+      console.error(`Provincias faltantes: ${missingProvinces.join(", ")}`);
+    console.log("Dry-run completado; no se escribió en PostgreSQL ni se descargaron ZIPs completos.");
+    if (missingProvinces.length) process.exitCode = 1;
     return;
   }
+  if (!resources.length)
+    throw new Error("No se descubrieron fuentes oficiales SRI para importar.");
   const version = resources
     .map((resource) => `${resource.province}:${resource.modifiedAt ?? ""}`)
     .sort()
     .join("|");
-  if (updateOnly) {
+  if (updateOnly && resources.every((resource) => resource.modifiedAt)) {
     const previous = await prisma.sriTaxpayerImportRun.findFirst({
       where: {
         status: "succeeded",
@@ -103,7 +120,7 @@ async function main() {
   const run = await prisma.sriTaxpayerImportRun.create({
     data: {
       status: "running",
-      sourceCatalogUrl: SRI_OPEN_DATA_CATALOG_API,
+      sourceCatalogUrl: SRI_DATASETS_URL,
       sourceVersion: version,
     },
   });
@@ -113,9 +130,11 @@ async function main() {
     inserted: 0,
     updated: 0,
     unchanged: 0,
-    errors: 0,
+    errors: missingProvinces.length,
   };
-  const failureMessages: string[] = [];
+  const failureMessages: string[] = missingProvinces.map(
+    (province) => `${province}: no se descubrió una fuente oficial.`,
+  );
   const store = new PrismaSriTaxpayerStore(prisma);
   try {
     for (const resource of resources) {

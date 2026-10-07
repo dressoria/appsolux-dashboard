@@ -7,6 +7,7 @@ import { validateCustomerForSriInvoice } from "@/lib/core/customer-fiscal";
 import { isValidEcuadorRuc } from "@/lib/core/ecuador-tax-id";
 import { buildSriAccessKey, createStableNumericCode } from "./sri-access-key";
 import { getSriSignatureReadiness } from "./sri-signature-readiness";
+import { requireResolvedSriTaxRegime } from "./sri-tax-regime-service";
 
 export type SriModuleStatus = {
   hasProfile: boolean;
@@ -157,7 +158,6 @@ export async function upsertSriProfile(
     tradeName?: string | null;
     ruc: string;
     dirMatriz?: string | null;
-    contribuyenteRimpe?: string | null;
     accountingRequired: boolean;
     specialTaxpayerNumber?: string | null;
     withholdingAgentResolution?: string | null;
@@ -165,10 +165,27 @@ export async function upsertSriProfile(
   },
 ) {
   const prisma = getPrismaClient();
+  const existing = await prisma.sriTaxpayerProfile.findUnique({
+    where: { tenantId },
+    select: { ruc: true },
+  });
+  const resetResolvedRegime =
+    existing && existing.ruc !== data.ruc
+      ? {
+          taxpayerStatus: null,
+          taxpayerClass: null,
+          taxpayerType: null,
+          taxRegimeCode: null,
+          contribuyenteRimpe: null,
+          taxRegimeSource: null,
+          taxRegimeSourceUpdatedAt: null,
+          taxRegimeQueriedAt: null,
+        }
+      : {};
   return prisma.sriTaxpayerProfile.upsert({
     where: { tenantId },
     create: { tenantId, ...data, status: "CONFIGURED" },
-    update: { ...data, status: "CONFIGURED" },
+    update: { ...data, ...resetResolvedRegime, status: "CONFIGURED" },
   });
 }
 
@@ -582,8 +599,12 @@ export async function createDraftSriDocumentFromBasicSale({
           phone: true,
           identificationType: true,
           identification: true,
+          address: true,
+          additionalEmails: true,
+          phoneNumbers: true,
         },
       },
+      payments: { orderBy: { createdAt: "asc" }, take: 1 },
       items: {
         include: { product: { select: { name: true, barcode: true } } },
       },
@@ -596,13 +617,7 @@ export async function createDraftSriDocumentFromBasicSale({
     );
   const fiscalCustomer = validateCustomerForSriInvoice(sale.customer);
 
-  const profile = await prisma.sriTaxpayerProfile.findUnique({
-    where: { tenantId },
-  });
-  if (!profile)
-    throw new Error(
-      "No existe configuracion SRI. Configura la empresa y RUC primero.",
-    );
+  const profile = await requireResolvedSriTaxRegime(tenantId);
 
   const establishment = await prisma.sriEstablishment.findFirst({
     where: {
@@ -685,8 +700,14 @@ export async function createDraftSriDocumentFromBasicSale({
       customerName: fiscalCustomer.name,
       customerIdentification: fiscalCustomer.identification,
       customerIdentificationType: fiscalCustomer.identificationType,
-      customerEmail: sale.customer?.email ?? null,
-      customerPhone: sale.customer?.phone ?? null,
+      customerEmail:
+        [sale.customer?.email, ...(sale.customer?.additionalEmails ?? [])].find(
+          (value) => value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+        ) ?? null,
+      customerPhone:
+        [sale.customer?.phone, ...(sale.customer?.phoneNumbers ?? [])].find(
+          (value) => value?.trim(),
+        ) ?? null,
       subtotal: new Prisma.Decimal(sriSubtotal),
       taxTotal: new Prisma.Decimal(sriTaxTotal),
       discountTotal: new Prisma.Decimal(sriDiscountTotal),

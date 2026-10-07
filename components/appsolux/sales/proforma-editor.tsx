@@ -395,18 +395,18 @@ export function ProformaEditor({
               ) : null}
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-[1000px] w-full text-sm">
+          <div className="max-w-full overflow-x-auto">
+            <table className="w-full min-w-[1180px] table-fixed text-sm">
               <thead>
                 <tr className="border-b text-left text-xs text-slate-500">
                   <th>#</th>
-                  <th>Producto</th>
-                  <th>Código</th>
+                  <th className="w-56">Producto / Código</th>
                   <th>Observación</th>
                   <th>Stock</th>
                   <th>Cantidad</th>
                   <th>Precio</th>
                   <th>IVA</th>
+                  <th>Desc. %</th>
                   <th>Desc. $</th>
                   <th>Subtotal</th>
                   <th>Total</th>
@@ -417,8 +417,14 @@ export function ProformaEditor({
                 {calculated.map((line, index) => (
                   <tr className="border-b" key={line.productId}>
                     <td>{index + 1}</td>
-                    <td>{line.product.name}</td>
-                    <td>{line.product.code ?? "—"}</td>
+                    <td>
+                      <span className="block font-medium">
+                        {line.product.name}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {line.product.code ?? "—"}
+                      </span>
+                    </td>
                     <td>
                       <Input
                         className="h-7 w-32"
@@ -461,6 +467,38 @@ export function ProformaEditor({
                     <td>{line.product.taxRate}%</td>
                     <td>
                       <Input
+                        className="h-7 w-20"
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="0.01"
+                        value={
+                          line.quantity * line.unitPrice > 0
+                            ? Number(
+                                (
+                                  (line.discount /
+                                    (line.quantity * line.unitPrice)) *
+                                  100
+                                ).toFixed(2),
+                              )
+                            : 0
+                        }
+                        onChange={(event) =>
+                          updateLine(line.productId, {
+                            discount:
+                              (line.quantity *
+                                line.unitPrice *
+                                Math.min(
+                                  100,
+                                  Math.max(0, Number(event.target.value)),
+                                )) /
+                              100,
+                          })
+                        }
+                      />
+                    </td>
+                    <td>
+                      <Input
                         className="h-7 w-24"
                         type="number"
                         min={0}
@@ -501,7 +539,7 @@ export function ProformaEditor({
             ) : null}
           </div>
         </section>
-        <aside className="h-fit rounded-xl border bg-white p-4">
+        <aside className="h-fit rounded-xl border bg-white p-4 xl:sticky xl:top-20">
           <h2 className="mb-3 font-semibold">Totales</h2>
           {Object.entries(bases).map(([rate, value]) => (
             <p className="flex justify-between py-1 text-sm" key={rate}>

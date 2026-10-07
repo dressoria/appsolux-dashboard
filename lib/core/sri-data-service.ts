@@ -1,14 +1,27 @@
 import type { PrismaClient } from "@prisma/client";
+import { resolveSriTaxRegime } from "./sri-tax-regime.ts";
 
 export const SRI_OPEN_DATA_CATALOG_API =
   "https://www.datosabiertos.gob.ec/api/3/action/package_search?q=Registro%20Unico%20de%20Contribuyentes&rows=100";
+export const SRI_DATASETS_URL = "https://www.sri.gob.ec/web/intersri/datasets";
 export const SRI_OPEN_DATA_SOURCE = "SRI_DATOS_ABIERTOS_RUC";
 export const SRI_EXPECTED_PROVINCE_COUNT = 24;
+export const SRI_DATA_USER_AGENT = "Facturom-SRI-Data/1.0";
+
+export const SRI_PROVINCES = [
+  "Azuay", "Bolívar", "Cañar", "Carchi", "Chimborazo", "Cotopaxi",
+  "El Oro", "Esmeraldas", "Galápagos", "Guayas", "Imbabura", "Loja",
+  "Los Ríos", "Manabí", "Morona Santiago", "Napo", "Orellana", "Pastaza",
+  "Pichincha", "Santa Elena", "Santo Domingo", "Sucumbíos", "Tungurahua",
+  "Zamora Chinchipe",
+] as const;
 
 export type SriTaxpayerDatasetResource = {
   province: string;
   url: string;
   modifiedAt?: string;
+  fileType?: string;
+  sizeBytes?: number;
 };
 export type NormalizedSriTaxpayerRecord = {
   ruc: string;
@@ -17,6 +30,8 @@ export type NormalizedSriTaxpayerRecord = {
   taxpayerStatus?: string;
   taxpayerClass?: string;
   taxpayerType?: string;
+  taxRegime?: string;
+  contribuyenteRimpe?: string;
   economicActivity?: string;
   ciiuCode?: string;
   province?: string;
@@ -159,6 +174,33 @@ export class PrismaSriTaxpayerStore implements SriTaxpayerStore {
           }),
         ),
       );
+    if (records.length) {
+      const matchingProfiles = await this.prisma.sriTaxpayerProfile.findMany({
+        where: { ruc: { in: records.map((record) => record.ruc) } },
+        select: { ruc: true },
+      });
+      const profileRucs = new Set(matchingProfiles.map((profile) => profile.ruc));
+      const profileRecords = records.filter((record) => profileRucs.has(record.ruc));
+      const queriedAt = new Date();
+      if (profileRecords.length) await this.prisma.$transaction(
+        profileRecords.map((record) => {
+          const regime = resolveSriTaxRegime(record);
+          return this.prisma.sriTaxpayerProfile.updateMany({
+            where: { ruc: record.ruc },
+            data: {
+              taxpayerStatus: record.taxpayerStatus,
+              taxpayerClass: record.taxpayerClass,
+              taxpayerType: record.taxpayerType,
+              taxRegimeCode: regime?.code ?? null,
+              contribuyenteRimpe: regime?.label ?? null,
+              taxRegimeSource: record.source,
+              taxRegimeSourceUpdatedAt: record.sourceUpdatedAt,
+              taxRegimeQueriedAt: queriedAt,
+            },
+          });
+        }),
+      );
+    }
     return {
       inserted: additions.length,
       updated: changes.length,
@@ -174,6 +216,8 @@ function toNormalized(record: {
   taxpayerStatus: string | null;
   taxpayerClass: string | null;
   taxpayerType: string | null;
+  taxRegime: string | null;
+  contribuyenteRimpe: string | null;
   economicActivity: string | null;
   ciiuCode: string | null;
   province: string | null;
@@ -193,6 +237,8 @@ function toNormalized(record: {
     taxpayerStatus: record.taxpayerStatus ?? undefined,
     taxpayerClass: record.taxpayerClass ?? undefined,
     taxpayerType: record.taxpayerType ?? undefined,
+    taxRegime: record.taxRegime ?? undefined,
+    contribuyenteRimpe: record.contribuyenteRimpe ?? undefined,
     economicActivity: record.economicActivity ?? undefined,
     ciiuCode: record.ciiuCode ?? undefined,
     province: record.province ?? undefined,
@@ -207,10 +253,45 @@ function toNormalized(record: {
   };
 }
 
-export async function discoverSriTaxpayerResources(
+const sriHeaders = (accept: string) => ({
+  "User-Agent": SRI_DATA_USER_AGENT,
+  Accept: accept,
+});
+
+const provinceKey = (value: string) =>
+  value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/gi, "").toLowerCase();
+
+export function isAllowedSriDataUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" &&
+      (url.hostname === "sri.gob.ec" || url.hostname === "www.sri.gob.ec" ||
+        url.hostname === "descargas.sri.gob.ec");
+  } catch {
+    return false;
+  }
+}
+
+export function discoverSriResourcesFromHtml(html: string, baseUrl = SRI_DATASETS_URL) {
+  const canonical = new Map(SRI_PROVINCES.map((name) => [provinceKey(name), name]));
+  const resources = new Map<string, SriTaxpayerDatasetResource>();
+  const hrefPattern = /href\s*=\s*["']([^"']*SRI_RUC_([^"'/?#]+)\.zip[^"']*)["']/gi;
+  for (const match of html.matchAll(hrefPattern)) {
+    const rawUrl = match[1].replace(/&amp;/g, "&");
+    const url = new URL(rawUrl, baseUrl).toString().replace(/^http:/, "https:");
+    const province = canonical.get(provinceKey(decodeURIComponent(match[2]).replace(/_/g, " ")));
+    if (province && isAllowedSriDataUrl(url)) {
+      resources.set(province, { province, url, fileType: "ZIP" });
+    }
+  }
+  return [...resources.values()].sort((a, b) => a.province.localeCompare(b.province, "es"));
+}
+
+async function discoverSriResourcesFromCkan(
   fetcher: typeof fetch = fetch,
 ): Promise<SriTaxpayerDatasetResource[]> {
   const response = await fetcher(SRI_OPEN_DATA_CATALOG_API, {
+    headers: sriHeaders("application/json"),
     signal: AbortSignal.timeout(20_000),
   });
   if (!response.ok)
@@ -250,10 +331,38 @@ export async function discoverSriTaxpayerResources(
                 dataset.title?.split("/").at(-1)?.trim() || dataset.name || "",
               url: resource.url.replace(/^http:/, "https:"),
               modifiedAt: dataset.metadata_modified,
+              fileType: "ZIP",
             },
           ]
         : [];
     });
+}
+
+export async function discoverSriTaxpayerResources(
+  fetcher: typeof fetch = fetch,
+): Promise<SriTaxpayerDatasetResource[]> {
+  let direct: SriTaxpayerDatasetResource[] = [];
+  try {
+    const response = await fetcher(SRI_DATASETS_URL, {
+      headers: sriHeaders("text/html,application/xhtml+xml"),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (response.ok) direct = discoverSriResourcesFromHtml(await response.text());
+  } catch {
+    // CKAN remains an optional fallback when the official SRI page is unavailable.
+  }
+  if (direct.length === SRI_EXPECTED_PROVINCE_COUNT) return direct;
+  try {
+    const fallback = await discoverSriResourcesFromCkan(fetcher);
+    const merged = new Map(direct.map((resource) => [resource.province, resource]));
+    for (const resource of fallback) {
+      if (isAllowedSriDataUrl(resource.url) && !merged.has(resource.province))
+        merged.set(resource.province, resource);
+    }
+    return [...merged.values()].sort((a, b) => a.province.localeCompare(b.province, "es"));
+  } catch {
+    return direct;
+  }
 }
 
 export async function validateSriTaxpayerResource(
@@ -264,7 +373,7 @@ export async function validateSriTaxpayerResource(
   if (
     !resource.province.trim() ||
     url.protocol !== "https:" ||
-    url.hostname !== "descargas.sri.gob.ec" ||
+    !isAllowedSriDataUrl(resource.url) ||
     !url.pathname.toLowerCase().endsWith(".zip")
   )
     throw new Error(
@@ -272,7 +381,7 @@ export async function validateSriTaxpayerResource(
     );
 
   const response = await fetcher(resource.url, {
-    headers: { Range: "bytes=0-3" },
+    headers: { ...sriHeaders("application/zip,application/octet-stream"), Range: "bytes=0-3" },
     signal: AbortSignal.timeout(20_000),
   });
   if (!response.ok || !response.body)
@@ -284,7 +393,10 @@ export async function validateSriTaxpayerResource(
   await reader.cancel();
   if (!value || value[0] !== 0x50 || value[1] !== 0x4b)
     throw new Error(`El recurso de ${resource.province} no es un ZIP válido.`);
-  return true;
+  return {
+    fileType: response.headers.get("content-type") ?? resource.fileType ?? "ZIP",
+    sizeBytes: Number(response.headers.get("content-range")?.split("/").at(-1) ?? response.headers.get("content-length")) || resource.sizeBytes,
+  };
 }
 
 export async function importNormalizedRecords(

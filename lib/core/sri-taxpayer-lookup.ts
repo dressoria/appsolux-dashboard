@@ -20,6 +20,8 @@ export type SriTaxpayerLookupResult =
       taxpayerStatus?: string;
       taxpayerClass?: string;
       taxpayerType?: string;
+      taxRegime?: string;
+      contribuyenteRimpe?: string;
       economicActivity?: string;
       ciiuCode?: string;
       accountingRequired?: boolean;
@@ -97,6 +99,10 @@ export function normalizeTaxpayerResponse(
     taxpayerType: text(
       data.taxpayerType ?? data.tipoContribuyente ?? data.tipo,
     ),
+    taxRegime: text(data.taxRegime ?? data.regimenTributario ?? data.regimen),
+    contribuyenteRimpe: text(
+      data.contribuyenteRimpe ?? data.condicionRimpe ?? data.regimenRimpe,
+    ),
     economicActivity: text(
       data.economicActivity ?? data.actividadEconomica ?? data.actividad,
     ),
@@ -124,6 +130,8 @@ type IndexedTaxpayerRecord = {
   taxpayerStatus?: string;
   taxpayerClass?: string;
   taxpayerType?: string;
+  taxRegime?: string;
+  contribuyenteRimpe?: string;
   economicActivity?: string;
   ciiuCode?: string;
   province?: string;

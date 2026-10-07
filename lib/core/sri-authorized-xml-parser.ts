@@ -9,6 +9,8 @@ type RidePayment = {
   code: string;
   label: string;
   amount: string;
+  term: string;
+  timeUnit: string;
 };
 
 type RideDetailAdditional = {
@@ -64,6 +66,9 @@ export type ParsedAuthorizedSriInvoice = {
   customer: {
     name: string;
     identification: string;
+    address: string;
+    phone: string;
+    email: string;
   };
   details: RideDetail[];
   additionalFields: RideAdditionalField[];
@@ -106,13 +111,19 @@ function decodeXmlEntities(value: string) {
 }
 
 function findFirstTag(xml: string, tagName: string) {
-  const matcher = new RegExp(`<([\\w.-]+:)?${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/([\\w.-]+:)?${tagName}>`, "i");
+  const matcher = new RegExp(
+    `<([\\w.-]+:)?${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/([\\w.-]+:)?${tagName}>`,
+    "i",
+  );
   const match = xml.match(matcher);
   return match ? decodeXmlEntities(match[2] ?? "") : "";
 }
 
 function findAllBlocks(xml: string, tagName: string) {
-  const matcher = new RegExp(`<([\\w.-]+:)?${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/([\\w.-]+:)?${tagName}>`, "gi");
+  const matcher = new RegExp(
+    `<([\\w.-]+:)?${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/([\\w.-]+:)?${tagName}>`,
+    "gi",
+  );
   const blocks: string[] = [];
   let match: RegExpExecArray | null;
 
@@ -132,7 +143,8 @@ function getTaxBucketLabel(codigoPorcentaje: string, tarifa: string) {
   if (codigoPorcentaje === "7") return "SUBTOTAL EXENTO DE IVA";
 
   const numericRate = Number(tarifa || "0");
-  if (numericRate > 0) return `SUBTOTAL ${Number.isInteger(numericRate) ? numericRate : tarifa}%`;
+  if (numericRate > 0)
+    return `SUBTOTAL ${Number.isInteger(numericRate) ? numericRate : tarifa}%`;
 
   return "SUBTOTAL 0%";
 }
@@ -143,7 +155,9 @@ function parseAuthorizedEnvelope(xml: string) {
   const documentXmlRaw = findFirstTag(xml, "comprobante");
 
   if (!documentXmlRaw) {
-    throw new Error("El XML autorizado no contiene el comprobante interno del SRI.");
+    throw new Error(
+      "El XML autorizado no contiene el comprobante interno del SRI.",
+    );
   }
 
   const documentXml = decodeXmlEntities(documentXmlRaw);
@@ -154,14 +168,19 @@ function parseAuthorizedEnvelope(xml: string) {
   };
 }
 
-export function parseAuthorizedSriInvoiceXml(xml: string): ParsedAuthorizedSriInvoice {
-  const { authorizationNumber, authorizationDate, documentXml } = parseAuthorizedEnvelope(xml);
+export function parseAuthorizedSriInvoiceXml(
+  xml: string,
+): ParsedAuthorizedSriInvoice {
+  const { authorizationNumber, authorizationDate, documentXml } =
+    parseAuthorizedEnvelope(xml);
 
   const infoTributaria = findAllBlocks(documentXml, "infoTributaria")[0] ?? "";
   const infoFactura = findAllBlocks(documentXml, "infoFactura")[0] ?? "";
 
   if (!infoTributaria || !infoFactura) {
-    throw new Error("El XML autorizado no corresponde a una factura SRI válida.");
+    throw new Error(
+      "El XML autorizado no corresponde a una factura SRI válida.",
+    );
   }
 
   const ambienteCode = findFirstTag(infoTributaria, "ambiente");
@@ -173,22 +192,28 @@ export function parseAuthorizedSriInvoiceXml(xml: string): ParsedAuthorizedSriIn
   const details: RideDetail[] = detailBlocks.map((detailXml) => {
     // Parse detail additional fields from <detallesAdicionales>
     const detAdicionalMatches = Array.from(
-      detailXml.matchAll(/<([\w.-]+:)?detAdicional\b([^>]*)>([\s\S]*?)<\/([\w.-]+:)?detAdicional>/gi)
+      detailXml.matchAll(
+        /<([\w.-]+:)?detAdicional\b([^>]*)>([\s\S]*?)<\/([\w.-]+:)?detAdicional>/gi,
+      ),
     );
-    const detailAdditional: RideDetailAdditional[] = detAdicionalMatches.map((m) => {
-      const attrs = m[2] ?? "";
-      const name = attrs.match(/\bnombre="([^"]+)"/i)?.[1] ?? "";
-      return {
-        name: decodeXmlEntities(name),
-        value: decodeXmlEntities(m[3] ?? ""),
-      };
-    });
+    const detailAdditional: RideDetailAdditional[] = detAdicionalMatches.map(
+      (m) => {
+        const attrs = m[2] ?? "";
+        const name = attrs.match(/\bnombre="([^"]+)"/i)?.[1] ?? "";
+        return {
+          name: decodeXmlEntities(name),
+          value: decodeXmlEntities(m[3] ?? ""),
+        };
+      },
+    );
 
-    const unitPrice = normalizeAmount(findFirstTag(detailXml, "precioUnitario"));
+    const unitPrice = normalizeAmount(
+      findFirstTag(detailXml, "precioUnitario"),
+    );
     const subsidio = normalizeAmount(findFirstTag(detailXml, "subsidio"));
     // precioSinSubsidio = unitPrice when no subsidy
     const precioSinSubsidio = normalizeAmount(
-      findFirstTag(detailXml, "precioSinSubsidio") || unitPrice
+      findFirstTag(detailXml, "precioSinSubsidio") || unitPrice,
     );
 
     return {
@@ -201,14 +226,18 @@ export function parseAuthorizedSriInvoiceXml(xml: string): ParsedAuthorizedSriIn
       subsidio,
       precioSinSubsidio,
       discount: normalizeAmount(findFirstTag(detailXml, "descuento")),
-      subtotalExcludingTax: normalizeAmount(findFirstTag(detailXml, "precioTotalSinImpuesto")),
+      subtotalExcludingTax: normalizeAmount(
+        findFirstTag(detailXml, "precioTotalSinImpuesto"),
+      ),
     };
   });
 
   // ── Additional fields ──────────────────────────────────────────────────────
 
   const additionalFieldBlocks = Array.from(
-    documentXml.matchAll(/<([\w.-]+:)?campoAdicional\b([^>]*)>([\s\S]*?)<\/([\w.-]+:)?campoAdicional>/gi)
+    documentXml.matchAll(
+      /<([\w.-]+:)?campoAdicional\b([^>]*)>([\s\S]*?)<\/([\w.-]+:)?campoAdicional>/gi,
+    ),
   );
   const additionalFields = additionalFieldBlocks.map((match) => {
     const attrs = match[2] ?? "";
@@ -230,6 +259,8 @@ export function parseAuthorizedSriInvoiceXml(xml: string): ParsedAuthorizedSriIn
         code,
         label: PAYMENT_METHOD_LABELS[code] ?? code,
         amount: normalizeAmount(findFirstTag(paymentXml, "total")),
+        term: findFirstTag(paymentXml, "plazo") || "0",
+        timeUnit: findFirstTag(paymentXml, "unidadTiempo") || "Días",
       };
     })
     .filter((p): p is RidePayment => p !== null);
@@ -248,7 +279,9 @@ export function parseAuthorizedSriInvoiceXml(xml: string): ParsedAuthorizedSriIn
   for (const taxXml of taxBlocks) {
     const codigo = findFirstTag(taxXml, "codigo");
     const codigoPorcentaje = findFirstTag(taxXml, "codigoPorcentaje");
-    const baseImponible = normalizeAmount(findFirstTag(taxXml, "baseImponible"));
+    const baseImponible = normalizeAmount(
+      findFirstTag(taxXml, "baseImponible"),
+    );
     const valor = normalizeAmount(findFirstTag(taxXml, "valor"));
     const tarifa = normalizeAmount(findFirstTag(taxXml, "tarifa"));
 
@@ -265,7 +298,8 @@ export function parseAuthorizedSriInvoiceXml(xml: string): ParsedAuthorizedSriIn
     const label = getTaxBucketLabel(codigoPorcentaje, tarifa);
 
     if (label === "SUBTOTAL 0%") subtotalZero = baseImponible;
-    if (label === "SUBTOTAL NO OBJETO DE IVA") subtotalNoObjetoIva = baseImponible;
+    if (label === "SUBTOTAL NO OBJETO DE IVA")
+      subtotalNoObjetoIva = baseImponible;
     if (label === "SUBTOTAL EXENTO DE IVA") subtotalExentoIva = baseImponible;
     if (
       label.startsWith("SUBTOTAL ") &&
@@ -278,9 +312,10 @@ export function parseAuthorizedSriInvoiceXml(xml: string): ParsedAuthorizedSriIn
 
     if (codigo === "2") {
       iva.push({
-        label: Number(tarifa) > 0
-          ? `IVA ${Number.isInteger(Number(tarifa)) ? Number(tarifa) : tarifa}%`
-          : "IVA 0%",
+        label:
+          Number(tarifa) > 0
+            ? `IVA ${Number.isInteger(Number(tarifa)) ? Number(tarifa) : tarifa}%`
+            : "IVA 0%",
         baseAmount: baseImponible,
         value: valor,
       });
@@ -304,7 +339,10 @@ export function parseAuthorizedSriInvoiceXml(xml: string): ParsedAuthorizedSriIn
       environmentCode: ambienteCode,
       environmentLabel: ambienteCode === "2" ? "PRODUCCIÓN" : "PRUEBAS",
       emissionCode: tipoEmisionCode || "1",
-      emissionLabel: tipoEmisionCode === "1" || !tipoEmisionCode ? "NORMAL" : tipoEmisionCode,
+      emissionLabel:
+        tipoEmisionCode === "1" || !tipoEmisionCode
+          ? "NORMAL"
+          : tipoEmisionCode,
       accessKey:
         findFirstTag(infoTributaria, "claveAcceso") ||
         authorizationNumber ||
@@ -323,8 +361,22 @@ export function parseAuthorizedSriInvoiceXml(xml: string): ParsedAuthorizedSriIn
       guideRemission: findFirstTag(infoFactura, "guiaRemision"),
     },
     customer: {
-      name: findFirstTag(infoFactura, "razonSocialComprador") || "Consumidor final",
-      identification: findFirstTag(infoFactura, "identificacionComprador") || "N/A",
+      name:
+        findFirstTag(infoFactura, "razonSocialComprador") || "Consumidor final",
+      identification:
+        findFirstTag(infoFactura, "identificacionComprador") || "N/A",
+      address:
+        additionalFields.find(
+          (field) => field.name.toUpperCase() === "DIRECCION CLIENTE",
+        )?.value ?? "",
+      phone:
+        additionalFields.find(
+          (field) => field.name.toUpperCase() === "TELEFONO CLIENTE",
+        )?.value ?? "",
+      email:
+        additionalFields.find(
+          (field) => field.name.toUpperCase() === "EMAIL CLIENTE",
+        )?.value ?? "",
     },
     details,
     additionalFields,
@@ -334,8 +386,12 @@ export function parseAuthorizedSriInvoiceXml(xml: string): ParsedAuthorizedSriIn
       subtotalZero,
       subtotalNoObjetoIva,
       subtotalExentoIva,
-      subtotalSinImpuestos: normalizeAmount(findFirstTag(infoFactura, "totalSinImpuestos")),
-      totalDescuento: normalizeAmount(findFirstTag(infoFactura, "totalDescuento")),
+      subtotalSinImpuestos: normalizeAmount(
+        findFirstTag(infoFactura, "totalSinImpuestos"),
+      ),
+      totalDescuento: normalizeAmount(
+        findFirstTag(infoFactura, "totalDescuento"),
+      ),
       ice,
       irbpnr,
       propina: normalizeAmount(findFirstTag(infoFactura, "propina")),

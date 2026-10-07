@@ -9,14 +9,14 @@ import type { ParsedAuthorizedSriInvoice } from "@/lib/core/sri-authorized-xml-p
 // ── Colors ────────────────────────────────────────────────────────────────────
 
 const C = {
-  headerBg:  rgb(0.04, 0.22, 0.47),  // SRI navy blue
-  white:     rgb(1, 1, 1),
-  border:    rgb(0.78, 0.80, 0.86),
-  text:      rgb(0.07, 0.10, 0.14),
-  muted:     rgb(0.38, 0.44, 0.52),
-  red:       rgb(0.75, 0.08, 0.08),
-  rowOdd:    rgb(0.96, 0.97, 0.99),
-  totalBg:   rgb(0.04, 0.22, 0.47),
+  headerBg: rgb(0.12, 0.32, 0.95),
+  white: rgb(1, 1, 1),
+  border: rgb(0.78, 0.8, 0.86),
+  text: rgb(0.07, 0.1, 0.14),
+  muted: rgb(0.38, 0.44, 0.52),
+  red: rgb(0.75, 0.08, 0.08),
+  rowOdd: rgb(0.96, 0.97, 0.99),
+  totalBg: rgb(0.04, 0.22, 0.47),
 };
 
 // ── Coordinate helpers ────────────────────────────────────────────────────────
@@ -32,10 +32,13 @@ function pdfY(H: number, fromTop: number): number {
 function drawRect(
   page: PDFPage,
   H: number,
-  x: number, fromTop: number, w: number, h: number,
+  x: number,
+  fromTop: number,
+  w: number,
+  h: number,
   fill?: RGB,
   borderColor?: RGB,
-  borderWidth = 0.5
+  borderWidth = 0.5,
 ) {
   page.drawRectangle({
     x,
@@ -51,13 +54,15 @@ function drawRect(
 function drawLine(
   page: PDFPage,
   H: number,
-  x1: number, x2: number, fromTop: number,
+  x1: number,
+  x2: number,
+  fromTop: number,
   color: RGB = C.border,
-  thickness = 0.5
+  thickness = 0.5,
 ) {
   page.drawLine({
     start: { x: x1, y: pdfY(H, fromTop) },
-    end:   { x: x2, y: pdfY(H, fromTop) },
+    end: { x: x2, y: pdfY(H, fromTop) },
     thickness,
     color,
   });
@@ -66,13 +71,15 @@ function drawLine(
 function drawVLine(
   page: PDFPage,
   H: number,
-  x: number, fromTop1: number, fromTop2: number,
+  x: number,
+  fromTop1: number,
+  fromTop2: number,
   color: RGB = C.border,
-  thickness = 0.5
+  thickness = 0.5,
 ) {
   page.drawLine({
     start: { x, y: pdfY(H, fromTop1) },
-    end:   { x, y: pdfY(H, fromTop2) },
+    end: { x, y: pdfY(H, fromTop2) },
     thickness,
     color,
   });
@@ -83,11 +90,12 @@ function drawText(
   page: PDFPage,
   H: number,
   text: string,
-  x: number, fromTop: number,
+  x: number,
+  fromTop: number,
   size: number,
   font: PDFFont,
   color: RGB = C.text,
-  maxWidth?: number
+  maxWidth?: number,
 ) {
   let t = text;
   if (maxWidth !== undefined && maxWidth > 0) {
@@ -110,10 +118,12 @@ function drawTextCentered(
   page: PDFPage,
   H: number,
   text: string,
-  boxX: number, fromTop: number, boxW: number,
+  boxX: number,
+  fromTop: number,
+  boxW: number,
   size: number,
   font: PDFFont,
-  color: RGB = C.text
+  color: RGB = C.text,
 ) {
   const tw = font.widthOfTextAtSize(text, size);
   const x = boxX + Math.max((boxW - tw) / 2, 0);
@@ -130,10 +140,11 @@ function drawTextRight(
   page: PDFPage,
   H: number,
   text: string,
-  rightX: number, fromTop: number,
+  rightX: number,
+  fromTop: number,
   size: number,
   font: PDFFont,
-  color: RGB = C.text
+  color: RGB = C.text,
 ) {
   const tw = font.widthOfTextAtSize(text, size);
   page.drawText(text, {
@@ -152,12 +163,64 @@ function money(value: string): string {
   return isNaN(n) ? "0.00" : n.toFixed(2);
 }
 
+function formatUnitPrice(value: string): string {
+  const number = Number(value || 0);
+  if (!Number.isFinite(number)) return "0.00";
+  return number.toFixed(6).replace(/0+$/, "").replace(/\.$/, ".00");
+}
+
 function safe(value: string | undefined | null): string {
   return value?.trim() || "";
 }
 
+const CODE39_DIGIT_PATTERNS: Record<string, string> = {
+  "0": "101001101101",
+  "1": "110100101011",
+  "2": "101100101011",
+  "3": "110110010101",
+  "4": "101001101011",
+  "5": "110100110101",
+  "6": "101100110101",
+  "7": "101001011011",
+  "8": "110100101101",
+  "9": "101100101101",
+  "*": "100101101101",
+};
+
+function drawAccessKeyBarcode(
+  page: PDFPage,
+  accessKey: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  const encoded = `*${accessKey.replace(/\D/g, "")}*`;
+  const modules = [...encoded]
+    .map((character) => CODE39_DIGIT_PATTERNS[character])
+    .filter(Boolean)
+    .join("0");
+  const moduleWidth = width / modules.length;
+  [...modules].forEach((module, index) => {
+    if (module === "1") {
+      page.drawRectangle({
+        x: x + index * moduleWidth,
+        y,
+        width: Math.max(moduleWidth, 0.2),
+        height,
+        color: C.text,
+      });
+    }
+  });
+}
+
 // Wraps `text` into lines that each fit within `maxWidth` at `size` pt.
-function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
+function wrapText(
+  text: string,
+  font: PDFFont,
+  size: number,
+  maxWidth: number,
+): string[] {
   const words = text.split(" ");
   const lines: string[] = [];
   let current = "";
@@ -190,34 +253,33 @@ const UW = A4W - ML - MR; // usable width ~559pt
 
 // Column widths for the detail table (total must equal UW ≈ 559)
 const TABLE_COLS = [
-  { label: "Cód. Principal",  w: 60 },
-  { label: "Cód. Aux.",       w: 44 },
-  { label: "Cant.",           w: 30 },
-  { label: "Descripción",     w: 140 },
-  { label: "Det. Adicional",  w: 60 },
-  { label: "P. Unitario",     w: 56 },
-  { label: "Subsidio",        w: 38 },
-  { label: "P.s/Subsidio",    w: 52 },
-  { label: "Descuento",       w: 42 },
-  { label: "P. Total",        w: 59 },
+  { label: "No.", w: 28 },
+  { label: "Código", w: 70 },
+  { label: "Cant.", w: 45 },
+  { label: "Descripción", w: 235 },
+  { label: "Precio U.", w: 65 },
+  { label: "Desc.", w: 55 },
+  { label: "Total", w: 61 },
 ] as const;
 // Total: 60+44+30+140+60+56+38+52+42+59 = 581... let me recalculate to exactly UW
 
 // ── Main generator ────────────────────────────────────────────────────────────
 
 export async function generateRidePdfFromAuthorizedXml(
-  invoice: ParsedAuthorizedSriInvoice
+  invoice: ParsedAuthorizedSriInvoice,
 ): Promise<Buffer> {
   const pdfDoc = await PDFDocument.create();
-  pdfDoc.setTitle(`RIDE ${invoice.document.number || invoice.authorization.number}`);
-  pdfDoc.setCreator("Appsolux");
-  pdfDoc.setProducer("Appsolux - SRI Ecuador");
+  pdfDoc.setTitle(
+    `RIDE ${invoice.document.number || invoice.authorization.number}`,
+  );
+  pdfDoc.setCreator("FACTUROM COM");
+  pdfDoc.setProducer("FACTUROM COM");
 
   const fontR = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontB = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
   // Recalculate table column widths to exactly fit UW
-  const colsRaw = [58, 43, 29, 138, 58, 55, 37, 51, 41, 59]; // raw widths
+  const colsRaw = TABLE_COLS.map((column) => column.w);
   const rawSum = colsRaw.reduce((a, b) => a + b, 0);
   const scaleF = UW / rawSum;
   const colWidths = colsRaw.map((w) => Math.round(w * scaleF));
@@ -230,6 +292,13 @@ export async function generateRidePdfFromAuthorizedXml(
 
   let currentPage = pdfDoc.addPage([A4W, A4H]);
   const H = A4H;
+  currentPage.drawRectangle({
+    x: 0,
+    y: 0,
+    width: A4W,
+    height: A4H,
+    color: C.white,
+  });
 
   // Track vertical cursor (fromTop)
   let Y = 0;
@@ -237,6 +306,13 @@ export async function generateRidePdfFromAuthorizedXml(
   function ensureSpace(needed: number): PDFPage {
     if (Y + needed > H - 55) {
       currentPage = pdfDoc.addPage([A4W, A4H]);
+      currentPage.drawRectangle({
+        x: 0,
+        y: 0,
+        width: A4W,
+        height: A4H,
+        color: C.white,
+      });
       Y = 20;
     }
     return currentPage;
@@ -248,14 +324,12 @@ export async function generateRidePdfFromAuthorizedXml(
 
   Y = 18;
   const headerTop = Y;
-  const leftW = Math.round(UW * 0.60);  // ~335
+  const leftW = Math.round(UW * 0.6); // ~335
   const rightX = ML + leftW + 4;
-  const rightW = UW - leftW - 4;        // ~220
+  const rightW = UW - leftW - 4; // ~220
 
   // Measure left panel content to determine header height
   const leftContentLines: Array<[string, PDFFont, number]> = [];
-
-  leftContentLines.push(["NO TIENE LOGO", fontB, 7]); // placeholder
 
   const legalName = safe(invoice.emitter.legalName).toUpperCase();
   const tradeName = safe(invoice.emitter.tradeName);
@@ -270,19 +344,31 @@ export async function generateRidePdfFromAuthorizedXml(
   if (dirMatriz) {
     leftContentLines.push(["Dirección Matriz:", fontB, 6]);
     const dmLines = wrapText(dirMatriz, fontR, 6.5, leftW - 18);
-    dmLines.forEach(l => leftContentLines.push([l, fontR, 6.5]));
+    dmLines.forEach((l) => leftContentLines.push([l, fontR, 6.5]));
   }
   if (dirEstab && dirEstab !== dirMatriz) {
     leftContentLines.push(["Dir. Establecimiento:", fontB, 6]);
     const deLines = wrapText(dirEstab, fontR, 6.5, leftW - 18);
-    deLines.forEach(l => leftContentLines.push([l, fontR, 6.5]));
+    deLines.forEach((l) => leftContentLines.push([l, fontR, 6.5]));
   }
   if (obCont) {
-    const label = obCont.toUpperCase() === "SI" || obCont.toUpperCase() === "SÍ" ? "SÍ" : "NO";
-    leftContentLines.push([`OBLIGADO A LLEVAR CONTABILIDAD: ${label}`, fontR, 6.5]);
+    const label =
+      obCont.toUpperCase() === "SI" || obCont.toUpperCase() === "SÍ"
+        ? "SÍ"
+        : "NO";
+    leftContentLines.push([
+      `OBLIGADO A LLEVAR CONTABILIDAD: ${label}`,
+      fontR,
+      6.5,
+    ]);
   }
   if (rimpe) leftContentLines.push([rimpe, fontR, 6.5]);
-  if (agente) leftContentLines.push([`Agente de Retención Res. No. ${agente}`, fontR, 6.5]);
+  if (agente)
+    leftContentLines.push([
+      `Agente de Retención Res. No. ${agente}`,
+      fontR,
+      6.5,
+    ]);
 
   // Estimate left panel height
   let leftH = 10;
@@ -298,45 +384,126 @@ export async function generateRidePdfFromAuthorizedXml(
 
   // Draw boxes
   drawRect(currentPage, H, ML, headerTop, leftW, headerH, C.white, C.border);
-  drawRect(currentPage, H, rightX, headerTop, rightW, headerH, C.white, C.border);
+  drawRect(
+    currentPage,
+    H,
+    rightX,
+    headerTop,
+    rightW,
+    headerH,
+    C.white,
+    C.border,
+  );
 
   // ── Left panel ──
 
   let lY = headerTop + 8;
 
-  // "NO TIENE LOGO" in red
-  drawText(currentPage, H, "NO TIENE LOGO", ML + 8, lY, 7, fontB, C.red, leftW - 16);
-  lY += 10;
-  drawLine(currentPage, H, ML + 8, ML + leftW - 8, lY, C.border);
-  lY += 5;
+  drawText(
+    currentPage,
+    H,
+    "FACTUROM",
+    ML + 8,
+    lY,
+    10,
+    fontB,
+    C.headerBg,
+    leftW - 16,
+  );
+  lY += 14;
 
   if (legalName) {
     const lnLines = wrapText(legalName, fontB, 8.5, leftW - 16);
-    for (const l of lnLines) { drawText(currentPage, H, l, ML + 8, lY, 8.5, fontB, C.text); lY += 11; }
+    for (const l of lnLines) {
+      drawText(currentPage, H, l, ML + 8, lY, 8.5, fontB, C.text);
+      lY += 11;
+    }
   }
   if (tradeName) {
-    drawText(currentPage, H, tradeName, ML + 8, lY, 7, fontR, C.text, leftW - 16);
+    drawText(
+      currentPage,
+      H,
+      tradeName,
+      ML + 8,
+      lY,
+      7,
+      fontR,
+      C.text,
+      leftW - 16,
+    );
     lY += 10;
   }
   if (dirMatriz) {
-    drawText(currentPage, H, "Dirección Matriz:", ML + 8, lY, 6, fontB, C.muted);
+    drawText(
+      currentPage,
+      H,
+      "Dirección Matriz:",
+      ML + 8,
+      lY,
+      6,
+      fontB,
+      C.muted,
+    );
     lY += 8;
     const dmLines = wrapText(dirMatriz, fontR, 6.5, leftW - 16);
-    for (const l of dmLines) { drawText(currentPage, H, l, ML + 8, lY, 6.5, fontR, C.text); lY += 9; }
+    for (const l of dmLines) {
+      drawText(currentPage, H, l, ML + 8, lY, 6.5, fontR, C.text);
+      lY += 9;
+    }
   }
   if (dirEstab && dirEstab !== dirMatriz) {
-    drawText(currentPage, H, "Dir. Establecimiento:", ML + 8, lY, 6, fontB, C.muted);
+    drawText(
+      currentPage,
+      H,
+      "Dir. Establecimiento:",
+      ML + 8,
+      lY,
+      6,
+      fontB,
+      C.muted,
+    );
     lY += 8;
     const deLines = wrapText(dirEstab, fontR, 6.5, leftW - 16);
-    for (const l of deLines) { drawText(currentPage, H, l, ML + 8, lY, 6.5, fontR, C.text); lY += 9; }
+    for (const l of deLines) {
+      drawText(currentPage, H, l, ML + 8, lY, 6.5, fontR, C.text);
+      lY += 9;
+    }
   }
   if (obCont) {
-    const label = obCont.toUpperCase() === "SI" || obCont.toUpperCase() === "SÍ" ? "SÍ" : "NO";
-    drawText(currentPage, H, `Obligado a llevar contabilidad: ${label}`, ML + 8, lY, 6.5, fontR, C.text, leftW - 16);
+    const label =
+      obCont.toUpperCase() === "SI" || obCont.toUpperCase() === "SÍ"
+        ? "SÍ"
+        : "NO";
+    drawText(
+      currentPage,
+      H,
+      `Obligado a llevar contabilidad: ${label}`,
+      ML + 8,
+      lY,
+      6.5,
+      fontR,
+      C.text,
+      leftW - 16,
+    );
     lY += 9;
   }
-  if (rimpe) { drawText(currentPage, H, rimpe, ML + 8, lY, 6.5, fontR, C.text, leftW - 16); lY += 9; }
-  if (agente) { drawText(currentPage, H, `Agente de Retención Res. No. ${agente}`, ML + 8, lY, 6.5, fontR, C.text, leftW - 16); }
+  if (rimpe) {
+    drawText(currentPage, H, rimpe, ML + 8, lY, 6.5, fontR, C.text, leftW - 16);
+    lY += 9;
+  }
+  if (agente) {
+    drawText(
+      currentPage,
+      H,
+      `Agente de Retención Res. No. ${agente}`,
+      ML + 8,
+      lY,
+      6.5,
+      fontR,
+      C.text,
+      leftW - 16,
+    );
+  }
 
   // ── Right panel ──
 
@@ -344,17 +511,54 @@ export async function generateRidePdfFromAuthorizedXml(
   const rInnerX = rightX + 6;
   const rInnerW = rightW - 12;
 
-  drawTextCentered(currentPage, H, `R.U.C.: ${safe(invoice.emitter.ruc)}`, rightX, rY, rightW, 7.5, fontB);
+  drawTextCentered(
+    currentPage,
+    H,
+    `R.U.C.: ${safe(invoice.emitter.ruc)}`,
+    rightX,
+    rY,
+    rightW,
+    7.5,
+    fontB,
+  );
   rY += 12;
-  drawTextCentered(currentPage, H, safe(invoice.document.typeLabel) || "FACTURA", rightX, rY, rightW, 11, fontB);
+  drawTextCentered(
+    currentPage,
+    H,
+    safe(invoice.document.typeLabel) || "FACTURA",
+    rightX,
+    rY,
+    rightW,
+    11,
+    fontB,
+  );
   rY += 15;
-  drawTextCentered(currentPage, H, `No. ${safe(invoice.document.number)}`, rightX, rY, rightW, 8, fontB);
+  drawTextCentered(
+    currentPage,
+    H,
+    `No. ${safe(invoice.document.number)}`,
+    rightX,
+    rY,
+    rightW,
+    8,
+    fontB,
+  );
   rY += 13;
   drawLine(currentPage, H, rInnerX, rightX + rightW - 6, rY, C.border);
   rY += 5;
 
   // Auth number
-  drawTextCentered(currentPage, H, "NÚMERO DE AUTORIZACIÓN", rightX, rY, rightW, 6, fontB, C.muted);
+  drawTextCentered(
+    currentPage,
+    H,
+    "NÚMERO DE AUTORIZACIÓN",
+    rightX,
+    rY,
+    rightW,
+    6,
+    fontB,
+    C.muted,
+  );
   rY += 9;
   // Auth number may be 49 chars — use small font + wrap at midpoint
   const anFS = authNum.length > 20 ? 5.5 : 7;
@@ -364,39 +568,148 @@ export async function generateRidePdfFromAuthorizedXml(
     rY += anFS + 4;
   } else {
     const mid = Math.ceil(authNum.length / 2);
-    drawTextCentered(currentPage, H, authNum.slice(0, mid), rightX, rY, rightW, anFS, fontR);
+    drawTextCentered(
+      currentPage,
+      H,
+      authNum.slice(0, mid),
+      rightX,
+      rY,
+      rightW,
+      anFS,
+      fontR,
+    );
     rY += anFS + 2;
-    drawTextCentered(currentPage, H, authNum.slice(mid), rightX, rY, rightW, anFS, fontR);
+    drawTextCentered(
+      currentPage,
+      H,
+      authNum.slice(mid),
+      rightX,
+      rY,
+      rightW,
+      anFS,
+      fontR,
+    );
     rY += anFS + 3;
   }
 
   drawLine(currentPage, H, rInnerX, rightX + rightW - 6, rY, C.border);
   rY += 5;
-  drawText(currentPage, H, `Fecha y hora de autorización:`, rInnerX, rY, 5.5, fontB, C.muted, rInnerW);
+  drawText(
+    currentPage,
+    H,
+    `Fecha y hora de autorización:`,
+    rInnerX,
+    rY,
+    5.5,
+    fontB,
+    C.muted,
+    rInnerW,
+  );
   rY += 8;
-  drawText(currentPage, H, safe(invoice.authorization.date), rInnerX, rY, 6.5, fontR, C.text, rInnerW);
+  drawText(
+    currentPage,
+    H,
+    safe(invoice.authorization.date),
+    rInnerX,
+    rY,
+    6.5,
+    fontR,
+    C.text,
+    rInnerW,
+  );
   rY += 9;
-  drawText(currentPage, H, `Ambiente: ${safe(invoice.authorization.environmentLabel)}`, rInnerX, rY, 6.5, fontR, C.text, rInnerW);
+  drawText(
+    currentPage,
+    H,
+    `Ambiente: ${safe(invoice.authorization.environmentLabel)}`,
+    rInnerX,
+    rY,
+    6.5,
+    fontR,
+    C.text,
+    rInnerW,
+  );
   rY += 9;
-  drawText(currentPage, H, `Emisión: ${safe(invoice.authorization.emissionLabel)}`, rInnerX, rY, 6.5, fontR, C.text, rInnerW);
+  drawText(
+    currentPage,
+    H,
+    `Emisión: ${safe(invoice.authorization.emissionLabel)}`,
+    rInnerX,
+    rY,
+    6.5,
+    fontR,
+    C.text,
+    rInnerW,
+  );
   rY += 11;
 
   // Clave de acceso
   drawLine(currentPage, H, rInnerX, rightX + rightW - 6, rY, C.border);
   rY += 5;
-  drawTextCentered(currentPage, H, "CLAVE DE ACCESO", rightX, rY, rightW, 5.5, fontB, C.muted);
+  drawTextCentered(
+    currentPage,
+    H,
+    "CLAVE DE ACCESO",
+    rightX,
+    rY,
+    rightW,
+    5.5,
+    fontB,
+    C.muted,
+  );
   rY += 8;
   if (accessKey) {
     const akFS = 5;
     const akW = fontR.widthOfTextAtSize(accessKey, akFS);
     if (akW <= rInnerW) {
-      drawTextCentered(currentPage, H, accessKey, rightX, rY, rightW, akFS, fontR);
+      drawTextCentered(
+        currentPage,
+        H,
+        accessKey,
+        rightX,
+        rY,
+        rightW,
+        akFS,
+        fontR,
+      );
     } else {
       const mid = Math.ceil(accessKey.length / 2);
-      drawTextCentered(currentPage, H, accessKey.slice(0, mid), rightX, rY, rightW, akFS, fontR);
+      drawTextCentered(
+        currentPage,
+        H,
+        accessKey.slice(0, mid),
+        rightX,
+        rY,
+        rightW,
+        akFS,
+        fontR,
+      );
       rY += 7;
-      drawTextCentered(currentPage, H, accessKey.slice(mid), rightX, rY, rightW, akFS, fontR);
+      drawTextCentered(
+        currentPage,
+        H,
+        accessKey.slice(mid),
+        rightX,
+        rY,
+        rightW,
+        akFS,
+        fontR,
+      );
     }
+  }
+
+  if (accessKey) {
+    const barTop = headerTop + headerH - 20;
+    const barX = rightX + 12;
+    const barW = rightW - 24;
+    drawAccessKeyBarcode(
+      currentPage,
+      accessKey,
+      barX,
+      pdfY(H, barTop + 12),
+      barW,
+      12,
+    );
   }
 
   // Advance Y past header
@@ -406,32 +719,140 @@ export async function generateRidePdfFromAuthorizedXml(
   // B. CUSTOMER DATA
   // ──────────────────────────────────────────────────────────────────────────
 
-  const customerH = 42;
+  const customerH = 62;
   drawRect(currentPage, H, ML, Y, UW, customerH, C.white, C.border);
 
   const halfW = Math.floor(UW / 2);
   const col2X = ML + halfW + 2;
 
   let cY = Y + 7;
-  drawText(currentPage, H, "Razón Social / Nombres y Apellidos:", ML + 6, cY, 5.5, fontB, C.muted);
-  drawText(currentPage, H, "Identificación:", col2X + 6, cY, 5.5, fontB, C.muted);
+  drawText(
+    currentPage,
+    H,
+    "Razón Social / Nombres y Apellidos:",
+    ML + 6,
+    cY,
+    5.5,
+    fontB,
+    C.muted,
+  );
+  drawText(
+    currentPage,
+    H,
+    "Identificación:",
+    col2X + 6,
+    cY,
+    5.5,
+    fontB,
+    C.muted,
+  );
   cY += 8;
-  drawText(currentPage, H, safe(invoice.customer.name), ML + 6, cY, 7.5, fontB, C.text, halfW - 12);
-  drawText(currentPage, H, safe(invoice.customer.identification), col2X + 6, cY, 7.5, fontR, C.text, halfW - 12);
+  drawText(
+    currentPage,
+    H,
+    safe(invoice.customer.name),
+    ML + 6,
+    cY,
+    7.5,
+    fontB,
+    C.text,
+    halfW - 12,
+  );
+  drawText(
+    currentPage,
+    H,
+    safe(invoice.customer.identification),
+    col2X + 6,
+    cY,
+    7.5,
+    fontR,
+    C.text,
+    halfW - 12,
+  );
   cY += 11;
 
   const issueDate = safe(invoice.document.issueDate);
   const guia = safe(invoice.document.guideRemission);
   const dirAdditional = invoice.additionalFields.find(
-    f => f.name.toLowerCase().includes("direc") || f.name.toLowerCase().includes("address")
+    (f) =>
+      f.name.toLowerCase().includes("direc") ||
+      f.name.toLowerCase().includes("address"),
   );
 
-  drawText(currentPage, H, `Fecha: ${issueDate}`, ML + 6, cY, 6.5, fontR, C.text, halfW - 12);
+  drawText(
+    currentPage,
+    H,
+    `Fecha: ${issueDate}`,
+    ML + 6,
+    cY,
+    6.5,
+    fontR,
+    C.text,
+    halfW - 12,
+  );
   if (guia) {
-    drawText(currentPage, H, `Guía de Remisión: ${guia}`, col2X + 6, cY, 6.5, fontR, C.text, halfW - 12);
+    drawText(
+      currentPage,
+      H,
+      `Guía de Remisión: ${guia}`,
+      col2X + 6,
+      cY,
+      6.5,
+      fontR,
+      C.text,
+      halfW - 12,
+    );
   } else if (dirAdditional) {
-    drawText(currentPage, H, `Dirección: ${dirAdditional.value}`, col2X + 6, cY, 6.5, fontR, C.text, halfW - 12);
+    drawText(
+      currentPage,
+      H,
+      `Dirección: ${dirAdditional.value}`,
+      col2X + 6,
+      cY,
+      6.5,
+      fontR,
+      C.text,
+      halfW - 12,
+    );
   }
+  cY += 10;
+  if (invoice.customer.address)
+    drawText(
+      currentPage,
+      H,
+      `Dirección: ${invoice.customer.address}`,
+      ML + 6,
+      cY,
+      6.5,
+      fontR,
+      C.text,
+      halfW - 12,
+    );
+  if (invoice.customer.phone)
+    drawText(
+      currentPage,
+      H,
+      `Teléfono: ${invoice.customer.phone}`,
+      col2X + 6,
+      cY,
+      6.5,
+      fontR,
+      C.text,
+      halfW - 12,
+    );
+  cY += 9;
+  if (invoice.customer.email)
+    drawText(
+      currentPage,
+      H,
+      `Email: ${invoice.customer.email}`,
+      ML + 6,
+      cY,
+      6.5,
+      fontR,
+      C.text,
+      UW - 12,
+    );
 
   Y += customerH + 3;
 
@@ -440,22 +861,50 @@ export async function generateRidePdfFromAuthorizedXml(
   // ──────────────────────────────────────────────────────────────────────────
 
   // Header row
-  drawRect(currentPage, H, ML, Y, UW, TABLE_HEADER_H, C.headerBg, C.headerBg, 0);
+  drawRect(
+    currentPage,
+    H,
+    ML,
+    Y,
+    UW,
+    TABLE_HEADER_H,
+    C.headerBg,
+    C.headerBg,
+    0,
+  );
 
-  const colLabels = TABLE_COLS.map(c => c.label);
+  const colLabels = TABLE_COLS.map((c) => c.label);
   let colX = ML;
   const colXPositions: number[] = [];
 
   for (let i = 0; i < colWidths.length; i++) {
     colXPositions.push(colX);
     const w = colWidths[i]!;
-    drawTextCentered(currentPage, H, colLabels[i]!, colX, Y + 4, w, 5.5, fontB, C.white);
+    drawTextCentered(
+      currentPage,
+      H,
+      colLabels[i]!,
+      colX,
+      Y + 4,
+      w,
+      5.5,
+      fontB,
+      C.white,
+    );
     colX += w;
   }
 
   // Vertical dividers in header
   for (let i = 1; i < colXPositions.length; i++) {
-    drawVLine(currentPage, H, colXPositions[i]!, Y, Y + TABLE_HEADER_H, C.white, 0.4);
+    drawVLine(
+      currentPage,
+      H,
+      colXPositions[i]!,
+      Y,
+      Y + TABLE_HEADER_H,
+      C.white,
+      0.4,
+    );
   }
 
   Y += TABLE_HEADER_H;
@@ -463,6 +912,23 @@ export async function generateRidePdfFromAuthorizedXml(
   // Data rows
   for (let rowIdx = 0; rowIdx < invoice.details.length; rowIdx++) {
     const pg = ensureSpace(TABLE_ROW_H);
+    if (Y === 20) {
+      drawRect(pg, H, ML, Y, UW, TABLE_HEADER_H, C.headerBg, C.headerBg, 0);
+      for (let index = 0; index < colWidths.length; index++) {
+        drawTextCentered(
+          pg,
+          H,
+          colLabels[index]!,
+          colXPositions[index]!,
+          Y + 4,
+          colWidths[index]!,
+          5.5,
+          fontB,
+          C.white,
+        );
+      }
+      Y += TABLE_HEADER_H;
+    }
     const det = invoice.details[rowIdx]!;
     const bg = rowIdx % 2 === 1 ? C.rowOdd : C.white;
 
@@ -476,27 +942,73 @@ export async function generateRidePdfFromAuthorizedXml(
     const cellY = Y + 5;
     const fs = 6.5;
 
-    // Col 0: Cod. Principal
-    drawText(pg, H, safe(det.code), colXPositions[0]! + 3, cellY, fs, fontR, C.text, colWidths[0]! - 6);
-    // Col 1: Cod. Aux.
-    drawText(pg, H, safe(det.auxiliaryCode), colXPositions[1]! + 3, cellY, fs, fontR, C.muted, colWidths[1]! - 6);
-    // Col 2: Cantidad (right-aligned)
-    drawTextRight(pg, H, safe(det.quantity), colXPositions[2]! + colWidths[2]! - 3, cellY, fs, fontR);
-    // Col 3: Descripción
-    drawText(pg, H, safe(det.description), colXPositions[3]! + 3, cellY, fs, fontR, C.text, colWidths[3]! - 6);
-    // Col 4: Det. Adicional (join multiple fields with "; ")
-    const detAdd = det.detailAdditional.map(d => `${d.name}: ${d.value}`).join("; ");
-    drawText(pg, H, detAdd, colXPositions[4]! + 3, cellY, fs, fontR, C.muted, colWidths[4]! - 6);
-    // Col 5: P. Unitario
-    drawTextRight(pg, H, money(det.unitPrice), colXPositions[5]! + colWidths[5]! - 3, cellY, fs, fontR);
-    // Col 6: Subsidio
-    drawTextRight(pg, H, money(det.subsidio), colXPositions[6]! + colWidths[6]! - 3, cellY, fs, fontR, C.muted);
-    // Col 7: P. s/ Subsidio
-    drawTextRight(pg, H, money(det.precioSinSubsidio), colXPositions[7]! + colWidths[7]! - 3, cellY, fs, fontR);
-    // Col 8: Descuento
-    drawTextRight(pg, H, money(det.discount), colXPositions[8]! + colWidths[8]! - 3, cellY, fs, fontR);
-    // Col 9: Precio Total
-    drawTextRight(pg, H, money(det.subtotalExcludingTax), colXPositions[9]! + colWidths[9]! - 3, cellY, fs, fontB);
+    drawTextRight(
+      pg,
+      H,
+      String(rowIdx + 1),
+      colXPositions[0]! + colWidths[0]! - 3,
+      cellY,
+      fs,
+      fontR,
+    );
+    drawText(
+      pg,
+      H,
+      safe(det.code),
+      colXPositions[1]! + 3,
+      cellY,
+      fs,
+      fontR,
+      C.text,
+      colWidths[1]! - 6,
+    );
+    drawTextRight(
+      pg,
+      H,
+      safe(det.quantity),
+      colXPositions[2]! + colWidths[2]! - 3,
+      cellY,
+      fs,
+      fontR,
+    );
+    drawText(
+      pg,
+      H,
+      safe(det.description),
+      colXPositions[3]! + 3,
+      cellY,
+      fs,
+      fontR,
+      C.text,
+      colWidths[3]! - 6,
+    );
+    drawTextRight(
+      pg,
+      H,
+      formatUnitPrice(det.unitPrice),
+      colXPositions[4]! + colWidths[4]! - 3,
+      cellY,
+      fs,
+      fontR,
+    );
+    drawTextRight(
+      pg,
+      H,
+      money(det.discount),
+      colXPositions[5]! + colWidths[5]! - 3,
+      cellY,
+      fs,
+      fontR,
+    );
+    drawTextRight(
+      pg,
+      H,
+      money(det.subtotalExcludingTax),
+      colXPositions[6]! + colWidths[6]! - 3,
+      cellY,
+      fs,
+      fontB,
+    );
 
     Y += TABLE_ROW_H;
   }
@@ -510,24 +1022,42 @@ export async function generateRidePdfFromAuthorizedXml(
   // Ensure minimum space for footer (estimate: ~160pt)
   if (Y + 160 > H - 35) {
     currentPage = pdfDoc.addPage([A4W, A4H]);
+    currentPage.drawRectangle({
+      x: 0,
+      y: 0,
+      width: A4W,
+      height: A4H,
+      color: C.white,
+    });
     Y = 18;
   }
 
   const footerTop = Y;
   const footerLeftW = Math.round(UW * 0.56); // ~313pt
   const footerRightX = ML + footerLeftW + 4;
-  const footerRightW = UW - footerLeftW - 4;  // ~242pt
+  const footerRightW = UW - footerLeftW - 4; // ~242pt
 
   // ── Left side ──
 
   let flY = footerTop;
 
   // Info adicional
-  drawText(currentPage, H, "INFORMACIÓN ADICIONAL", ML + 5, flY, 6.5, fontB, C.text);
+  drawText(
+    currentPage,
+    H,
+    "INFORMACIÓN ADICIONAL",
+    ML + 5,
+    flY,
+    6.5,
+    fontB,
+    C.text,
+  );
   flY += 10;
 
   const fieldsToShow = invoice.additionalFields.filter(
-    f => !f.name.toLowerCase().includes("direc") && !f.name.toLowerCase().includes("address")
+    (f) =>
+      !f.name.toLowerCase().includes("direc") &&
+      !f.name.toLowerCase().includes("address"),
   );
 
   if (fieldsToShow.length === 0) {
@@ -536,7 +1066,17 @@ export async function generateRidePdfFromAuthorizedXml(
   } else {
     for (const field of fieldsToShow.slice(0, 8)) {
       const line = `${safe(field.name)}: ${safe(field.value)}`;
-      drawText(currentPage, H, line, ML + 5, flY, 6.5, fontR, C.text, footerLeftW - 10);
+      drawText(
+        currentPage,
+        H,
+        line,
+        ML + 5,
+        flY,
+        6.5,
+        fontR,
+        C.text,
+        footerLeftW - 10,
+      );
       flY += 9;
     }
   }
@@ -544,37 +1084,74 @@ export async function generateRidePdfFromAuthorizedXml(
   flY += 5;
   drawText(currentPage, H, "FORMA DE PAGO", ML + 5, flY, 6.5, fontB, C.text);
   flY += 10;
+  drawText(
+    currentPage,
+    H,
+    "COD   FORMA DE PAGO                         VALOR      PLAZO",
+    ML + 5,
+    flY,
+    5.5,
+    fontB,
+    C.muted,
+    footerLeftW - 10,
+  );
+  flY += 9;
 
   if (invoice.payments.length === 0) {
     drawText(currentPage, H, "—", ML + 5, flY, 6.5, fontR, C.muted);
     flY += 10;
   } else {
     for (const pmt of invoice.payments) {
-      const pmtLabel = pmt.label || pmt.code;
-      const pmtAmt = pmt.amount && pmt.amount !== "0.00" ? ` — $${money(pmt.amount)}` : "";
-      drawText(currentPage, H, `${pmtLabel}${pmtAmt}`, ML + 5, flY, 6.5, fontR, C.text, footerLeftW - 10);
+      drawText(
+        currentPage,
+        H,
+        `${pmt.code}  ${pmt.label || pmt.code}  $${money(pmt.amount)}  ${pmt.term} ${pmt.timeUnit}`,
+        ML + 5,
+        flY,
+        6.2,
+        fontR,
+        C.text,
+        footerLeftW - 10,
+      );
       flY += 9;
     }
   }
 
   // ── Right side: Totals table ──
 
-  type SummaryRow = { label: string; value: string; isTotal?: boolean; skip?: boolean };
+  type SummaryRow = {
+    label: string;
+    value: string;
+    isTotal?: boolean;
+    skip?: boolean;
+  };
 
   const summaryRows: SummaryRow[] = [
     // Subtotales por tarifa (e.g. SUBTOTAL 15%)
-    ...invoice.totals.subtotalTaxed.map(r => ({ label: r.label, value: r.baseAmount })),
-    { label: "SUBTOTAL 0%",                 value: invoice.totals.subtotalZero },
-    { label: "SUBTOTAL NO OBJETO DE IVA",   value: invoice.totals.subtotalNoObjetoIva },
-    { label: "SUBTOTAL EXENTO DE IVA",      value: invoice.totals.subtotalExentoIva },
-    { label: "SUBTOTAL SIN IMPUESTOS",      value: invoice.totals.subtotalSinImpuestos },
-    { label: "TOTAL DESCUENTO",             value: invoice.totals.totalDescuento },
-    { label: "ICE",                         value: invoice.totals.ice },
-    { label: "IRBPNR",                      value: invoice.totals.irbpnr },
+    ...invoice.totals.subtotalTaxed.map((r) => ({
+      label: r.label,
+      value: r.baseAmount,
+    })),
+    { label: "SUBTOTAL 0%", value: invoice.totals.subtotalZero },
+    {
+      label: "SUBTOTAL NO OBJETO DE IVA",
+      value: invoice.totals.subtotalNoObjetoIva,
+    },
+    {
+      label: "SUBTOTAL EXENTO DE IVA",
+      value: invoice.totals.subtotalExentoIva,
+    },
+    {
+      label: "SUBTOTAL SIN IMPUESTOS",
+      value: invoice.totals.subtotalSinImpuestos,
+    },
+    { label: "TOTAL DESCUENTO", value: invoice.totals.totalDescuento },
+    { label: "ICE", value: invoice.totals.ice },
+    { label: "IRBPNR", value: invoice.totals.irbpnr },
     // IVA rows (e.g. IVA 15%)
-    ...invoice.totals.iva.map(r => ({ label: r.label, value: r.value })),
-    { label: "PROPINA",                     value: invoice.totals.propina },
-    { label: "VALOR TOTAL",                 value: invoice.totals.importeTotal, isTotal: true },
+    ...invoice.totals.iva.map((r) => ({ label: r.label, value: r.value })),
+    { label: "PROPINA", value: invoice.totals.propina },
+    { label: "VALOR TOTAL", value: invoice.totals.importeTotal, isTotal: true },
   ];
 
   let frY = footerTop;
@@ -589,13 +1166,49 @@ export async function generateRidePdfFromAuthorizedXml(
     const labelColor = row.isTotal ? C.white : C.muted;
 
     if (row.isTotal) {
-      drawRect(currentPage, H, footerRightX, frY, footerRightW, rowH, C.totalBg, C.totalBg, 0);
+      drawRect(
+        currentPage,
+        H,
+        footerRightX,
+        frY,
+        footerRightW,
+        rowH,
+        C.totalBg,
+        C.totalBg,
+        0,
+      );
     } else {
-      drawLine(currentPage, H, footerRightX, footerRightX + footerRightW, frY + rowH, C.border);
+      drawLine(
+        currentPage,
+        H,
+        footerRightX,
+        footerRightX + footerRightW,
+        frY + rowH,
+        C.border,
+      );
     }
 
-    drawText(currentPage, H, row.label, frLabelX, frY + 2, fs, f, labelColor, footerRightW * 0.70);
-    drawTextRight(currentPage, H, `$${money(row.value)}`, frValueX, frY + 2, fs, f, color);
+    drawText(
+      currentPage,
+      H,
+      row.label,
+      frLabelX,
+      frY + 2,
+      fs,
+      f,
+      labelColor,
+      footerRightW * 0.7,
+    );
+    drawTextRight(
+      currentPage,
+      H,
+      `$${money(row.value)}`,
+      frValueX,
+      frY + 2,
+      fs,
+      f,
+      color,
+    );
 
     frY += rowH;
   }
@@ -604,13 +1217,32 @@ export async function generateRidePdfFromAuthorizedXml(
   // E. FOOTER NOTE
   // ──────────────────────────────────────────────────────────────────────────
 
-  const noteY = H - 20;
-  drawLine(currentPage, H, ML, ML + UW, noteY, C.border);
-  drawText(
-    currentPage, H,
-    "Representación impresa del comprobante electrónico autorizado por el Servicio de Rentas Internas.",
-    ML, noteY + 5, 6, fontR, C.muted, UW
-  );
+  const pages = pdfDoc.getPages();
+  pages.forEach((page, index) => {
+    const noteY = H - 20;
+    drawLine(page, H, ML, ML + UW, noteY, C.border);
+    drawText(
+      page,
+      H,
+      "GENERADO POR FACTUROM COM",
+      ML,
+      noteY + 5,
+      6,
+      fontB,
+      C.muted,
+      UW / 2,
+    );
+    drawTextRight(
+      page,
+      H,
+      `Página ${index + 1} de ${pages.length}`,
+      ML + UW,
+      noteY + 5,
+      6,
+      fontR,
+      C.muted,
+    );
+  });
 
   const pdfBytes = await pdfDoc.save();
   return Buffer.from(pdfBytes);

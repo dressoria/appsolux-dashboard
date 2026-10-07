@@ -1,16 +1,21 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
   discoverSriTaxpayerResources,
+  discoverSriResourcesFromHtml,
   getSriImportRunStatus,
   importNormalizedRecords,
   normalizeSriTaxpayerRow,
   parsePipeDelimitedLine,
+  isAllowedSriDataUrl,
   rowFromHeaders,
   SRI_OPEN_DATA_SOURCE,
+  SRI_PROVINCES,
   type NormalizedSriTaxpayerRecord,
   type SriTaxpayerStore,
+  validateSriTaxpayerResource,
 } from "./sri-data-service.ts";
 import { IndexedSriTaxpayerProvider } from "./sri-taxpayer-lookup.ts";
 
@@ -66,6 +71,8 @@ test("normaliza una fila oficial sin inventar campos", () => {
   assert.equal(result?.legalName, "EMPRESA DE PRUEBA S.A.");
   assert.equal(result?.source, SRI_OPEN_DATA_SOURCE);
   assert.equal("address" in (result ?? {}), false);
+  assert.equal(result?.taxRegime, undefined);
+  assert.equal(result?.contribuyenteRimpe, undefined);
 });
 
 test("mapea ubicación y banderas del establecimiento matriz", () => {
@@ -142,13 +149,83 @@ test("proveedor indexado devuelve found false cuando no existe", async () => {
   assert.equal(result.found, false);
 });
 
-test("descubrimiento falla limpiamente si la fuente no está disponible", async () => {
+test("descubrimiento falla limpiamente si las fuentes no están disponibles", async () => {
   const unavailable = (() =>
     Promise.resolve(new Response(null, { status: 503 }))) as typeof fetch;
-  await assert.rejects(
-    discoverSriTaxpayerResources(unavailable),
-    /catálogo oficial \(503\)/,
+  assert.deepEqual(await discoverSriTaxpayerResources(unavailable), []);
+});
+
+const officialHtml = SRI_PROVINCES.map(
+  (province) =>
+    `<a href="https://descargas.sri.gob.ec/download/datosAbiertos/SRI_RUC_${province
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/ /g, "_")}.zip">Descargar</a>`,
+).join("\n");
+
+test("discovery oficial encuentra las 24 provincias", () => {
+  const resources = discoverSriResourcesFromHtml(officialHtml);
+  assert.equal(resources.length, 24);
+  assert.deepEqual(new Set(resources.map((resource) => resource.province)), new Set(SRI_PROVINCES));
+});
+
+test("CKAN 403 no aborta cuando SRI directo funciona", async () => {
+  let ckanCalls = 0;
+  const fetcher = (async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.includes("datosabiertos.gob.ec")) {
+      ckanCalls++;
+      return new Response(null, { status: 403 });
+    }
+    return new Response(officialHtml, { status: 200 });
+  }) as typeof fetch;
+  const resources = await discoverSriTaxpayerResources(fetcher);
+  assert.equal(resources.length, 24);
+  assert.equal(ckanCalls, 0);
+});
+
+test("solo permite dominios oficiales SRI", () => {
+  assert.equal(isAllowedSriDataUrl("https://descargas.sri.gob.ec/a.zip"), true);
+  assert.equal(isAllowedSriDataUrl("https://www.sri.gob.ec/datasets"), true);
+  assert.equal(isAllowedSriDataUrl("https://sri.gob.ec.evil.example/a.zip"), false);
+  assert.equal(isAllowedSriDataUrl("http://descargas.sri.gob.ec/a.zip"), false);
+});
+
+test("valida la firma de un ZIP oficial sin descargarlo completo", async () => {
+  const fetcher = (async () =>
+    new Response(new Uint8Array([0x50, 0x4b, 0x03, 0x04]), {
+      status: 206,
+      headers: {
+        "content-type": "application/zip",
+        "content-range": "bytes 0-3/4096",
+      },
+    })) as typeof fetch;
+  const metadata = await validateSriTaxpayerResource(
+    {
+      province: "Azuay",
+      url: "https://descargas.sri.gob.ec/download/datosAbiertos/SRI_RUC_Azuay.zip",
+    },
+    fetcher,
   );
+  assert.equal(metadata.fileType, "application/zip");
+  assert.equal(metadata.sizeBytes, 4096);
+});
+
+test("una importación parcial conserva datos previos y nunca trunca", async () => {
+  const store = new MemoryStore();
+  const original = normalizeSriTaxpayerRow(sourceRow())!;
+  await store.apply([original]);
+  await importNormalizedRecords(records(null), store);
+  assert.deepEqual(await store.findByRuc(original.ruc), original);
+});
+
+test("el importador no contiene operaciones destructivas y dry-run termina antes de escribir", async () => {
+  const source = await readFile(
+    new URL("../../scripts/sri-import-taxpayers.ts", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(source, /\bTRUNCATE\b|\.deleteMany\s*\(/i);
+  assert.ok(source.indexOf("if (dryRun)") < source.indexOf("sriTaxpayerImportRun.create"));
 });
 
 test("una importación parcial nunca se marca como completada", () => {

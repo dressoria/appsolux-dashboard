@@ -42,7 +42,7 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
     );
   }
 
-  const [profile, sequence] = await Promise.all([
+  const [profile, sequence, company, sale] = await Promise.all([
     prisma.sriTaxpayerProfile.findUnique({ where: { tenantId: tenant.id } }),
     prisma.sriDocumentSequence.findFirst({
       where: {
@@ -53,6 +53,16 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
         isActive: true,
       },
     }),
+    prisma.tenant.findUnique({ where: { id: tenant.id } }),
+    doc.sourceType === "BASIC_SALE" && doc.sourceId
+      ? prisma.lightweightSale.findFirst({
+          where: { id: doc.sourceId, tenantId: tenant.id },
+          include: {
+            customer: true,
+            payments: { orderBy: { createdAt: "asc" }, take: 1 },
+          },
+        })
+      : null,
   ]);
 
   if (!profile) {
@@ -73,6 +83,10 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
       ruc: profile.ruc,
       environment: profile.environment,
       accountingRequired: profile.accountingRequired,
+      contribuyenteRimpe: profile.contribuyenteRimpe,
+      dirMatriz: profile.dirMatriz,
+      companyEmail: company?.contactEmail,
+      companyPhone: company?.phone,
     },
     establishment: {
       code: doc.establishment.code,
@@ -90,6 +104,8 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
       customerIdentificationType: doc.customerIdentificationType,
       customerEmail: doc.customerEmail,
       customerPhone: doc.customerPhone,
+      customerAddress: sale?.customer?.address,
+      commercialPaymentMethod: sale?.payments[0]?.method,
       subtotal: doc.subtotal.toString(),
       taxTotal: doc.taxTotal.toString(),
       discountTotal: doc.discountTotal.toString(),

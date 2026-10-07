@@ -683,6 +683,8 @@ model SriTaxpayerRecord {
   taxpayerStatus      String?
   taxpayerClass       String?
   taxpayerType        String?
+  taxRegime           String?
+  contribuyenteRimpe  String?
   economicActivity    String?
   ciiuCode            String?
   province            String?
@@ -1105,6 +1107,13 @@ model SriTaxpayerProfile {
   ruc                        String
   dirMatriz                  String?
   contribuyenteRimpe         String?
+  taxpayerStatus             String?
+  taxpayerClass              String?
+  taxpayerType               String?
+  taxRegimeCode              String?
+  taxRegimeSource            String?
+  taxRegimeSourceUpdatedAt   DateTime?
+  taxRegimeQueriedAt         DateTime?
   environment                SriEnvironment  @default(TEST)
   accountingRequired         Boolean         @default(false)
   specialTaxpayerNumber      String?
