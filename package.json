@@ -12,6 +12,7 @@
     "test:sri-taxpayer-lookup": "node --test --experimental-strip-types lib/core/sri-taxpayer-lookup.test.ts",
     "test:sri-data-service": "node --test --experimental-strip-types lib/core/sri-data-service.test.ts",
     "test:lightweight-suppliers": "tsx --test lib/core/lightweight-suppliers.test.ts",
+    "test:proformas": "tsx --test lib/core/lightweight-proformas.test.ts lib/core/pos-checkout.test.ts",
     "sri:import-taxpayers": "tsx scripts/sri-import-taxpayers.ts",
     "sri:update-taxpayers": "tsx scripts/sri-import-taxpayers.ts --update",
     "prisma:generate": "prisma generate",

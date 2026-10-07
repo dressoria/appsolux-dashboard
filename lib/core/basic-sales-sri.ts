@@ -12,11 +12,7 @@ import {
 import { getSriDocumentTechnicalChecklist } from "@/lib/core/sri-technical-checklist";
 
 export type SaleSriFlowState =
-  | "preparing"
-  | "sending"
-  | "received"
-  | "authorized"
-  | "rejected";
+  "preparing" | "sending" | "received" | "authorized" | "rejected";
 
 export type StartSriFlowFromBasicSaleResult = {
   documentId: string;
@@ -62,6 +58,8 @@ export async function startSriFlowFromBasicSale(params: {
   tenantId: string;
   saleId: string;
   requestedByUserId?: string;
+  establishmentId?: string;
+  issuePointId?: string;
 }): Promise<StartSriFlowFromBasicSaleResult> {
   await requireTenantOperationalAccess(params.tenantId);
   const prisma = getPrismaClient();
@@ -69,6 +67,8 @@ export async function startSriFlowFromBasicSale(params: {
   const draft = await createDraftSriDocumentFromBasicSale({
     tenantId: params.tenantId,
     saleId: params.saleId,
+    establishmentId: params.establishmentId,
+    issuePointId: params.issuePointId,
   });
 
   const current = await getSriDocumentById(params.tenantId, draft.documentId);
@@ -77,14 +77,19 @@ export async function startSriFlowFromBasicSale(params: {
   }
 
   if (current.status === "DRAFT") {
-    const checklist = await getSriDocumentTechnicalChecklist(params.tenantId, current.id);
+    const checklist = await getSriDocumentTechnicalChecklist(
+      params.tenantId,
+      current.id,
+    );
     if (!checklist) {
-      throw new Error("No se pudo validar el checklist tecnico del comprobante.");
+      throw new Error(
+        "No se pudo validar el checklist tecnico del comprobante.",
+      );
     }
 
     if (checklist.blockingIssues.length > 0) {
       throw new Error(
-        `La factura SRI no puede prepararse todavia: ${checklist.blockingIssues.join("; ")}`
+        `La factura SRI no puede prepararse todavia: ${checklist.blockingIssues.join("; ")}`,
       );
     }
 
@@ -114,7 +119,9 @@ export async function startSriFlowFromBasicSale(params: {
   });
 
   if (!afterReady) {
-    throw new Error("No se pudo recargar el comprobante SRI despues de prepararlo.");
+    throw new Error(
+      "No se pudo recargar el comprobante SRI despues de prepararlo.",
+    );
   }
 
   if (afterReady.status === "READY_FOR_TESTING") {
@@ -144,7 +151,9 @@ export async function startSriFlowFromBasicSale(params: {
   });
 
   if (!afterSigning) {
-    throw new Error("No se pudo consultar el estado actualizado del comprobante SRI.");
+    throw new Error(
+      "No se pudo consultar el estado actualizado del comprobante SRI.",
+    );
   }
 
   if (afterSigning.status === "SIGNED") {

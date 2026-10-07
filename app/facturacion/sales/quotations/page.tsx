@@ -1,5 +1,5 @@
-import QuotationsPage from "@/app/erp/sales/quotations/page";
+import { redirect } from "next/navigation";
 
 export default function FacturacionQuotationsPage() {
-  return <QuotationsPage />;
+  redirect("/facturacion/proformas");
 }

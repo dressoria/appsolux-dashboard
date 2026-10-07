@@ -102,10 +102,14 @@ export type CreateSaleInput = {
   customerId?: string;
   paymentMethod: LightweightPaymentMethod;
   paidAmount?: number;
+  sriPaymentCode?: string;
+  notes?: string;
   items: Array<{
     productId: string;
     quantity: number;
     discountAmount?: number;
+    unitPrice?: number;
+    description?: string;
   }>;
 };
 
@@ -136,6 +140,16 @@ function assertPositiveMoney(value: number, field: string) {
   if (!Number.isFinite(value) || value < 0) {
     throw new Error(`${field} debe ser un numero positivo.`);
   }
+}
+
+const SRI_PAYMENT_CODES = new Set(["01", "16", "17", "18", "19", "20", "21"]);
+
+function normalizeSriPaymentCode(value: string | undefined) {
+  const code = value?.trim() || "01";
+  if (!SRI_PAYMENT_CODES.has(code)) {
+    throw new Error("La forma de pago SRI no es válida.");
+  }
+  return code;
 }
 
 function assertPositiveInteger(value: number, field: string) {
@@ -1024,7 +1038,12 @@ export async function createSale(input: CreateSaleInput) {
         }
       }
 
-      const grossAmount = product.price.mul(item.quantity);
+      const unitPrice =
+        item.unitPrice === undefined
+          ? product.price
+          : new Prisma.Decimal(item.unitPrice);
+      assertPositiveMoney(Number(unitPrice), "El precio");
+      const grossAmount = unitPrice.mul(item.quantity);
       const discountAmount = new Prisma.Decimal(
         Math.max(0, Math.min(item.discountAmount ?? 0, Number(grossAmount))),
       );
@@ -1040,7 +1059,8 @@ export async function createSale(input: CreateSaleInput) {
       return {
         product,
         quantity: item.quantity,
-        price: product.price,
+        price: unitPrice,
+        description: item.description?.trim() || null,
         discountAmount,
         taxRate,
         taxAmount,
@@ -1078,6 +1098,8 @@ export async function createSale(input: CreateSaleInput) {
         discountTotal,
         total,
         paymentStatus,
+        sriPaymentCode: normalizeSriPaymentCode(input.sriPaymentCode),
+        notes: input.notes?.trim() || null,
         items: {
           create: saleItems.map((item) => ({
             productId: item.product.id,
@@ -1087,6 +1109,7 @@ export async function createSale(input: CreateSaleInput) {
             taxRate: item.taxRate,
             taxAmount: item.taxAmount,
             total: item.total,
+            description: item.description,
           })),
         },
         payments: {

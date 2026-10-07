@@ -32,11 +32,21 @@ function readItems(value: unknown) {
         typeof row.discountAmount === "number"
           ? row.discountAmount
           : Number(row.discountAmount ?? 0),
+      unitPrice:
+        typeof row.unitPrice === "number"
+          ? row.unitPrice
+          : row.unitPrice === undefined
+            ? undefined
+            : Number(row.unitPrice),
+      description:
+        typeof row.description === "string" ? row.description : undefined,
     };
   });
 }
 
-function isOutputMode(value: unknown): value is "internal_receipt" | "sri_invoice" {
+function isOutputMode(
+  value: unknown,
+): value is "internal_receipt" | "sri_invoice" {
   return value === "internal_receipt" || value === "sri_invoice";
 }
 
@@ -44,7 +54,10 @@ export async function GET(request: Request) {
   const user = await getCurrentUser();
 
   if (!user) {
-    return NextResponse.json({ ok: false, message: "Sesion requerida." }, { status: 401 });
+    return NextResponse.json(
+      { ok: false, message: "Sesion requerida." },
+      { status: 401 },
+    );
   }
 
   const tenant = await getCurrentTenant(user);
@@ -65,7 +78,10 @@ export async function POST(request: Request) {
     const user = await getCurrentUser();
 
     if (!user) {
-      return NextResponse.json({ ok: false, message: "Sesion requerida." }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, message: "Sesion requerida." },
+        { status: 401 },
+      );
     }
 
     const tenant = await getCurrentTenant(user);
@@ -76,7 +92,9 @@ export async function POST(request: Request) {
       throw new Error("Metodo de pago invalido.");
     }
 
-    const outputMode = isOutputMode(body.outputMode) ? body.outputMode : "internal_receipt";
+    const outputMode = isOutputMode(body.outputMode)
+      ? body.outputMode
+      : "internal_receipt";
 
     const sale = await createSale({
       tenantId: tenant.id,
@@ -89,6 +107,11 @@ export async function POST(request: Request) {
         typeof body.paidAmount === "number"
           ? body.paidAmount
           : Number(body.paidAmount ?? 0),
+      sriPaymentCode:
+        typeof body.sriPaymentCode === "string"
+          ? body.sriPaymentCode
+          : undefined,
+      notes: typeof body.notes === "string" ? body.notes : undefined,
       items: readItems(body.items),
     });
 
@@ -104,6 +127,14 @@ export async function POST(request: Request) {
           tenantId: tenant.id,
           saleId: sale.id,
           requestedByUserId: user.id,
+          establishmentId:
+            typeof body.establishmentId === "string"
+              ? body.establishmentId
+              : undefined,
+          issuePointId:
+            typeof body.issuePointId === "string"
+              ? body.issuePointId
+              : undefined,
         });
 
         output = {
@@ -131,7 +162,7 @@ export async function POST(request: Request) {
         message:
           error instanceof Error ? error.message : "No se pudo crear venta.",
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
 }

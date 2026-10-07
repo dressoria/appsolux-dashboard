@@ -48,10 +48,12 @@ const link = (
   title: string,
   href: string,
   icon?: SidebarIconName,
-  exact = false
+  exact = false,
 ): SidebarLink => ({ kind: "link", title, href, icon, exact });
 
-export function buildSidebarNavigation(tenantMode: TenantModeState): NavGroup[] {
+export function buildSidebarNavigation(
+  tenantMode: TenantModeState,
+): NavGroup[] {
   // The master navigation is intentionally independent from the technical engine.
   void tenantMode;
 
@@ -82,7 +84,8 @@ export function buildSidebarNavigation(tenantMode: TenantModeState): NavGroup[] 
           kind: "submenu",
           title: "Ventas",
           items: [
-            link("Facturar", routes.facturacionPos),
+            link("Facturar", routes.facturacionSalesNew),
+            link("Punto de Venta", routes.facturacionPos),
             link("Documentos", routes.facturacionDocuments),
             link("Proformas", routes.facturacionSalesQuotations),
             link("Órdenes de venta", routes.facturacionSalesOrders),
@@ -104,9 +107,17 @@ export function buildSidebarNavigation(tenantMode: TenantModeState): NavGroup[] 
       title: "SRI",
       icon: "receipt",
       items: [
-        link("Comprobantes electrónicos", routes.facturacionDocuments, "file-check"),
+        link(
+          "Comprobantes electrónicos",
+          routes.facturacionDocuments,
+          "file-check",
+        ),
         link("Configuración SRI", routes.facturacionSri, "settings-2", true),
-        link("Firma electrónica", routes.facturacionSriSignature, "shield-check"),
+        link(
+          "Firma electrónica",
+          routes.facturacionSriSignature,
+          "shield-check",
+        ),
         link("Secuenciales", routes.facturacionSriSequences),
         link("Establecimientos", routes.facturacionSriEstablishments),
         link("Puntos de emisión", routes.facturacionSriIssuePoints),
@@ -151,9 +162,15 @@ export function buildSidebarNavigation(tenantMode: TenantModeState): NavGroup[] 
         link("Plan de cuentas", routes.facturacionAccountingChartOfAccounts),
         link("Asientos", routes.facturacionAccountingJournal),
         link("Libro mayor", routes.facturacionAccountingLedger),
-        link("Estado de resultados", routes.facturacionAccountingIncomeStatement),
+        link(
+          "Estado de resultados",
+          routes.facturacionAccountingIncomeStatement,
+        ),
         link("Balance general", routes.facturacionAccountingBalanceSheet),
-        link("Balance de comprobación", routes.facturacionAccountingTrialBalance),
+        link(
+          "Balance de comprobación",
+          routes.facturacionAccountingTrialBalance,
+        ),
       ],
     },
     {
@@ -167,7 +184,12 @@ export function buildSidebarNavigation(tenantMode: TenantModeState): NavGroup[] 
       title: "Empresa",
       icon: "building-2",
       items: [
-        link("Datos de empresa", routes.facturacionSettings, "building-2", true),
+        link(
+          "Datos de empresa",
+          routes.facturacionSettings,
+          "building-2",
+          true,
+        ),
         link("Métodos de pago", routes.facturacionSettingsPaymentMethods),
         link("Bodegas", routes.facturacionSettingsWarehouses),
       ],
@@ -176,12 +198,15 @@ export function buildSidebarNavigation(tenantMode: TenantModeState): NavGroup[] 
       key: "security",
       title: "Seguridad",
       icon: "shield-check",
-      items: [link("Usuarios y permisos", routes.facturacionSettingsUsers, "users")],
+      items: [
+        link("Usuarios y permisos", routes.facturacionSettingsUsers, "users"),
+      ],
     },
   ];
 
   return groups.filter((group) => {
-    if (group.key === "transactions") return access.invoicing || access.purchases;
+    if (group.key === "transactions")
+      return access.invoicing || access.purchases;
     if (group.key === "sri") return access.sri;
     if (group.key === "treasury") return access.treasury;
     if (group.key === "inventory") return access.inventory;

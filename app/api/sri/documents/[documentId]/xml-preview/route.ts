@@ -8,7 +8,8 @@ type RouteParams = { params: Promise<{ documentId: string }> };
 
 export async function POST(_req: NextRequest, { params }: RouteParams) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Sesion requerida." }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "Sesion requerida." }, { status: 401 });
 
   const tenant = await getCurrentTenant(user);
   const { documentId } = await params;
@@ -25,13 +26,19 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
   });
 
   if (!doc) {
-    return NextResponse.json({ error: "Comprobante no encontrado." }, { status: 404 });
+    return NextResponse.json(
+      { error: "Comprobante no encontrado." },
+      { status: 404 },
+    );
   }
 
   if (doc.status !== "DRAFT" && doc.status !== "READY_FOR_TESTING") {
     return NextResponse.json(
-      { error: "Solo se puede generar vista previa de comprobantes en estado borrador." },
-      { status: 422 }
+      {
+        error:
+          "Solo se puede generar vista previa de comprobantes en estado borrador.",
+      },
+      { status: 422 },
     );
   }
 
@@ -49,7 +56,10 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
   ]);
 
   if (!profile) {
-    return NextResponse.json({ error: "Perfil SRI no configurado." }, { status: 422 });
+    return NextResponse.json(
+      { error: "Perfil SRI no configurado." },
+      { status: 422 },
+    );
   }
 
   const sequentialNumber = doc.sequentialNumber ?? sequence?.currentNumber ?? 1;
@@ -84,6 +94,7 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
       taxTotal: doc.taxTotal.toString(),
       discountTotal: doc.discountTotal.toString(),
       grandTotal: doc.grandTotal.toString(),
+      sriPaymentCode: doc.sriPaymentCode ?? undefined,
       issuedAt: doc.issuedAt,
       createdAt: doc.createdAt,
     },

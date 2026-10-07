@@ -12,7 +12,11 @@ import { getPrismaClient } from "@/lib/db/prisma";
 import { listCustomers, listProducts } from "@/lib/core/lightweight-pos";
 import { getTenantPlanState } from "@/lib/core/plans";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
-import { getSriModuleStatus } from "@/lib/core/sri";
+import {
+  getSriModuleStatus,
+  listSriEstablishments,
+  listSriIssuePoints,
+} from "@/lib/core/sri";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import {
   loadSharedErpPosCustomers,
@@ -37,7 +41,9 @@ const compactActions = (
   </div>
 );
 
-export default async function FacturacionPosPage({ searchParams }: FacturacionPosPageProps) {
+export default async function FacturacionPosPage({
+  searchParams,
+}: FacturacionPosPageProps) {
   const { user, tenant } = await requireDashboardSession();
   const [resolvedParams, tenantMode, plan] = await Promise.all([
     searchParams,
@@ -93,7 +99,12 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
     let initialWarehouseName = "";
 
     try {
-      const [loadedProducts, loadedCustomers, warehouses, preferredWarehouseName] = await Promise.all([
+      const [
+        loadedProducts,
+        loadedCustomers,
+        warehouses,
+        preferredWarehouseName,
+      ] = await Promise.all([
         loadSharedErpPosProducts(tenant.id),
         loadSharedErpPosCustomers(),
         getErpnextWarehouses(),
@@ -103,13 +114,17 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
       products = loadedProducts;
       customers = loadedCustomers;
       warehouseOptions = warehouses
-        .filter((warehouse) => warehouse.is_group !== 1 && warehouse.disabled !== 1)
+        .filter(
+          (warehouse) => warehouse.is_group !== 1 && warehouse.disabled !== 1,
+        )
         .map((warehouse) => ({
           name: warehouse.name,
           label: warehouse.warehouse_name || warehouse.name,
         }));
       initialWarehouseName =
-        warehouseOptions.find((warehouse) => warehouse.name === preferredWarehouseName)?.name ??
+        warehouseOptions.find(
+          (warehouse) => warehouse.name === preferredWarehouseName,
+        )?.name ??
         warehouseOptions[0]?.name ??
         "";
     } catch (err) {
@@ -154,11 +169,14 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
   }
 
   // ── CORE: existing logic ──────────────────────────────────────────────────
-  const [coreProducts, coreCustomers, sriStatus] = await Promise.all([
-    listProducts(tenant.id, { status: "active" }),
-    listCustomers(tenant.id, { status: "active" }),
-    getSriModuleStatus(tenant.id),
-  ]);
+  const [coreProducts, coreCustomers, sriStatus, establishments, issuePoints] =
+    await Promise.all([
+      listProducts(tenant.id, { status: "active" }),
+      listCustomers(tenant.id, { status: "active" }),
+      getSriModuleStatus(tenant.id),
+      listSriEstablishments(tenant.id),
+      listSriIssuePoints(tenant.id),
+    ]);
 
   const hasSriConfig =
     sriStatus.hasProfile &&
@@ -195,10 +213,31 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
               id: product.id,
               name: product.name,
               price: product.price.toString(),
-              stock: product.type === "COMBO"
-                ? Math.max(0, Math.min(...product.comboItems.filter((item) => item.componentProduct.trackInventory).map((item) => Math.floor(item.componentProduct.stock / Number(item.quantity))), 999999))
-                : product.trackInventory ? product.stock : 999999,
+              stock:
+                product.type === "COMBO"
+                  ? Math.max(
+                      0,
+                      Math.min(
+                        ...product.comboItems
+                          .filter(
+                            (item) => item.componentProduct.trackInventory,
+                          )
+                          .map((item) =>
+                            Math.floor(
+                              item.componentProduct.stock /
+                                Number(item.quantity),
+                            ),
+                          ),
+                        999999,
+                      ),
+                    )
+                  : product.trackInventory
+                    ? product.stock
+                    : 999999,
               barcode: product.barcode,
+              primaryCode: product.primaryCode,
+              auxiliaryCode: product.auxiliaryCode,
+              description: product.description,
               taxRate: product.taxRate.toString(),
             }))}
             customers={coreCustomers.map((customer) => ({
@@ -208,7 +247,24 @@ export default async function FacturacionPosPage({ searchParams }: FacturacionPo
               email: customer.email,
               address: customer.address,
               identification: customer.identification,
+              tradeName: customer.tradeName,
+              customerType: customer.customerType,
             }))}
+            establishments={establishments
+              .filter((item) => item.isActive)
+              .map((item) => ({
+                id: item.id,
+                code: item.code,
+                name: item.name,
+              }))}
+            issuePoints={issuePoints
+              .filter((item) => item.isActive)
+              .map((item) => ({
+                id: item.id,
+                code: item.code,
+                name: item.name,
+                establishmentId: item.establishmentId,
+              }))}
           />
         </div>
       </BasicModuleShell>

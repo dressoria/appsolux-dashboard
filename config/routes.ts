@@ -76,11 +76,14 @@ export const routes = {
   sales: "/sales",
   facturacion: "/facturacion",
   facturacionPos: "/facturacion/pos",
+  facturacionSalesNew: "/facturacion/sales/new",
   facturacionQuickInvoice: "/facturacion/quick-invoice",
   facturacionDocuments: "/facturacion/documents",
   facturacionCustomers: "/facturacion/customers",
   facturacionPurchasesSuppliers: "/facturacion/suppliers",
-  facturacionSalesQuotations: "/facturacion/sales/quotations",
+  facturacionSalesQuotations: "/facturacion/proformas",
+  facturacionProformas: "/facturacion/proformas",
+  facturacionProformasNew: "/facturacion/proformas/new",
   facturacionSalesOrders: "/facturacion/sales/orders",
   facturacionProducts: "/facturacion/products",
   facturacionImports: "/facturacion/imports",
@@ -118,10 +121,12 @@ export const routes = {
   facturacionPurchasesDocuments: "/facturacion/purchases/documents",
   facturacionPurchasesReceived: "/facturacion/purchases/received",
 
-  facturacionAccountingChartOfAccounts: "/facturacion/accounting/chart-of-accounts",
+  facturacionAccountingChartOfAccounts:
+    "/facturacion/accounting/chart-of-accounts",
   facturacionAccountingJournal: "/facturacion/accounting/journal",
   facturacionAccountingLedger: "/facturacion/accounting/ledger",
-  facturacionAccountingIncomeStatement: "/facturacion/accounting/income-statement",
+  facturacionAccountingIncomeStatement:
+    "/facturacion/accounting/income-statement",
   facturacionAccountingBalanceSheet: "/facturacion/accounting/balance-sheet",
   facturacionAccountingTrialBalance: "/facturacion/accounting/trial-balance",
 

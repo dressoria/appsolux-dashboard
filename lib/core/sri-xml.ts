@@ -27,13 +27,15 @@ export type SriXmlPreviewParams = {
     documentType: string;
     customerName: string;
     customerIdentification: string | null;
-    customerIdentificationType?: "RUC" | "CEDULA" | "PASSPORT" | "FOREIGN_ID" | null;
+    customerIdentificationType?:
+      "RUC" | "CEDULA" | "PASSPORT" | "FOREIGN_ID" | null;
     customerEmail?: string | null;
     customerPhone?: string | null;
     subtotal: string | number;
     taxTotal: string | number;
     discountTotal: string | number;
     grandTotal: string | number;
+    sriPaymentCode?: string;
     issuedAt: Date | null;
     createdAt: Date;
   };
@@ -84,7 +86,10 @@ function resolveAmbiente(env: "TEST" | "PRODUCTION"): string {
   return env === "PRODUCTION" ? "2" : "1";
 }
 
-function resolveIdentificacion(identification: string | null, identificationType?: "RUC" | "CEDULA" | "PASSPORT" | "FOREIGN_ID" | null): {
+function resolveIdentificacion(
+  identification: string | null,
+  identificationType?: "RUC" | "CEDULA" | "PASSPORT" | "FOREIGN_ID" | null,
+): {
   tipo: string;
   valor: string;
 } {
@@ -99,21 +104,29 @@ function resolveIdentificacion(identification: string | null, identificationType
     if (/^\d{10}$/.test(value)) return { tipo: "05", valor: value };
     return { tipo: "06", valor: value };
   }
-  return { tipo: mapCustomerIdentificationTypeToSri(identificationType), valor: value };
+  return {
+    tipo: mapCustomerIdentificationTypeToSri(identificationType),
+    valor: value,
+  };
 }
 
 function resolveIvaCodigoPorcentaje(taxRate: number): string {
-  if (taxRate === 0) return "0";  // IVA 0%
-  if (taxRate === 5) return "5";  // IVA 5% (bienes específicos)
+  if (taxRate === 0) return "0"; // IVA 0%
+  if (taxRate === 5) return "5"; // IVA 5% (bienes específicos)
   if (taxRate === 12) return "2"; // IVA 12% (tarifa histórica)
   if (taxRate === 15) return "4"; // IVA 15% (tarifa vigente desde abril 2024)
   return "2";
 }
 
-function buildLineXml(line: SriXmlPreviewParams["lines"][number], index: number): string {
+function buildLineXml(
+  line: SriXmlPreviewParams["lines"][number],
+  index: number,
+): string {
   const taxRate = Number(line.taxRate);
   const codigoPct = resolveIvaCodigoPorcentaje(taxRate);
-  const codigoPrincipal = line.itemCode ? xmlEscape(line.itemCode) : `ITEM-${pad(index + 1, 3)}`;
+  const codigoPrincipal = line.itemCode
+    ? xmlEscape(line.itemCode)
+    : `ITEM-${pad(index + 1, 3)}`;
 
   return `    <detalle>
       <codigoPrincipal>${codigoPrincipal}</codigoPrincipal>
@@ -137,7 +150,7 @@ function buildLineXml(line: SriXmlPreviewParams["lines"][number], index: number)
 export function buildSriDocumentDisplayNumber(
   estabCode: string,
   issuePointCode: string,
-  sequential: number
+  sequential: number,
 ): string {
   return `${estabCode}-${issuePointCode}-${pad(sequential, 9)}`;
 }
@@ -163,26 +176,32 @@ export function validateSriDocumentForXmlPreview(params: SriXmlPreviewParams): {
     errors.push("El total del comprobante debe ser mayor a 0.");
   }
   if (params.document.documentType !== "INVOICE") {
-    errors.push(`Tipo '${params.document.documentType}' no está implementado en esta fase.`);
+    errors.push(
+      `Tipo '${params.document.documentType}' no está implementado en esta fase.`,
+    );
   }
 
   if (!params.document.customerIdentification) {
-    warnings.push("Cliente sin identificación: se usará Consumidor Final (9999999999999).");
+    warnings.push(
+      "Cliente sin identificación: se usará Consumidor Final (9999999999999).",
+    );
   }
   if (Number(params.document.taxTotal) === 0) {
-    warnings.push("IVA es $0.00. El POS básico no registra IVA. Revisa antes de emitir.");
+    warnings.push(
+      "IVA es $0.00. El POS básico no registra IVA. Revisa antes de emitir.",
+    );
   }
 
   return { valid: errors.length === 0, errors, warnings };
 }
 
 export function buildUnsignedSriInvoiceXmlPreview(
-  params: SriXmlPreviewParams
+  params: SriXmlPreviewParams,
 ): SriXmlPreviewResult {
   const displayNumber = buildSriDocumentDisplayNumber(
     params.establishment.code,
     params.issuePoint.code,
-    params.sequentialNumber
+    params.sequentialNumber,
   );
 
   const validation = validateSriDocumentForXmlPreview(params);
@@ -201,15 +220,20 @@ export function buildUnsignedSriInvoiceXmlPreview(
   }
 
   const ambiente = resolveAmbiente(params.profile.environment);
-  const fechaEmision = formatDateEC(params.document.issuedAt ?? params.document.createdAt);
+  const fechaEmision = formatDateEC(
+    params.document.issuedAt ?? params.document.createdAt,
+  );
   const { tipo: tipoIdComprador, valor: idComprador } = resolveIdentificacion(
     params.document.customerIdentification,
-    params.document.customerIdentificationType
+    params.document.customerIdentificationType,
   );
   const linesXml = params.lines.map((l, i) => buildLineXml(l, i)).join("\n");
 
   // Agrupar impuestos por tasa para totalConImpuestos
-  const taxMap = new Map<number, { codigoPorcentaje: string; baseImponible: number; valor: number }>();
+  const taxMap = new Map<
+    number,
+    { codigoPorcentaje: string; baseImponible: number; valor: number }
+  >();
   for (const line of params.lines) {
     const rate = Number(line.taxRate);
     const cp = resolveIvaCodigoPorcentaje(rate);
@@ -220,7 +244,11 @@ export function buildUnsignedSriInvoiceXmlPreview(
       existing.baseImponible += base;
       existing.valor += tax;
     } else {
-      taxMap.set(rate, { codigoPorcentaje: cp, baseImponible: base, valor: tax });
+      taxMap.set(rate, {
+        codigoPorcentaje: cp,
+        baseImponible: base,
+        valor: tax,
+      });
     }
   }
   const taxGroupsXml = Array.from(taxMap.values())
@@ -230,7 +258,7 @@ export function buildUnsignedSriInvoiceXmlPreview(
         <codigoPorcentaje>${g.codigoPorcentaje}</codigoPorcentaje>
         <baseImponible>${dec(g.baseImponible)}</baseImponible>
         <valor>${dec(g.valor)}</valor>
-      </totalImpuesto>`
+      </totalImpuesto>`,
     )
     .join("\n");
 
@@ -238,12 +266,12 @@ export function buildUnsignedSriInvoiceXmlPreview(
   const infoAdicionalItems: string[] = [];
   if (params.document.customerEmail) {
     infoAdicionalItems.push(
-      `    <campoAdicional nombre="email">${xmlEscape(params.document.customerEmail)}</campoAdicional>`
+      `    <campoAdicional nombre="email">${xmlEscape(params.document.customerEmail)}</campoAdicional>`,
     );
   }
   if (params.document.customerPhone) {
     infoAdicionalItems.push(
-      `    <campoAdicional nombre="telefono">${xmlEscape(params.document.customerPhone)}</campoAdicional>`
+      `    <campoAdicional nombre="telefono">${xmlEscape(params.document.customerPhone)}</campoAdicional>`,
     );
   }
   const infoAdicionalXml =
@@ -274,11 +302,15 @@ export function buildUnsignedSriInvoiceXmlPreview(
       accessKey = keyResult.accessKey;
       claveAcceso = keyResult.accessKey;
     } catch {
-      warnings.push("No se pudo generar la clave de acceso. Verifica la configuración SRI.");
+      warnings.push(
+        "No se pudo generar la clave de acceso. Verifica la configuración SRI.",
+      );
     }
   }
 
-  const dirMatriz = xmlEscape(params.profile.dirMatriz ?? params.establishment.address);
+  const dirMatriz = xmlEscape(
+    params.profile.dirMatriz ?? params.establishment.address,
+  );
   const contribuyenteRimpeXml = params.profile.contribuyenteRimpe
     ? `\n    <contribuyenteRimpe>${xmlEscape(params.profile.contribuyenteRimpe)}</contribuyenteRimpe>`
     : "";
@@ -316,7 +348,7 @@ ${taxGroupsXml}
     <moneda>DOLAR</moneda>
     <pagos>
       <pago>
-        <formaPago>01</formaPago>
+        <formaPago>${xmlEscape(params.document.sriPaymentCode ?? "01")}</formaPago>
         <total>${dec(params.document.grandTotal)}</total>
         <plazo>0</plazo>
         <unidadTiempo>dias</unidadTiempo>

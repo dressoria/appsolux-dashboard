@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   FileCheck2,
   Maximize2,
+  Package,
   ReceiptText,
   Trash2,
   UserPlus,
@@ -22,6 +23,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/config/routes";
+import {
+  defaultSriPaymentCode,
+  fiscalSelection,
+} from "@/lib/core/pos-checkout";
 
 const SRI_PAYMENT_OPTIONS = [
   { code: "01", label: "Sin utilización del sistema financiero (efectivo)" },
@@ -33,21 +38,15 @@ const SRI_PAYMENT_OPTIONS = [
   { code: "21", label: "Endoso de títulos" },
 ] as const;
 
-function defaultSriCode(method: string): string {
-  switch (method) {
-    case "cash": return "01";
-    case "transfer": return "20";
-    case "card": return "19";
-    default: return "01";
-  }
-}
-
 type Product = {
   id: string;
   name: string;
   price: string;
   stock: number;
   barcode?: string | null;
+  primaryCode?: string | null;
+  auxiliaryCode?: string | null;
+  description?: string | null;
   taxRate: string;
   warehouseStock?: Record<string, number>;
 };
@@ -59,6 +58,16 @@ type Customer = {
   email?: string | null;
   address?: string | null;
   identification?: string | null;
+  tradeName?: string | null;
+  customerType?: string | null;
+};
+
+type EstablishmentOption = { id: string; code: string; name: string };
+type IssuePointOption = {
+  id: string;
+  code: string;
+  name: string;
+  establishmentId: string;
 };
 
 type WarehouseOption = {
@@ -127,6 +136,8 @@ export function BasicPosClient({
   engine = "CORE",
   warehouses = [],
   initialWarehouseName = "",
+  establishments = [],
+  issuePoints = [],
 }: {
   tenantName: string;
   currentUserName?: string;
@@ -138,13 +149,17 @@ export function BasicPosClient({
   engine?: "CORE" | "SHARED_ERP";
   warehouses?: WarehouseOption[];
   initialWarehouseName?: string;
+  establishments?: EstablishmentOption[];
+  issuePoints?: IssuePointOption[];
 }) {
   const router = useRouter();
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerId, setCustomerId] = useState(initialCustomerId ?? "");
   const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [outputMode, setOutputMode] = useState<"internal_receipt" | "sri_invoice">("internal_receipt");
+  const [outputMode, setOutputMode] = useState<
+    "internal_receipt" | "sri_invoice"
+  >("internal_receipt");
   const [paidAmount, setPaidAmount] = useState("");
   const [search, setSearch] = useState("");
   const [lastSale, setLastSale] = useState<SaleResponse | null>(null);
@@ -154,21 +169,38 @@ export function BasicPosClient({
   const [showReceipt, setShowReceipt] = useState(false);
   const [showInvoiceEditor, setShowInvoiceEditor] = useState(false);
   const [invoiceSearch, setInvoiceSearch] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [establishmentId, setEstablishmentId] = useState(
+    establishments[0]?.id ?? "",
+  );
+  const availableIssuePoints = issuePoints.filter(
+    (item) => item.establishmentId === establishmentId,
+  );
+  const [issuePointId, setIssuePointId] = useState(
+    availableIssuePoints[0]?.id ?? "",
+  );
 
   const [cartInputs, setCartInputs] = useState<Record<string, string>>({});
-  const [discountInputs, setDiscountInputs] = useState<Record<string, string>>({});
-  const [discountPctInputs, setDiscountPctInputs] = useState<Record<string, string>>({});
+  const [discountInputs, setDiscountInputs] = useState<Record<string, string>>(
+    {},
+  );
+  const [discountPctInputs, setDiscountPctInputs] = useState<
+    Record<string, string>
+  >({});
   const [lineNotes, setLineNotes] = useState<Record<string, string>>({});
 
   const [transferBank, setTransferBank] = useState("");
   const [transferRef, setTransferRef] = useState("");
 
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
-  const [selectedWarehouse, setSelectedWarehouse] = useState(initialWarehouseName);
+  const [selectedWarehouse, setSelectedWarehouse] =
+    useState(initialWarehouseName);
 
   // Invoice editor customer fields (editable overrides)
-  const [invoiceCustomerName, setInvoiceCustomerName] = useState("Consumidor Final");
-  const [invoiceCustomerIdentification, setInvoiceCustomerIdentification] = useState("9999999999999");
+  const [invoiceCustomerName, setInvoiceCustomerName] =
+    useState("Consumidor Final");
+  const [invoiceCustomerIdentification, setInvoiceCustomerIdentification] =
+    useState("9999999999999");
   const [invoiceCustomerPhone, setInvoiceCustomerPhone] = useState("");
   const [invoiceCustomerEmail, setInvoiceCustomerEmail] = useState("");
   const [invoiceCustomerAddress, setInvoiceCustomerAddress] = useState("");
@@ -191,7 +223,10 @@ export function BasicPosClient({
 
   useEffect(() => {
     if (!warehouses.length) return;
-    if (selectedWarehouse && warehouses.some((warehouse) => warehouse.name === selectedWarehouse)) {
+    if (
+      selectedWarehouse &&
+      warehouses.some((warehouse) => warehouse.name === selectedWarehouse)
+    ) {
       return;
     }
     setSelectedWarehouse(initialWarehouseName || warehouses[0]?.name || "");
@@ -219,7 +254,15 @@ export function BasicPosClient({
 
   function calcLine(item: CartItem) {
     const product = productById.get(item.productId);
-    if (!product) return { gross: 0, discount: 0, subtotal: 0, tax: 0, total: 0, taxRate: 0 };
+    if (!product)
+      return {
+        gross: 0,
+        discount: 0,
+        subtotal: 0,
+        tax: 0,
+        total: 0,
+        taxRate: 0,
+      };
     const gross = toNumber(product.price) * item.quantity;
     const discount = Math.max(0, Math.min(item.discountAmount, gross));
     const sub = gross - discount;
@@ -238,40 +281,75 @@ export function BasicPosClient({
         total: acc.total + line.total,
       };
     },
-    { subtotal: 0, taxTotal: 0, discountTotal: 0, total: 0 }
+    { subtotal: 0, taxTotal: 0, discountTotal: 0, total: 0 },
   );
 
-  const subtotalByRate = cart.reduce((acc, item) => {
-    const line = calcLine(item);
-    const r = line.taxRate;
-    acc[r] = (acc[r] ?? 0) + line.subtotal;
-    return acc;
-  }, {} as Record<number, number>);
+  const subtotalByRate = cart.reduce(
+    (acc, item) => {
+      const line = calcLine(item);
+      const r = line.taxRate;
+      acc[r] = (acc[r] ?? 0) + line.subtotal;
+      return acc;
+    },
+    {} as Record<number, number>,
+  );
 
   const filteredProducts = products.filter((product) => {
     const term = search.trim().toLowerCase();
     if (!term) return true;
     return (
       product.name.toLowerCase().includes(term) ||
-      (product.barcode ?? "").toLowerCase().includes(term)
+      (product.barcode ?? "").toLowerCase().includes(term) ||
+      (product.primaryCode ?? "").toLowerCase().includes(term) ||
+      (product.auxiliaryCode ?? "").toLowerCase().includes(term) ||
+      (product.description ?? "").toLowerCase().includes(term)
     );
   });
+  const customerMatches = customerSearch.trim()
+    ? customers
+        .filter((customer) =>
+          [
+            customer.identification,
+            customer.name,
+            customer.tradeName,
+            customer.email,
+          ].some((value) =>
+            value?.toLowerCase().includes(customerSearch.toLowerCase()),
+          ),
+        )
+        .slice(0, 8)
+    : [];
+  const selectedCustomer = customers.find(
+    (customer) => customer.id === customerId,
+  );
 
   const filteredInvoiceProducts = invoiceSearch.trim()
     ? products
         .filter(
           (p) =>
             p.name.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
-            (p.barcode ?? "").toLowerCase().includes(invoiceSearch.toLowerCase())
+            (p.barcode ?? "")
+              .toLowerCase()
+              .includes(invoiceSearch.toLowerCase()),
         )
         .slice(0, 6)
     : [];
 
   const creditWithoutCustomer = paymentMethod === "credit" && !customerId;
 
-  const paidNum = paidAmount ? Number(paidAmount) : (paymentMethod === "credit" ? 0 : cartTotals.total);
-  const saldo = paymentMethod === "credit" ? cartTotals.total : Math.max(0, cartTotals.total - paidNum);
-  const vuelto = paymentMethod !== "credit" && paidNum > cartTotals.total ? paidNum - cartTotals.total : 0;
+  const paidNum = paidAmount
+    ? Number(paidAmount)
+    : paymentMethod === "credit"
+      ? 0
+      : cartTotals.total;
+  const saldo =
+    paymentMethod === "credit"
+      ? cartTotals.total
+      : Math.max(0, cartTotals.total - paidNum);
+  const vuelto =
+    paymentMethod !== "credit" && paidNum > cartTotals.total
+      ? paidNum - cartTotals.total
+      : 0;
 
   function getAvailableStock(product: Product) {
     if (engine !== "SHARED_ERP") return product.stock;
@@ -315,9 +393,12 @@ export function BasicPosClient({
         // recalculate pct display after qty change
         const gross = toNumber(product.price) * newQty;
         const pct = gross > 0 ? (existing.discountAmount / gross) * 100 : 0;
-        setDiscountPctInputs((prev) => ({ ...prev, [productId]: pct.toFixed(1) }));
+        setDiscountPctInputs((prev) => ({
+          ...prev,
+          [productId]: pct.toFixed(1),
+        }));
         return current.map((item) =>
-          item.productId === productId ? { ...item, quantity: newQty } : item
+          item.productId === productId ? { ...item, quantity: newQty } : item,
         );
       }
       setCartInputs((prev) => ({ ...prev, [productId]: "1" }));
@@ -341,14 +422,17 @@ export function BasicPosClient({
     setCartInputs((prev) => ({ ...prev, [productId]: String(safe) }));
     setCart((current) => {
       const updated = current.map((item) =>
-        item.productId === productId ? { ...item, quantity: safe } : item
+        item.productId === productId ? { ...item, quantity: safe } : item,
       );
       // recalculate pct after qty change
       const cartItem = updated.find((i) => i.productId === productId);
       if (product && cartItem) {
         const gross = toNumber(product.price) * safe;
         const pct = gross > 0 ? (cartItem.discountAmount / gross) * 100 : 0;
-        setDiscountPctInputs((prev) => ({ ...prev, [productId]: pct.toFixed(1) }));
+        setDiscountPctInputs((prev) => ({
+          ...prev,
+          [productId]: pct.toFixed(1),
+        }));
       }
       return updated;
     });
@@ -367,12 +451,17 @@ export function BasicPosClient({
     if (product && cartItem) {
       const gross = toNumber(product.price) * cartItem.quantity;
       const pct = gross > 0 ? (clamped / gross) * 100 : 0;
-      setDiscountPctInputs((prev) => ({ ...prev, [productId]: pct.toFixed(1) }));
+      setDiscountPctInputs((prev) => ({
+        ...prev,
+        [productId]: pct.toFixed(1),
+      }));
     }
     setCart((current) =>
       current.map((item) =>
-        item.productId === productId ? { ...item, discountAmount: clamped } : item
-      )
+        item.productId === productId
+          ? { ...item, discountAmount: clamped }
+          : item,
+      ),
     );
   }
 
@@ -385,21 +474,47 @@ export function BasicPosClient({
     if (!product || !cartItem) return;
     const gross = toNumber(product.price) * cartItem.quantity;
     const discountAmt = Math.round(gross * safePct) / 100;
-    setDiscountPctInputs((prev) => ({ ...prev, [productId]: safePct.toFixed(1) }));
-    setDiscountInputs((prev) => ({ ...prev, [productId]: discountAmt.toFixed(2) }));
+    setDiscountPctInputs((prev) => ({
+      ...prev,
+      [productId]: safePct.toFixed(1),
+    }));
+    setDiscountInputs((prev) => ({
+      ...prev,
+      [productId]: discountAmt.toFixed(2),
+    }));
     setCart((current) =>
       current.map((item) =>
-        item.productId === productId ? { ...item, discountAmount: discountAmt } : item
-      )
+        item.productId === productId
+          ? { ...item, discountAmount: discountAmt }
+          : item,
+      ),
     );
   }
 
   function removeFromCart(productId: string) {
-    setCart((current) => current.filter((item) => item.productId !== productId));
-    setCartInputs((prev) => { const n = { ...prev }; delete n[productId]; return n; });
-    setDiscountInputs((prev) => { const n = { ...prev }; delete n[productId]; return n; });
-    setDiscountPctInputs((prev) => { const n = { ...prev }; delete n[productId]; return n; });
-    setLineNotes((prev) => { const n = { ...prev }; delete n[productId]; return n; });
+    setCart((current) =>
+      current.filter((item) => item.productId !== productId),
+    );
+    setCartInputs((prev) => {
+      const n = { ...prev };
+      delete n[productId];
+      return n;
+    });
+    setDiscountInputs((prev) => {
+      const n = { ...prev };
+      delete n[productId];
+      return n;
+    });
+    setDiscountPctInputs((prev) => {
+      const n = { ...prev };
+      delete n[productId];
+      return n;
+    });
+    setLineNotes((prev) => {
+      const n = { ...prev };
+      delete n[productId];
+      return n;
+    });
   }
 
   async function submitSale() {
@@ -408,12 +523,16 @@ export function BasicPosClient({
 
     try {
       if (creditWithoutCustomer) {
-        throw new Error("Para vender a crédito debes seleccionar o crear un cliente.");
+        throw new Error(
+          "Para vender a crédito debes seleccionar o crear un cliente.",
+        );
       }
       for (const item of cart) {
         const product = productById.get(item.productId);
         if (!product || item.quantity > getAvailableStock(product)) {
-          throw new Error(`Stock insuficiente para ${product?.name ?? "producto"}.`);
+          throw new Error(
+            `Stock insuficiente para ${product?.name ?? "producto"}.`,
+          );
         }
       }
 
@@ -424,8 +543,14 @@ export function BasicPosClient({
           customerId,
           paymentMethod,
           paidAmount:
-            paymentMethod === "credit" ? 0 : paidAmount ? Number(paidAmount) : cartTotals.total,
+            paymentMethod === "credit"
+              ? 0
+              : paidAmount
+                ? Number(paidAmount)
+                : cartTotals.total,
           outputMode,
+          sriPaymentCode,
+          ...fiscalSelection(outputMode, establishmentId, issuePointId),
           warehouseName: selectedWarehouse || undefined,
           items: cart.map((item) => ({
             productId: item.productId,
@@ -461,7 +586,9 @@ export function BasicPosClient({
       router.refresh();
     } catch (requestError) {
       setError(
-        requestError instanceof Error ? requestError.message : "No se pudo confirmar venta."
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo confirmar venta.",
       );
     } finally {
       setIsLoading(false);
@@ -501,7 +628,9 @@ export function BasicPosClient({
       setNewCustomerEmail("");
       setNewCustomerAddr("");
     } catch (err) {
-      setNewCustomerError(err instanceof Error ? err.message : "No se pudo crear cliente.");
+      setNewCustomerError(
+        err instanceof Error ? err.message : "No se pudo crear cliente.",
+      );
     } finally {
       setNewCustomerLoading(false);
     }
@@ -561,12 +690,17 @@ export function BasicPosClient({
               const product = productById.get(item.productId);
               const line = calcLine(item);
               return (
-                <tr key={item.productId} className="align-middle transition hover:bg-slate-50/50">
+                <tr
+                  key={item.productId}
+                  className="align-middle transition hover:bg-slate-50/50"
+                >
                   <td className="px-3 py-2.5 text-[11px] text-slate-400 font-mono">
                     {product?.barcode ?? "—"}
                   </td>
                   <td className="px-4 py-2.5">
-                    <p className="font-medium text-slate-800 leading-tight">{product?.name}</p>
+                    <p className="font-medium text-slate-800 leading-tight">
+                      {product?.name}
+                    </p>
                     {line.taxRate === 0 && (
                       <p className="text-[10px] text-slate-400">Sin IVA</p>
                     )}
@@ -575,7 +709,10 @@ export function BasicPosClient({
                     <Input
                       value={lineNotes[item.productId] ?? ""}
                       onChange={(e) =>
-                        setLineNotes((prev) => ({ ...prev, [item.productId]: e.target.value }))
+                        setLineNotes((prev) => ({
+                          ...prev,
+                          [item.productId]: e.target.value,
+                        }))
                       }
                       placeholder="Obs."
                       className="h-7 w-full text-xs rounded-lg border-slate-200"
@@ -586,9 +723,14 @@ export function BasicPosClient({
                       type="number"
                       min="1"
                       max={product?.stock ?? undefined}
-                      value={cartInputs[item.productId] ?? String(item.quantity)}
+                      value={
+                        cartInputs[item.productId] ?? String(item.quantity)
+                      }
                       onChange={(e) =>
-                        setCartInputs((prev) => ({ ...prev, [item.productId]: e.target.value }))
+                        setCartInputs((prev) => ({
+                          ...prev,
+                          [item.productId]: e.target.value,
+                        }))
                       }
                       onBlur={() => commitQuantity(item.productId)}
                       className="h-7 w-14 text-right text-xs rounded-lg"
@@ -608,7 +750,10 @@ export function BasicPosClient({
                       step="0.1"
                       value={discountPctInputs[item.productId] ?? "0.0"}
                       onChange={(e) =>
-                        setDiscountPctInputs((prev) => ({ ...prev, [item.productId]: e.target.value }))
+                        setDiscountPctInputs((prev) => ({
+                          ...prev,
+                          [item.productId]: e.target.value,
+                        }))
                       }
                       onBlur={() => commitDiscountPct(item.productId)}
                       className="h-7 w-16 text-right text-xs rounded-lg"
@@ -622,7 +767,10 @@ export function BasicPosClient({
                       step="0.01"
                       value={discountInputs[item.productId] ?? "0.00"}
                       onChange={(e) =>
-                        setDiscountInputs((prev) => ({ ...prev, [item.productId]: e.target.value }))
+                        setDiscountInputs((prev) => ({
+                          ...prev,
+                          [item.productId]: e.target.value,
+                        }))
                       }
                       onBlur={() => commitDiscount(item.productId)}
                       className="h-7 w-20 text-right text-xs rounded-lg"
@@ -655,13 +803,14 @@ export function BasicPosClient({
 
   return (
     <div className="space-y-4">
-
       {/* ── New customer modal ─────────────────────────────────────────────── */}
       {showNewCustomer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
           <div className="w-full max-w-sm rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-slate-900">Nuevo cliente</h3>
+              <h3 className="text-base font-semibold text-slate-900">
+                Nuevo cliente
+              </h3>
               <button
                 type="button"
                 onClick={() => setShowNewCustomer(false)}
@@ -724,7 +873,11 @@ export function BasicPosClient({
                 >
                   {newCustomerLoading ? "Guardando..." : "Crear cliente"}
                 </Button>
-                <Button type="button" variant="outline" onClick={() => setShowNewCustomer(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowNewCustomer(false)}
+                >
                   Cancelar
                 </Button>
               </div>
@@ -738,7 +891,6 @@ export function BasicPosClient({
         <div className="fixed inset-0 z-40 overflow-y-auto bg-black/50">
           <div className="flex min-h-full items-start justify-center p-4 pt-6">
             <div className="mb-8 w-full max-w-6xl rounded-2xl border border-slate-200 bg-white shadow-2xl">
-
               {/* Modal header */}
               <div className="flex items-start justify-between border-b border-slate-100 px-6 py-4">
                 <div>
@@ -748,12 +900,14 @@ export function BasicPosClient({
                         ? "Factura electrónica SRI"
                         : "Recibo interno de venta"}
                     </h2>
-                    <span className={cn(
-                      "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                      outputMode === "sri_invoice"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-slate-100 text-slate-500"
-                    )}>
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                        outputMode === "sri_invoice"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-slate-100 text-slate-500",
+                      )}
+                    >
                       {outputMode === "sri_invoice" ? "SRI" : "Interno"}
                     </span>
                   </div>
@@ -770,10 +924,8 @@ export function BasicPosClient({
 
               {/* Modal body */}
               <div className="grid lg:grid-cols-[1fr_288px]">
-
                 {/* ── Left column: document data + customer + products ─── */}
                 <div className="space-y-6 p-6">
-
                   {/* Tipo de comprobante */}
                   <div>
                     <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -787,7 +939,7 @@ export function BasicPosClient({
                           "flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition",
                           outputMode === "internal_receipt"
                             ? "border-[#004080] bg-blue-50 text-[#004080]"
-                            : "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                            : "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700",
                         )}
                       >
                         <ReceiptText className="h-3.5 w-3.5" />
@@ -795,22 +947,30 @@ export function BasicPosClient({
                       </button>
                       <button
                         type="button"
-                        onClick={() => hasSriConfig && setOutputMode("sri_invoice")}
+                        onClick={() =>
+                          hasSriConfig && setOutputMode("sri_invoice")
+                        }
                         disabled={!hasSriConfig}
-                        title={!hasSriConfig ? "Configura el módulo SRI primero" : undefined}
+                        title={
+                          !hasSriConfig
+                            ? "Configura el módulo SRI primero"
+                            : undefined
+                        }
                         className={cn(
                           "flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition",
                           outputMode === "sri_invoice"
                             ? "border-[#004080] bg-blue-50 text-[#004080]"
                             : hasSriConfig
                               ? "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700"
-                              : "cursor-not-allowed border-slate-100 text-slate-300"
+                              : "cursor-not-allowed border-slate-100 text-slate-300",
                         )}
                       >
                         <FileCheck2 className="h-3.5 w-3.5" />
                         Factura SRI
                         {!hasSriConfig && (
-                          <span className="ml-1 text-[10px]">(sin config.)</span>
+                          <span className="ml-1 text-[10px]">
+                            (sin config.)
+                          </span>
                         )}
                       </button>
                     </div>
@@ -830,28 +990,48 @@ export function BasicPosClient({
                           className="rounded-lg bg-slate-50 text-sm text-slate-700"
                         />
                       </div>
+                      <div className="space-y-1 sm:col-span-2">
+                        <Label className="text-xs text-slate-500">
+                          Establecimiento / Punto de emisión
+                        </Label>
+                        <Input
+                          readOnly
+                          value={
+                            outputMode === "internal_receipt"
+                              ? "No requerido para recibo interno"
+                              : `${establishments.find((item) => item.id === establishmentId)?.code ?? "—"}-${issuePoints.find((item) => item.id === issuePointId)?.code ?? "—"}`
+                          }
+                          className="rounded-lg bg-slate-50 text-sm text-slate-700"
+                        />
+                      </div>
                       <div className="space-y-1">
-                        <Label className="text-xs text-slate-500">Cajero / Vendedor</Label>
+                        <Label className="text-xs text-slate-500">
+                          Cajero / Vendedor
+                        </Label>
                         <Input
                           value={currentUserName ?? "—"}
                           readOnly
                           className="rounded-lg bg-slate-50 text-sm text-slate-700"
                         />
                       </div>
-                      <div className="space-y-1 sm:col-span-2">
-                        <Label className="text-xs text-slate-500">Forma de pago (SRI)</Label>
-                        <select
-                          value={sriPaymentCode}
-                          onChange={(e) => setSriPaymentCode(e.target.value)}
-                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700"
-                        >
-                          {SRI_PAYMENT_OPTIONS.map((o) => (
-                            <option key={o.code} value={o.code}>
-                              {o.code} – {o.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      {outputMode === "sri_invoice" ? (
+                        <div className="space-y-1 sm:col-span-2">
+                          <Label className="text-xs text-slate-500">
+                            Forma de pago (SRI)
+                          </Label>
+                          <select
+                            value={sriPaymentCode}
+                            onChange={(e) => setSriPaymentCode(e.target.value)}
+                            className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700"
+                          >
+                            {SRI_PAYMENT_OPTIONS.map((o) => (
+                              <option key={o.code} value={o.code}>
+                                {o.code} – {o.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : null}
                       <div className="space-y-1 sm:col-span-2">
                         <Label className="text-xs text-slate-500">
                           N. Guía de remisión{" "}
@@ -919,16 +1099,17 @@ export function BasicPosClient({
                     </h3>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <Label className="text-xs text-slate-500">Seleccionar cliente</Label>
+                        <Label className="text-xs text-slate-500">
+                          Seleccionar cliente
+                        </Label>
                         {engine === "CORE" ? (
-                          <button
-                            type="button"
-                            onClick={() => setShowNewCustomer(true)}
+                          <Link
+                            href={routes.facturacionCustomers + "/new"}
                             className="flex items-center gap-1 text-xs text-[#004080] hover:text-[#003060]"
                           >
                             <UserPlus className="h-3 w-3" />
                             Nuevo cliente
-                          </button>
+                          </Link>
                         ) : null}
                       </div>
                       <select
@@ -945,56 +1126,80 @@ export function BasicPosClient({
                       </select>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div className="space-y-1">
-                          <Label className="text-xs text-slate-500">Nombre / Razón social</Label>
+                          <Label className="text-xs text-slate-500">
+                            Nombre / Razón social
+                          </Label>
                           <Input
                             value={invoiceCustomerName}
-                            onChange={(e) => setInvoiceCustomerName(e.target.value)}
+                            onChange={(e) =>
+                              setInvoiceCustomerName(e.target.value)
+                            }
                             placeholder="Consumidor Final"
                             className="rounded-lg text-sm"
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs text-slate-500">Cédula / RUC / Pasaporte</Label>
+                          <Label className="text-xs text-slate-500">
+                            Cédula / RUC / Pasaporte
+                          </Label>
                           <Input
                             value={invoiceCustomerIdentification}
-                            onChange={(e) => setInvoiceCustomerIdentification(e.target.value)}
+                            onChange={(e) =>
+                              setInvoiceCustomerIdentification(e.target.value)
+                            }
                             placeholder="9999999999999"
                             className="rounded-lg text-sm"
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs text-slate-500">Teléfono</Label>
+                          <Label className="text-xs text-slate-500">
+                            Teléfono
+                          </Label>
                           <Input
                             value={invoiceCustomerPhone}
-                            onChange={(e) => setInvoiceCustomerPhone(e.target.value)}
+                            onChange={(e) =>
+                              setInvoiceCustomerPhone(e.target.value)
+                            }
                             placeholder="0999000000"
                             className="rounded-lg text-sm"
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs text-slate-500">Correo electrónico</Label>
+                          <Label className="text-xs text-slate-500">
+                            Correo electrónico
+                          </Label>
                           <Input
                             type="email"
                             value={invoiceCustomerEmail}
-                            onChange={(e) => setInvoiceCustomerEmail(e.target.value)}
+                            onChange={(e) =>
+                              setInvoiceCustomerEmail(e.target.value)
+                            }
                             placeholder="correo@ejemplo.com"
                             className="rounded-lg text-sm"
                           />
                         </div>
                         <div className="space-y-1 sm:col-span-2">
-                          <Label className="text-xs text-slate-500">Dirección</Label>
+                          <Label className="text-xs text-slate-500">
+                            Dirección
+                          </Label>
                           <Input
                             value={invoiceCustomerAddress}
-                            onChange={(e) => setInvoiceCustomerAddress(e.target.value)}
+                            onChange={(e) =>
+                              setInvoiceCustomerAddress(e.target.value)
+                            }
                             placeholder="Dirección del cliente"
                             className="rounded-lg text-sm"
                           />
                         </div>
                         <div className="space-y-1 sm:col-span-2">
-                          <Label className="text-xs text-slate-500">Observaciones</Label>
+                          <Label className="text-xs text-slate-500">
+                            Observaciones
+                          </Label>
                           <Input
                             value={invoiceCustomerNotes}
-                            onChange={(e) => setInvoiceCustomerNotes(e.target.value)}
+                            onChange={(e) =>
+                              setInvoiceCustomerNotes(e.target.value)
+                            }
                             placeholder="Información adicional para la factura"
                             className="rounded-lg text-sm"
                           />
@@ -1029,10 +1234,13 @@ export function BasicPosClient({
                                 disabled={p.stock <= 0}
                                 className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-slate-50 disabled:opacity-40"
                               >
-                                <span className="font-medium text-slate-800">{p.name}</span>
+                                <span className="font-medium text-slate-800">
+                                  {p.name}
+                                </span>
                                 <span className="shrink-0 text-xs text-slate-500">
                                   {money(toNumber(p.price))} · stock {p.stock}
-                                  {toNumber(p.taxRate) > 0 && ` · IVA ${p.taxRate}%`}
+                                  {toNumber(p.taxRate) > 0 &&
+                                    ` · IVA ${p.taxRate}%`}
                                 </span>
                               </button>
                             ))}
@@ -1046,7 +1254,6 @@ export function BasicPosClient({
 
                 {/* ── Right column: totals + payment + actions ────────── */}
                 <div className="flex flex-col gap-4 border-t border-slate-100 p-6 lg:border-l lg:border-t-0">
-
                   {/* Resumen detallado */}
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-sm">
                     <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -1056,7 +1263,10 @@ export function BasicPosClient({
                     {Object.entries(subtotalByRate)
                       .sort(([a], [b]) => Number(a) - Number(b))
                       .map(([rate, base]) => (
-                        <div key={rate} className="flex justify-between text-slate-600">
+                        <div
+                          key={rate}
+                          className="flex justify-between text-slate-600"
+                        >
                           <span>Base IVA {rate}%</span>
                           <span>{money(base)}</span>
                         </div>
@@ -1065,7 +1275,9 @@ export function BasicPosClient({
                     {hasDiscount && (
                       <div className="flex justify-between text-slate-600">
                         <span>Descuento</span>
-                        <span className="text-red-600">-{money(cartTotals.discountTotal)}</span>
+                        <span className="text-red-600">
+                          -{money(cartTotals.discountTotal)}
+                        </span>
                       </div>
                     )}
 
@@ -1078,18 +1290,24 @@ export function BasicPosClient({
 
                     <div className="flex justify-between border-t border-slate-200 pt-2 font-semibold text-slate-900">
                       <span>Total factura</span>
-                      <span className="text-base">{money(cartTotals.total)}</span>
+                      <span className="text-base">
+                        {money(cartTotals.total)}
+                      </span>
                     </div>
                   </div>
 
                   {/* Forma de pago */}
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-slate-700">Forma de pago</Label>
+                    <Label className="text-xs font-medium text-slate-700">
+                      Forma de pago comercial
+                    </Label>
                     <select
                       value={paymentMethod}
                       onChange={(e) => {
                         setPaymentMethod(e.target.value);
-                        setSriPaymentCode(defaultSriCode(e.target.value));
+                        setSriPaymentCode(
+                          defaultSriPaymentCode(e.target.value),
+                        );
                       }}
                       className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
                     >
@@ -1103,7 +1321,9 @@ export function BasicPosClient({
                   {/* Monto pagado */}
                   {paymentMethod !== "credit" && (
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-medium text-slate-700">Monto pagado</Label>
+                      <Label className="text-xs font-medium text-slate-700">
+                        Monto pagado
+                      </Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -1128,10 +1348,12 @@ export function BasicPosClient({
                         <span>{money(vuelto)}</span>
                       </div>
                     ) : (
-                      <div className={cn(
-                        "flex justify-between font-medium",
-                        saldo > 0 ? "text-amber-700" : "text-emerald-700"
-                      )}>
+                      <div
+                        className={cn(
+                          "flex justify-between font-medium",
+                          saldo > 0 ? "text-amber-700" : "text-emerald-700",
+                        )}
+                      >
                         <span>Saldo pendiente</span>
                         <span>{money(saldo)}</span>
                       </div>
@@ -1162,14 +1384,12 @@ export function BasicPosClient({
                     <Button
                       type="button"
                       onClick={submitSale}
-                      disabled={isLoading || cart.length === 0 || creditWithoutCustomer}
+                      disabled={
+                        isLoading || cart.length === 0 || creditWithoutCustomer
+                      }
                       className="w-full bg-[#004080] hover:bg-[#003060]"
                     >
-                      {isLoading
-                        ? "Procesando..."
-                        : outputMode === "sri_invoice"
-                          ? "Emitir factura SRI"
-                          : "Finalizar venta"}
+                      {isLoading ? "Procesando..." : "Cobrar y finalizar"}
                     </Button>
                     <Button
                       type="button"
@@ -1220,13 +1440,14 @@ export function BasicPosClient({
                   {showReceipt ? "Ocultar recibo" : "Ver recibo"}
                 </Button>
               )}
-              {lastOutput.mode === "sri_invoice" && lastOutput.sri?.documentId && (
-                <Button asChild size="sm" variant="outline">
-                  <Link href={`/sri/documents/${lastOutput.sri.documentId}`}>
-                    Ver factura SRI
-                  </Link>
-                </Button>
-              )}
+              {lastOutput.mode === "sri_invoice" &&
+                lastOutput.sri?.documentId && (
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={`/sri/documents/${lastOutput.sri.documentId}`}>
+                      Ver factura SRI
+                    </Link>
+                  </Button>
+                )}
               {engine === "CORE" ? (
                 <Button asChild size="sm" variant="outline">
                   <Link href={`/basic/sales/${lastSale.id}`}>Ver venta</Link>
@@ -1245,7 +1466,9 @@ export function BasicPosClient({
           {lastOutput.mode === "sri_invoice" &&
             lastOutput.status === "partial" &&
             lastOutput.errorMessage && (
-              <p className="text-xs text-amber-700">{lastOutput.errorMessage}</p>
+              <p className="text-xs text-amber-700">
+                {lastOutput.errorMessage}
+              </p>
             )}
 
           {showReceipt && lastOutput.mode === "internal_receipt" && (
@@ -1266,14 +1489,61 @@ export function BasicPosClient({
         />
       ) : null}
 
+      <div className="grid gap-3 rounded-2xl border bg-white p-3 text-sm sm:grid-cols-3">
+        <label className="grid gap-1 text-xs text-slate-500">
+          Establecimiento
+          <select
+            className="h-9 rounded-lg border px-2 text-sm"
+            value={establishmentId}
+            onChange={(event) => {
+              const id = event.target.value;
+              setEstablishmentId(id);
+              setIssuePointId(
+                issuePoints.find((item) => item.establishmentId === id)?.id ??
+                  "",
+              );
+            }}
+          >
+            <option value="">Sin configurar</option>
+            {establishments.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.code} · {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs text-slate-500">
+          Punto de emisión
+          <select
+            className="h-9 rounded-lg border px-2 text-sm"
+            value={issuePointId}
+            onChange={(event) => setIssuePointId(event.target.value)}
+          >
+            <option value="">Sin configurar</option>
+            {availableIssuePoints.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.code} · {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="grid gap-1 text-xs text-slate-500">
+          <span>Vendedor · Fecha</span>
+          <span className="h-9 rounded-lg border px-3 py-2 text-sm text-slate-700">
+            {currentUserName ?? "—"} · {todayStr}
+          </span>
+        </div>
+      </div>
+
       {/* ── POS grid ────────────────────────────────────────────────────────── */}
       <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
-
         {/* Left: product search + grid */}
         <div className="space-y-4">
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <Label className="text-sm font-medium text-slate-900">Productos</Label>
+              <Label className="text-sm font-medium text-slate-900">
+                Productos
+              </Label>
               <SaleStatusBadge
                 label={`${filteredProducts.length} disponibles`}
                 variant="info"
@@ -1297,40 +1567,58 @@ export function BasicPosClient({
                 disabled={isLoading || getAvailableStock(product) <= 0}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <span className="block font-medium text-slate-900">{product.name}</span>
-                    <span className="text-slate-500">
-                      {money(toNumber(product.price))} · stock {getAvailableStock(product)}
-                    </span>
-                    {engine === "SHARED_ERP" ? (
-                      <span className="block text-xs text-slate-400">
-                        Total ERP {product.stock}
+                  <div className="flex min-w-0 gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+                      <Package className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <span className="block font-medium text-slate-900">
+                        {product.name}
                       </span>
-                    ) : null}
-                    {toNumber(product.taxRate) > 0 && (
                       <span className="block text-xs text-slate-400">
-                        IVA {product.taxRate}%
+                        {product.primaryCode ?? product.barcode ?? "Sin código"}
                       </span>
-                    )}
+                      <span className="text-slate-500">
+                        {money(toNumber(product.price))} · stock{" "}
+                        {getAvailableStock(product)}
+                      </span>
+                      {engine === "SHARED_ERP" ? (
+                        <span className="block text-xs text-slate-400">
+                          Total ERP {product.stock}
+                        </span>
+                      ) : null}
+                      {toNumber(product.taxRate) > 0 && (
+                        <span className="block text-xs text-slate-400">
+                          IVA {product.taxRate}%
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <SaleStatusBadge
-                    label={getAvailableStock(product) > 0 ? "Disponible" : "Agotado"}
-                    variant={getAvailableStock(product) > 0 ? "success" : "danger"}
+                    label={
+                      getAvailableStock(product) > 0 ? "Disponible" : "Agotado"
+                    }
+                    variant={
+                      getAvailableStock(product) > 0 ? "success" : "danger"
+                    }
                   />
                 </div>
-                <p className="mt-3 text-xs text-slate-500">Toca para agregar al carrito.</p>
+                <p className="mt-3 text-xs text-slate-500">
+                  Toca para agregar al carrito.
+                </p>
               </button>
             ))}
           </div>
 
           {filteredProducts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No hay productos disponibles.</p>
+            <p className="text-sm text-muted-foreground">
+              No hay productos disponibles.
+            </p>
           ) : null}
         </div>
 
         {/* Right: cart + checkout */}
         <div className="space-y-4 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-
           {/* Cart header */}
           <div className="flex items-center justify-between">
             <div>
@@ -1342,7 +1630,9 @@ export function BasicPosClient({
                   Total {money(cartTotals.total)}
                 </p>
               ) : (
-                <p className="text-xs text-slate-500">Total: {money(cartTotals.total)}</p>
+                <p className="text-xs text-slate-500">
+                  Total: {money(cartTotals.total)}
+                </p>
               )}
             </div>
             {cart.length > 0 && (
@@ -1350,10 +1640,10 @@ export function BasicPosClient({
                 type="button"
                 onClick={() => setShowInvoiceEditor(true)}
                 className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs text-slate-500 transition hover:border-[#004080] hover:text-[#004080]"
-                title="Abrir facturero completo"
+                title="Editar detalle de venta"
               >
                 <Maximize2 className="h-3.5 w-3.5" />
-                Facturero
+                Editar detalle
               </button>
             )}
           </div>
@@ -1362,7 +1652,8 @@ export function BasicPosClient({
           <div className="space-y-2">
             {cart.map((item) => {
               const product = productById.get(item.productId);
-              const rawValue = cartInputs[item.productId] ?? String(item.quantity);
+              const rawValue =
+                cartInputs[item.productId] ?? String(item.quantity);
               const line = calcLine(item);
               return (
                 <div
@@ -1374,7 +1665,8 @@ export function BasicPosClient({
                     <p className="text-xs text-slate-500">
                       {money(toNumber(product?.price ?? 0))}
                       {line.taxRate > 0 && ` · IVA ${line.taxRate}%`}
-                      {item.discountAmount > 0 && ` · Desc. ${money(item.discountAmount)}`}
+                      {item.discountAmount > 0 &&
+                        ` · Desc. ${money(item.discountAmount)}`}
                     </p>
                   </div>
                   <Input
@@ -1408,14 +1700,13 @@ export function BasicPosClient({
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor="customerId">Cliente</Label>
               {engine === "CORE" ? (
-                <button
-                  type="button"
-                  onClick={() => setShowNewCustomer(true)}
+                <Link
+                  href={routes.facturacionCustomers + "/new"}
                   className="flex items-center gap-1 text-xs text-[#004080] hover:text-[#003060]"
                 >
                   <UserPlus className="h-3 w-3" />
                   Nuevo cliente
-                </button>
+                </Link>
               ) : null}
             </div>
             {initialCustomerId && customerId === initialCustomerId && (
@@ -1423,19 +1714,50 @@ export function BasicPosClient({
                 Cliente seleccionado desde conversacion.
               </p>
             )}
-            <select
-              id="customerId"
-              value={customerId}
-              onChange={(event) => setCustomerId(event.target.value)}
-              className="h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm"
-            >
-              <option value="">Consumidor final</option>
-              {customers.map((customer) => (
-                <option key={customer.id} value={customer.id}>
-                  {customer.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <Input
+                id="customerId"
+                value={customerSearch}
+                onChange={(event) => setCustomerSearch(event.target.value)}
+                placeholder="RUC/cédula, nombre, nombre comercial o email"
+              />
+              {customerMatches.length ? (
+                <div className="absolute z-20 mt-1 w-full rounded-xl border bg-white shadow-lg">
+                  {customerMatches.map((customer) => (
+                    <button
+                      type="button"
+                      key={customer.id}
+                      className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                      onClick={() => {
+                        setCustomerId(customer.id);
+                        setCustomerSearch("");
+                      }}
+                    >
+                      {customer.name} ·{" "}
+                      {customer.identification ?? "Sin identificación"}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            {selectedCustomer ? (
+              <p className="text-xs text-slate-500">
+                <strong>{selectedCustomer.name}</strong> ·{" "}
+                {selectedCustomer.identification ?? "—"} ·{" "}
+                {selectedCustomer.tradeName ?? "Sin nombre comercial"} ·{" "}
+                {selectedCustomer.phone ?? "—"} ·{" "}
+                {selectedCustomer.address ?? "—"} ·{" "}
+                {selectedCustomer.customerType ?? "Sin tipo"}
+              </p>
+            ) : (
+              <button
+                type="button"
+                className="text-left text-xs text-slate-500"
+                onClick={() => setCustomerId("")}
+              >
+                <strong>CONSUMIDOR FINAL</strong> · 9999999999999
+              </button>
+            )}
 
             {creditWithoutCustomer && (
               <p className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
@@ -1447,13 +1769,13 @@ export function BasicPosClient({
 
           {/* Payment method */}
           <div className="space-y-2">
-            <Label htmlFor="paymentMethod">Método de pago</Label>
+            <Label htmlFor="paymentMethod">Forma de pago comercial</Label>
             <select
               id="paymentMethod"
               value={paymentMethod}
               onChange={(event) => {
                 setPaymentMethod(event.target.value);
-                setSriPaymentCode(defaultSriCode(event.target.value));
+                setSriPaymentCode(defaultSriPaymentCode(event.target.value));
               }}
               className="h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm"
             >
@@ -1464,10 +1786,30 @@ export function BasicPosClient({
             </select>
           </div>
 
+          {outputMode === "sri_invoice" ? (
+            <div className="space-y-2">
+              <Label htmlFor="sriPaymentCode">Forma de pago SRI</Label>
+              <select
+                id="sriPaymentCode"
+                value={sriPaymentCode}
+                onChange={(event) => setSriPaymentCode(event.target.value)}
+                className="h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm"
+              >
+                {SRI_PAYMENT_OPTIONS.map((option) => (
+                  <option key={option.code} value={option.code}>
+                    {option.code} · {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+
           {/* Transfer fields */}
           {paymentMethod === "transfer" && (
             <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-              <p className="text-xs font-medium text-slate-600">Datos de transferencia</p>
+              <p className="text-xs font-medium text-slate-600">
+                Datos de transferencia
+              </p>
               <div className="space-y-1.5">
                 <Label htmlFor="transferBank">Banco</Label>
                 <Input
@@ -1517,7 +1859,9 @@ export function BasicPosClient({
           {/* Sale output mode + tooltip */}
           <div className="space-y-2">
             <div className="flex items-center gap-1.5">
-              <Label className="text-sm font-medium text-slate-900">Comprobante</Label>
+              <Label className="text-sm font-medium text-slate-900">
+                Comprobante
+              </Label>
               <div className="relative">
                 <button
                   type="button"
@@ -1538,12 +1882,18 @@ export function BasicPosClient({
                       aria-hidden
                     />
                     <p className="text-xs text-slate-600">
-                      <span className="font-medium text-slate-800">Recibo interno: </span>
-                      Registra la venta, descuenta inventario y genera un recibo operativo sin enviarlo al SRI.
+                      <span className="font-medium text-slate-800">
+                        Recibo interno:{" "}
+                      </span>
+                      Registra la venta, descuenta inventario y genera un recibo
+                      operativo sin enviarlo al SRI.
                     </p>
                     <p className="text-xs text-slate-600">
-                      <span className="font-medium text-slate-800">Factura SRI: </span>
-                      Registra la venta, descuenta inventario y emite una factura electrónica autorizada por el SRI.
+                      <span className="font-medium text-slate-800">
+                        Factura SRI:{" "}
+                      </span>
+                      Registra la venta, descuenta inventario y emite una
+                      factura electrónica autorizada por el SRI.
                     </p>
                   </div>
                 )}
@@ -1558,7 +1908,7 @@ export function BasicPosClient({
                   "flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition",
                   outputMode === "internal_receipt"
                     ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
+                    : "text-slate-500 hover:text-slate-700",
                 )}
               >
                 <ReceiptText className="h-4 w-4 shrink-0" />
@@ -1574,7 +1924,7 @@ export function BasicPosClient({
                     ? "bg-white text-slate-900 shadow-sm"
                     : hasSriConfig
                       ? "text-slate-500 hover:text-slate-700"
-                      : "cursor-not-allowed text-slate-300"
+                      : "cursor-not-allowed text-slate-300",
                 )}
               >
                 <FileCheck2 className="h-4 w-4 shrink-0" />
@@ -1624,15 +1974,11 @@ export function BasicPosClient({
 
           <Button
             type="button"
-            onClick={submitSale}
+            onClick={() => setShowInvoiceEditor(true)}
             disabled={isLoading || cart.length === 0 || creditWithoutCustomer}
             className="w-full"
           >
-            {isLoading
-              ? "Finalizando..."
-              : outputMode === "sri_invoice"
-                ? "Emitir factura SRI"
-                : "Finalizar venta"}
+            {isLoading ? "Procesando..." : "Cobrar"}
           </Button>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}

@@ -17,10 +17,16 @@ export type SriModuleStatus = {
   establishmentCount: number;
   issuePointCount: number;
   sequenceCount: number;
-  signatureStatus: "NOT_UPLOADED" | "UPLOADED_METADATA_ONLY" | "READY_FOR_TESTING" | "EXPIRED" | null;
+  signatureStatus:
+    | "NOT_UPLOADED"
+    | "UPLOADED_METADATA_ONLY"
+    | "READY_FOR_TESTING"
+    | "EXPIRED"
+    | null;
   signatureHasEncryptedCertificate: boolean;
   signatureHasEncryptedPassword: boolean;
-  readinessLabel: "not_started" | "incomplete" | "ready_for_testing" | "production_ready";
+  readinessLabel:
+    "not_started" | "incomplete" | "ready_for_testing" | "production_ready";
   documentCount: number;
   documentStatusCounts: {
     draft: number;
@@ -29,7 +35,9 @@ export type SriModuleStatus = {
   };
 };
 
-export async function getSriModuleStatus(tenantId: string): Promise<SriModuleStatus> {
+export async function getSriModuleStatus(
+  tenantId: string,
+): Promise<SriModuleStatus> {
   const prisma = getPrismaClient();
 
   const profile = await prisma.sriTaxpayerProfile.findUnique({
@@ -71,33 +79,46 @@ export async function getSriModuleStatus(tenantId: string): Promise<SriModuleSta
     };
   }
 
-  const [issuePointCount, sequenceCount, documentCount, draftCount, readyForTestingCount, signedCount] = await Promise.all([
+  const [
+    issuePointCount,
+    sequenceCount,
+    documentCount,
+    draftCount,
+    readyForTestingCount,
+    signedCount,
+  ] = await Promise.all([
     prisma.sriIssuePoint.count({ where: { tenantId, isActive: true } }),
     prisma.sriDocumentSequence.count({ where: { tenantId, isActive: true } }),
     prisma.sriDocument.count({ where: { tenantId } }),
     prisma.sriDocument.count({ where: { tenantId, status: "DRAFT" } }),
-    prisma.sriDocument.count({ where: { tenantId, status: "READY_FOR_TESTING" } }),
+    prisma.sriDocument.count({
+      where: { tenantId, status: "READY_FOR_TESTING" },
+    }),
     prisma.sriDocument.count({ where: { tenantId, status: "SIGNED" } }),
   ]);
 
   const establishmentCount = profile.establishments.length;
   const signatureStatus = profile.signatureConfig?.status ?? null;
   const signatureHasEncryptedCertificate = Boolean(
-    profile.signatureConfig?.encryptedCertificateStorageKey
+    profile.signatureConfig?.encryptedCertificateStorageKey,
   );
   const signatureHasEncryptedPassword = Boolean(
-    profile.signatureConfig?.encryptedCertificatePassword
+    profile.signatureConfig?.encryptedCertificatePassword,
   );
   const signatureReadiness = getSriSignatureReadiness(profile.signatureConfig);
 
   let readinessLabel: SriModuleStatus["readinessLabel"] = "incomplete";
-  if (profile.status === "CONFIGURED" && establishmentCount > 0 && issuePointCount > 0 && sequenceCount > 0) {
-    readinessLabel =
-      signatureReadiness.isReady
-        ? profile.environment === "PRODUCTION"
-          ? "production_ready"
-          : "ready_for_testing"
-        : "incomplete";
+  if (
+    profile.status === "CONFIGURED" &&
+    establishmentCount > 0 &&
+    issuePointCount > 0 &&
+    sequenceCount > 0
+  ) {
+    readinessLabel = signatureReadiness.isReady
+      ? profile.environment === "PRODUCTION"
+        ? "production_ready"
+        : "ready_for_testing"
+      : "incomplete";
   } else if (profile.status === "PENDING" && establishmentCount === 0) {
     readinessLabel = "incomplete";
   }
@@ -141,7 +162,7 @@ export async function upsertSriProfile(
     specialTaxpayerNumber?: string | null;
     withholdingAgentResolution?: string | null;
     environment: "TEST" | "PRODUCTION";
-  }
+  },
 ) {
   const prisma = getPrismaClient();
   return prisma.sriTaxpayerProfile.upsert({
@@ -167,7 +188,7 @@ export async function listSriEstablishments(tenantId: string) {
 export async function createSriEstablishment(
   tenantId: string,
   profileId: string,
-  data: { code: string; name: string; address: string; isMain: boolean }
+  data: { code: string; name: string; address: string; isMain: boolean },
 ) {
   const prisma = getPrismaClient();
   return prisma.sriEstablishment.create({
@@ -186,18 +207,25 @@ export async function listSriIssuePoints(tenantId: string) {
 
 export async function createSriIssuePoint(
   tenantId: string,
-  data: { establishmentId: string; code: string; name: string }
+  data: { establishmentId: string; code: string; name: string },
 ) {
   const prisma = getPrismaClient();
   await requireTenantOperationalAccess(tenantId);
   const limit = await getLimit(tenantId, "issuePoints");
-  return prisma.$transaction(async (tx) => {
-    const currentCount = await tx.sriIssuePoint.count({ where: { tenantId } });
-    if (currentCount >= limit) {
-      throw new Error(`Alcanzaste el límite de ${limit} puntos de emisión de tu plan.`);
-    }
-    return tx.sriIssuePoint.create({ data: { tenantId, ...data } });
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  return prisma.$transaction(
+    async (tx) => {
+      const currentCount = await tx.sriIssuePoint.count({
+        where: { tenantId },
+      });
+      if (currentCount >= limit) {
+        throw new Error(
+          `Alcanzaste el límite de ${limit} puntos de emisión de tu plan.`,
+        );
+      }
+      return tx.sriIssuePoint.create({ data: { tenantId, ...data } });
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  );
 }
 
 export async function listSriSequences(tenantId: string) {
@@ -208,7 +236,11 @@ export async function listSriSequences(tenantId: string) {
       establishment: { select: { code: true, name: true } },
       issuePoint: { select: { code: true, name: true } },
     },
-    orderBy: [{ establishment: { code: "asc" } }, { issuePoint: { code: "asc" } }, { documentType: "asc" }],
+    orderBy: [
+      { establishment: { code: "asc" } },
+      { issuePoint: { code: "asc" } },
+      { documentType: "asc" },
+    ],
   });
 }
 
@@ -217,11 +249,16 @@ export async function upsertSriSequence(
   data: {
     establishmentId: string;
     issuePointId: string;
-    documentType: "INVOICE" | "CREDIT_NOTE" | "DEBIT_NOTE" | "WITHHOLDING" | "REFERRAL_GUIDE";
+    documentType:
+      | "INVOICE"
+      | "CREDIT_NOTE"
+      | "DEBIT_NOTE"
+      | "WITHHOLDING"
+      | "REFERRAL_GUIDE";
     currentNumber: number;
     startNumber: number;
     maxNumber?: number | null;
-  }
+  },
 ) {
   const prisma = getPrismaClient();
   return prisma.sriDocumentSequence.upsert({
@@ -234,7 +271,11 @@ export async function upsertSriSequence(
       },
     },
     create: { tenantId, ...data },
-    update: { currentNumber: data.currentNumber, startNumber: data.startNumber, maxNumber: data.maxNumber },
+    update: {
+      currentNumber: data.currentNumber,
+      startNumber: data.startNumber,
+      maxNumber: data.maxNumber,
+    },
   });
 }
 
@@ -252,28 +293,43 @@ export async function updateSriSignatureMetadata(
     subjectName?: string | null;
     serialNumber?: string | null;
     fingerprintSha256?: string | null;
-  }
+  },
 ) {
   const prisma = getPrismaClient();
   const profile = await prisma.sriTaxpayerProfile.findUnique({
     where: { tenantId },
     select: { id: true },
   });
-  if (!profile) throw new Error("Perfil SRI no configurado. Configura el RUC y razón social primero.");
+  if (!profile)
+    throw new Error(
+      "Perfil SRI no configurado. Configura el RUC y razón social primero.",
+    );
 
-  const current = await prisma.sriSignatureConfig.findUnique({ where: { tenantId } });
-  const readiness = getSriSignatureReadiness(current ? { ...current, expiresAt: data.expiresAt } : null);
+  const current = await prisma.sriSignatureConfig.findUnique({
+    where: { tenantId },
+  });
+  const readiness = getSriSignatureReadiness(
+    current ? { ...current, expiresAt: data.expiresAt } : null,
+  );
   return prisma.sriSignatureConfig.upsert({
     where: { tenantId },
     create: {
       tenantId,
       profileId: profile.id,
-      status: readiness.isReady ? "READY_FOR_TESTING" : data.expiresAt < new Date() ? "EXPIRED" : "UPLOADED_METADATA_ONLY",
+      status: readiness.isReady
+        ? "READY_FOR_TESTING"
+        : data.expiresAt < new Date()
+          ? "EXPIRED"
+          : "UPLOADED_METADATA_ONLY",
       certificateUploadedAt: new Date(),
       ...data,
     },
     update: {
-      status: readiness.isReady ? "READY_FOR_TESTING" : data.expiresAt < new Date() ? "EXPIRED" : "UPLOADED_METADATA_ONLY",
+      status: readiness.isReady
+        ? "READY_FOR_TESTING"
+        : data.expiresAt < new Date()
+          ? "EXPIRED"
+          : "UPLOADED_METADATA_ONLY",
       certificateUploadedAt: new Date(),
       ...data,
     },
@@ -287,7 +343,7 @@ export async function updateSriSignatureSecureMaterial(
     encryptedCertificateStorageKey: string;
     encryptedCertificatePassword: string;
     encryptionKeyVersion: string;
-  }
+  },
 ) {
   const prisma = getPrismaClient();
   const profile = await prisma.sriTaxpayerProfile.findUnique({
@@ -296,7 +352,9 @@ export async function updateSriSignatureSecureMaterial(
   });
 
   if (!profile) {
-    throw new Error("Perfil SRI no configurado. Configura el RUC y razon social primero.");
+    throw new Error(
+      "Perfil SRI no configurado. Configura el RUC y razon social primero.",
+    );
   }
 
   const current = await prisma.sriSignatureConfig.findUnique({
@@ -373,7 +431,7 @@ export const SRI_DOCUMENT_SOURCE_LABELS: Record<string, string> = {
 
 export async function getSriDocuments(
   tenantId: string,
-  options: { take?: number; status?: string } = {}
+  options: { take?: number; status?: string } = {},
 ) {
   const prisma = getPrismaClient();
   return prisma.sriDocument.findMany({
@@ -412,11 +470,17 @@ export async function getSriDocumentSequence(
   tenantId: string,
   establishmentId: string,
   issuePointId: string,
-  documentType: SriDocumentType = SriDocumentType.INVOICE
+  documentType: SriDocumentType = SriDocumentType.INVOICE,
 ) {
   const prisma = getPrismaClient();
   return prisma.sriDocumentSequence.findFirst({
-    where: { tenantId, establishmentId, issuePointId, documentType, isActive: true },
+    where: {
+      tenantId,
+      establishmentId,
+      issuePointId,
+      documentType,
+      isActive: true,
+    },
   });
 }
 
@@ -441,8 +505,18 @@ export async function getSriDraftForSale(tenantId: string, saleId: string) {
 
 export async function getSriDocumentsForSales(
   tenantId: string,
-  saleIds: string[]
-): Promise<Record<string, { id: string; status: string; environment: string; sriAuthorizationNumber: string | null }>> {
+  saleIds: string[],
+): Promise<
+  Record<
+    string,
+    {
+      id: string;
+      status: string;
+      environment: string;
+      sriAuthorizationNumber: string | null;
+    }
+  >
+> {
   if (saleIds.length === 0) return {};
   const prisma = getPrismaClient();
   const docs = await prisma.sriDocument.findMany({
@@ -469,18 +543,23 @@ export async function getSriDocumentsForSales(
           id: d.id,
           status: d.status,
           environment: d.environment,
-          sriAuthorizationNumber: d.submissionJobs[0]?.sriAuthorizationNumber ?? null,
+          sriAuthorizationNumber:
+            d.submissionJobs[0]?.sriAuthorizationNumber ?? null,
         },
-      ])
+      ]),
   );
 }
 
 export async function createDraftSriDocumentFromBasicSale({
   tenantId,
   saleId,
+  establishmentId,
+  issuePointId,
 }: {
   tenantId: string;
   saleId: string;
+  establishmentId?: string;
+  issuePointId?: string;
 }): Promise<{ documentId: string; alreadyExists: boolean }> {
   await requireTenantOperationalAccess(tenantId);
   const prisma = getPrismaClient();
@@ -496,28 +575,61 @@ export async function createDraftSriDocumentFromBasicSale({
   const sale = await prisma.lightweightSale.findFirst({
     where: { id: saleId, tenantId },
     include: {
-      customer: { select: { name: true, email: true, phone: true, identificationType: true, identification: true } },
-      items: { include: { product: { select: { name: true, barcode: true } } } },
+      customer: {
+        select: {
+          name: true,
+          email: true,
+          phone: true,
+          identificationType: true,
+          identification: true,
+        },
+      },
+      items: {
+        include: { product: { select: { name: true, barcode: true } } },
+      },
     },
   });
   if (!sale) throw new Error("Venta no encontrada.");
-  if (sale.status === "canceled") throw new Error("La venta esta cancelada y no puede prepararse como comprobante.");
+  if (sale.status === "canceled")
+    throw new Error(
+      "La venta esta cancelada y no puede prepararse como comprobante.",
+    );
   const fiscalCustomer = validateCustomerForSriInvoice(sale.customer);
 
-  const profile = await prisma.sriTaxpayerProfile.findUnique({ where: { tenantId } });
-  if (!profile) throw new Error("No existe configuracion SRI. Configura la empresa y RUC primero.");
+  const profile = await prisma.sriTaxpayerProfile.findUnique({
+    where: { tenantId },
+  });
+  if (!profile)
+    throw new Error(
+      "No existe configuracion SRI. Configura la empresa y RUC primero.",
+    );
 
   const establishment = await prisma.sriEstablishment.findFirst({
-    where: { tenantId, isActive: true },
+    where: {
+      tenantId,
+      isActive: true,
+      ...(establishmentId ? { id: establishmentId } : {}),
+    },
     orderBy: [{ isMain: "desc" }, { code: "asc" }],
   });
-  if (!establishment) throw new Error("No hay establecimientos activos. Configura al menos uno en SRI.");
+  if (!establishment)
+    throw new Error(
+      "No hay establecimientos activos. Configura al menos uno en SRI.",
+    );
 
   const issuePoint = await prisma.sriIssuePoint.findFirst({
-    where: { tenantId, establishmentId: establishment.id, isActive: true },
+    where: {
+      tenantId,
+      establishmentId: establishment.id,
+      isActive: true,
+      ...(issuePointId ? { id: issuePointId } : {}),
+    },
     orderBy: { code: "asc" },
   });
-  if (!issuePoint) throw new Error("No hay puntos de emision activos para el establecimiento.");
+  if (!issuePoint)
+    throw new Error(
+      "No hay puntos de emision activos para el establecimiento.",
+    );
 
   const sequence = await prisma.sriDocumentSequence.findFirst({
     where: {
@@ -528,7 +640,10 @@ export async function createDraftSriDocumentFromBasicSale({
       isActive: true,
     },
   });
-  if (!sequence) throw new Error("No hay secuencia de factura configurada para este establecimiento y punto de emision. Crea una en SRI → Secuenciales.");
+  if (!sequence)
+    throw new Error(
+      "No hay secuencia de factura configurada para este establecimiento y punto de emision. Crea una en SRI → Secuenciales.",
+    );
 
   const lines = sale.items.map((item) => {
     const qty = item.quantity;
@@ -552,7 +667,10 @@ export async function createDraftSriDocumentFromBasicSale({
 
   const sriSubtotal = lines.reduce((acc, l) => acc + Number(l.subtotal), 0);
   const sriTaxTotal = lines.reduce((acc, l) => acc + Number(l.taxAmount), 0);
-  const sriDiscountTotal = lines.reduce((acc, l) => acc + Number(l.discountAmount), 0);
+  const sriDiscountTotal = lines.reduce(
+    (acc, l) => acc + Number(l.discountAmount),
+    0,
+  );
 
   const document = await prisma.sriDocument.create({
     data: {
@@ -573,6 +691,7 @@ export async function createDraftSriDocumentFromBasicSale({
       taxTotal: new Prisma.Decimal(sriTaxTotal),
       discountTotal: new Prisma.Decimal(sriDiscountTotal),
       grandTotal: new Prisma.Decimal(sriSubtotal + sriTaxTotal),
+      sriPaymentCode: sale.sriPaymentCode ?? "01",
       lines: { create: lines },
     },
     select: { id: true },
@@ -638,15 +757,21 @@ export async function reserveSriDocumentNumberingForTesting(params: {
 
     const doc = lockedDocs[0];
     if (!doc) {
-      throw new Error("Comprobante no encontrado o no pertenece a este tenant.");
+      throw new Error(
+        "Comprobante no encontrado o no pertenece a este tenant.",
+      );
     }
 
     if (doc.status !== "DRAFT" && doc.status !== "READY_FOR_TESTING") {
-      throw new Error("Solo se puede reservar numeracion para comprobantes en borrador o listos para pruebas.");
+      throw new Error(
+        "Solo se puede reservar numeracion para comprobantes en borrador o listos para pruebas.",
+      );
     }
 
     if (doc.accessKey && doc.sequentialNumber == null) {
-      throw new Error("El comprobante tiene clave persistida pero no secuencial. Corrige la numeracion antes de continuar.");
+      throw new Error(
+        "El comprobante tiene clave persistida pero no secuencial. Corrige la numeracion antes de continuar.",
+      );
     }
 
     const [profile, establishment, issuePoint] = await Promise.all([
@@ -693,13 +818,20 @@ export async function reserveSriDocumentNumberingForTesting(params: {
 
       const sequence = lockedSequences[0];
       if (!sequence) {
-        throw new Error("No hay secuencia activa para este establecimiento y punto de emision.");
+        throw new Error(
+          "No hay secuencia activa para este establecimiento y punto de emision.",
+        );
       }
 
       sequenceId = sequence.id;
       if (sequentialNumber == null) {
-        if (sequence.maxNumber != null && sequence.currentNumber > sequence.maxNumber) {
-          throw new Error("La secuencia activa ya alcanzo su numero maximo configurado.");
+        if (
+          sequence.maxNumber != null &&
+          sequence.currentNumber > sequence.maxNumber
+        ) {
+          throw new Error(
+            "La secuencia activa ya alcanzo su numero maximo configurado.",
+          );
         }
         sequentialNumber = sequence.currentNumber;
         shouldAdvanceSequence = true;
@@ -707,7 +839,9 @@ export async function reserveSriDocumentNumberingForTesting(params: {
     }
 
     if (sequentialNumber == null || !sequenceId) {
-      throw new Error("No se pudo resolver la secuencia persistida para este comprobante.");
+      throw new Error(
+        "No se pudo resolver la secuencia persistida para este comprobante.",
+      );
     }
 
     const issuedAt = doc.issuedAt ?? new Date();
