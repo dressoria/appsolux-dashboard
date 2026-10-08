@@ -387,6 +387,7 @@ model Tenant {
   businessSuiteActivationJobs  BusinessSuiteActivationJob[]
   erpProductPricings           ErpProductPricing[]
   quickInvoiceDrafts           QuickInvoiceDraft[]
+  businessSettings             BusinessSettings?
 }
 
 model Plan {
@@ -1352,4 +1353,104 @@ model SriDocumentLine {
   document SriDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@index([documentId])
+}
+
+model BusinessSettings {
+  id       String @id @default(cuid())
+  tenantId String @unique
+
+  // ── Sistema: Factura ──
+  defaultCustomerEmail  String?
+  defaultQuantity       Int       @default(1)
+  salesDecimals         Int       @default(2)
+  saleDescription       String?
+  enableSubsidyManagement Boolean @default(false)
+  editSellerData        Boolean   @default(false)
+  showSellerCustomers   Boolean   @default(false)
+  costPriceFromNetTotal Boolean   @default(false)
+
+  // ── Sistema: Ocultar campos de tabla ──
+  hideObservation Boolean @default(false)
+  hideStock       Boolean @default(false)
+  hideIva         Boolean @default(false)
+  hideDiscounts   Boolean @default(false)
+
+  // ── Sistema: Inventario ──
+  controlStockOnSale      Boolean @default(false)
+  controlStockOnProforma  Boolean @default(false)
+  detailedInventory       Boolean @default(false)
+  enableProductCosting    Boolean @default(false)
+  autoDiscountOnSale      Boolean @default(false)
+
+  // ── Sistema: Columnas de productos ──
+  colBarcode   Boolean @default(true)
+  colImage     Boolean @default(true)
+  colCode      Boolean @default(true)
+  colName      Boolean @default(true)
+  colBrand     Boolean @default(true)
+  colCost      Boolean @default(true)
+  colPvpIva    Boolean @default(true)
+  colBar       Boolean @default(true)
+  colTax       Boolean @default(true)
+  colCategory  Boolean @default(true)
+  colStock     Boolean @default(true)
+  colStatus    Boolean @default(true)
+
+  // ── Sistema: Transacciones ──
+  allowDeleteDocuments    Boolean @default(false)
+  requireKeyOnSale        Boolean @default(false)
+  selectSellerOnInvoice   Boolean @default(false)
+  selectDateOnInvoice     Boolean @default(false)
+  disableManualPriceChange Boolean @default(false)
+
+  // ── Sistema: Impresiones ──
+  showPriceWithIvaOnTicket Boolean @default(false)
+  useBranchInfoOnPrint     Boolean @default(false)
+  includeLogoOnTicket      Boolean @default(false)
+  barcodeColumns           Int     @default(1)
+
+  // ── Sistema: Etiqueta código de barras ──
+  labelShowName  Boolean @default(true)
+  labelShowCode  Boolean @default(true)
+  labelShowBrand Boolean @default(false)
+  labelShowColor Boolean @default(false)
+  labelShowPrice Boolean @default(true)
+  labelShowSize  Boolean @default(false)
+
+  // ── Sistema: Cierre de caja ──
+  cashClosingMode String @default("by_cash_register")
+  cashClosingType String @default("cash_only")
+
+  // ── Sistema: Autorización notas de crédito ──
+  requireCreditNoteAuth       Boolean @default(false)
+  creditNoteAuthPasswordHash  String?
+
+  // ── Comprobantes: PDF ──
+  pdfBackgroundColor  String @default("#FFFFFF")
+  pdfAccentColor      String @default("#1a1a1a")
+  includeExtraSequential Boolean @default(false)
+  invoiceLegend       String?
+  invoiceExtraNote    String?
+
+  // ── Comprobantes: Formato proforma ──
+  proformaFormat String @default("standard")
+
+  // ── Comprobantes: Datos adicionales factura ──
+  showResponsible Boolean @default(false)
+  showWarehouse   Boolean @default(false)
+  showSeller      Boolean @default(false)
+
+  // ── Comprobantes: Ticket ──
+  showTicketAutomatically Boolean @default(false)
+  showResponsibilitySignatures Boolean @default(false)
+
+  // ── Comprobantes: Logo ──
+  logoStorageKey String?
+  logoFileName   String?
+  logoMimeType   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }

@@ -4,9 +4,11 @@ import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { formatSequentialNumber } from "@/lib/core/sri";
 import { generateRidePdfFromAuthorizedXml } from "@/lib/core/sri-ride-generator";
+import type { RideLogoInput } from "@/lib/core/sri-ride-generator";
 import { saveRidePdf } from "@/lib/core/sri-ride-storage";
 import { readAuthorizedXml } from "@/lib/core/sri-authorized-xml-storage";
 import { parseAuthorizedSriInvoiceXml } from "@/lib/core/sri-authorized-xml-parser";
+import { readLogo } from "@/lib/core/logo-storage";
 
 type Props = { params: Promise<{ documentId: string }> };
 
@@ -69,16 +71,32 @@ export async function GET(_req: Request, { params }: Props) {
     return NextResponse.json({ error: message }, { status });
   }
 
+  let logo: RideLogoInput | null = null;
+  try {
+    const settings = await prisma.businessSettings.findUnique({
+      where: { tenantId: tenant.id },
+      select: { logoStorageKey: true, logoMimeType: true },
+    });
+    if (settings?.logoStorageKey) {
+      const logoBuffer = await readLogo(settings.logoStorageKey);
+      logo = {
+        bytes: new Uint8Array(logoBuffer),
+        mimeType: settings.logoMimeType || "image/png",
+      };
+    }
+  } catch {
+    // Continue without logo
+  }
+
   let pdfBuffer: Buffer;
   try {
     const parsedInvoice = parseAuthorizedSriInvoiceXml(authorizedXml);
-    pdfBuffer = await generateRidePdfFromAuthorizedXml(parsedInvoice);
+    pdfBuffer = await generateRidePdfFromAuthorizedXml(parsedInvoice, logo);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error generando PDF.";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
-  // Guardar en storage y actualizar el documento (best-effort)
   try {
     const storageKey = await saveRidePdf(tenant.id, documentId, pdfBuffer);
     await prisma.sriDocument.update({
@@ -86,7 +104,7 @@ export async function GET(_req: Request, { params }: Props) {
       data: { ridePdfStorageKey: storageKey },
     });
   } catch {
-    // El PDF se sirve igualmente aunque falle el guardado
+    // PDF served regardless of save failure
   }
 
   return pdfResponse(pdfBuffer, buildFilename(doc));

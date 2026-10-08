@@ -117,6 +117,7 @@ export const routes = {
   facturacionSettingsCategories: "/facturacion/settings/categories",
   facturacionSettingsUnits: "/facturacion/settings/units",
   facturacionSettingsPaymentMethods: "/facturacion/settings/payment-methods",
+  facturacionConfiguration: "/facturacion/configuration",
 
   facturacionPurchasesDocuments: "/facturacion/purchases/documents",
   facturacionPurchasesReceived: "/facturacion/purchases/received",

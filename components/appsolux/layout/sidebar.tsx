@@ -190,6 +190,7 @@ export function buildSidebarNavigation(
           "building-2",
           true,
         ),
+        link("Configuración", routes.facturacionConfiguration, "settings-2"),
         link("Métodos de pago", routes.facturacionSettingsPaymentMethods),
         link("Bodegas", routes.facturacionSettingsWarehouses),
       ],
