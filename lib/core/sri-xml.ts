@@ -1,6 +1,7 @@
 import "@/lib/security/server-only";
 import { buildSriAccessKey, createStableNumericCode } from "./sri-access-key";
 import { mapCustomerIdentificationTypeToSri } from "@/lib/core/customer-fiscal";
+import { formatEcuadorSriDate } from "./sri-ecuador-date";
 
 export type SriXmlPreviewParams = {
   documentId: string;
@@ -70,8 +71,7 @@ function pad(n: number, digits: number): string {
 }
 
 function formatDateEC(date: Date): string {
-  const d = new Date(date);
-  return `${pad(d.getDate(), 2)}/${pad(d.getMonth() + 1, 2)}/${d.getFullYear()}`;
+  return formatEcuadorSriDate(date);
 }
 
 function dec(value: string | number, digits = 2): string {

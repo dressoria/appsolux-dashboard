@@ -3,6 +3,7 @@ import { getPrismaClient } from "@/lib/db/prisma";
 import { requireTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
 import { getSriDocumentReadinessForSigning } from "./sri-technical-checklist";
 import type { SriSigningJobStatus } from "@prisma/client";
+import { accessKeyMatchesEcuadorIssueDate } from "./sri-access-key";
 
 export type { SriSigningJobStatus };
 
@@ -53,6 +54,19 @@ export async function createSriSigningJobForDocument(params: {
       ok: false,
       reason: "El comprobante debe estar en estado 'Listo para pruebas' para solicitar firma.",
       code: "WRONG_STATUS",
+    };
+  }
+
+  const fiscalDate = doc.issuedAt ?? doc.createdAt;
+  if (
+    !doc.accessKey ||
+    !accessKeyMatchesEcuadorIssueDate(doc.accessKey, fiscalDate)
+  ) {
+    return {
+      ok: false,
+      reason:
+        "La fecha fiscal Ecuador no coincide con la clave de acceso persistida. Regenera la numeración antes de solicitar la firma.",
+      code: "BLOCKED",
     };
   }
 

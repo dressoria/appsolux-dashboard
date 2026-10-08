@@ -9,12 +9,18 @@ import {
   FACTUROM_ELECTRONIC_BILLING_PROVIDER_RUC,
   FACTUROM_SYSTEM_NAME,
 } from "./sri-xml";
+import {
+  buildSriAccessKey,
+  accessKeyMatchesEcuadorIssueDate,
+  formatSriDateForAccessKey,
+} from "./sri-access-key";
+import { formatEcuadorSriDate } from "./sri-ecuador-date";
 
 function buildXml(profileOverrides: {
   accountingRequired?: boolean;
   taxRegimeCode?: string | null;
   contribuyenteRimpe?: string | null;
-} = {}) {
+} = {}, issuedAt = new Date("2026-10-07T12:00:00-05:00")) {
   return buildUnsignedSriInvoiceXmlPreview({
     documentId: "invoice-test",
     profile: {
@@ -47,8 +53,8 @@ function buildXml(profileOverrides: {
       discountTotal: 0,
       grandTotal: 11.5,
       sriPaymentCode: "20",
-      issuedAt: new Date("2026-10-07T12:00:00-05:00"),
-      createdAt: new Date("2026-10-07T12:00:00-05:00"),
+      issuedAt,
+      createdAt: issuedAt,
     },
     lines: [
       {
@@ -132,6 +138,40 @@ test("RIMPE ubica contribuyenteRimpe en infoTributaria y respeta orden SRI", () 
 test("obligadoContabilidad refleja exactamente el perfil sincronizado", () => {
   assert.match(buildXml({ accountingRequired: false }), /<obligadoContabilidad>NO<\/obligadoContabilidad>/);
   assert.match(buildXml({ accountingRequired: true }), /<obligadoContabilidad>SI<\/obligadoContabilidad>/);
+});
+
+test("fecha XML y clave usan el mismo día fiscal America/Guayaquil", () => {
+  const beforeMidnight = new Date("2026-10-08T04:39:00.000Z");
+  const afterMidnight = new Date("2026-10-08T05:01:00.000Z");
+  assert.equal(formatEcuadorSriDate(beforeMidnight), "07/10/2026");
+  assert.equal(formatSriDateForAccessKey(beforeMidnight), "07102026");
+  assert.equal(formatSriDateForAccessKey(afterMidnight), "08102026");
+
+  const result = buildSriAccessKey({
+    issuedAt: beforeMidnight,
+    documentType: "INVOICE",
+    ruc: "1790012345001",
+    environment: "PRODUCTION",
+    establishmentCode: "001",
+    issuePointCode: "001",
+    sequentialNumber: 307,
+    numericCode: "12345678",
+  });
+  assert.ok(result.accessKey.startsWith("07102026"));
+  assert.equal(
+    accessKeyMatchesEcuadorIssueDate(result.accessKey, beforeMidnight),
+    true,
+  );
+  assert.equal(
+    accessKeyMatchesEcuadorIssueDate(result.accessKey, afterMidnight),
+    false,
+  );
+
+  const xml = buildXml({}, beforeMidnight);
+  const xmlDate = xml.match(/<fechaEmision>([^<]+)<\/fechaEmision>/)?.[1];
+  const xmlAccessKey = xml.match(/<claveAcceso>(\d{49})<\/claveAcceso>/)?.[1];
+  assert.equal(xmlDate, "07/10/2026");
+  assert.equal(xmlAccessKey?.slice(0, 8), xmlDate?.replaceAll("/", ""));
 });
 
 test("ajustes UI mantienen overflow y select contenido", async () => {

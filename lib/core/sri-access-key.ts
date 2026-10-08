@@ -1,5 +1,6 @@
 import "@/lib/security/server-only";
 import { createHash } from "crypto";
+import { formatEcuadorSriDateCompact } from "./sri-ecuador-date";
 
 export type SriAccessKeyParams = {
   issuedAt: Date;
@@ -25,11 +26,15 @@ export type SriAccessKeyResult = {
 };
 
 export function formatSriDateForAccessKey(date: Date): string {
-  const d = new Date(date);
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = String(d.getFullYear());
-  return `${day}${month}${year}`;
+  return formatEcuadorSriDateCompact(date);
+}
+
+export function accessKeyMatchesEcuadorIssueDate(
+  accessKey: string,
+  issuedAt: Date,
+): boolean {
+  return /^\d{49}$/.test(accessKey) &&
+    accessKey.slice(0, 8) === formatSriDateForAccessKey(issuedAt);
 }
 
 export function getSriDocumentCode(documentType: string): string {
