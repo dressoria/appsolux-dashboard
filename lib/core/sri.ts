@@ -606,7 +606,7 @@ export async function createDraftSriDocumentFromBasicSale({
       },
       payments: { orderBy: { createdAt: "asc" }, take: 1 },
       items: {
-        include: { product: { select: { name: true, barcode: true } } },
+        include: { product: { select: { name: true, primaryCode: true, auxiliaryCode: true } } },
       },
     },
   });
@@ -660,6 +660,14 @@ export async function createDraftSriDocumentFromBasicSale({
       "No hay secuencia de factura configurada para este establecimiento y punto de emision. Crea una en SRI → Secuenciales.",
     );
 
+  for (const item of sale.items) {
+    if (!item.product.primaryCode?.trim()) {
+      throw new Error(
+        `El producto "${item.product.name}" no tiene código principal configurado.`,
+      );
+    }
+  }
+
   const lines = sale.items.map((item) => {
     const qty = item.quantity;
     const unitPrice = Number(item.price);
@@ -669,7 +677,8 @@ export async function createDraftSriDocumentFromBasicSale({
     const taxAmount = Math.round(lineSubtotal * taxRate) / 100;
     return {
       itemName: item.product.name,
-      itemCode: item.product.barcode ?? null,
+      itemCode: item.product.primaryCode!.trim(),
+      itemAuxiliaryCode: item.product.auxiliaryCode?.trim() || null,
       quantity: new Prisma.Decimal(qty),
       unitPrice: new Prisma.Decimal(unitPrice),
       discountAmount: new Prisma.Decimal(discountAmount),

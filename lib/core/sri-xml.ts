@@ -48,6 +48,7 @@ export type SriXmlPreviewParams = {
   lines: Array<{
     itemName: string;
     itemCode: string | null;
+    itemAuxiliaryCode?: string | null;
     quantity: string | number;
     unitPrice: string | number;
     discountAmount: string | number;
@@ -141,16 +142,22 @@ function resolveIvaCodigoPorcentaje(taxRate: number): string {
 
 function buildLineXml(
   line: SriXmlPreviewParams["lines"][number],
-  index: number,
+  _index: number,
 ): string {
+  if (!line.itemCode?.trim()) {
+    throw new Error(
+      `El producto "${line.itemName}" no tiene código principal (codigoPrincipal).`,
+    );
+  }
   const taxRate = Number(line.taxRate);
   const codigoPct = resolveIvaCodigoPorcentaje(taxRate);
-  const codigoPrincipal = line.itemCode
-    ? xmlEscape(line.itemCode)
-    : `ITEM-${pad(index + 1, 3)}`;
+  const codigoPrincipal = xmlEscape(line.itemCode.trim());
+  const auxLine = line.itemAuxiliaryCode?.trim()
+    ? `\n      <codigoAuxiliar>${xmlEscape(line.itemAuxiliaryCode.trim())}</codigoAuxiliar>`
+    : "";
 
   return `    <detalle>
-      <codigoPrincipal>${codigoPrincipal}</codigoPrincipal>
+      <codigoPrincipal>${codigoPrincipal}</codigoPrincipal>${auxLine}
       <descripcion>${xmlEscape(line.itemName)}</descripcion>
       <cantidad>${dec(line.quantity, 4)}</cantidad>
       <precioUnitario>${dec(line.unitPrice, 4)}</precioUnitario>
