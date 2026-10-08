@@ -412,7 +412,7 @@ ${taxGroupsXml}
     <moneda>DOLAR</moneda>
     <pagos>
       <pago>
-        <formaPago>${xmlEscape(params.document.sriPaymentCode ?? "01")}</formaPago>
+        <formaPago>${xmlEscape(params.document.sriPaymentCode || "")}</formaPago>
         <total>${dec(params.document.grandTotal)}</total>
         <plazo>0</plazo>
         <unidadTiempo>dias</unidadTiempo>

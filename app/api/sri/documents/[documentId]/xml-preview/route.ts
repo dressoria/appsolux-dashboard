@@ -106,7 +106,7 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
       customerEmail: doc.customerEmail,
       customerPhone: doc.customerPhone,
       customerAddress: sale?.customer?.address,
-      commercialPaymentMethod: sale?.payments[0]?.method,
+      commercialPaymentMethod: doc.commercialPaymentMethod ?? sale?.payments[0]?.method,
       subtotal: doc.subtotal.toString(),
       taxTotal: doc.taxTotal.toString(),
       discountTotal: doc.discountTotal.toString(),

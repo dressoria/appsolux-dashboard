@@ -1246,6 +1246,7 @@ model SriDocument {
   grandTotal                 Decimal                                @db.Decimal(12, 2)
   currency                   String                                 @default("USD")
   sriPaymentCode             String?
+  commercialPaymentMethod    String?
   issuedAt                   DateTime?
   createdAt                  DateTime                               @default(now())
   updatedAt                  DateTime                               @updatedAt

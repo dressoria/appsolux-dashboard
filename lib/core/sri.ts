@@ -660,6 +660,27 @@ export async function createDraftSriDocumentFromBasicSale({
       "No hay secuencia de factura configurada para este establecimiento y punto de emision. Crea una en SRI → Secuenciales.",
     );
 
+  const VALID_SRI_PAYMENT_CODES = new Set(["01", "16", "17", "18", "19", "20", "21"]);
+
+  const sriPaymentCode = sale.sriPaymentCode?.trim() || null;
+  if (!sriPaymentCode) {
+    throw new Error(
+      "SRI_PAYMENT_CODE_MISSING: La venta no tiene código de forma de pago SRI asignado.",
+    );
+  }
+  if (!VALID_SRI_PAYMENT_CODES.has(sriPaymentCode)) {
+    throw new Error(
+      `SRI_PAYMENT_CODE_INVALID: Código de forma de pago SRI "${sriPaymentCode}" no es válido.`,
+    );
+  }
+
+  const commercialPaymentMethod = sale.payments[0]?.method?.trim() || null;
+  if (!commercialPaymentMethod) {
+    throw new Error(
+      "SRI_COMMERCIAL_PAYMENT_MISSING: La venta no tiene forma de pago comercial registrada.",
+    );
+  }
+
   for (const item of sale.items) {
     if (!item.product.primaryCode?.trim()) {
       throw new Error(
@@ -721,7 +742,8 @@ export async function createDraftSriDocumentFromBasicSale({
       taxTotal: new Prisma.Decimal(sriTaxTotal),
       discountTotal: new Prisma.Decimal(sriDiscountTotal),
       grandTotal: new Prisma.Decimal(sriSubtotal + sriTaxTotal),
-      sriPaymentCode: sale.sriPaymentCode ?? "01",
+      sriPaymentCode,
+      commercialPaymentMethod,
       lines: { create: lines },
     },
     select: { id: true },
