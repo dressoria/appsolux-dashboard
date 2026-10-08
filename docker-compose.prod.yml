@@ -19,6 +19,7 @@ services:
       - /home/ubuntu/appsolux-secure/sri-certificates:/app/.appsolux-secure/sri-certificates
       - /home/ubuntu/appsolux-secure/sri-signed-xml:/app/.appsolux-secure/sri-signed-xml
       - /home/ubuntu/appsolux-secure/sri-authorized-xml:/app/.appsolux-secure/sri-authorized-xml
+      - /home/ubuntu/appsolux-secure/logos:/app/.appsolux-secure/logos
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/login"]
       interval: 30s

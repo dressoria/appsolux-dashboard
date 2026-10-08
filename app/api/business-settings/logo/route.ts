@@ -5,7 +5,6 @@ import { getPrismaClient } from "@/lib/db/prisma";
 import { saveLogo, deleteLogo, readLogo } from "@/lib/core/logo-storage";
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
-const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/jpg"]);
 
 function detectMimeType(buffer: Buffer): string | null {
   if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
@@ -34,7 +33,7 @@ export async function GET() {
   }
 
   try {
-    const buffer = await readLogo(settings.logoStorageKey);
+    const buffer = await readLogo(settings.logoStorageKey, tenant.id);
     return new Response(new Uint8Array(buffer), {
       status: 200,
       headers: {
@@ -43,8 +42,11 @@ export async function GET() {
         "Cache-Control": "private, max-age=3600",
       },
     });
-  } catch {
-    return NextResponse.json({ error: "Error al leer el logo." }, { status: 500 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error al leer el logo.";
+    const status = msg.includes("denegado") ? 403 : 500;
+    console.error(`[logo] GET failed tenant=${tenant.id}: ${msg}`);
+    return NextResponse.json({ error: "Error al leer el logo." }, { status });
   }
 }
 
@@ -55,7 +57,13 @@ export async function POST(req: Request) {
   const tenant = await getCurrentTenant(user);
   const prisma = getPrismaClient();
 
-  const formData = await req.formData();
+  let formData: FormData;
+  try {
+    formData = await req.formData();
+  } catch {
+    return NextResponse.json({ error: "Formulario inválido." }, { status: 400 });
+  }
+
   const file = formData.get("logo");
 
   if (!file || !(file instanceof File)) {
@@ -80,7 +88,7 @@ export async function POST(req: Request) {
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const detectedMime = detectMimeType(buffer);
-  if (!detectedMime || !ALLOWED_MIME_TYPES.has(detectedMime)) {
+  if (!detectedMime) {
     return NextResponse.json(
       { error: "El contenido del archivo no corresponde a un formato de imagen válido." },
       { status: 400 },
@@ -93,25 +101,48 @@ export async function POST(req: Request) {
   });
 
   if (existingSettings?.logoStorageKey) {
-    await deleteLogo(existingSettings.logoStorageKey).catch(() => {});
+    try {
+      await deleteLogo(existingSettings.logoStorageKey, tenant.id);
+    } catch {
+      // Old file cleanup is best-effort
+    }
   }
 
-  const storageKey = await saveLogo(tenant.id, file.name, buffer);
+  let storageKey: string;
+  try {
+    storageKey = await saveLogo(tenant.id, file.name, buffer);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    console.error(`[logo] POST saveLogo failed tenant=${tenant.id}: ${msg}`);
+    return NextResponse.json(
+      { error: "No se pudo guardar el logo." },
+      { status: 500 },
+    );
+  }
 
-  await prisma.businessSettings.upsert({
-    where: { tenantId: tenant.id },
-    create: {
-      tenantId: tenant.id,
-      logoStorageKey: storageKey,
-      logoFileName: file.name,
-      logoMimeType: detectedMime,
-    },
-    update: {
-      logoStorageKey: storageKey,
-      logoFileName: file.name,
-      logoMimeType: detectedMime,
-    },
-  });
+  try {
+    await prisma.businessSettings.upsert({
+      where: { tenantId: tenant.id },
+      create: {
+        tenantId: tenant.id,
+        logoStorageKey: storageKey,
+        logoFileName: file.name,
+        logoMimeType: detectedMime,
+      },
+      update: {
+        logoStorageKey: storageKey,
+        logoFileName: file.name,
+        logoMimeType: detectedMime,
+      },
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    console.error(`[logo] POST DB update failed tenant=${tenant.id}: ${msg}`);
+    return NextResponse.json(
+      { error: "No se pudo guardar el logo." },
+      { status: 500 },
+    );
+  }
 
   return NextResponse.json({
     success: true,
@@ -132,7 +163,12 @@ export async function DELETE() {
   });
 
   if (settings?.logoStorageKey) {
-    await deleteLogo(settings.logoStorageKey).catch(() => {});
+    try {
+      await deleteLogo(settings.logoStorageKey, tenant.id);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error desconocido";
+      console.error(`[logo] DELETE failed tenant=${tenant.id}: ${msg}`);
+    }
   }
 
   await prisma.businessSettings.upsert({

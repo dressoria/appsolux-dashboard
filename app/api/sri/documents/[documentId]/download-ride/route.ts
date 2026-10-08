@@ -78,7 +78,7 @@ export async function GET(_req: Request, { params }: Props) {
       select: { logoStorageKey: true, logoMimeType: true },
     });
     if (settings?.logoStorageKey) {
-      const logoBuffer = await readLogo(settings.logoStorageKey);
+      const logoBuffer = await readLogo(settings.logoStorageKey, tenant.id);
       logo = {
         bytes: new Uint8Array(logoBuffer),
         mimeType: settings.logoMimeType || "image/png",

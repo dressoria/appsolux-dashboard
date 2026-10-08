@@ -412,20 +412,31 @@ function ComprobantesTab({
     const form = new FormData();
     form.append("logo", file);
 
+    let res: Response;
     try {
-      const res = await fetch("/api/business-settings/logo", {
+      res = await fetch("/api/business-settings/logo", {
         method: "POST",
         body: form,
       });
+    } catch {
+      setLogoMessage("Error de conexión al subir logo.");
+      setLogoUploading(false);
+      return;
+    }
+
+    try {
       const result = await res.json();
       if (!res.ok) {
-        setLogoMessage(result.error || "Error al subir logo.");
+        setLogoMessage(result.error || "No se pudo guardar el logo.");
+        setLogoUploading(false);
         return;
       }
       setLogoPreview(`/api/business-settings/logo?t=${Date.now()}`);
       setLogoMessage("Logo actualizado correctamente.");
     } catch {
-      setLogoMessage("Error de conexión al subir logo.");
+      setLogoMessage(
+        res.ok ? "Logo actualizado correctamente." : "No se pudo guardar el logo.",
+      );
     } finally {
       setLogoUploading(false);
     }
