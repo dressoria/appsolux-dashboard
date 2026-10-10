@@ -38,7 +38,8 @@ type FeatureKey =
   | "dedicated_erp"
   | "erp_provisioning"
   | "admin_access"
-  | "beta_access";
+  | "beta_access"
+  | "ai_invoicing";
 type OverrideState = "default" | "enabled" | "disabled";
 
 type TenantBillingRow = {
@@ -188,6 +189,7 @@ const featureOptions: Array<{ key: FeatureKey; label: string }> = [
   { key: "erp_provisioning", label: "Provisioning ERP" },
   { key: "admin_access", label: "Admin access" },
   { key: "beta_access", label: "Beta access" },
+  { key: "ai_invoicing", label: "Facturacion con IA" },
 ];
 
 function toDateInput(value: string | Date | null | undefined) {

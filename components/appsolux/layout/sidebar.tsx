@@ -17,6 +17,7 @@ export type SidebarIconName =
   | "settings-2"
   | "shield-check"
   | "shopping-cart"
+  | "sparkles"
   | "users"
   | "wallet-cards";
 
@@ -54,9 +55,6 @@ const link = (
 export function buildSidebarNavigation(
   tenantMode: TenantModeState,
 ): NavGroup[] {
-  // The master navigation is intentionally independent from the technical engine.
-  void tenantMode;
-
   const access = getFacturomAccess();
   const groups: NavGroup[] = [
     {
@@ -89,6 +87,9 @@ export function buildSidebarNavigation(
             link("Documentos", routes.facturacionDocuments),
             link("Proformas", routes.facturacionSalesQuotations),
             link("Órdenes de venta", routes.facturacionSalesOrders),
+            ...(tenantMode.canAccessAiInvoicing
+              ? [link("Facturación con IA", routes.facturacionAi, "sparkles")]
+              : []),
           ],
         },
         {

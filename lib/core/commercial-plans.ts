@@ -23,6 +23,7 @@ export const allTenantFeatureKeys = [
   "erp_provisioning",
   "admin_access",
   "beta_access",
+  "ai_invoicing",
 ] as const satisfies readonly FeatureKey[];
 
 function buildFeatureMap(enabledKeys: readonly FeatureKey[]): TenantFeatureMap {

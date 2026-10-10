@@ -60,6 +60,7 @@ export type TenantModeState = {
   canAccessAdvancedReports: boolean;
   canAccessSriConfiguration: boolean;
   canAccessSriInvoicing: boolean;
+  canAccessAiInvoicing: boolean;
   canUseAdvancedErp: boolean;
 };
 
@@ -146,6 +147,7 @@ export async function getTenantModeState(tenant: AppsoluxTenant): Promise<Tenant
     canAccessAdvancedReports: effectiveAccess.features.advanced_reports,
     canAccessSriConfiguration: effectiveAccess.features.sri_configuration,
     canAccessSriInvoicing: effectiveAccess.features.sri_invoicing,
+    canAccessAiInvoicing: effectiveAccess.features.ai_invoicing,
   };
 
   return {

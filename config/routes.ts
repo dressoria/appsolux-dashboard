@@ -112,6 +112,7 @@ export const routes = {
   facturacionSettings: "/facturacion/settings",
   facturacionSettingsUsers: "/facturacion/settings/users",
   facturacionHistoryBasic: "/facturacion/history/basic",
+  facturacionAi: "/facturacion/ai",
 
   facturacionSettingsWarehouses: "/facturacion/settings/warehouses",
   facturacionSettingsCategories: "/facturacion/settings/categories",

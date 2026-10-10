@@ -22,6 +22,7 @@ import {
   Settings2,
   ShieldCheck,
   ShoppingCart,
+  Sparkles,
   Users,
   WalletCards,
   X,
@@ -66,6 +67,7 @@ const sidebarIcons: Record<SidebarIconName, LucideIcon> = {
   "settings-2": Settings2,
   "shield-check": ShieldCheck,
   "shopping-cart": ShoppingCart,
+  sparkles: Sparkles,
   users: Users,
   "wallet-cards": WalletCards,
 };

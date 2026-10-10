@@ -164,6 +164,7 @@ enum FeatureKey {
   erp_provisioning
   admin_access
   beta_access
+  ai_invoicing
 }
 
 enum FeatureSource {
@@ -336,6 +337,7 @@ model User {
   cashClosings                         CashClosing[]                @relation("CashClosingCreatedBy")
   tenantFeatureOverridesCreated        TenantFeatureOverride[]
   requestedBusinessSuiteActivationJobs BusinessSuiteActivationJob[] @relation("RequestedBusinessSuiteActivationJobs")
+  aiInvoiceDrafts                      AiInvoiceDraft[]
 }
 
 model Tenant {
@@ -388,6 +390,8 @@ model Tenant {
   erpProductPricings           ErpProductPricing[]
   quickInvoiceDrafts           QuickInvoiceDraft[]
   businessSettings             BusinessSettings?
+  aiInvoiceDrafts              AiInvoiceDraft[]
+  aiInvoiceProposals           AiInvoiceProposal[]
 }
 
 model Plan {
@@ -666,9 +670,10 @@ model LightweightCustomer {
   createdAt          DateTime                               @default(now())
   updatedAt          DateTime                               @updatedAt
 
-  tenant    Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  sales     LightweightSale[]
-  proformas LightweightProforma[]
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sales           LightweightSale[]
+  proformas       LightweightProforma[]
+  aiInvoiceDrafts AiInvoiceDraft[]
 
   @@unique([tenantId, identification])
   @@index([tenantId])
@@ -1455,4 +1460,64 @@ model BusinessSettings {
   updatedAt DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AI INVOICING
+// ══════════════════════════════════════════════════════════════════════════════
+
+enum AiInvoiceDraftStatus {
+  CREATED
+  PROPOSED
+  SELECTED
+  CONVERTED
+  DISCARDED
+}
+
+enum AiInvoiceTaxMode {
+  AUTO
+  IVA_0
+  IVA_15
+  MIXED
+}
+
+model AiInvoiceDraft {
+  id              String               @id @default(cuid())
+  tenantId        String
+  createdByUserId String
+  originalPrompt  String?
+  requestedAmount Decimal?             @db.Decimal(12, 2)
+  customerId      String?
+  taxMode         AiInvoiceTaxMode
+  status          AiInvoiceDraftStatus @default(CREATED)
+  selectedProposalId String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User                @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  customer  LightweightCustomer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  proposals AiInvoiceProposal[]
+
+  @@index([tenantId])
+  @@index([createdByUserId])
+}
+
+model AiInvoiceProposal {
+  id             String  @id @default(cuid())
+  tenantId       String
+  draftId        String
+  proposalNumber Int
+  subtotal       Decimal @db.Decimal(12, 2)
+  taxTotal       Decimal @db.Decimal(12, 2)
+  total          Decimal @db.Decimal(12, 2)
+  items          Json
+  combinationHash String?
+  createdAt      DateTime @default(now())
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  draft  AiInvoiceDraft  @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([draftId])
 }
