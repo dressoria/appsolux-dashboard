@@ -1,5 +1,5 @@
-import PaymentsPage from "@/app/pos/payments/page";
+import { redirect } from "next/navigation";
 
-export default function FacturacionTreasuryPaymentsPage() {
-  return <PaymentsPage />;
+export default function Page() {
+  redirect("/facturacion/treasury/portfolio/payables");
 }

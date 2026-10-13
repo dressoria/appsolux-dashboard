@@ -427,6 +427,7 @@ export const SRI_DOCUMENT_TYPE_LABELS: Record<string, string> = {
   DEBIT_NOTE: "Nota de debito",
   WITHHOLDING: "Retencion",
   REFERRAL_GUIDE: "Guia de remision",
+  PURCHASE_SETTLEMENT: "Liquidacion de compra",
 };
 
 export const SRI_DOCUMENT_STATUS_LABELS: Record<string, string> = {
@@ -444,6 +445,8 @@ export const SRI_DOCUMENT_SOURCE_LABELS: Record<string, string> = {
   BASIC_SALE: "Venta basica (POS)",
   ERP_SALES_INVOICE: "Venta ERP",
   MANUAL: "Manual",
+  PURCHASE_WITHHOLDING: "Retencion de compra",
+  PURCHASE_SETTLEMENT: "Liquidacion de compra",
 };
 
 export async function getSriDocuments(

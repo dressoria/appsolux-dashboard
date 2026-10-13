@@ -4,9 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SriConfigurationSection } from "@/components/appsolux/sri-tax/configuration-section";
 import { Label } from "@/components/ui/label";
 
-type ConfigTabId = "sistema" | "comprobantes" | "firma" | "accesos";
+type ConfigTabId = "sistema" | "comprobantes" | "sri" | "accesos";
 
 type Settings = Record<string, unknown> & {
   id?: string;
@@ -18,7 +19,7 @@ type Settings = Record<string, unknown> & {
 const TABS: Array<{ id: ConfigTabId; label: string }> = [
   { id: "sistema", label: "Sistema" },
   { id: "comprobantes", label: "Comprobantes" },
-  { id: "firma", label: "Firma electrónica" },
+  { id: "sri", label: "SRI" },
   { id: "accesos", label: "Accesos directos" },
 ];
 
@@ -620,35 +621,6 @@ function ComprobantesTab({
   );
 }
 
-function FirmaTab() {
-  return (
-    <SectionCard
-      title="Firma electrónica"
-      description="Gestiona tu certificado digital para la emisión de comprobantes electrónicos."
-    >
-      <div className="space-y-3">
-        <p className="text-sm text-muted-foreground">
-          La configuración de firma electrónica se gestiona desde la sección SRI
-          del menú lateral. Accede a{" "}
-          <a
-            href="/facturacion/sri/signature"
-            className="font-medium text-blue-600 hover:underline"
-          >
-            SRI → Firma electrónica
-          </a>{" "}
-          para ver el estado del certificado, cargarlo o reemplazarlo.
-        </p>
-        <a
-          href="/facturacion/sri/signature"
-          className="inline-flex h-9 items-center rounded-lg border bg-white px-4 text-sm font-medium transition-colors hover:bg-slate-50"
-        >
-          Ir a Firma electrónica
-        </a>
-      </div>
-    </SectionCard>
-  );
-}
-
 function AccesosTab() {
   return (
     <SectionCard title="Accesos directos">
@@ -758,7 +730,7 @@ export function ConfigurationPageClient() {
         <ComprobantesTab settings={settings} onUpdate={handleUpdate} saving={saving} />
       )}
 
-      {activeTab === "firma" && <FirmaTab />}
+      {activeTab === "sri" && <SriConfigurationSection />}
 
       {activeTab === "accesos" && <AccesosTab />}
     </div>

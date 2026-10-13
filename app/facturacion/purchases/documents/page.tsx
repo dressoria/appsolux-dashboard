@@ -1,5 +1,13 @@
-import ErpPurchasesDocumentsPage from "@/app/erp/purchases/documents/page";
+import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
+import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
+import { PurchaseDocumentsClient } from "./purchase-documents-client";
 
 export default async function FacturacionPurchasesDocumentsPage() {
-  return <ErpPurchasesDocumentsPage />;
+  await requireDashboardSession();
+
+  return (
+    <DashboardShell mainClassName="px-4 py-6 sm:px-6 sm:py-8" contentClassName="mx-auto max-w-7xl">
+      <PurchaseDocumentsClient />
+    </DashboardShell>
+  );
 }

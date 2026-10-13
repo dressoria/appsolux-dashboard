@@ -39,6 +39,8 @@ export async function POST(request: Request, context: RouteContext) {
       typeof body.amount === "number" ? body.amount : Number(body.amount ?? 0);
     const sale = await addSalePayment({
       tenantId: tenant.id,
+      createdByUserId: user.id,
+      treasuryAccountId: typeof body.treasuryAccountId === "string" ? body.treasuryAccountId : undefined,
       saleId,
       method,
       amount,

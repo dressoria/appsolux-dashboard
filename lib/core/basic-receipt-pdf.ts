@@ -22,9 +22,13 @@ type ReceiptPdfPayment = {
 
 export type ReceiptPdfData = {
   tenantName: string;
+  tenantRuc?: string;
+  tenantAddress?: string;
+  tenantPhone?: string;
   saleId: string;
   createdAt: Date;
   customerName: string;
+  customerIdentification?: string;
   status: string;
   paymentStatus: string;
   subtotal: number;
@@ -149,7 +153,20 @@ export async function generateBasicReceiptPdf(data: ReceiptPdfData): Promise<Buf
   drawText(page, H, data.tenantName, ML, Y, 18, fontB, C.blue, UW);
   Y += 24;
 
-  drawText(page, H, "Recibo interno", ML, Y, 11, fontB, C.text);
+  if (data.tenantRuc) {
+    drawText(page, H, `RUC: ${data.tenantRuc}`, ML, Y, 8.5, fontR, C.muted);
+    Y += 11;
+  }
+  if (data.tenantAddress) {
+    drawText(page, H, data.tenantAddress, ML, Y, 8.5, fontR, C.muted, UW);
+    Y += 11;
+  }
+  if (data.tenantPhone) {
+    drawText(page, H, `Tel: ${data.tenantPhone}`, ML, Y, 8.5, fontR, C.muted);
+    Y += 11;
+  }
+
+  drawText(page, H, "RECIBO DE VENTA", ML, Y, 11, fontB, C.text);
   Y += 14;
   drawText(page, H, `Recibo #${shortId}`, ML, Y, 8.5, fontR, C.muted);
   Y += 11;
@@ -167,6 +184,9 @@ export async function generateBasicReceiptPdf(data: ReceiptPdfData): Promise<Buf
 
   drawText(page, H, "Cliente", ML + 12, Y + 10, 8, fontB, C.blue);
   drawText(page, H, data.customerName, ML + 12, Y + 22, 9, fontR, C.text, half - 16);
+  if (data.customerIdentification) {
+    drawText(page, H, data.customerIdentification, ML + 12, Y + 34, 7.5, fontR, C.muted, half - 16);
+  }
 
   drawText(page, H, "Estado", ML + half + 12, Y + 10, 8, fontB, C.blue);
   drawText(page, H, `${data.status} · ${data.paymentStatus}`, ML + half + 12, Y + 22, 8.5, fontR, C.text, half - 16);
@@ -260,7 +280,7 @@ export async function generateBasicReceiptPdf(data: ReceiptPdfData): Promise<Buf
   // ── Footer note ──
 
   drawLine(page, H, ML, ML + UW, H - 42, C.border);
-  drawText(page, H, "Recibo interno generado por Appsolux. No corresponde a un comprobante tributario SRI.",
+  drawText(page, H, "Documento interno — no constituye comprobante electrónico autorizado por el SRI",
     ML, H - 36, 7, fontR, C.muted, UW);
 
   const pdfBytes = await pdfDoc.save();

@@ -29,9 +29,13 @@ export async function GET(_request: Request, { params }: Props) {
   try {
     pdfBuffer = await generateBasicReceiptPdf({
       tenantName: sale.tenant.name,
+      tenantRuc: sale.tenant.taxIdentificationValue ?? undefined,
+      tenantAddress: sale.tenant.address ?? undefined,
+      tenantPhone: sale.tenant.phone ?? undefined,
       saleId: sale.id,
       createdAt: sale.createdAt,
       customerName: sale.customer?.name ?? "Consumidor final",
+      customerIdentification: sale.customer?.identification ?? undefined,
       status: sale.status,
       paymentStatus: sale.paymentStatus,
       subtotal: Number(sale.subtotal),

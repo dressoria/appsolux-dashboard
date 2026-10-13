@@ -44,6 +44,7 @@ export function getSriDocumentCode(documentType: string): string {
     DEBIT_NOTE: "05",
     WITHHOLDING: "07",
     REFERRAL_GUIDE: "06",
+    PURCHASE_SETTLEMENT: "03",
   };
   const code = codes[documentType];
   if (!code) throw new Error(`Tipo de documento SRI no soportado: ${documentType}`);

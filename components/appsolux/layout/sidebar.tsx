@@ -1,3 +1,5 @@
+import { TREASURY_NAVIGATION } from "@/config/treasury-navigation";
+import { SRI_TAX_NAVIGATION } from "@/config/sri-tax-navigation";
 import { routes } from "@/config/routes";
 import { getFacturomAccess } from "@/lib/core/facturom-access";
 import type { TenantModeState } from "@/lib/core/tenant-mode";
@@ -87,6 +89,8 @@ export function buildSidebarNavigation(
             link("Documentos", routes.facturacionDocuments),
             link("Proformas", routes.facturacionSalesQuotations),
             link("Órdenes de venta", routes.facturacionSalesOrders),
+            link("Recibos", routes.facturacionReceipts),
+            link("Importar ventas", routes.facturacionSalesImports),
             ...(tenantMode.canAccessAiInvoicing
               ? [link("Facturación con IA", routes.facturacionAi, "sparkles")]
               : []),
@@ -96,9 +100,14 @@ export function buildSidebarNavigation(
           kind: "submenu",
           title: "Compras",
           items: [
-            link("Registrar compra", routes.facturacionPurchases),
-            link("Documentos de compra", routes.facturacionPurchasesDocuments),
+            link("Documentos", routes.facturacionPurchasesDocuments),
+            link("Registrar compra", routes.facturacionPurchasesNew),
             link("Recepciones", routes.facturacionPurchasesReceived),
+            link("Retenciones", routes.facturacionPurchasesWithholdings),
+            link("Liquidaciones", routes.facturacionPurchasesSettlements),
+            link("Bandeja de compras", routes.facturacionPurchasesInbox),
+            link("Descarga automática SRI", routes.facturacionPurchasesAutoDownload),
+            link("Proveedores", routes.facturacionPurchasesSuppliers),
           ],
         },
       ],
@@ -107,34 +116,17 @@ export function buildSidebarNavigation(
       key: "sri",
       title: "SRI",
       icon: "receipt",
-      items: [
-        link(
-          "Comprobantes electrónicos",
-          routes.facturacionDocuments,
-          "file-check",
-        ),
-        link("Configuración SRI", routes.facturacionSri, "settings-2", true),
-        link(
-          "Firma electrónica",
-          routes.facturacionSriSignature,
-          "shield-check",
-        ),
-        link("Secuenciales", routes.facturacionSriSequences),
-        link("Establecimientos", routes.facturacionSriEstablishments),
-        link("Puntos de emisión", routes.facturacionSriIssuePoints),
-      ],
+      items: SRI_TAX_NAVIGATION.map((item) => link(item.title, item.href, "file-check", true)),
     },
     {
       key: "treasury",
       title: "Tesorería",
       icon: "wallet-cards",
-      items: [
-        link("Caja", routes.facturacionCash, "credit-card"),
-        link("Cobros", routes.facturacionTreasuryCollections),
-        link("Pagos", routes.facturacionTreasuryPayments),
-        link("Cuentas por cobrar", routes.facturacionTreasuryReceivables),
-        link("Cuentas por pagar", routes.facturacionTreasuryPayables),
-      ],
+      items: TREASURY_NAVIGATION.map((group) => ({
+        kind: "submenu",
+        title: group.title,
+        items: group.items.map((item) => link(item.title, item.href)),
+      })),
     },
     {
       key: "inventory",

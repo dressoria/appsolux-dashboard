@@ -1,0 +1,90 @@
+// Verified against the SRI guide linked on formularios-e-instructivos,
+// updated 2026-06-15. Only these classifications are implemented in this phase.
+// An accounting category or an IVA rate alone is not a fiscal classification.
+export const IVA_CLASSIFICATIONS = {
+  SALE_LOCAL_TAXED: {
+    direction: "SALE",
+    label: "Venta local gravada, excluye activos fijos",
+    codes: ["401", "411", "421"],
+    tax: "POSITIVE",
+    credit: false,
+  },
+  SALE_FIXED_TAXED: {
+    direction: "SALE",
+    label: "Venta de activos fijos gravada",
+    codes: ["402", "412", "422"],
+    tax: "POSITIVE",
+    credit: false,
+  },
+  SALE_ZERO_NO_CREDIT: {
+    direction: "SALE",
+    label: "Venta local 0% sin derecho a crédito",
+    codes: ["403", "413"],
+    tax: "ZERO",
+    credit: false,
+  },
+  SALE_ZERO_CREDIT: {
+    direction: "SALE",
+    label: "Venta local 0% con derecho a crédito",
+    codes: ["405", "415"],
+    tax: "ZERO",
+    credit: false,
+  },
+  SALE_EXPORT_GOODS: {
+    direction: "SALE",
+    label: "Exportación de bienes",
+    codes: ["407", "417"],
+    tax: "ZERO",
+    credit: false,
+  },
+  SALE_EXPORT_SERVICES: {
+    direction: "SALE",
+    label: "Exportación de servicios o derechos",
+    codes: ["408", "418"],
+    tax: "ZERO",
+    credit: false,
+  },
+  PURCHASE_LOCAL_CREDIT: {
+    direction: "PURCHASE",
+    label: "Compra local gravada con derecho a crédito, excluye activos fijos",
+    codes: ["500", "510", "520"],
+    tax: "POSITIVE",
+    credit: true,
+  },
+  PURCHASE_FIXED_CREDIT: {
+    direction: "PURCHASE",
+    label: "Activo fijo gravado con derecho a crédito",
+    codes: ["501", "511", "521"],
+    tax: "POSITIVE",
+    credit: true,
+  },
+  PURCHASE_NO_CREDIT: {
+    direction: "PURCHASE",
+    label: "Compra gravada sin derecho a crédito",
+    codes: ["502", "512", "522"],
+    tax: "POSITIVE",
+    credit: false,
+  },
+  PURCHASE_ZERO: {
+    direction: "PURCHASE",
+    label: "Compra 0%, incluye activos fijos",
+    codes: ["507", "517"],
+    tax: "ZERO",
+    credit: false,
+  },
+  PURCHASE_NON_SUBJECT: {
+    direction: "PURCHASE",
+    label: "Compra no objeto de IVA",
+    codes: ["531", "541"],
+    tax: "ZERO",
+    credit: false,
+  },
+  PURCHASE_EXEMPT: {
+    direction: "PURCHASE",
+    label: "Compra exenta de IVA",
+    codes: ["532", "542"],
+    tax: "ZERO",
+    credit: false,
+  },
+} as const;
+export type IvaClassification = keyof typeof IVA_CLASSIFICATIONS;

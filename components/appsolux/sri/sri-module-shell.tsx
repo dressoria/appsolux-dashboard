@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { SRI_CONFIGURATION_NAVIGATION } from "@/config/sri-tax-navigation";
+
 type SriModuleShellProps = {
   title: string;
   description: string;
@@ -12,6 +15,7 @@ type SriModuleShellProps = {
 
 export function SriModuleShell({
   description,
+  activeHref,
   children,
   action,
   appName = "Configuración SRI",
@@ -32,6 +36,10 @@ export function SriModuleShell({
           )}
         </div>
       </div>
+      <nav aria-label="Configuración SRI" className="flex flex-wrap gap-3 border-b bg-white px-4 py-3 text-sm sm:px-6 lg:px-8">
+        <Link href="/facturacion/configuration" className="font-medium text-blue-600">Empresa → Configuración</Link>
+        {SRI_CONFIGURATION_NAVIGATION.map((item) => <Link key={item.href} href={item.href} aria-current={item.href === activeHref ? "page" : undefined} className="text-slate-600 hover:text-blue-600">{item.title}</Link>)}
+      </nav>
       <main className="flex-1 overflow-auto bg-facturom-bg p-4 sm:p-6 lg:p-8">
         <div className="mx-auto max-w-6xl">{children}</div>
       </main>

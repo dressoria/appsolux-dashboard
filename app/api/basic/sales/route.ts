@@ -98,6 +98,8 @@ export async function POST(request: Request) {
 
     const sale = await createSale({
       tenantId: tenant.id,
+      createdByUserId: user.id,
+      treasuryAccountId: typeof body.treasuryAccountId === "string" ? body.treasuryAccountId : undefined,
       customerId:
         typeof body.customerId === "string" && body.customerId
           ? body.customerId

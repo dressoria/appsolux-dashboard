@@ -39,7 +39,8 @@ type FeatureKey =
   | "erp_provisioning"
   | "admin_access"
   | "beta_access"
-  | "ai_invoicing";
+  | "ai_invoicing"
+  | "purchase_sri_sync";
 type OverrideState = "default" | "enabled" | "disabled";
 
 type TenantBillingRow = {

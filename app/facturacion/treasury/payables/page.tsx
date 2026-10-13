@@ -1,5 +1,5 @@
-import PayablesPage from "@/app/erp/finance/payables/page";
+import { redirect } from "next/navigation";
 
-export default function FacturacionTreasuryPayablesPage() {
-  return <PayablesPage />;
+export default function Page() {
+  redirect("/facturacion/treasury/portfolio/payables");
 }

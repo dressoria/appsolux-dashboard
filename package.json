@@ -16,6 +16,8 @@
     "test:proformas": "tsx --test lib/core/lightweight-proformas.test.ts lib/core/pos-checkout.test.ts",
     "test:sri-documents": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/sri-documents.test.ts",
     "test:ai-invoicing": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/ai-invoice-proposal-engine.test.ts",
+    "test:receipts-imports": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/receipts-and-imports.test.ts",
+    "test:purchases": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/purchases-module.test.ts",
     "sri:import-taxpayers": "tsx scripts/sri-import-taxpayers.ts",
     "sri:update-taxpayers": "tsx scripts/sri-import-taxpayers.ts --update",
     "sri:backfill-taxpayer-profiles": "tsx scripts/sri-backfill-taxpayer-profiles.ts",
@@ -27,7 +29,9 @@
     "maintenance:business-suite-migration": "node scripts/maintenance/business-suite-migration.mjs",
     "maintenance:upgrade-core-to-business-suite": "node scripts/maintenance/upgrade-core-to-business-suite.mjs",
     "maintenance:mark-vitabell-erp-real": "node scripts/maintenance/mark-vitabell-erp-real.mjs",
-    "maintenance:ensure-plans": "node scripts/maintenance/ensure-plans.mjs"
+    "maintenance:ensure-plans": "node scripts/maintenance/ensure-plans.mjs",
+    "test:sri-tax": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/sri-tax/*.test.ts",
+    "test:treasury": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/treasury/treasury.test.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.5.6",

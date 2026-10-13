@@ -165,6 +165,7 @@ enum FeatureKey {
   admin_access
   beta_access
   ai_invoicing
+  purchase_sri_sync
 }
 
 enum FeatureSource {
@@ -233,6 +234,110 @@ enum LightweightPaymentMethod {
 enum LightweightStockMovementType {
   sale
   adjustment
+  purchase_receipt
+}
+
+enum LightweightSaleOrigin {
+  NORMAL
+  POS
+  IMPORT
+}
+
+enum SalesImportBatchStatus {
+  UPLOADED
+  VALIDATED
+  PROCESSING
+  COMPLETED
+  PARTIAL
+  FAILED
+}
+
+enum PurchaseDocumentType {
+  INVOICE
+  CREDIT_NOTE
+  DEBIT_NOTE
+  PURCHASE_SETTLEMENT
+  OTHER
+}
+
+enum PurchaseDocumentOrigin {
+  MANUAL
+  XML_IMPORT
+  SRI_SYNC
+}
+
+enum PurchaseDocumentStatus {
+  DRAFT
+  REGISTERED
+  AUTHORIZED
+  CANCELLED
+  REJECTED
+  NEEDS_REVIEW
+}
+
+enum PurchaseReceiptStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+enum PurchaseInboxStatus {
+  NEW
+  CLASSIFIED
+  NEEDS_REVIEW
+  REGISTERED
+  IGNORED
+}
+
+enum PurchaseSriSyncStatus {
+  DISABLED
+  PENDING_SETUP
+  ACTIVE
+  ERROR
+}
+
+enum DeductibilityStatus {
+  UNREVIEWED
+  LIKELY_DEDUCTIBLE
+  LIKELY_NON_DEDUCTIBLE
+  REVIEW_REQUIRED
+  CONFIRMED_DEDUCTIBLE
+  CONFIRMED_NON_DEDUCTIBLE
+}
+
+enum WithholdingTaxType {
+  RENTA
+  IVA
+}
+
+enum PurchaseSriCredentialStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  INVALID
+  HUMAN_VERIFICATION_REQUIRED
+  ERROR
+}
+
+enum PurchaseSriSyncJobType {
+  VERIFY_CONNECTION
+  SYNC_RECEIVED_DOCUMENTS
+}
+
+enum PurchaseSriSyncJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+  CANCELLED
+  HUMAN_VERIFICATION_REQUIRED
+}
+
+enum PurchaseSriSyncTrigger {
+  ACTIVATION
+  MANUAL
+  SCHEDULED
+  RETRY
 }
 
 enum LightweightProformaStatus {
@@ -263,12 +368,15 @@ enum SriDocumentType {
   DEBIT_NOTE
   WITHHOLDING
   REFERRAL_GUIDE
+  PURCHASE_SETTLEMENT
 }
 
 enum SriDocumentSourceType {
   BASIC_SALE
   ERP_SALES_INVOICE
   MANUAL
+  PURCHASE_WITHHOLDING
+  PURCHASE_SETTLEMENT
 }
 
 enum SriDocumentStatus {
@@ -338,6 +446,10 @@ model User {
   tenantFeatureOverridesCreated        TenantFeatureOverride[]
   requestedBusinessSuiteActivationJobs BusinessSuiteActivationJob[] @relation("RequestedBusinessSuiteActivationJobs")
   aiInvoiceDrafts                      AiInvoiceDraft[]
+  salesImportBatches                   SalesImportBatch[]
+  purchaseDocumentsCreated             PurchaseDocument[]   @relation("PurchaseDocumentsCreatedBy")
+  purchaseReceiptsCreated              PurchaseReceipt[]    @relation("PurchaseReceiptsCreatedBy")
+  purchaseSyncJobsRequested            PurchaseSriSyncJob[] @relation("PurchaseSyncJobsRequestedBy")
 }
 
 model Tenant {
@@ -392,6 +504,20 @@ model Tenant {
   businessSettings             BusinessSettings?
   aiInvoiceDrafts              AiInvoiceDraft[]
   aiInvoiceProposals           AiInvoiceProposal[]
+  salesImportBatches           SalesImportBatch[]
+  purchaseDocuments            PurchaseDocument[]
+  purchaseReceipts             PurchaseReceipt[]
+  purchaseAccountingCategories PurchaseAccountingCategory[]
+  purchaseClassificationRules  PurchaseClassificationRule[]
+  purchaseInboxItems           PurchaseInboxItem[]
+  purchaseSriSyncConfig        PurchaseSriSyncConfig?
+  purchaseSriCredential        PurchaseSriCredential?
+  purchaseSriSyncJobs          PurchaseSriSyncJob[]
+  purchaseSriSyncRuns          PurchaseSriSyncRun[]
+  treasuryAccounts TreasuryAccount[]
+  treasuryObligations TreasuryObligation[]
+  postdatedChecks PostdatedCheck[]
+
 }
 
 model Plan {
@@ -594,6 +720,8 @@ model LightweightProduct {
   category       LightweightProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   comboItems     LightweightComboItem[]      @relation("ComboProduct")
   componentOf    LightweightComboItem[]      @relation("ComboComponent")
+  purchaseDocumentItems PurchaseDocumentItem[]
+  purchaseReceiptItems  PurchaseReceiptItem[]
 
   @@unique([tenantId, primaryCode])
   @@unique([tenantId, barcode])
@@ -679,6 +807,11 @@ model LightweightCustomer {
   @@index([tenantId])
   @@index([tenantId, name])
   @@index([tenantId, isActive])
+  treasuryObligations TreasuryObligation[]
+  treasuryAdvances TreasuryAdvance[]
+  treasuryChecks PostdatedCheck[]
+  @@unique([id,tenantId])
+
 }
 
 model SriTaxpayerRecord {
@@ -771,36 +904,55 @@ model LightweightSupplier {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  purchaseDocuments PurchaseDocument[]
+  purchaseReceipts  PurchaseReceipt[]
+
   @@unique([tenantId, identification])
   @@index([tenantId])
   @@index([tenantId, name])
   @@index([tenantId, isActive])
+  treasuryObligations TreasuryObligation[]
+  treasuryAdvances TreasuryAdvance[]
+  treasuryChecks PostdatedCheck[]
+  @@unique([id,tenantId])
+
 }
 
 model LightweightSale {
-  id             String                   @id @default(cuid())
-  tenantId       String
-  customerId     String?
-  status         LightweightSaleStatus    @default(paid)
-  subtotal       Decimal                  @default(0) @db.Decimal(12, 2)
-  taxTotal       Decimal                  @default(0) @db.Decimal(12, 2)
-  discountTotal  Decimal                  @default(0) @db.Decimal(12, 2)
-  total          Decimal                  @db.Decimal(12, 2)
-  paymentStatus  LightweightPaymentStatus @default(paid)
-  sriPaymentCode String?
-  notes          String?
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
+  id                String                   @id @default(cuid())
+  tenantId          String
+  customerId        String?
+  status            LightweightSaleStatus    @default(paid)
+  subtotal          Decimal                  @default(0) @db.Decimal(12, 2)
+  taxTotal          Decimal                  @default(0) @db.Decimal(12, 2)
+  discountTotal     Decimal                  @default(0) @db.Decimal(12, 2)
+  total             Decimal                  @db.Decimal(12, 2)
+  paymentStatus     LightweightPaymentStatus @default(paid)
+  sriPaymentCode    String?
+  notes             String?
+  origin            LightweightSaleOrigin    @default(NORMAL)
+  externalReference String?
+  originalIssuedAt  DateTime?
+  importBatchId     String?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
 
-  tenant   Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer LightweightCustomer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  items    LightweightSaleItem[]
-  payments LightweightPayment[]
+  tenant      Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer    LightweightCustomer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  items       LightweightSaleItem[]
+  payments    LightweightPayment[]
+  importBatch SalesImportBatch?     @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@index([tenantId, status])
+  @@index([tenantId, origin])
   @@index([customerId])
   @@index([createdAt])
+  @@index([importBatchId])
+  treasuryObligation TreasuryObligation?
+  treasuryCardTransactions CardTransaction[]
+  @@unique([id,tenantId])
+
 }
 
 model LightweightSaleItem {
@@ -833,6 +985,8 @@ model LightweightPayment {
 
   @@index([saleId])
   @@index([method])
+  treasuryMovement TreasuryMovement?
+
 }
 
 model LightweightStockMovement {
@@ -1034,13 +1188,13 @@ model CashClosing {
   cashAccountName        String?
   date                   DateTime
   closedAt               DateTime @default(now())
-  expectedCashAmount     Decimal  @default(0) @db.Decimal(12, 2)
-  expectedTransferAmount Decimal  @default(0) @db.Decimal(12, 2)
-  expectedCardAmount     Decimal  @default(0) @db.Decimal(12, 2)
-  expectedOtherAmount    Decimal  @default(0) @db.Decimal(12, 2)
-  expectedTotalAmount    Decimal  @default(0) @db.Decimal(12, 2)
-  countedCashAmount      Decimal  @default(0) @db.Decimal(12, 2)
-  differenceAmount       Decimal  @default(0) @db.Decimal(12, 2)
+  expectedCashAmount     Decimal  @default(0) @db.Decimal(14, 2)
+  expectedTransferAmount Decimal  @default(0) @db.Decimal(14, 2)
+  expectedCardAmount     Decimal  @default(0) @db.Decimal(14, 2)
+  expectedOtherAmount    Decimal  @default(0) @db.Decimal(14, 2)
+  expectedTotalAmount    Decimal  @default(0) @db.Decimal(14, 2)
+  countedCashAmount      Decimal  @default(0) @db.Decimal(14, 2)
+  differenceAmount       Decimal  @default(0) @db.Decimal(14, 2)
   notes                  String?
   status                 String   @default("closed")
   createdByUserId        String?
@@ -1053,6 +1207,8 @@ model CashClosing {
   @@index([tenantId, date])
   @@index([createdByUserId])
   @@index([status])
+  treasurySession CashSession?
+
 }
 
 model ErpProductPricing {
@@ -1259,9 +1415,10 @@ model SriDocument {
   tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   establishment  SriEstablishment   @relation(fields: [establishmentId], references: [id])
   issuePoint     SriIssuePoint      @relation(fields: [issuePointId], references: [id])
-  lines          SriDocumentLine[]
-  signingJobs    SriSigningJob[]
-  submissionJobs SriSubmissionJob[]
+  lines            SriDocumentLine[]
+  signingJobs      SriSigningJob[]
+  submissionJobs   SriSubmissionJob[]
+  withholdingLines SriWithholdingLine[]
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -1520,4 +1677,787 @@ model AiInvoiceProposal {
 
   @@index([tenantId])
   @@index([draftId])
+}
+
+model SalesImportBatch {
+  id              String                 @id @default(cuid())
+  tenantId        String
+  createdByUserId String
+  fileName        String
+  sourceType      String                 @default("xlsx")
+  status          SalesImportBatchStatus @default(UPLOADED)
+  totalRows       Int                    @default(0)
+  validRows       Int                    @default(0)
+  warningRows     Int                    @default(0)
+  errorRows       Int                    @default(0)
+  importedSales   Int                    @default(0)
+  totalAmount     Decimal                @default(0) @db.Decimal(12, 2)
+  createdAt       DateTime               @default(now())
+  completedAt     DateTime?
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User              @relation(fields: [createdByUserId], references: [id])
+  sales     LightweightSale[]
+
+  @@index([tenantId])
+  @@index([createdByUserId])
+  @@index([tenantId, status])
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PURCHASES MODULE
+// ══════════════════════════════════════════════════════════════════════════════
+
+model PurchaseDocument {
+  id                      String                 @id @default(cuid())
+  tenantId                String
+  supplierId              String?
+
+  documentType            PurchaseDocumentType   @default(INVOICE)
+  supplierDocumentNumber  String?
+  accessKey               String?
+  authorizationNumber     String?
+
+  issueDate               DateTime?
+  authorizationDate       DateTime?
+
+  subtotal0               Decimal                @default(0) @db.Decimal(12, 2)
+  subtotal15              Decimal                @default(0) @db.Decimal(12, 2)
+  subtotalNoTax           Decimal                @default(0) @db.Decimal(12, 2)
+  subtotalExempt          Decimal                @default(0) @db.Decimal(12, 2)
+
+  discountTotal           Decimal                @default(0) @db.Decimal(12, 2)
+  iceTotal                Decimal                @default(0) @db.Decimal(12, 2)
+  ivaTotal                Decimal                @default(0) @db.Decimal(12, 2)
+  total                   Decimal                @default(0) @db.Decimal(12, 2)
+
+  paymentMethod           String?
+  paymentTermDays         Int?
+  dueDate                 DateTime?
+
+  status                  PurchaseDocumentStatus @default(DRAFT)
+  origin                  PurchaseDocumentOrigin @default(MANUAL)
+
+  xmlPath                 String?
+  ridePath                String?
+
+  accountingCategoryId    String?
+  deductibilityStatus     DeductibilityStatus    @default(UNREVIEWED)
+  deductibilityReason     String?
+
+  supplierName            String?
+  supplierIdentification  String?
+
+  notes                   String?
+
+  createdByUserId         String
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+
+  tenant              Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier            LightweightSupplier?      @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  accountingCategory  PurchaseAccountingCategory? @relation(fields: [accountingCategoryId], references: [id], onDelete: SetNull)
+  createdBy           User                      @relation("PurchaseDocumentsCreatedBy", fields: [createdByUserId], references: [id])
+  items               PurchaseDocumentItem[]
+  payments            PurchasePayment[]
+  receipts            PurchaseReceipt[]
+  inboxItem           PurchaseInboxItem?
+
+  @@unique([tenantId, accessKey])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, documentType])
+  @@index([tenantId, origin])
+  @@index([tenantId, supplierId])
+  @@index([tenantId, issueDate])
+  @@index([createdByUserId])
+  treasuryObligation TreasuryObligation?
+  @@unique([id,tenantId])
+
+}
+
+model PurchaseDocumentItem {
+  id                 String   @id @default(cuid())
+  purchaseDocumentId String
+  productId          String?
+  description        String
+  quantity           Decimal  @db.Decimal(12, 4)
+  unitPrice          Decimal  @db.Decimal(12, 4)
+  discountAmount     Decimal  @default(0) @db.Decimal(12, 2)
+  subtotal           Decimal  @db.Decimal(12, 2)
+  taxRate            Decimal  @default(0) @db.Decimal(5, 2)
+  taxAmount          Decimal  @default(0) @db.Decimal(12, 2)
+  total              Decimal  @db.Decimal(12, 2)
+  createdAt          DateTime @default(now())
+
+  purchaseDocument PurchaseDocument     @relation(fields: [purchaseDocumentId], references: [id], onDelete: Cascade)
+  product          LightweightProduct?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([purchaseDocumentId])
+}
+
+model PurchasePayment {
+  id                 String   @id @default(cuid())
+  purchaseDocumentId String
+  method             String
+  amount             Decimal  @db.Decimal(12, 2)
+  paidAt             DateTime @default(now())
+  notes              String?
+  createdAt          DateTime @default(now())
+
+  purchaseDocument PurchaseDocument @relation(fields: [purchaseDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseDocumentId])
+  treasuryMovement TreasuryMovement?
+
+}
+
+model PurchaseReceipt {
+  id                 String                @id @default(cuid())
+  tenantId           String
+  purchaseDocumentId String?
+  supplierId         String?
+  warehouseId        String?
+  status             PurchaseReceiptStatus @default(DRAFT)
+  receivedAt         DateTime              @default(now())
+  notes              String?
+
+  createdByUserId    String
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  tenant           Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchaseDocument PurchaseDocument?      @relation(fields: [purchaseDocumentId], references: [id], onDelete: SetNull)
+  supplier         LightweightSupplier?   @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  createdBy        User                   @relation("PurchaseReceiptsCreatedBy", fields: [createdByUserId], references: [id])
+  items            PurchaseReceiptItem[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([purchaseDocumentId])
+}
+
+model PurchaseReceiptItem {
+  id                String   @id @default(cuid())
+  purchaseReceiptId String
+  productId         String
+  quantityExpected  Decimal  @default(0) @db.Decimal(12, 4)
+  quantityReceived  Decimal  @db.Decimal(12, 4)
+  createdAt         DateTime @default(now())
+
+  purchaseReceipt PurchaseReceipt    @relation(fields: [purchaseReceiptId], references: [id], onDelete: Cascade)
+  product         LightweightProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseReceiptId])
+}
+
+model PurchaseAccountingCategory {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  documents PurchaseDocument[]
+  rules     PurchaseClassificationRule[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model PurchaseClassificationRule {
+  id           String   @id @default(cuid())
+  tenantId     String
+  field        String
+  operator     String   @default("contains")
+  value        String
+  categoryId   String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant   Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category PurchaseAccountingCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+}
+
+model TaxWithholdingCode {
+  id          String   @id @default(cuid())
+  taxType     WithholdingTaxType
+  code        String
+  description String
+  percentage  Decimal  @db.Decimal(5, 2)
+  isActive    Boolean  @default(true)
+  validFrom   DateTime @default(now())
+  validTo     DateTime?
+  createdAt   DateTime @default(now())
+
+  withholdingLines SriWithholdingLine[]
+
+  @@unique([taxType, code])
+  @@index([taxType])
+  @@index([isActive])
+}
+
+model SriWithholdingLine {
+  id                       String              @id @default(cuid())
+  documentId               String
+  taxType                  WithholdingTaxType
+  withholdingCodeId        String?
+  code                     String
+  description              String?
+  taxBase                  Decimal             @db.Decimal(12, 2)
+  percentage               Decimal             @db.Decimal(5, 2)
+  retainedAmount           Decimal             @db.Decimal(12, 2)
+  purchaseDocumentNumber   String?
+  purchaseDocumentDate     DateTime?
+  createdAt                DateTime            @default(now())
+
+  document        SriDocument         @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  withholdingCode TaxWithholdingCode? @relation(fields: [withholdingCodeId], references: [id], onDelete: SetNull)
+
+  @@index([documentId])
+}
+
+model PurchaseInboxItem {
+  id                 String              @id @default(cuid())
+  tenantId           String
+  purchaseDocumentId String?             @unique
+  accessKey          String?
+  supplierName       String?
+  supplierRuc        String?
+  documentNumber     String?
+  documentType       String?
+  issueDate          DateTime?
+  subtotal           Decimal             @default(0) @db.Decimal(12, 2)
+  ivaTotal           Decimal             @default(0) @db.Decimal(12, 2)
+  total              Decimal             @default(0) @db.Decimal(12, 2)
+  suggestedCategory  String?
+  suggestedDeductibility DeductibilityStatus @default(UNREVIEWED)
+  status             PurchaseInboxStatus @default(NEW)
+  xmlStorageKey      String?
+  origin             PurchaseDocumentOrigin @default(XML_IMPORT)
+  processedAt        DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchaseDocument PurchaseDocument? @relation(fields: [purchaseDocumentId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, accessKey])
+}
+
+model PurchaseSriSyncConfig {
+  id                      String              @id @default(cuid())
+  tenantId                String              @unique
+  status                  PurchaseSriSyncStatus @default(DISABLED)
+  provider                String?
+  lastSyncAt              DateTime?
+  nextSyncAt              DateTime?
+  lastSuccessfulSyncAt    DateTime?
+  lastError               String?
+  autoClassify            Boolean             @default(false)
+  autoDetectDeductibility Boolean             @default(false)
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model PurchaseSriCredential {
+  id                    String                       @id @default(cuid())
+  tenantId              String                       @unique
+  username              String
+  additionalUserId      String?
+  encryptedPassword     String
+  encryptionIv          String
+  authTag               String
+  keyVersion            Int                          @default(1)
+  status                PurchaseSriCredentialStatus   @default(PENDING_VERIFICATION)
+  verifiedAt            DateTime?
+  lastVerificationAt    DateTime?
+  lastVerificationError String?
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model PurchaseSriSyncJob {
+  id                   String                    @id @default(cuid())
+  tenantId             String
+  type                 PurchaseSriSyncJobType
+  status               PurchaseSriSyncJobStatus  @default(QUEUED)
+  requestedByUserId    String?
+  trigger              PurchaseSriSyncTrigger    @default(MANUAL)
+  dateFrom             DateTime?
+  dateTo               DateTime?
+  attemptCount         Int                       @default(0)
+  maxAttempts          Int                       @default(3)
+  lockedAt             DateTime?
+  lockedBy             String?
+  startedAt            DateTime?
+  finishedAt           DateTime?
+  documentsFound       Int                       @default(0)
+  documentsDownloaded  Int                       @default(0)
+  documentsImported    Int                       @default(0)
+  documentsSkipped     Int                       @default(0)
+  documentsFailed      Int                       @default(0)
+  errorCode            String?
+  errorMessage         String?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+
+  tenant      Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedBy User?                 @relation("PurchaseSyncJobsRequestedBy", fields: [requestedByUserId], references: [id])
+  runs        PurchaseSriSyncRun[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([tenantId, status])
+  @@index([lockedAt])
+}
+
+model PurchaseSriSyncRun {
+  id                         String                    @id @default(cuid())
+  tenantId                   String
+  jobId                      String
+  workerId                   String?
+  attemptNumber              Int                       @default(1)
+  startedAt                  DateTime                  @default(now())
+  finishedAt                 DateTime?
+  status                     PurchaseSriSyncJobStatus  @default(RUNNING)
+  loginSucceeded             Boolean?
+  humanVerificationDetected  Boolean                   @default(false)
+  documentsFound             Int                       @default(0)
+  documentsDownloaded        Int                       @default(0)
+  documentsImported          Int                       @default(0)
+  documentsSkipped           Int                       @default(0)
+  documentsFailed            Int                       @default(0)
+  errorCode                  String?
+  errorMessage               String?
+  createdAt                  DateTime                  @default(now())
+
+  tenant Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  job    PurchaseSriSyncJob   @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([jobId])
+}
+
+// Facturom Treasury Core — additive; historical payments remain the source of payments.
+enum TreasuryAccountType {
+  CASH
+  BANK
+  CARD
+}
+
+enum TreasuryMovementDirection {
+  IN
+  OUT
+}
+
+enum TreasuryMovementType {
+  OPENING_BALANCE
+  SALE_COLLECTION
+  PURCHASE_PAYMENT
+  CASH_IN
+  CASH_OUT
+  BANK_DEPOSIT
+  BANK_WITHDRAWAL
+  BANK_TRANSFER
+  CUSTOMER_ADVANCE
+  SUPPLIER_ADVANCE
+  CARD_COLLECTION
+  CARD_FEE
+  CARD_SETTLEMENT
+  CHECK_RECEIVED
+  CHECK_DEPOSIT
+  CHECK_CLEARED
+  CHECK_BOUNCED
+  ADJUSTMENT
+  OTHER
+}
+
+enum TreasuryMovementStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  RECONCILED
+}
+
+enum TreasurySourceType {
+  MANUAL
+  SALE_PAYMENT
+  PURCHASE_PAYMENT
+  OBLIGATION
+  TRANSFER
+  ADVANCE
+  CARD
+  CHECK
+  REVERSAL
+}
+
+enum CashSessionStatus {
+  OPEN
+  CLOSED
+  CANCELLED
+}
+
+enum TreasuryObligationType {
+  RECEIVABLE
+  PAYABLE
+}
+
+enum TreasuryObligationStatus {
+  OPEN
+  PARTIAL
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum TreasuryAdvanceType {
+  CUSTOMER
+  SUPPLIER
+}
+
+enum TreasuryAdvanceStatus {
+  AVAILABLE
+  PARTIALLY_APPLIED
+  APPLIED
+  CANCELLED
+}
+
+enum PostdatedCheckStatus {
+  PENDING
+  READY_TO_DEPOSIT
+  DEPOSITED
+  CLEARED
+  BOUNCED
+  CANCELLED
+  DELIVERED
+}
+
+enum BankAccountType {
+  CHECKING
+  SAVINGS
+  OTHER
+}
+
+enum BankReconciliationStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum BankStatementLineStatus {
+  UNMATCHED
+  MATCHED
+}
+
+enum CardTransactionStatus {
+  PENDING
+  SETTLED
+  REVERSED
+  DISPUTED
+  CANCELLED
+}
+
+model TreasuryAccount {
+  id                      String               @id @default(cuid())
+  tenantId                String
+  type                    TreasuryAccountType
+  name                    String
+  code                    String?
+  active                  Boolean              @default(true)
+  currency                String               @default("USD")
+  defaultAccount          Boolean              @default(false)
+  openingBalance          Decimal              @default(0) @db.Decimal(14, 2)
+  openingDate             DateTime             @default(now())
+  responsibleName         String?
+  bankName                String?
+  accountName             String?
+  accountNumberMasked     String?
+  bankAccountType         BankAccountType?
+  provider                String?
+  settlementBankAccountId String?
+  feePercentage           Decimal              @default(0) @db.Decimal(7, 4)
+  fixedFee                Decimal              @default(0) @db.Decimal(14, 2)
+  settlementDays          Int                  @default(2)
+  createdByUserId         String
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  tenant                  Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  settlementBank          TreasuryAccount?     @relation("SettlementBank", fields: [settlementBankAccountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  cardChannels            TreasuryAccount[]    @relation("SettlementBank")
+  movements               TreasuryMovement[]
+  sessions                CashSession[]
+  reconciliations         BankReconciliation[]
+  statementLines          BankStatementLine[]
+  advances                TreasuryAdvance[]
+  cardTransactions        CardTransaction[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, code])
+  @@index([tenantId, type, active])
+}
+
+model CashSession {
+  id                    String             @id @default(cuid())
+  tenantId              String
+  cashAccountId         String
+  openedByUserId        String
+  closedByUserId        String?
+  openedAt              DateTime           @default(now())
+  closedAt              DateTime?
+  openingAmount         Decimal            @db.Decimal(14, 2)
+  expectedClosingAmount Decimal?           @db.Decimal(14, 2)
+  countedClosingAmount  Decimal?           @db.Decimal(14, 2)
+  differenceAmount      Decimal?           @db.Decimal(14, 2)
+  status                CashSessionStatus  @default(OPEN)
+  notes                 String?
+  cashClosingId         String?            @unique
+  cashAccount           TreasuryAccount    @relation(fields: [cashAccountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  cashClosing           CashClosing?       @relation(fields: [cashClosingId], references: [id], onDelete: Restrict)
+  movements             TreasuryMovement[]
+
+  @@unique([id, tenantId])
+  @@index([tenantId, cashAccountId, status])
+}
+
+model TreasuryObligation {
+  id                 String                   @id @default(cuid())
+  tenantId           String
+  type               TreasuryObligationType
+  customerId         String?
+  supplierId         String?
+  saleId             String?                  @unique
+  purchaseDocumentId String?                  @unique
+  documentType       String                   @default("OPENING_OBLIGATION")
+  documentNumber     String?
+  issueDate          DateTime
+  dueDate            DateTime
+  originalAmount     Decimal                  @db.Decimal(14, 2)
+  paidAmount         Decimal                  @default(0) @db.Decimal(14, 2)
+  balance            Decimal                  @db.Decimal(14, 2)
+  status             TreasuryObligationStatus @default(OPEN)
+  externalReference  String
+  importBatchId      String?
+  notes              String?
+  createdByUserId    String
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  tenant             Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  customer           LightweightCustomer?     @relation(fields: [customerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  supplier           LightweightSupplier?     @relation(fields: [supplierId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  sale               LightweightSale?         @relation(fields: [saleId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  purchaseDocument   PurchaseDocument?        @relation(fields: [purchaseDocumentId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  movements          TreasuryMovement[]
+  applications       AdvanceApplication[]
+  checks             PostdatedCheck[]
+  cardTransactions   CardTransaction[]
+
+  @@unique([saleId, tenantId])
+  @@unique([purchaseDocumentId, tenantId])
+  @@unique([id, tenantId])
+  @@unique([tenantId, type, externalReference])
+  @@index([tenantId, type, status, dueDate])
+}
+
+model TreasuryMovement {
+  id                 String                    @id @default(cuid())
+  tenantId           String
+  accountId          String
+  cashSessionId      String?
+  obligationId       String?
+  movementType       TreasuryMovementType
+  direction          TreasuryMovementDirection
+  amount             Decimal                   @db.Decimal(14, 2)
+  date               DateTime
+  description        String
+  reference          String?
+  sourceType         TreasurySourceType
+  sourceId           String
+  transferGroupId    String?
+  counterpartyType   TreasuryAdvanceType?
+  counterpartyId     String?
+  status             TreasuryMovementStatus    @default(CONFIRMED)
+  salePaymentId      String?                   @unique
+  purchasePaymentId  String?                   @unique
+  reversalOfId       String?                   @unique
+  createdByUserId    String
+  cancelledByUserId  String?
+  cancelledAt        DateTime?
+  cancellationReason String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  account            TreasuryAccount           @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  cashSession        CashSession?              @relation(fields: [cashSessionId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  obligation         TreasuryObligation?       @relation(fields: [obligationId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  salePayment        LightweightPayment?       @relation(fields: [salePaymentId], references: [id], onDelete: Restrict)
+  purchasePayment    PurchasePayment?          @relation(fields: [purchasePaymentId], references: [id], onDelete: Restrict)
+  reversalOf         TreasuryMovement?         @relation("MovementReversal", fields: [reversalOfId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  reversal           TreasuryMovement?         @relation("MovementReversal")
+  statementLine      BankStatementLine?
+
+  @@unique([reversalOfId, tenantId])
+  @@unique([id, tenantId])
+  @@unique([tenantId, sourceType, sourceId, movementType, direction])
+  @@index([tenantId, accountId, date])
+  @@index([tenantId, transferGroupId])
+}
+
+model PostdatedCheck {
+  id                      String                 @id @default(cuid())
+  tenantId                String
+  direction               TreasuryObligationType
+  checkNumber             String
+  bankName                String
+  bankAccountNumberMasked String?
+  issuerName              String
+  issuerIdentification    String?
+  beneficiaryName         String?
+  amount                  Decimal                @db.Decimal(14, 2)
+  issueDate               DateTime
+  dueDate                 DateTime
+  status                  PostdatedCheckStatus   @default(PENDING)
+  customerId              String?
+  supplierId              String?
+  obligationId            String?
+  notes                   String?
+  createdByUserId         String
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  tenant                  Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  obligation              TreasuryObligation?    @relation(fields: [obligationId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  customer                LightweightCustomer?   @relation(fields: [customerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  supplier                LightweightSupplier?   @relation(fields: [supplierId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, direction, bankName, checkNumber, issuerName])
+  @@index([tenantId, status, dueDate])
+}
+
+model BankReconciliation {
+  id                      String                   @id @default(cuid())
+  tenantId                String
+  bankAccountId           String
+  periodStart             DateTime
+  periodEnd               DateTime
+  dateToleranceDays       Int                      @default(2)
+  statementOpeningBalance Decimal                  @db.Decimal(14, 2)
+  statementClosingBalance Decimal                  @db.Decimal(14, 2)
+  systemOpeningBalance    Decimal                  @db.Decimal(14, 2)
+  systemClosingBalance    Decimal                  @db.Decimal(14, 2)
+  difference              Decimal                  @db.Decimal(14, 2)
+  status                  BankReconciliationStatus @default(DRAFT)
+  createdByUserId         String
+  createdAt               DateTime                 @default(now())
+  completedAt             DateTime?
+  bankAccount             TreasuryAccount          @relation(fields: [bankAccountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  lines                   BankStatementLine[]
+
+  @@unique([id, tenantId])
+  @@index([tenantId, bankAccountId, periodStart, periodEnd])
+}
+
+model BankStatementLine {
+  id                String                    @id @default(cuid())
+  tenantId          String
+  bankAccountId     String
+  reconciliationId  String
+  date              DateTime
+  description       String
+  reference         String?
+  amount            Decimal                   @db.Decimal(14, 2)
+  direction         TreasuryMovementDirection
+  matchedMovementId String?                   @unique
+  status            BankStatementLineStatus   @default(UNMATCHED)
+  importKey         String
+  createdAt         DateTime                  @default(now())
+  bankAccount       TreasuryAccount           @relation(fields: [bankAccountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  reconciliation    BankReconciliation        @relation(fields: [reconciliationId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  matchedMovement   TreasuryMovement?         @relation(fields: [matchedMovementId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([matchedMovementId, tenantId])
+  @@unique([id, tenantId])
+  @@unique([tenantId, bankAccountId, importKey])
+  @@index([tenantId, reconciliationId, status])
+}
+
+model TreasuryAdvance {
+  id                String                   @id @default(cuid())
+  tenantId          String
+  type              TreasuryAdvanceType
+  customerId        String?
+  supplierId        String?
+  amount            Decimal                  @db.Decimal(14, 2)
+  appliedAmount     Decimal                  @default(0) @db.Decimal(14, 2)
+  balance           Decimal                  @db.Decimal(14, 2)
+  date              DateTime
+  treasuryAccountId String
+  paymentMethod     LightweightPaymentMethod
+  reference         String?
+  notes             String?
+  status            TreasuryAdvanceStatus    @default(AVAILABLE)
+  createdByUserId   String
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  treasuryAccount   TreasuryAccount          @relation(fields: [treasuryAccountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  customer          LightweightCustomer?     @relation(fields: [customerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  supplier          LightweightSupplier?     @relation(fields: [supplierId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  applications      AdvanceApplication[]
+
+  @@unique([id, tenantId])
+  @@index([tenantId, type, status])
+}
+
+model AdvanceApplication {
+  id              String             @id @default(cuid())
+  tenantId        String
+  advanceId       String
+  obligationId    String
+  amount          Decimal            @db.Decimal(14, 2)
+  requestKey      String
+  createdByUserId String
+  createdAt       DateTime           @default(now())
+  advance         TreasuryAdvance    @relation(fields: [advanceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  obligation      TreasuryObligation @relation(fields: [obligationId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([tenantId, requestKey])
+  @@index([tenantId, obligationId])
+}
+
+model CardTransaction {
+  id                     String                @id @default(cuid())
+  tenantId               String
+  cardAccountId          String
+  saleId                 String?
+  obligationId           String?
+  sourceId               String
+  grossAmount            Decimal               @db.Decimal(14, 2)
+  feeAmount              Decimal               @db.Decimal(14, 2)
+  netAmount              Decimal               @db.Decimal(14, 2)
+  transactionDate        DateTime
+  expectedSettlementDate DateTime?
+  settledAt              DateTime?
+  reference              String?
+  status                 CardTransactionStatus @default(PENDING)
+  bankMovementId         String?               @unique
+  createdByUserId        String
+  cardAccount            TreasuryAccount       @relation(fields: [cardAccountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  sale                   LightweightSale?      @relation(fields: [saleId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  obligation             TreasuryObligation?   @relation(fields: [obligationId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, sourceId])
+  @@index([tenantId, status, expectedSettlementDate])
 }

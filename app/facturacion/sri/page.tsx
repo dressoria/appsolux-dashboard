@@ -1,10 +1,5 @@
-import SriPage from "@/app/sri/page";
-import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
+import { TaxPage } from "@/components/appsolux/sri-tax/tax-page";
 
-export default async function FacturacionSriPage() {
-  return (
-    <DashboardShell mainClassName="" contentClassName="">
-      <SriPage />
-    </DashboardShell>
-  );
+export default async function Page() {
+  return <TaxPage view="summary" />;
 }

@@ -1,5 +1,5 @@
-import CollectionsPage from "@/app/erp/finance/payments-received/page";
+import { redirect } from "next/navigation";
 
-export default function FacturacionTreasuryCollectionsPage() {
-  return <CollectionsPage />;
+export default function Page() {
+  redirect("/facturacion/treasury/portfolio/receivables");
 }

@@ -1,3 +1,4 @@
+import { prepareTreasuryIntegration, integrateSale, cancelTreasurySource } from "@/lib/core/treasury/integration";
 import "@/lib/security/server-only";
 
 import {
@@ -99,6 +100,8 @@ type UpdateCustomerInput = Partial<Omit<CreateCustomerInput, "tenantId">> & {
 
 export type CreateSaleInput = {
   tenantId: string;
+  createdByUserId?: string;
+  treasuryAccountId?: string;
   customerId?: string;
   paymentMethod: LightweightPaymentMethod;
   paidAmount?: number;
@@ -131,6 +134,8 @@ type CustomerListInput = {
 
 type AddSalePaymentInput = {
   tenantId: string;
+  createdByUserId?: string;
+  treasuryAccountId?: string;
   saleId: string;
   method: LightweightPaymentMethod;
   amount: number;
@@ -973,6 +978,8 @@ export async function createSale(input: CreateSaleInput) {
   });
   await assertLimitAvailable(input.tenantId, "receipts", saleCount);
 
+  const treasury = await prepareTreasuryIntegration(input.tenantId, input.createdByUserId, input.treasuryAccountId);
+
   return prisma.$transaction(async (tx) => {
     const productIds = [...new Set(input.items.map((item) => item.productId))];
     const products = await tx.lightweightProduct.findMany({
@@ -1190,6 +1197,7 @@ export async function createSale(input: CreateSaleInput) {
       });
     }
 
+    if (treasury) await integrateSale(tx, treasury, sale.id, sale.payments.map((payment) => payment.id));
     return sale;
   });
 }
@@ -1198,7 +1206,9 @@ export async function cancelSale(tenantId: string, saleId: string) {
   await requireTenantOperationalAccess(tenantId);
   const prisma = getPrismaClient();
 
+  const treasury = await prepareTreasuryIntegration(tenantId);
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "LightweightSale" WHERE "id"=${saleId} AND "tenantId"=${tenantId} FOR UPDATE`;
     const sale = await tx.lightweightSale.findFirst({
       where: {
         id: saleId,
@@ -1224,6 +1234,7 @@ export async function cancelSale(tenantId: string, saleId: string) {
       throw new Error("La venta ya esta cancelada.");
     }
 
+    if (treasury) await cancelTreasurySource(tx, treasury, "SALE", sale.id);
     const paidAmount = sale.payments.reduce(
       (sum, payment) => sum.add(payment.amount),
       new Prisma.Decimal(0),
@@ -1305,7 +1316,9 @@ export async function addSalePayment(input: AddSalePaymentInput) {
 
   const prisma = getPrismaClient();
 
+  const treasury = await prepareTreasuryIntegration(input.tenantId, input.createdByUserId, input.treasuryAccountId);
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "LightweightSale" WHERE "id"=${input.saleId} AND "tenantId"=${input.tenantId} FOR UPDATE`;
     const sale = await tx.lightweightSale.findFirst({
       where: {
         id: input.saleId,
@@ -1342,7 +1355,7 @@ export async function addSalePayment(input: AddSalePaymentInput) {
     const paymentStatus = resolvePaymentStatus(sale.total, nextPaid);
     const status = resolveSaleStatus(paymentStatus);
 
-    await tx.lightweightPayment.create({
+    const newPayment = await tx.lightweightPayment.create({
       data: {
         saleId: sale.id,
         method: input.method,
@@ -1361,7 +1374,7 @@ export async function addSalePayment(input: AddSalePaymentInput) {
       });
     }
 
-    return tx.lightweightSale.update({
+    const updated = await tx.lightweightSale.update({
       where: { id: sale.id },
       data: {
         paymentStatus,
@@ -1373,6 +1386,8 @@ export async function addSalePayment(input: AddSalePaymentInput) {
         payments: true,
       },
     });
+    if (treasury) await integrateSale(tx, treasury, updated.id, [newPayment.id]);
+    return updated;
   });
 }
 
