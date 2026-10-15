@@ -35,7 +35,7 @@ import { FacturomBrand as FacturomBrandLogo } from "@/components/public/facturom
 import { routes } from "@/config/routes";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
-import type { NavGroup, SidebarIconName } from "./sidebar";
+import type { NavGroup, SidebarEntry, SidebarIconName } from "./sidebar";
 
 type DashboardFrameProps = {
   children: ReactNode;
@@ -51,6 +51,7 @@ type DashboardFrameProps = {
 
 const SIDEBAR_STORAGE_KEY = "facturom.sidebar.collapsed";
 const SIDEBAR_OPEN_STORAGE_KEY = "facturom.sidebar.open-groups";
+const SIDEBAR_SUBMENU_STORAGE_KEY = "facturom.sidebar.open-submenus";
 
 const sidebarIcons: Record<SidebarIconName, LucideIcon> = {
   archive: Archive,
@@ -88,12 +89,22 @@ function matchesPath(pathname: string, href: string, exact = false) {
   return exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function entryContainsPath(entry: SidebarEntry, pathname: string): boolean {
+  if (entry.kind === "link") return matchesPath(pathname, entry.href, entry.exact);
+  return entry.items.some((item) => entryContainsPath(item, pathname));
+}
+
 function groupContainsPath(group: NavGroup, pathname: string) {
-  return group.items.some((entry) =>
-    entry.kind === "link"
-      ? matchesPath(pathname, entry.href, entry.exact)
-      : entry.items.some((item) => matchesPath(pathname, item.href, item.exact))
-  );
+  return group.items.some((entry) => entryContainsPath(entry, pathname));
+}
+
+function findFirstLink(entries: SidebarEntry[]): Extract<SidebarEntry, { kind: "link" }> | undefined {
+  for (const entry of entries) {
+    if (entry.kind === "link") return entry;
+    const found = findFirstLink(entry.items);
+    if (found) return found;
+  }
+  return undefined;
 }
 
 export function DashboardFrame({
@@ -111,6 +122,7 @@ export function DashboardFrame({
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const storedValue = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
@@ -123,6 +135,12 @@ export function DashboardFrame({
     } catch {
       setOpenGroups({});
     }
+    try {
+      const storedSubmenus = window.localStorage.getItem(SIDEBAR_SUBMENU_STORAGE_KEY);
+      if (storedSubmenus) setOpenSubmenus(JSON.parse(storedSubmenus) as Record<string, boolean>);
+    } catch {
+      setOpenSubmenus({});
+    }
   }, []);
 
   useEffect(() => {
@@ -134,6 +152,15 @@ export function DashboardFrame({
     const activeGroup = navigationGroups.find((group) => groupContainsPath(group, pathname));
     if (activeGroup && !activeGroup.direct) {
       setOpenGroups((current) => ({ ...current, [activeGroup.key]: true }));
+      setOpenSubmenus((current) => {
+        const next = { ...current };
+        for (const entry of activeGroup.items) {
+          if (entry.kind === "submenu" && entryContainsPath(entry, pathname)) {
+            next[`${activeGroup.key}.${entry.title}`] = true;
+          }
+        }
+        return next;
+      });
     }
   }, [navigationGroups, pathname]);
 
@@ -141,6 +168,14 @@ export function DashboardFrame({
     setOpenGroups((current) => {
       const next = { ...current, [key]: !current[key] };
       window.localStorage.setItem(SIDEBAR_OPEN_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function toggleSubmenu(key: string) {
+    setOpenSubmenus((current) => {
+      const next = { ...current, [key]: !current[key] };
+      window.localStorage.setItem(SIDEBAR_SUBMENU_STORAGE_KEY, JSON.stringify(next));
       return next;
     });
   }
@@ -173,6 +208,31 @@ export function DashboardFrame({
         <span className="truncate">{item.title}</span>
       </Link>
     );
+  }
+
+  function renderEntries(entries: SidebarEntry[], groupKey: string, groupActive: boolean, depth = 0) {
+    return entries.map((entry, index) => {
+      if (entry.kind === "link") {
+        return renderLink(entry, `${groupKey}-d${depth}-${entry.href}`, depth > 0, groupActive);
+      }
+      const submenuKey = `${groupKey}.${entry.title}`;
+      const submenuActive = groupActive && entryContainsPath(entry, pathname);
+      const submenuOpen = openSubmenus[submenuKey] ?? submenuActive;
+      return (
+        <div key={`${groupKey}-${entry.title}-${index}`} className="space-y-1 py-1">
+          <button
+            type="button"
+            onClick={() => toggleSubmenu(submenuKey)}
+            className="flex w-full items-center gap-2 px-4 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35 hover:text-white/50 transition-colors"
+            aria-expanded={submenuOpen}
+          >
+            <span className="flex-1 text-left">{entry.title}</span>
+            <ChevronDown className={cn("h-3 w-3 shrink-0 transition-transform", submenuOpen && "rotate-180")} />
+          </button>
+          {submenuOpen ? renderEntries(entry.items, groupKey, groupActive, depth + 1) : null}
+        </div>
+      );
+    });
   }
 
   const sidebarContent = (
@@ -208,8 +268,7 @@ export function DashboardFrame({
           {navigationGroups.map((group) => {
             const Icon = sidebarIcons[group.icon];
             const groupActive = activeGroupKey === group.key;
-            const firstEntry = group.items[0];
-            const firstLink = firstEntry?.kind === "link" ? firstEntry : firstEntry?.items[0];
+            const firstLink = findFirstLink(group.items);
 
             if (collapsed) {
               return firstLink ? (
@@ -261,18 +320,7 @@ export function DashboardFrame({
                 </button>
                 {open ? (
                   <div className="space-y-1 border-l border-white/10 pl-2">
-                    {group.items.map((entry, index) =>
-                      entry.kind === "link" ? (
-                        renderLink(entry, `${group.key}-${entry.href}`, false, groupActive)
-                      ) : (
-                        <div key={`${group.key}-${entry.title}-${index}`} className="space-y-1 py-1">
-                          <p className="px-4 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35">
-                            {entry.title}
-                          </p>
-                          {entry.items.map((item) => renderLink(item, `${group.key}-${entry.title}-${item.href}`, true, groupActive))}
-                        </div>
-                      )
-                    )}
+                    {renderEntries(group.items, group.key, groupActive)}
                   </div>
                 ) : null}
               </div>

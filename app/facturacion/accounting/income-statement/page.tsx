@@ -1,7 +1,19 @@
-import ErpAccountingProfitAndLossPage from "@/app/erp/accounting/profit-and-loss/page";
+import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
+import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
+import { IncomeStatementClient } from "./income-statement-client";
 
-type Props = { searchParams: Promise<{ from?: string; to?: string; company?: string }> };
+export default async function IncomeStatementPage() {
+  await requireDashboardSession();
 
-export default async function FacturacionAccountingIncomeStatementPage({ searchParams }: Props) {
-  return <ErpAccountingProfitAndLossPage searchParams={searchParams} />;
+  return (
+    <DashboardShell>
+      <div className="space-y-6">
+        <div>
+          <p className="text-sm text-muted-foreground">Contabilidad › Reportes contables</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Estado de resultados</h1>
+        </div>
+        <IncomeStatementClient />
+      </div>
+    </DashboardShell>
+  );
 }

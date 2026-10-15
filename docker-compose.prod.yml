@@ -20,6 +20,7 @@ services:
       - /home/ubuntu/appsolux-secure/sri-signed-xml:/app/.appsolux-secure/sri-signed-xml
       - /home/ubuntu/appsolux-secure/sri-authorized-xml:/app/.appsolux-secure/sri-authorized-xml
       - /home/ubuntu/appsolux-secure/logos:/app/.appsolux-secure/logos
+      - /home/ubuntu/appsolux-secure/product-images:/app/.appsolux-secure/product-images
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/login"]
       interval: 30s

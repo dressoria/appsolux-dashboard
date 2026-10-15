@@ -1,7 +1,19 @@
-import ErpAccountingTrialBalancePage from "@/app/erp/accounting/trial-balance/page";
+import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
+import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
+import { TrialBalanceClient } from "./trial-balance-client";
 
-type Props = { searchParams: Promise<{ from?: string; to?: string; company?: string }> };
+export default async function TrialBalancePage() {
+  await requireDashboardSession();
 
-export default async function FacturacionAccountingTrialBalancePage({ searchParams }: Props) {
-  return <ErpAccountingTrialBalancePage searchParams={searchParams} />;
+  return (
+    <DashboardShell>
+      <div className="space-y-6">
+        <div>
+          <p className="text-sm text-muted-foreground">Contabilidad › Reportes contables</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Balance de comprobación</h1>
+        </div>
+        <TrialBalanceClient />
+      </div>
+    </DashboardShell>
+  );
 }

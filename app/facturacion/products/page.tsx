@@ -1,26 +1,32 @@
-import BasicProductsPage from "@/app/basic/products/page";
-import ErpInventoryProductsPage from "@/app/erp/inventory/products/page";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
-import { getTenantModeState } from "@/lib/core/tenant-mode";
+import { getProducts } from "@/lib/core/inventory-products";
+import { getWarehouses } from "@/lib/core/inventory-warehouses";
+import { getBrands } from "@/lib/core/inventory-brands";
+import { ProductsListClient } from "./products-list-client";
 
-type FacturacionProductsPageProps = {
-  searchParams: Promise<{ q?: string }>;
-};
-
-export default async function FacturacionProductsPage({
-  searchParams,
-}: FacturacionProductsPageProps) {
+export default async function FacturacionProductsPage() {
   const { tenant } = await requireDashboardSession();
-  const tenantMode = await getTenantModeState(tenant);
-
-  if (tenantMode.canUseAdvancedErp) {
-    return <ErpInventoryProductsPage />;
-  }
+  const [productsResult, warehouses, brands] = await Promise.all([
+    getProducts(tenant.id, { take: 50 }),
+    getWarehouses(tenant.id),
+    getBrands(tenant.id),
+  ]);
 
   return (
-    <DashboardShell mainClassName="" contentClassName="">
-      <BasicProductsPage searchParams={searchParams} />
+    <DashboardShell>
+      <div className="space-y-6">
+        <div>
+          <p className="text-sm text-muted-foreground">Inventario</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Productos</h1>
+        </div>
+        <ProductsListClient
+          initialProducts={JSON.parse(JSON.stringify(productsResult.items))}
+          initialTotal={productsResult.total}
+          warehouses={JSON.parse(JSON.stringify(warehouses))}
+          brands={JSON.parse(JSON.stringify(brands))}
+        />
+      </div>
     </DashboardShell>
   );
 }

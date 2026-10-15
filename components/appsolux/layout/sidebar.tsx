@@ -34,7 +34,7 @@ export type SidebarLink = {
 export type SidebarSubmenu = {
   kind: "submenu";
   title: string;
-  items: SidebarLink[];
+  items: SidebarEntry[];
 };
 
 export type SidebarEntry = SidebarLink | SidebarSubmenu;
@@ -133,17 +133,33 @@ export function buildSidebarNavigation(
       title: "Inventario",
       icon: "archive",
       items: [
-        link("Resumen", routes.facturacionInventory, "archive", true),
         link("Productos", routes.facturacionProducts, "package"),
-        link("Categorías", routes.facturacionSettingsCategories),
-        link("Unidades", routes.facturacionSettingsUnits),
-        link("Bodegas", routes.facturacionSettingsWarehouses),
         link("Movimientos", routes.facturacionInventoryMovements),
+        link("Toma física", routes.facturacionInventoryPhysicalCount),
         link("Ajustes", routes.facturacionInventoryAdjustments),
         link("Transferencias", routes.facturacionInventoryTransfers),
         link("Kardex", routes.facturacionInventoryKardex),
-        link("Conteo físico", routes.facturacionInventoryPhysicalCount),
         link("Valoración", routes.facturacionInventoryValuation),
+        {
+          kind: "submenu",
+          title: "Guías de remisión",
+          items: [
+            link("Documentos guía", routes.facturacionInventoryShippingGuides),
+            link("Vehículos", routes.facturacionInventoryVehicles),
+          ],
+        },
+        link("Bodegas", routes.facturacionInventoryWarehouses),
+        link("Catálogo", routes.facturacionInventoryCatalog),
+        link("Pedidos", routes.facturacionInventoryOrders),
+        {
+          kind: "submenu",
+          title: "Configuración",
+          items: [
+            link("Categorías", routes.facturacionInventorySettingsCategories),
+            link("Unidades", routes.facturacionInventorySettingsUnits),
+            link("Marcas", routes.facturacionInventorySettingsBrands),
+          ],
+        },
       ],
     },
     {
@@ -153,17 +169,22 @@ export function buildSidebarNavigation(
       items: [
         link("Resumen", routes.facturacionAccounting, "book-open", true),
         link("Plan de cuentas", routes.facturacionAccountingChartOfAccounts),
+        link("Parámetros", routes.facturacionAccountingParameters),
+        link("Códigos retención", routes.facturacionAccountingTaxCodes),
+        link("Costos y gastos", routes.facturacionAccountingCostsExpenses),
+        link("Centros de costo", routes.facturacionAccountingCostCenters),
+        link("Periodos", routes.facturacionAccountingPeriods),
         link("Asientos", routes.facturacionAccountingJournal),
-        link("Libro mayor", routes.facturacionAccountingLedger),
-        link(
-          "Estado de resultados",
-          routes.facturacionAccountingIncomeStatement,
-        ),
-        link("Balance general", routes.facturacionAccountingBalanceSheet),
-        link(
-          "Balance de comprobación",
-          routes.facturacionAccountingTrialBalance,
-        ),
+        {
+          kind: "submenu",
+          title: "Reportes contables",
+          items: [
+            link("Libro mayor", routes.facturacionAccountingLedger),
+            link("Estado de resultados", routes.facturacionAccountingIncomeStatement),
+            link("Balance general", routes.facturacionAccountingBalanceSheet),
+            link("Balance de comprobación", routes.facturacionAccountingTrialBalance),
+          ],
+        },
       ],
     },
     {

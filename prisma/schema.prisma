@@ -340,6 +340,116 @@ enum PurchaseSriSyncTrigger {
   RETRY
 }
 
+enum AccountingPlanStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum AccountingRootType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  COST_EXPENSE
+}
+
+enum AccountingNormalBalance {
+  DEBIT
+  CREDIT
+}
+
+enum AccountingPeriodStatus {
+  OPEN
+  CLOSED
+  LOCKED
+}
+
+enum AccountingJournalEntryStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+enum AccountingSourceType {
+  MANUAL
+  OPENING
+  SALE
+  SALE_CREDIT_NOTE
+  PURCHASE
+  PURCHASE_CREDIT_NOTE
+  WITHHOLDING_EMITTED
+  WITHHOLDING_RECEIVED
+  TREASURY
+  BANK_TRANSFER
+  CARD_SETTLEMENT
+  CUSTOMER_ADVANCE
+  SUPPLIER_ADVANCE
+  INVENTORY_ADJUSTMENT
+  COGS
+  CLOSING
+  REVERSAL
+}
+
+enum AccountingCostCenterType {
+  COST_CENTER
+  PROJECT
+}
+
+enum AccountingAccountMappingKey {
+  TRANSITORY_CLEARING
+  ASSUMED_WITHHOLDING_LIABILITY
+  ASSUMED_WITHHOLDING_EXPENSE
+  CUSTOMER_RECEIVABLE_LOCAL
+  CUSTOMER_RECEIVABLE_FOREIGN
+  CUSTOMER_ADVANCE_LOCAL
+  CUSTOMER_ADVANCE_FOREIGN
+  IMPORTED_CUSTOMER_OBLIGATION
+  SUPPLIER_PAYABLE_LOCAL
+  SUPPLIER_PAYABLE_FOREIGN
+  SUPPLIER_ADVANCE_LOCAL
+  SUPPLIER_ADVANCE_FOREIGN
+  IMPORTED_SUPPLIER_OBLIGATION
+  INVENTORY_TAXABLE
+  INVENTORY_ZERO
+  INVENTORY_NON_OBJECT
+  INVENTORY_EXEMPT
+  COGS_TAXABLE
+  COGS_ZERO
+  COGS_NON_OBJECT
+  COGS_EXEMPT
+  SALES_TAXABLE
+  SALES_ZERO
+  SALES_NON_OBJECT
+  SALES_EXEMPT
+  SALES_EXPORT
+  SALES_CREDIT_NOTE_DISCOUNT_TAXABLE
+  SALES_CREDIT_NOTE_DISCOUNT_ZERO
+  SALES_CREDIT_NOTE_DISCOUNT_NON_OBJECT
+  SALES_CREDIT_NOTE_DISCOUNT_EXEMPT
+  SALES_CREDIT_NOTE_RETURN_TAXABLE
+  SALES_CREDIT_NOTE_RETURN_ZERO
+  SALES_CREDIT_NOTE_RETURN_NON_OBJECT
+  SALES_CREDIT_NOTE_RETURN_EXEMPT
+  PURCHASE_CREDIT_NOTE_DISCOUNT_TAXABLE
+  PURCHASE_CREDIT_NOTE_DISCOUNT_ZERO
+  PURCHASE_CREDIT_NOTE_DISCOUNT_NON_OBJECT
+  PURCHASE_CREDIT_NOTE_DISCOUNT_EXEMPT
+  PURCHASE_CREDIT_NOTE_RETURN_TAXABLE
+  PURCHASE_CREDIT_NOTE_RETURN_ZERO
+  PURCHASE_CREDIT_NOTE_RETURN_NON_OBJECT
+  PURCHASE_CREDIT_NOTE_RETURN_EXEMPT
+  UNSUPPORTED_MERCHANDISE
+  PHYSICAL_COUNT_ADJUSTMENT
+  VAT_OUTPUT
+  VAT_INPUT
+  VAT_COST_EXPENSE
+  CLOSING_ACCUMULATED_RESULTS
+  CLOSING_PROFIT_LOSS
+  CLOSING_CURRENT_RESULT
+  CARD_CLEARING
+}
+
 enum LightweightProformaStatus {
   ACTIVE
 }
@@ -517,7 +627,28 @@ model Tenant {
   treasuryAccounts TreasuryAccount[]
   treasuryObligations TreasuryObligation[]
   postdatedChecks PostdatedCheck[]
-
+  accountingPlans              AccountingPlan[]
+  accountingAccounts           AccountingAccount[]
+  accountingAccountMappings    AccountingAccountMapping[]
+  taxWithholdingAccountMappings TaxWithholdingAccountMapping[]
+  accountingCostExpenseConcepts AccountingCostExpenseConcept[]
+  accountingCostCenters        AccountingCostCenter[]
+  accountingPeriods            AccountingPeriod[]
+  accountingJournalEntries     AccountingJournalEntry[]
+  accountingJournalLines       AccountingJournalLine[]
+  accountingSettings           AccountingSettings?
+  inventoryBrands              InventoryBrand[]
+  inventoryUnits               InventoryUnit[]
+  inventoryWarehouses          InventoryWarehouse[]
+  inventoryStockBalances       InventoryStockBalance[]
+  inventoryMovements           InventoryMovement[]
+  inventoryPhysicalCounts      InventoryPhysicalCount[]
+  inventoryTransfers           InventoryTransfer[]
+  inventoryVehicles            InventoryVehicle[]
+  shipmentGuides               ShipmentGuide[]
+  inventoryOrders              InventoryOrder[]
+  productPriceChanges          ProductPriceChange[]
+  inventorySettings            InventorySettings?
 }
 
 model Plan {
@@ -711,6 +842,22 @@ model LightweightProduct {
   iceEnabled     Boolean                @default(false)
   iceCode        String?
   iceRate        Decimal?               @db.Decimal(7, 4)
+  price4         Decimal?               @db.Decimal(12, 2)
+  auxiliaryTransportCode String?
+  imageStorageKey        String?
+  defaultWarehouseId     String?
+  unitId                 String?
+  brandId                String?
+  salesAccountId         String?
+  inventoryAccountId     String?
+  cogsAccountId          String?
+  purchaseAccountId      String?
+  taxCategory            ProductTaxCategory?
+  color                  String?
+  additionalComment      String?
+  isProcessed            Boolean                @default(false)
+  warrantyDuration       Int?
+  warrantyUnit           WarrantyUnit?
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
 
@@ -722,6 +869,20 @@ model LightweightProduct {
   componentOf    LightweightComboItem[]      @relation("ComboComponent")
   purchaseDocumentItems PurchaseDocumentItem[]
   purchaseReceiptItems  PurchaseReceiptItem[]
+  defaultWarehouse      InventoryWarehouse?    @relation("ProductDefaultWarehouse", fields: [defaultWarehouseId], references: [id], onDelete: SetNull)
+  inventoryUnit         InventoryUnit?         @relation("ProductUnit", fields: [unitId], references: [id], onDelete: SetNull)
+  brand                 InventoryBrand?        @relation("ProductBrand", fields: [brandId], references: [id], onDelete: SetNull)
+  salesAccount          AccountingAccount?     @relation("ProductSalesAccount", fields: [salesAccountId], references: [id], onDelete: SetNull)
+  inventoryAccount      AccountingAccount?     @relation("ProductInventoryAccount", fields: [inventoryAccountId], references: [id], onDelete: SetNull)
+  cogsAccount           AccountingAccount?     @relation("ProductCogsAccount", fields: [cogsAccountId], references: [id], onDelete: SetNull)
+  purchaseAccount       AccountingAccount?     @relation("ProductPurchaseAccount", fields: [purchaseAccountId], references: [id], onDelete: SetNull)
+  stockBalances         InventoryStockBalance[]
+  inventoryMovements    InventoryMovement[]
+  physicalCountItems    InventoryPhysicalCountItem[]
+  transferItems         InventoryTransferItem[]
+  shipmentGuideItems    ShipmentGuideItem[]
+  orderItems            InventoryOrderItem[]
+  priceChanges          ProductPriceChange[]
 
   @@unique([tenantId, primaryCode])
   @@unique([tenantId, barcode])
@@ -729,6 +890,8 @@ model LightweightProduct {
   @@index([tenantId, name])
   @@index([tenantId, barcode])
   @@index([tenantId, type, isActive])
+  @@index([brandId])
+  @@index([unitId])
 }
 
 model LightweightProductCategory {
@@ -906,6 +1069,7 @@ model LightweightSupplier {
 
   purchaseDocuments PurchaseDocument[]
   purchaseReceipts  PurchaseReceipt[]
+  inventoryOrders   InventoryOrder[]
 
   @@unique([tenantId, identification])
   @@index([tenantId])
@@ -1886,19 +2050,24 @@ model PurchaseClassificationRule {
 }
 
 model TaxWithholdingCode {
-  id          String   @id @default(cuid())
-  taxType     WithholdingTaxType
-  code        String
-  description String
-  percentage  Decimal  @db.Decimal(5, 2)
-  isActive    Boolean  @default(true)
-  validFrom   DateTime @default(now())
-  validTo     DateTime?
-  createdAt   DateTime @default(now())
+  id                String              @id @default(cuid())
+  taxType           WithholdingTaxType
+  code              String
+  description       String
+  percentage        Decimal             @db.Decimal(5, 2)
+  isActive          Boolean             @default(true)
+  validFrom         DateTime            @default(now())
+  validTo           DateTime?
+  sourceName        String?
+  sourceReference   String?
+  sourcePublishedAt DateTime?
+  loadedAt          DateTime?
+  createdAt         DateTime            @default(now())
 
-  withholdingLines SriWithholdingLine[]
+  withholdingLines    SriWithholdingLine[]
+  accountMappings     TaxWithholdingAccountMapping[]
 
-  @@unique([taxType, code])
+  @@unique([taxType, code, validFrom])
   @@index([taxType])
   @@index([isActive])
 }
@@ -2460,4 +2629,634 @@ model CardTransaction {
   @@unique([id, tenantId])
   @@unique([tenantId, sourceId])
   @@index([tenantId, status, expectedSettlementDate])
+}
+
+// ========================================
+// Accounting Core
+// ========================================
+
+model AccountingPlan {
+  id              String               @id @default(cuid())
+  tenantId        String
+  name            String
+  description     String?
+  status          AccountingPlanStatus  @default(DRAFT)
+  source          String?
+  createdByUserId String
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  accounts AccountingAccount[]
+
+  @@index([tenantId])
+}
+
+model AccountingAccount {
+  id            String                  @id @default(cuid())
+  tenantId      String
+  planId        String
+  code          String
+  name          String
+  description   String?
+  parentId      String?
+  level         Int                     @default(1)
+  rootType      AccountingRootType
+  normalBalance AccountingNormalBalance
+  isGroup       Boolean                 @default(false)
+  allowsPosting Boolean                 @default(true)
+  active        Boolean                 @default(true)
+  systemLocked  Boolean                 @default(false)
+  f101Code      String?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  tenant  Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan    AccountingPlan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  parent  AccountingAccount? @relation("AccountHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children AccountingAccount[] @relation("AccountHierarchy")
+
+  journalLines        AccountingJournalLine[]
+  mappings            AccountingAccountMapping[]
+  costExpenseAsCost   AccountingCostExpenseConcept[] @relation("CostAccount")
+  costExpenseAsExpense AccountingCostExpenseConcept[] @relation("ExpenseAccount")
+  withholdingAsAsset   TaxWithholdingAccountMapping[] @relation("WithholdingAsset")
+  withholdingAsLiability TaxWithholdingAccountMapping[] @relation("WithholdingLiability")
+  withholdingAsExpense TaxWithholdingAccountMapping[] @relation("WithholdingExpense")
+  productSalesAccounts     LightweightProduct[] @relation("ProductSalesAccount")
+  productInventoryAccounts LightweightProduct[] @relation("ProductInventoryAccount")
+  productCogsAccounts      LightweightProduct[] @relation("ProductCogsAccount")
+  productPurchaseAccounts  LightweightProduct[] @relation("ProductPurchaseAccount")
+
+  @@unique([tenantId, planId, code])
+  @@index([tenantId])
+  @@index([planId])
+  @@index([tenantId, planId, parentId])
+}
+
+model AccountingAccountMapping {
+  id        String                       @id @default(cuid())
+  tenantId  String
+  key       AccountingAccountMappingKey
+  accountId String
+  createdAt DateTime                     @default(now())
+  updatedAt DateTime                     @updatedAt
+
+  tenant  Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account AccountingAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+}
+
+model TaxWithholdingAccountMapping {
+  id                String  @id @default(cuid())
+  tenantId          String
+  withholdingCodeId String
+  assetAccountId    String?
+  liabilityAccountId String?
+  expenseAccountId  String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  withholdingCode TaxWithholdingCode @relation(fields: [withholdingCodeId], references: [id], onDelete: Cascade)
+  assetAccount    AccountingAccount? @relation("WithholdingAsset", fields: [assetAccountId], references: [id], onDelete: SetNull)
+  liabilityAccount AccountingAccount? @relation("WithholdingLiability", fields: [liabilityAccountId], references: [id], onDelete: SetNull)
+  expenseAccount  AccountingAccount? @relation("WithholdingExpense", fields: [expenseAccountId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, withholdingCodeId])
+  @@index([tenantId])
+}
+
+model AccountingCostExpenseConcept {
+  id               String  @id @default(cuid())
+  tenantId         String
+  code             String
+  name             String
+  description      String?
+  costAccountId    String?
+  expenseAccountId String?
+  active           Boolean @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  costAccount    AccountingAccount? @relation("CostAccount", fields: [costAccountId], references: [id], onDelete: SetNull)
+  expenseAccount AccountingAccount? @relation("ExpenseAccount", fields: [expenseAccountId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+model AccountingCostCenter {
+  id          String                    @id @default(cuid())
+  tenantId    String
+  code        String
+  name        String
+  description String?
+  type        AccountingCostCenterType  @default(COST_CENTER)
+  parentId    String?
+  active      Boolean                   @default(true)
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+
+  tenant   Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent   AccountingCostCenter? @relation("CostCenterHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children AccountingCostCenter[] @relation("CostCenterHierarchy")
+  journalLines AccountingJournalLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+model AccountingPeriod {
+  id              String                  @id @default(cuid())
+  tenantId        String
+  year            Int
+  month           Int?
+  startDate       DateTime
+  endDate         DateTime
+  status          AccountingPeriodStatus  @default(OPEN)
+  closedAt        DateTime?
+  closedByUserId  String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, year, month])
+  @@index([tenantId])
+  @@index([tenantId, status])
+}
+
+model AccountingJournalEntry {
+  id               String                         @id @default(cuid())
+  tenantId         String
+  number           String
+  date             DateTime
+  description      String
+  sourceType       AccountingSourceType            @default(MANUAL)
+  sourceId         String?
+  status           AccountingJournalEntryStatus    @default(DRAFT)
+  totalDebit       Decimal                         @default(0) @db.Decimal(14, 2)
+  totalCredit      Decimal                         @default(0) @db.Decimal(14, 2)
+  reversalOfId     String?                         @unique
+  createdByUserId  String
+  postedByUserId   String?
+  reversedByUserId String?
+  postedAt         DateTime?
+  reversedAt       DateTime?
+  createdAt        DateTime                        @default(now())
+  updatedAt        DateTime                        @updatedAt
+
+  tenant     Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reversalOf AccountingJournalEntry? @relation("JournalReversal", fields: [reversalOfId], references: [id], onDelete: SetNull)
+  reversedBy AccountingJournalEntry? @relation("JournalReversal")
+  lines      AccountingJournalLine[]
+
+  @@unique([tenantId, number])
+  @@unique([tenantId, sourceType, sourceId])
+  @@index([tenantId])
+  @@index([tenantId, date])
+  @@index([tenantId, status])
+}
+
+model AccountingJournalLine {
+  id               String  @id @default(cuid())
+  tenantId         String
+  entryId          String
+  accountId        String
+  description      String?
+  debit            Decimal @default(0) @db.Decimal(14, 2)
+  credit           Decimal @default(0) @db.Decimal(14, 2)
+  costCenterId     String?
+  counterpartyType String?
+  counterpartyId   String?
+  reference        String?
+  createdAt        DateTime @default(now())
+
+  tenant     Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entry      AccountingJournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  account    AccountingAccount      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  costCenter AccountingCostCenter?  @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([entryId])
+  @@index([accountId])
+  @@index([tenantId, accountId])
+}
+
+model AccountingSettings {
+  id                 String   @id @default(cuid())
+  tenantId           String   @unique
+  autoPostingEnabled Boolean  @default(false)
+  configuredAt       DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// ─── Inventory Core enums ──────────────────────────────────────────────
+
+enum InventoryMovementDirection {
+  IN
+  OUT
+}
+
+enum InventoryMovementType {
+  OPENING
+  SALE
+  SALE_RETURN
+  PURCHASE_RECEIPT
+  PURCHASE_RETURN
+  TRANSFER_IN
+  TRANSFER_OUT
+  PHYSICAL_COUNT
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  COMBO_CONSUMPTION
+  OTHER
+}
+
+enum InventoryPhysicalCountStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum InventoryTransferStatus {
+  DRAFT
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum ShipmentGuideStatus {
+  DRAFT
+  ISSUED
+  REFERRAL_GUIDE_SRI_PENDING
+  CANCELLED
+}
+
+enum InventoryOrderStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  PARTIAL
+  RECEIVED
+  CANCELLED
+}
+
+enum InventoryValuationMethod {
+  WEIGHTED_AVERAGE
+  FIFO
+}
+
+enum ProductTaxCategory {
+  TAXABLE
+  ZERO
+  NON_OBJECT
+  EXEMPT
+}
+
+enum WarrantyUnit {
+  DAYS
+  MONTHS
+  YEARS
+}
+
+// ─── Inventory Core models ─────────────────────────────────────────────
+
+model InventoryBrand {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products LightweightProduct[] @relation("ProductBrand")
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model InventoryUnit {
+  id           String   @id @default(cuid())
+  tenantId     String
+  code         String
+  name         String
+  abbreviation String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products LightweightProduct[] @relation("ProductUnit")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+model InventoryWarehouse {
+  id        String   @id @default(cuid())
+  tenantId  String
+  code      String
+  name      String
+  address   String?
+  city      String?
+  phone     String?
+  active    Boolean  @default(true)
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant                Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  stockBalances         InventoryStockBalance[]
+  movements             InventoryMovement[]
+  physicalCounts        InventoryPhysicalCount[]
+  transfersOut          InventoryTransfer[]         @relation("TransferSource")
+  transfersIn           InventoryTransfer[]         @relation("TransferDestination")
+  defaultForProducts    LightweightProduct[]        @relation("ProductDefaultWarehouse")
+  shipmentGuides        ShipmentGuide[]             @relation("GuideSourceWarehouse")
+  orders                InventoryOrder[]
+  defaultForSettings    InventorySettings[]         @relation("SettingsDefaultWarehouse")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+model InventoryStockBalance {
+  id          String   @id @default(cuid())
+  tenantId    String
+  warehouseId String
+  productId   String
+  quantity    Decimal  @default(0) @db.Decimal(14, 4)
+  updatedAt   DateTime @updatedAt
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  warehouse InventoryWarehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  product   LightweightProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, warehouseId, productId])
+  @@index([tenantId])
+  @@index([warehouseId])
+  @@index([productId])
+}
+
+model InventoryMovement {
+  id              String                     @id @default(cuid())
+  tenantId        String
+  productId       String
+  warehouseId     String
+  direction       InventoryMovementDirection
+  quantity        Decimal                    @db.Decimal(14, 4)
+  movementType    InventoryMovementType
+  date            DateTime
+  reference       String?
+  description     String?
+  sourceType      String?
+  sourceId        String?
+  transferGroupId String?
+  unitCost        Decimal?                   @db.Decimal(14, 4)
+  createdByUserId String
+  createdAt       DateTime                   @default(now())
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product   LightweightProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouse InventoryWarehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([productId])
+  @@index([warehouseId])
+  @@index([tenantId, productId, warehouseId, date])
+  @@index([tenantId, sourceType, sourceId])
+  @@index([transferGroupId])
+}
+
+model InventoryPhysicalCount {
+  id                String                        @id @default(cuid())
+  tenantId          String
+  warehouseId       String
+  number            String
+  status            InventoryPhysicalCountStatus   @default(DRAFT)
+  startedAt         DateTime                       @default(now())
+  completedAt       DateTime?
+  createdByUserId   String
+  completedByUserId String?
+  notes             String?
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+
+  tenant    Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  warehouse InventoryWarehouse            @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  items     InventoryPhysicalCountItem[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+}
+
+model InventoryPhysicalCountItem {
+  id               String   @id @default(cuid())
+  physicalCountId  String
+  productId        String
+  expectedQuantity Decimal  @db.Decimal(14, 4)
+  countedQuantity  Decimal? @db.Decimal(14, 4)
+  difference       Decimal? @db.Decimal(14, 4)
+  unitCost         Decimal? @db.Decimal(14, 4)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  physicalCount InventoryPhysicalCount @relation(fields: [physicalCountId], references: [id], onDelete: Cascade)
+  product       LightweightProduct     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([physicalCountId, productId])
+  @@index([physicalCountId])
+}
+
+model InventoryTransfer {
+  id                     String                   @id @default(cuid())
+  tenantId               String
+  number                 String
+  sourceWarehouseId      String
+  destinationWarehouseId String
+  status                 InventoryTransferStatus  @default(DRAFT)
+  createdByUserId        String
+  completedByUserId      String?
+  createdAt              DateTime                 @default(now())
+  completedAt            DateTime?
+  notes                  String?
+  updatedAt              DateTime                 @updatedAt
+
+  tenant               Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sourceWarehouse      InventoryWarehouse      @relation("TransferSource", fields: [sourceWarehouseId], references: [id], onDelete: Cascade)
+  destinationWarehouse InventoryWarehouse      @relation("TransferDestination", fields: [destinationWarehouseId], references: [id], onDelete: Cascade)
+  items                InventoryTransferItem[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+}
+
+model InventoryTransferItem {
+  id         String  @id @default(cuid())
+  transferId String
+  productId  String
+  quantity   Decimal @db.Decimal(14, 4)
+
+  transfer InventoryTransfer  @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  product  LightweightProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([transferId, productId])
+  @@index([transferId])
+}
+
+model InventoryVehicle {
+  id        String   @id @default(cuid())
+  tenantId  String
+  plate     String
+  brand     String?
+  model     String?
+  year      Int?
+  color     String?
+  notes     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  shipmentGuides ShipmentGuide[]
+
+  @@unique([tenantId, plate])
+  @@index([tenantId])
+}
+
+model ShipmentGuide {
+  id                     String              @id @default(cuid())
+  tenantId               String
+  number                 String
+  status                 ShipmentGuideStatus @default(DRAFT)
+  issueDate              DateTime
+  startTransportDate     DateTime
+  endTransportDate       DateTime?
+  originAddress          String
+  destinationAddress     String
+  route                  String?
+  reason                 String
+  carrierIdentification  String?
+  carrierName            String?
+  vehicleId              String?
+  sourceWarehouseId      String?
+  saleId                 String?
+  transferId             String?
+  notes                  String?
+  createdByUserId        String
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vehicle         InventoryVehicle?   @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  sourceWarehouse InventoryWarehouse? @relation("GuideSourceWarehouse", fields: [sourceWarehouseId], references: [id], onDelete: SetNull)
+  items           ShipmentGuideItem[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+  @@index([tenantId, issueDate])
+}
+
+model ShipmentGuideItem {
+  id          String  @id @default(cuid())
+  guideId     String
+  productId   String?
+  code        String
+  description String
+  quantity    Decimal @db.Decimal(14, 4)
+
+  guide   ShipmentGuide       @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  product LightweightProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([guideId])
+}
+
+model InventoryOrder {
+  id              String               @id @default(cuid())
+  tenantId        String
+  number          String
+  warehouseId     String
+  supplierId      String?
+  status          InventoryOrderStatus @default(DRAFT)
+  requestedAt     DateTime             @default(now())
+  expectedAt      DateTime?
+  notes           String?
+  createdByUserId String
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  tenant    Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  warehouse InventoryWarehouse    @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  supplier  LightweightSupplier?  @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  items     InventoryOrderItem[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+}
+
+model InventoryOrderItem {
+  id                String   @id @default(cuid())
+  orderId           String
+  productId         String
+  requestedQuantity Decimal  @db.Decimal(14, 4)
+  receivedQuantity  Decimal  @default(0) @db.Decimal(14, 4)
+  unitCostEstimate  Decimal? @db.Decimal(14, 4)
+
+  order   InventoryOrder     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product LightweightProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, productId])
+  @@index([orderId])
+}
+
+model ProductPriceChange {
+  id        String   @id @default(cuid())
+  tenantId  String
+  productId String
+  channel   String
+  oldPrice  Decimal  @db.Decimal(12, 2)
+  newPrice  Decimal  @db.Decimal(12, 2)
+  reason    String?
+  userId    String
+  createdAt DateTime @default(now())
+
+  tenant  Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product LightweightProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([productId])
+  @@index([tenantId, createdAt])
+}
+
+model InventorySettings {
+  id                  String                    @id @default(cuid())
+  tenantId            String                    @unique
+  defaultWarehouseId  String?
+  allowNegativeStock  Boolean                   @default(false)
+  valuationMethod     InventoryValuationMethod  @default(WEIGHTED_AVERAGE)
+  catalogShowBrand    Boolean                   @default(true)
+  catalogShowUnit     Boolean                   @default(false)
+  catalogShowStock    Boolean                   @default(false)
+  catalogShowPrice    Boolean                   @default(true)
+  catalogShowCode     Boolean                   @default(true)
+  catalogOrientation  String                    @default("vertical")
+  catalogAccentColor  String?
+  catalogHeaderAll    Boolean                   @default(true)
+  barcodeFormat       String                    @default("A4")
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+
+  tenant           Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  defaultWarehouse InventoryWarehouse? @relation("SettingsDefaultWarehouse", fields: [defaultWarehouseId], references: [id], onDelete: SetNull)
 }

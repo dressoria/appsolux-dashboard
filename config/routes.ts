@@ -142,6 +142,21 @@ export const routes = {
   facturacionPurchasesInbox: "/facturacion/purchases/inbox",
   facturacionPurchasesAutoDownload: "/facturacion/purchases/automatic-download",
 
+  facturacionInventoryWarehouses: "/facturacion/inventory/warehouses",
+  facturacionInventoryCatalog: "/facturacion/inventory/catalog",
+  facturacionInventoryOrders: "/facturacion/inventory/orders",
+  facturacionInventoryShippingGuides:
+    "/facturacion/inventory/shipping-guides/documents",
+  facturacionInventoryShippingGuidesNew:
+    "/facturacion/inventory/shipping-guides/documents/new",
+  facturacionInventoryVehicles:
+    "/facturacion/inventory/shipping-guides/vehicles",
+  facturacionInventorySettingsCategories:
+    "/facturacion/inventory/settings/categories",
+  facturacionInventorySettingsUnits: "/facturacion/inventory/settings/units",
+  facturacionInventorySettingsBrands: "/facturacion/inventory/settings/brands",
+  facturacionProductsNew: "/facturacion/products/new",
+
   facturacionAccountingChartOfAccounts:
     "/facturacion/accounting/chart-of-accounts",
   facturacionAccountingJournal: "/facturacion/accounting/journal",
@@ -150,6 +165,11 @@ export const routes = {
     "/facturacion/accounting/income-statement",
   facturacionAccountingBalanceSheet: "/facturacion/accounting/balance-sheet",
   facturacionAccountingTrialBalance: "/facturacion/accounting/trial-balance",
+  facturacionAccountingParameters: "/facturacion/accounting/parameters",
+  facturacionAccountingTaxCodes: "/facturacion/accounting/tax-codes",
+  facturacionAccountingCostsExpenses: "/facturacion/accounting/costs-expenses",
+  facturacionAccountingCostCenters: "/facturacion/accounting/cost-centers",
+  facturacionAccountingPeriods: "/facturacion/accounting/periods",
 
   basic: "/basic",
   basicProducts: "/basic/products",

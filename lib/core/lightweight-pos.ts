@@ -1186,6 +1186,50 @@ export async function createSale(input: CreateSaleInput) {
       });
     }
 
+    try {
+      const defaultWarehouse = await tx.inventoryWarehouse.findFirst({
+        where: { tenantId: input.tenantId, isDefault: true },
+      });
+      if (defaultWarehouse) {
+        for (const [productId, quantity] of inventoryDemand) {
+          await tx.inventoryMovement.create({
+            data: {
+              tenantId: input.tenantId,
+              productId,
+              warehouseId: defaultWarehouse.id,
+              direction: "OUT",
+              movementType: "SALE",
+              quantity: new Prisma.Decimal(quantity),
+              date: new Date(),
+              sourceType: "SALE",
+              sourceId: sale.id,
+              createdByUserId: input.createdByUserId ?? "system",
+            },
+          });
+          await tx.inventoryStockBalance.upsert({
+            where: {
+              tenantId_warehouseId_productId: {
+                tenantId: input.tenantId,
+                warehouseId: defaultWarehouse.id,
+                productId,
+              },
+            },
+            create: {
+              tenantId: input.tenantId,
+              productId,
+              warehouseId: defaultWarehouse.id,
+              quantity: new Prisma.Decimal(-quantity),
+            },
+            update: {
+              quantity: { decrement: new Prisma.Decimal(quantity) },
+            },
+          });
+        }
+      }
+    } catch {
+      // InventoryMovement/InventoryStockBalance tables may not exist yet
+    }
+
     if (input.customerId && balanceImpact.greaterThan(0)) {
       await tx.lightweightCustomer.update({
         where: { id: input.customerId },
@@ -1279,6 +1323,50 @@ export async function cancelSale(tenantId: string, saleId: string) {
           quantity,
         },
       });
+    }
+
+    try {
+      const defaultWarehouse = await tx.inventoryWarehouse.findFirst({
+        where: { tenantId, isDefault: true },
+      });
+      if (defaultWarehouse) {
+        for (const [productId, quantity] of inventoryRestore) {
+          await tx.inventoryMovement.create({
+            data: {
+              tenantId,
+              productId,
+              warehouseId: defaultWarehouse.id,
+              direction: "IN",
+              movementType: "SALE_RETURN",
+              quantity: new Prisma.Decimal(quantity),
+              date: new Date(),
+              sourceType: "SALE_CANCEL",
+              sourceId: sale.id,
+              createdByUserId: "system",
+            },
+          });
+          await tx.inventoryStockBalance.upsert({
+            where: {
+              tenantId_warehouseId_productId: {
+                tenantId,
+                warehouseId: defaultWarehouse.id,
+                productId,
+              },
+            },
+            create: {
+              tenantId,
+              productId,
+              warehouseId: defaultWarehouse.id,
+              quantity: new Prisma.Decimal(quantity),
+            },
+            update: {
+              quantity: { increment: new Prisma.Decimal(quantity) },
+            },
+          });
+        }
+      }
+    } catch {
+      // InventoryMovement/InventoryStockBalance tables may not exist yet
     }
 
     if (sale.customerId && balanceImpact.greaterThan(0)) {

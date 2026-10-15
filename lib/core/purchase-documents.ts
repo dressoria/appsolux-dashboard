@@ -1,6 +1,7 @@
 import { prepareTreasuryIntegration, integratePurchase, cancelTreasurySource } from "@/lib/core/treasury/integration";
 import "@/lib/security/server-only";
 import { getPrismaClient } from "@/lib/db/prisma";
+import { Prisma } from "@prisma/client";
 import type {
   PurchaseDocumentType,
   PurchaseDocumentStatus,
@@ -285,6 +286,52 @@ export async function confirmPurchaseReceipt(
         data: { stock: { increment: Number(item.quantityReceived) } },
       });
     }
+
+    try {
+      const defaultWarehouse = await tx.inventoryWarehouse.findFirst({
+        where: { tenantId, isDefault: true },
+      });
+      if (defaultWarehouse) {
+        for (const item of receipt.items) {
+          const qty = Number(item.quantityReceived);
+          await tx.inventoryMovement.create({
+            data: {
+              tenantId,
+              productId: item.productId,
+              warehouseId: defaultWarehouse.id,
+              direction: "IN",
+              movementType: "PURCHASE_RECEIPT",
+              quantity: new Prisma.Decimal(qty),
+              date: new Date(),
+              sourceType: "PURCHASE_RECEIPT",
+              sourceId: receiptId,
+              createdByUserId: "system",
+            },
+          });
+          await tx.inventoryStockBalance.upsert({
+            where: {
+              tenantId_warehouseId_productId: {
+                tenantId,
+                warehouseId: defaultWarehouse.id,
+                productId: item.productId,
+              },
+            },
+            create: {
+              tenantId,
+              productId: item.productId,
+              warehouseId: defaultWarehouse.id,
+              quantity: new Prisma.Decimal(qty),
+            },
+            update: {
+              quantity: { increment: new Prisma.Decimal(qty) },
+            },
+          });
+        }
+      }
+    } catch {
+      // InventoryMovement/InventoryStockBalance tables may not exist yet
+    }
+
     await tx.purchaseReceipt.update({
       where: { id: receiptId },
       data: { status: "CONFIRMED" },
