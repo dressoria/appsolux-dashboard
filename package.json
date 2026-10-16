@@ -16,6 +16,8 @@
     "test:proformas": "tsx --test lib/core/lightweight-proformas.test.ts lib/core/pos-checkout.test.ts",
     "test:sri-documents": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/sri-documents.test.ts",
     "test:ai-invoicing": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/ai-invoice-proposal-engine.test.ts",
+    "test:ai-invoicing-exact": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/ai-invoice-exact-solver.test.ts",
+    "test:customer-import": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/customer-import.test.ts",
     "test:receipts-imports": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/receipts-and-imports.test.ts",
     "test:purchases": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/purchases-module.test.ts",
     "sri:import-taxpayers": "tsx scripts/sri-import-taxpayers.ts",
@@ -31,13 +33,16 @@
     "maintenance:mark-vitabell-erp-real": "node scripts/maintenance/mark-vitabell-erp-real.mjs",
     "maintenance:ensure-plans": "node scripts/maintenance/ensure-plans.mjs",
     "test:sri-tax": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/sri-tax/*.test.ts",
-    "test:treasury": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/treasury/treasury.test.ts"
+    "test:treasury": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/treasury/treasury.test.ts",
+    "test:inventory": "node --conditions=react-server --experimental-test-module-mocks --import tsx --test lib/core/inventory-core.test.ts lib/core/inventory-products-hotfix.test.ts",
+    "test:inventory-ui": "node --experimental-test-module-mocks --import tsx --test lib/core/inventory-actions-ui.test.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.5.6",
     "@prisma/client": "^6.19.3",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.1",
+    "bwip-js": "^4.11.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "exceljs": "^4.4.0",

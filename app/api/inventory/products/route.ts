@@ -1,3 +1,5 @@
+import { productErrorResponse } from "@/lib/core/inventory-product-errors";
+import { ProductInputError } from "@/lib/core/inventory-product-input";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
@@ -5,7 +7,7 @@ import { getProducts, createProduct } from "@/lib/core/inventory-products";
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
+  if (!user) return NextResponse.json({ code: "AUTH_REQUIRED", message: "Sesión requerida." }, { status: 401 });
   const tenant = await getCurrentTenant(user);
 
   const url = req.nextUrl;
@@ -27,13 +29,17 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
+  if (!user) return NextResponse.json({ code: "AUTH_REQUIRED", message: "Sesión requerida." }, { status: 401 });
   const tenant = await getCurrentTenant(user);
 
-  const body = await req.json();
-  if (!body.name) return NextResponse.json({ error: "Nombre requerido." }, { status: 400 });
-  if (body.price == null) return NextResponse.json({ error: "Precio requerido." }, { status: 400 });
+  try {
+    const body = await req.json();
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new ProductInputError("Datos de producto inválidos.");
 
-  const product = await createProduct(tenant.id, body);
-  return NextResponse.json(product, { status: 201 });
+    const product = await createProduct(tenant.id, body);
+    return NextResponse.json(product, { status: 201 });
+  } catch (error) {
+    const result = productErrorResponse(error);
+    return NextResponse.json(result.body, { status: result.status });
+  }
 }

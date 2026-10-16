@@ -1,7 +1,7 @@
 import "@/lib/security/server-only";
 import { getPrismaClient } from "@/lib/db/prisma";
-import { Decimal } from "@prisma/client/runtime/library";
-import type { ProductTaxCategory, WarrantyUnit } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+import { normalizeProductInput, ProductInputError } from "./inventory-product-input";
 
 export type ProductFilters = {
   warehouseId?: string;
@@ -76,126 +76,56 @@ export async function getProductById(tenantId: string, id: string) {
   });
 }
 
-export async function createProduct(
-  tenantId: string,
-  data: {
-    name: string;
-    description?: string;
-    type?: string;
-    primaryCode?: string;
-    auxiliaryCode?: string;
-    auxiliaryTransportCode?: string;
-    barcode?: string;
-    categoryId?: string;
-    unitId?: string;
-    brandId?: string;
-    defaultWarehouseId?: string;
-    price: number;
-    price2?: number;
-    price3?: number;
-    price4?: number;
-    cost?: number;
-    taxRate?: number;
-    taxCategory?: ProductTaxCategory;
-    trackInventory?: boolean;
-    minStock?: number;
-    salesAccountId?: string;
-    inventoryAccountId?: string;
-    cogsAccountId?: string;
-    purchaseAccountId?: string;
-    color?: string;
-    additionalComment?: string;
-    isProcessed?: boolean;
-    warrantyDuration?: number;
-    warrantyUnit?: WarrantyUnit;
-    expiresAt?: Date;
-  },
-) {
-  const prisma = getPrismaClient();
+type ProductClient = Pick<Prisma.TransactionClient, "lightweightProduct" | "lightweightProductCategory" | "inventoryBrand" | "inventoryUnit" | "inventoryWarehouse" | "accountingAccount">;
 
-  if (data.categoryId) {
-    const cat = await prisma.lightweightProductCategory.findFirst({
-      where: { id: data.categoryId, tenantId },
-    });
-    if (!cat) throw new Error("Categoría no pertenece a este tenant.");
+async function prepareProduct(tenantId: string, input: Record<string, unknown>, db: ProductClient, existing?: Record<string, unknown>) {
+  const previous = existing ? { ...existing } : undefined;
+  if (previous) for (const key of ["price", "price2", "price3", "price4", "cost", "taxRate"]) {
+    if (previous[key] != null) previous[key] = Number(previous[key]);
   }
-  if (data.brandId) {
-    const brand = await prisma.inventoryBrand.findFirst({
-      where: { id: data.brandId, tenantId },
-    });
-    if (!brand) throw new Error("Marca no pertenece a este tenant.");
+  const data = normalizeProductInput(input, previous);
+  // Resolve existing optional defaults; never create catalog rows while saving.
+  for (const [field, defaultName] of [
+    ["categoryId", "SIN CATEGORÍA"],
+    ["brandId", "SIN MARCA"],
+    ["unitId", "SIN UNIDAD"],
+  ] as const) {
+    const where = data[field] ? { tenantId, id: data[field] } : { tenantId, name: defaultName };
+    const record = field === "categoryId" ? await db.lightweightProductCategory.findFirst({ where })
+      : field === "brandId" ? await db.inventoryBrand.findFirst({ where })
+      : await db.inventoryUnit.findFirst({ where });
+    if (data[field] && !record) throw new ProductInputError(`${defaultName === "SIN MARCA" ? "Marca" : field === "unitId" ? "Unidad" : "Categoría"} no pertenece a este tenant.`, field);
+    data[field] = record?.id ?? null;
   }
-  if (data.unitId) {
-    const unit = await prisma.inventoryUnit.findFirst({
-      where: { id: data.unitId, tenantId },
-    });
-    if (!unit) throw new Error("Unidad no pertenece a este tenant.");
+  if (data.defaultWarehouseId || data.trackInventory) {
+    const warehouse = await db.inventoryWarehouse.findFirst({ where: {
+      tenantId, active: true, ...(data.defaultWarehouseId ? { id: data.defaultWarehouseId } : { isDefault: true }),
+    } });
+    if (!warehouse) throw new ProductInputError(data.defaultWarehouseId ? "Bodega inválida para este tenant." : "Configura una bodega predeterminada antes de crear productos con inventario.", "defaultWarehouseId");
+    data.defaultWarehouseId = warehouse.id;
   }
-  if (data.salesAccountId) {
-    const acc = await prisma.accountingAccount.findFirst({
-      where: { id: data.salesAccountId, tenantId, active: true, allowsPosting: true },
-    });
-    if (!acc) throw new Error("Cuenta contable de venta inválida.");
+  for (const field of ["salesAccountId", "inventoryAccountId", "cogsAccountId", "purchaseAccountId"] as const) {
+    if (data[field] && !await db.accountingAccount.findFirst({ where: { tenantId, id: data[field], active: true, allowsPosting: true } })) {
+      throw new ProductInputError("Cuenta contable inválida para este tenant.", field);
+    }
   }
-  if (data.inventoryAccountId) {
-    const acc = await prisma.accountingAccount.findFirst({
-      where: { id: data.inventoryAccountId, tenantId, active: true, allowsPosting: true },
-    });
-    if (!acc) throw new Error("Cuenta contable de inventario inválida.");
+  for (const field of ["primaryCode", "barcode"] as const) {
+    if (data[field] && await db.lightweightProduct.findFirst({ where: { tenantId, [field]: data[field], ...(existing ? { id: { not: existing.id as string } } : {}) } })) {
+      throw new ProductInputError(field === "barcode" ? "No se pudo guardar: el código de barras ya existe." : "No se pudo guardar: el código ya existe.", field, "DUPLICATE_PRODUCT", 409);
+    }
   }
-  if (data.cogsAccountId) {
-    const acc = await prisma.accountingAccount.findFirst({
-      where: { id: data.cogsAccountId, tenantId, active: true, allowsPosting: true },
-    });
-    if (!acc) throw new Error("Cuenta contable de costos inválida.");
-  }
-
-  return prisma.lightweightProduct.create({
-    data: {
-      tenantId,
-      name: data.name,
-      description: data.description,
-      type: (data.type as never) ?? "PRODUCT",
-      primaryCode: data.primaryCode,
-      auxiliaryCode: data.auxiliaryCode,
-      auxiliaryTransportCode: data.auxiliaryTransportCode,
-      barcode: data.barcode,
-      categoryId: data.categoryId,
-      unitId: data.unitId,
-      brandId: data.brandId,
-      defaultWarehouseId: data.defaultWarehouseId,
-      price: new Decimal(data.price),
-      price2: data.price2 != null ? new Decimal(data.price2) : undefined,
-      price3: data.price3 != null ? new Decimal(data.price3) : undefined,
-      price4: data.price4 != null ? new Decimal(data.price4) : undefined,
-      cost: data.cost != null ? new Decimal(data.cost) : undefined,
-      taxRate: new Decimal(data.taxRate ?? 0),
-      taxCategory: data.taxCategory,
-      trackInventory: data.trackInventory ?? true,
-      minStock: data.minStock,
-      salesAccountId: data.salesAccountId,
-      inventoryAccountId: data.inventoryAccountId,
-      cogsAccountId: data.cogsAccountId,
-      purchaseAccountId: data.purchaseAccountId,
-      color: data.color,
-      additionalComment: data.additionalComment,
-      isProcessed: data.isProcessed ?? false,
-      warrantyDuration: data.warrantyDuration,
-      warrantyUnit: data.warrantyUnit,
-      expiresAt: data.expiresAt,
-    },
-  });
+  return data;
 }
 
-export async function updateProduct(
-  tenantId: string,
-  id: string,
-  data: Record<string, unknown>,
-) {
-  const prisma = getPrismaClient();
-  const product = await prisma.lightweightProduct.findFirst({
-    where: { id, tenantId },
-  });
-  if (!product) throw new Error("Producto no encontrado.");
-  return prisma.lightweightProduct.update({ where: { id }, data });
+export async function createProduct(tenantId: string, input: Record<string, unknown>, db: ProductClient = getPrismaClient()) {
+  const data = await prepareProduct(tenantId, input, db);
+  return db.lightweightProduct.create({ data: { tenantId, ...data } });
+}
+
+export async function updateProduct(tenantId: string, id: string, input: Record<string, unknown>) {
+  const db = getPrismaClient();
+  const existing = await db.lightweightProduct.findFirst({ where: { id, tenantId } });
+  if (!existing) throw new ProductInputError("Producto no encontrado.", "id", "PRODUCT_NOT_FOUND", 404);
+  const data = await prepareProduct(tenantId, input, db, existing);
+  return db.lightweightProduct.update({ where: { id, tenantId }, data });
 }

@@ -8,6 +8,7 @@ import {
   ReceiptText,
   Settings2,
   ShoppingCart,
+  Sparkles,
   Users,
   Wallet,
 } from "lucide-react";
@@ -19,6 +20,7 @@ import { routes } from "@/config/routes";
 import { getBasicReports } from "@/lib/core/lightweight-pos";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { getSriDocuments, getSriModuleStatus } from "@/lib/core/sri";
+import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getPrismaClient } from "@/lib/db/prisma";
 
 const pendingStatuses = ["DRAFT", "READY_FOR_TESTING", "SIGNED", "SENT"];
@@ -159,10 +161,11 @@ const quickActions = [
 
 export default async function FacturacionPage() {
   const { tenant } = await requireDashboardSession();
-  const [reports, sriStatus, dashboard] = await Promise.all([
+  const [reports, sriStatus, dashboard, tenantMode] = await Promise.all([
     getBasicReports(tenant.id),
     getSriModuleStatus(tenant.id),
     getDashboardData(tenant.id),
+    getTenantModeState(tenant),
   ]);
   const alerts = [
     ...(dashboard.documentCounts.rejected > 0
@@ -424,6 +427,15 @@ export default async function FacturacionPage() {
           </Card>
         </section>
       </div>
+      {tenantMode.canAccessAiInvoicing && (
+        <Link
+          href={routes.facturacionAi}
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-[#1769E0] px-5 py-3 text-sm font-medium text-white shadow-lg transition-colors hover:bg-[#155DC4]"
+        >
+          <Sparkles className="size-4" />
+          Facturación inteligente
+        </Link>
+      )}
     </DashboardShell>
   );
 }

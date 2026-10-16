@@ -3,9 +3,9 @@ import { NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { requireAiInvoicingAccess } from "@/lib/core/require-ai-invoicing-access";
 import {
-  generateProposals,
+  generateExactProposal,
   type AiProductCandidate,
-} from "@/lib/core/ai-invoice-proposal-engine";
+} from "@/lib/core/ai-invoice-exact-solver";
 import { Prisma } from "@prisma/client";
 
 const VALID_TAX_MODES = new Set(["AUTO", "IVA_0", "IVA_15", "MIXED"]);
@@ -18,7 +18,8 @@ export async function POST(request: Request) {
   const customerId = typeof body.customerId === "string" ? body.customerId.trim() : null;
   const rawAmount = body.requestedAmount;
   const taxMode = typeof body.taxMode === "string" ? body.taxMode : "AUTO";
-  const originalPrompt = typeof body.originalPrompt === "string" ? body.originalPrompt.trim() : null;
+  const paymentMethod = typeof body.paymentMethod === "string" ? body.paymentMethod : "transfer";
+  const sriPaymentCode = typeof body.sriPaymentCode === "string" ? body.sriPaymentCode : "20";
 
   if (!VALID_TAX_MODES.has(taxMode)) {
     return NextResponse.json(
@@ -66,6 +67,7 @@ export async function POST(request: Request) {
       price: true,
       price2: true,
       price3: true,
+      price4: true,
       taxRate: true,
       stock: true,
       trackInventory: true,
@@ -81,13 +83,14 @@ export async function POST(request: Request) {
     price: p.price,
     price2: p.price2,
     price3: p.price3,
+    price4: p.price4 ?? null,
     taxRate: p.taxRate,
     stock: p.stock,
     trackInventory: p.trackInventory,
     type: p.type,
   }));
 
-  const proposals = generateProposals({
+  const proposal = generateExactProposal({
     products: candidates,
     requestedAmount,
     taxMode: taxMode as "AUTO" | "IVA_0" | "IVA_15" | "MIXED",
@@ -97,48 +100,58 @@ export async function POST(request: Request) {
     data: {
       tenantId: access.tenant.id,
       createdByUserId: access.user.id,
-      originalPrompt: originalPrompt || null,
       requestedAmount,
       customerId: customerId || null,
       taxMode: taxMode as "AUTO" | "IVA_0" | "IVA_15" | "MIXED",
-      status: proposals.length > 0 ? "PROPOSED" : "CREATED",
+      paymentMethod,
+      sriPaymentCode,
+      status: proposal ? "PROPOSED" : "CREATED",
     },
   });
 
-  const savedProposals = await Promise.all(
-    proposals.map((proposal, index) =>
-      prisma.aiInvoiceProposal.create({
-        data: {
-          tenantId: access.tenant.id,
-          draftId: draft.id,
-          proposalNumber: index + 1,
-          subtotal: new Prisma.Decimal(proposal.subtotal),
-          taxTotal: new Prisma.Decimal(proposal.taxTotal),
-          total: new Prisma.Decimal(proposal.total),
-          items: proposal.items,
-          combinationHash: proposal.combinationHash,
-        },
-      }),
-    ),
-  );
+  let savedProposal = null;
+  if (proposal) {
+    savedProposal = await prisma.aiInvoiceProposal.create({
+      data: {
+        tenantId: access.tenant.id,
+        draftId: draft.id,
+        proposalNumber: 1,
+        subtotal: new Prisma.Decimal(proposal.subtotal),
+        taxTotal: new Prisma.Decimal(proposal.taxTotal),
+        total: new Prisma.Decimal(proposal.total),
+        items: proposal.items,
+        combinationHash: proposal.combinationHash,
+      },
+    });
+
+    await prisma.aiInvoiceDraft.update({
+      where: { id: draft.id },
+      data: { selectedProposalId: savedProposal.id },
+    });
+  }
 
   return NextResponse.json({
     ok: true,
     draft: {
       id: draft.id,
-      status: draft.status,
+      status: proposal ? "PROPOSED" : "CREATED",
       requestedAmount: draft.requestedAmount?.toString(),
       taxMode: draft.taxMode,
+      paymentMethod: draft.paymentMethod,
+      sriPaymentCode: draft.sriPaymentCode,
     },
-    proposals: savedProposals.map((p) => ({
-      id: p.id,
-      proposalNumber: p.proposalNumber,
-      subtotal: p.subtotal.toString(),
-      taxTotal: p.taxTotal.toString(),
-      total: p.total.toString(),
-      items: p.items,
-      combinationHash: p.combinationHash,
-      difference: proposals[p.proposalNumber - 1]?.difference ?? "0.00",
-    })),
+    proposal: savedProposal
+      ? {
+          id: savedProposal.id,
+          proposalNumber: savedProposal.proposalNumber,
+          subtotal: savedProposal.subtotal.toString(),
+          taxTotal: savedProposal.taxTotal.toString(),
+          total: savedProposal.total.toString(),
+          items: savedProposal.items,
+          combinationHash: savedProposal.combinationHash,
+          isExact: true,
+        }
+      : null,
+    error: !proposal ? "No fue posible generar una factura exacta con los productos, IVA y stock disponibles. Cambia el modo de IVA o revisa el catálogo." : undefined,
   });
 }

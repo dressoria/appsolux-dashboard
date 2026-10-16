@@ -91,9 +91,6 @@ export function buildSidebarNavigation(
             link("Órdenes de venta", routes.facturacionSalesOrders),
             link("Recibos", routes.facturacionReceipts),
             link("Importar ventas", routes.facturacionSalesImports),
-            ...(tenantMode.canAccessAiInvoicing
-              ? [link("Facturación con IA", routes.facturacionAi, "sparkles")]
-              : []),
           ],
         },
         {

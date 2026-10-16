@@ -13,6 +13,7 @@ import {
 
 import { getPrismaClient } from "@/lib/db/prisma";
 import { getLimit } from "@/lib/core/plans";
+import { calculateLine } from "@/lib/core/sale-totals-calculator";
 import { isUnlimitedCommercialVolume } from "@/lib/core/billing-access-policy";
 import { requireTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
 import {
@@ -1050,17 +1051,14 @@ export async function createSale(input: CreateSaleInput) {
           ? product.price
           : new Prisma.Decimal(item.unitPrice);
       assertPositiveMoney(Number(unitPrice), "El precio");
-      const grossAmount = unitPrice.mul(item.quantity);
       const discountAmount = new Prisma.Decimal(
-        Math.max(0, Math.min(item.discountAmount ?? 0, Number(grossAmount))),
+        Math.max(0, Math.min(item.discountAmount ?? 0, Number(unitPrice.mul(item.quantity)))),
       );
-      const lineSubtotal = grossAmount.sub(discountAmount);
       const taxRate = product.taxRate;
-      const taxAmount = lineSubtotal.mul(taxRate).div(100).toDecimalPlaces(2);
-      const lineTotal = lineSubtotal.add(taxAmount);
+      const calc = calculateLine({ quantity: item.quantity, unitPrice, discountAmount, taxRate });
 
-      subtotal = subtotal.add(lineSubtotal);
-      taxTotal = taxTotal.add(taxAmount);
+      subtotal = subtotal.add(calc.lineSubtotal);
+      taxTotal = taxTotal.add(calc.taxAmount);
       discountTotal = discountTotal.add(discountAmount);
 
       return {
@@ -1070,8 +1068,8 @@ export async function createSale(input: CreateSaleInput) {
         description: item.description?.trim() || null,
         discountAmount,
         taxRate,
-        taxAmount,
-        total: lineTotal,
+        taxAmount: calc.taxAmount,
+        total: calc.lineTotal,
       };
     });
 

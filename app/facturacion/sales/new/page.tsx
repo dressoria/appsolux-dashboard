@@ -5,10 +5,20 @@ import { listSriEstablishments, listSriIssuePoints } from "@/lib/core/sri";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getPrismaClient } from "@/lib/db/prisma";
 
-export default async function NewInvoicePage() {
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
+
+export default async function NewInvoicePage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const { user, tenant } = await requireDashboardSession();
   const tenantMode = await getTenantModeState(tenant);
   const prisma = getPrismaClient();
+  const params = await searchParams;
+  const aiProposalId = typeof params.aiProposalId === "string" ? params.aiProposalId : undefined;
+  const aiDraftId = typeof params.aiDraftId === "string" ? params.aiDraftId : undefined;
+
   const [customers, products, establishments, issuePoints] = await Promise.all([
     prisma.lightweightCustomer.findMany({
       where: { tenantId: tenant.id, isActive: true },
@@ -24,6 +34,45 @@ export default async function NewInvoicePage() {
     listSriEstablishments(tenant.id),
     listSriIssuePoints(tenant.id),
   ]);
+
+  let initialCustomerId: string | undefined;
+  let initialLines: Array<{
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    discountPct: number;
+    description: string;
+  }> | undefined;
+  let initialPaymentMethod: string | undefined;
+  let initialSriPaymentCode: string | undefined;
+
+  if (aiProposalId) {
+    const proposal = await prisma.aiInvoiceProposal.findFirst({
+      where: { id: aiProposalId, tenantId: tenant.id },
+      include: { draft: true },
+    });
+
+    if (proposal) {
+      const items = proposal.items as Array<{
+        productId: string;
+        quantity: number;
+        unitPrice: string;
+        discountAmount: string;
+      }>;
+
+      initialCustomerId = proposal.draft.customerId ?? undefined;
+      initialPaymentMethod = proposal.draft.paymentMethod ?? "transfer";
+      initialSriPaymentCode = proposal.draft.sriPaymentCode ?? "20";
+      initialLines = items.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice),
+        discountPct: 0,
+        description: "",
+      }));
+    }
+  }
+
   const activeEstablishments = establishments.filter((item) => item.isActive);
   const activeIssuePoints = issuePoints.filter((item) => item.isActive);
   return (
@@ -88,6 +137,12 @@ export default async function NewInvoicePage() {
           name: item.name,
           establishmentId: item.establishmentId,
         }))}
+        initialCustomerId={initialCustomerId}
+        initialLines={initialLines}
+        initialPaymentMethod={initialPaymentMethod}
+        initialSriPaymentCode={initialSriPaymentCode}
+        aiDraftId={aiDraftId}
+        aiProposalId={aiProposalId}
       />
     </DashboardShell>
   );

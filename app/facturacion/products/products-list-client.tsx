@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ProductActionsClient } from "./product-actions-client";
+import { productTaxLabel } from "@/lib/core/inventory-product-input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +21,7 @@ type Product = {
   cost: string | null;
   stock: number;
   taxRate: string;
+  taxCategory: string | null;
   type: string;
   isActive: boolean;
   imageStorageKey: string | null;
@@ -28,8 +32,10 @@ type Product = {
 type Props = {
   initialProducts: Product[];
   initialTotal: number;
-  warehouses: Array<{ id: string; code: string; name: string }>;
-  brands: Array<{ id: string; name: string }>;
+  q: string;
+  type: string;
+  page: number;
+  saved?: string;
 };
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
@@ -37,19 +43,13 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   false: { label: "Inactivo", className: "bg-red-100 text-red-800" },
 };
 
-export function ProductsListClient({ initialProducts, initialTotal, warehouses, brands }: Props) {
-  const [products] = useState(initialProducts);
+export function ProductsListClient({ initialProducts: products, initialTotal, q, type, page, saved }: Props) {
+  const router = useRouter();
+  const [showSuccess, setShowSuccess] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [search, setSearch] = useState("");
-
-  const filtered = search
-    ? products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(search.toLowerCase()) ||
-          p.primaryCode?.toLowerCase().includes(search.toLowerCase()) ||
-          p.barcode?.toLowerCase().includes(search.toLowerCase()),
-      )
-    : products;
+  const filtered = products;
+  const allVisibleSelected = filtered.length > 0 && filtered.every((p) => selected.has(p.id));
+  const pageUrl = (nextPage: number) => `/facturacion/products?${new URLSearchParams({ q, type, page: String(nextPage) })}`;
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -61,11 +61,13 @@ export function ProductsListClient({ initialProducts, initialTotal, warehouses, 
   };
 
   const toggleAll = () => {
-    if (selected.size === filtered.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(filtered.map((p) => p.id)));
-    }
+    setSelected((previous) => {
+      const next = new Set(previous);
+      for (const product of filtered) {
+        if (allVisibleSelected) next.delete(product.id); else next.add(product.id);
+      }
+      return next;
+    });
   };
 
   return (
@@ -74,28 +76,21 @@ export function ProductsListClient({ initialProducts, initialTotal, warehouses, 
         <Link href="/facturacion/products/new">
           <Button size="sm">+ Crear producto</Button>
         </Link>
-        <Button size="sm" variant="outline" disabled>Actualizar precios</Button>
-        <Button size="sm" variant="outline" disabled>Importar</Button>
-        <Button size="sm" variant="outline" disabled>Descargar formato</Button>
-        <Button size="sm" variant="outline" disabled>Combos</Button>
-        <Button size="sm" variant="outline" disabled={selected.size === 0}>
-          Imprimir códigos de barras
-        </Button>
+        <ProductActionsClient key={`${q}:${type}`} selected={[...selected]} q={q} type={type} />
       </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          placeholder="Buscar por nombre, código o barras..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-sm"
-        />
-        {selected.size > 0 && (
-          <span className="text-sm text-muted-foreground">
-            {selected.size} seleccionados
-          </span>
-        )}
-      </div>
+      {saved && showSuccess && <div role="status" className="fixed bottom-4 right-4 z-50 max-w-md rounded border border-green-300 bg-green-50 p-4 text-green-800 shadow-lg flex gap-4 justify-between">
+        {saved === "created" ? "Producto creado correctamente." : "Producto actualizado correctamente."}
+        <button aria-label="Cerrar notificación" onClick={() => setShowSuccess(false)}>Cerrar</button>
+      </div>}
+      <form className="flex flex-wrap items-center gap-2" onSubmit={(event) => {
+        event.preventDefault();
+        router.push(`/facturacion/products?${new URLSearchParams({ q: String(new FormData(event.currentTarget).get("q") ?? "").trim(), type })}`);
+      }}>
+        <Input aria-label="Buscar productos" placeholder="Buscar por nombre, código o barras..." name="q" key={`${q}:${type}`} defaultValue={q} className="max-w-sm" />
+        <Button size="sm" variant="outline" type="submit">Buscar</Button>
+        {type === "COMBO" && <span className="text-sm">Tipo: Combo</span>}
+        {selected.size > 0 && <span className="text-sm text-muted-foreground">{selected.size} seleccionados</span>}
+      </form>
 
       <Card>
         <CardContent className="p-0">
@@ -104,7 +99,7 @@ export function ProductsListClient({ initialProducts, initialTotal, warehouses, 
               <thead>
                 <tr className="border-b bg-muted/50">
                   <th className="px-3 py-3 text-left">
-                    <input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0} onChange={toggleAll} />
+                    <input type="checkbox" aria-label="Seleccionar productos visibles" checked={allVisibleSelected} onChange={toggleAll} />
                   </th>
                   <th className="px-3 py-3 text-left font-medium">Código</th>
                   <th className="px-3 py-3 text-left font-medium">Nombre</th>
@@ -133,7 +128,7 @@ export function ProductsListClient({ initialProducts, initialTotal, warehouses, 
                     return (
                       <tr key={p.id} className="border-b last:border-0 hover:bg-muted/30">
                         <td className="px-3 py-2">
-                          <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} />
+                          <input type="checkbox" aria-label={`Seleccionar ${p.name}`} checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} />
                         </td>
                         <td className="px-3 py-2 font-mono text-xs">{p.primaryCode ?? "—"}</td>
                         <td className="px-3 py-2">
@@ -148,7 +143,7 @@ export function ProductsListClient({ initialProducts, initialTotal, warehouses, 
                         <td className="px-3 py-2 text-right font-mono text-xs">{p.price3 ? `$${Number(p.price3).toFixed(2)}` : "—"}</td>
                         <td className="px-3 py-2 text-right font-mono text-xs">{p.price4 ? `$${Number(p.price4).toFixed(2)}` : "—"}</td>
                         <td className="px-3 py-2 text-right">{p.stock}</td>
-                        <td className="px-3 py-2 text-center text-xs">{Number(p.taxRate)}%</td>
+                        <td className="px-3 py-2 text-center text-xs">{productTaxLabel(p.taxCategory, p.taxRate)}</td>
                         <td className="px-3 py-2 text-center">
                           <span className={`rounded px-2 py-0.5 text-xs font-medium ${status?.className}`}>
                             {status?.label}
@@ -167,7 +162,11 @@ export function ProductsListClient({ initialProducts, initialTotal, warehouses, 
             </table>
           </div>
           <div className="border-t px-4 py-2 text-xs text-muted-foreground">
-            {initialTotal} producto(s) total
+            {initialTotal} producto(s) total · Página {page}
+            <div className="flex gap-4 mt-2">
+              {page > 1 && <Link href={pageUrl(page - 1)}>Anterior</Link>}
+              {page * 50 < initialTotal && <Link href={pageUrl(page + 1)}>Siguiente</Link>}
+            </div>
           </div>
         </CardContent>
       </Card>

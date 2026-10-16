@@ -96,6 +96,12 @@ export function InvoiceEditor({
   products,
   establishments,
   issuePoints,
+  initialCustomerId,
+  initialLines,
+  initialPaymentMethod,
+  initialSriPaymentCode,
+  aiDraftId,
+  aiProposalId,
 }: {
   currentUserName: string;
   submissionEnabled?: boolean;
@@ -104,14 +110,20 @@ export function InvoiceEditor({
   products: Product[];
   establishments: Establishment[];
   issuePoints: IssuePoint[];
+  initialCustomerId?: string;
+  initialLines?: Line[];
+  initialPaymentMethod?: string;
+  initialSriPaymentCode?: string;
+  aiDraftId?: string;
+  aiProposalId?: string;
 }) {
-  const [customerId, setCustomerId] = useState("");
+  const [customerId, setCustomerId] = useState(initialCustomerId ?? "");
   const [customerSearch, setCustomerSearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
-  const [lines, setLines] = useState<Line[]>([]);
+  const [lines, setLines] = useState<Line[]>(initialLines ?? []);
   const [priceTier, setPriceTier] = useState("PVP1");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [sriPaymentCode, setSriPaymentCode] = useState("01");
+  const [paymentMethod, setPaymentMethod] = useState(initialPaymentMethod ?? "cash");
+  const [sriPaymentCode, setSriPaymentCode] = useState(initialSriPaymentCode ?? "01");
   const [notes, setNotes] = useState("");
   const [globalPct, setGlobalPct] = useState(0);
   const [globalAmount, setGlobalAmount] = useState(0);
@@ -304,6 +316,15 @@ export function InvoiceEditor({
       };
       if (!response.ok || !result.ok || !result.sale)
         throw new Error(result.message ?? "No se pudo guardar la factura.");
+      if (aiDraftId) {
+        try {
+          await fetch(`/api/ai-invoicing/drafts/${aiDraftId}/convert`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ saleId: result.sale.id }),
+          });
+        } catch { /* best effort */ }
+      }
       setSaved({
         saleId: result.sale.id,
         documentId: result.output?.sri?.documentId,

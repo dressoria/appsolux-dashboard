@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { requireAiInvoicingAccess } from "@/lib/core/require-ai-invoicing-access";
 import {
-  generateProposals,
+  generateExactProposal,
   type AiProductCandidate,
-} from "@/lib/core/ai-invoice-proposal-engine";
+} from "@/lib/core/ai-invoice-exact-solver";
 import { Prisma } from "@prisma/client";
 
 type RouteParams = { params: Promise<{ draftId: string }> };
@@ -57,6 +57,7 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
       price: true,
       price2: true,
       price3: true,
+      price4: true,
       taxRate: true,
       stock: true,
       trackInventory: true,
@@ -72,56 +73,71 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
     price: p.price,
     price2: p.price2,
     price3: p.price3,
+    price4: p.price4 ?? null,
     taxRate: p.taxRate,
     stock: p.stock,
     trackInventory: p.trackInventory,
     type: p.type,
   }));
 
-  const newProposals = generateProposals({
+  const generationNumber = draft.proposals.length + 1;
+  const seed = hashCode(`${draftId}:${generationNumber}`);
+
+  const proposal = generateExactProposal({
     products: candidates,
     requestedAmount: draft.requestedAmount,
     taxMode: draft.taxMode,
     excludedHashes,
+    seed,
   });
 
-  const existingCount = draft.proposals.length;
-
-  const savedProposals = await Promise.all(
-    newProposals.map((proposal, index) =>
-      prisma.aiInvoiceProposal.create({
-        data: {
-          tenantId: access.tenant.id,
-          draftId: draft.id,
-          proposalNumber: existingCount + index + 1,
-          subtotal: new Prisma.Decimal(proposal.subtotal),
-          taxTotal: new Prisma.Decimal(proposal.taxTotal),
-          total: new Prisma.Decimal(proposal.total),
-          items: proposal.items,
-          combinationHash: proposal.combinationHash,
-        },
-      }),
-    ),
-  );
-
-  if (newProposals.length > 0) {
-    await prisma.aiInvoiceDraft.update({
-      where: { id: draft.id },
-      data: { status: "PROPOSED" },
-    });
+  if (!proposal) {
+    return NextResponse.json({
+      ok: false,
+      error: "No fue posible generar otra combinación exacta con los productos, IVA y stock disponibles.",
+    }, { status: 422 });
   }
+
+  const savedProposal = await prisma.aiInvoiceProposal.create({
+    data: {
+      tenantId: access.tenant.id,
+      draftId: draft.id,
+      proposalNumber: generationNumber,
+      subtotal: new Prisma.Decimal(proposal.subtotal),
+      taxTotal: new Prisma.Decimal(proposal.taxTotal),
+      total: new Prisma.Decimal(proposal.total),
+      items: proposal.items,
+      combinationHash: proposal.combinationHash,
+    },
+  });
+
+  await prisma.aiInvoiceDraft.update({
+    where: { id: draft.id },
+    data: {
+      selectedProposalId: savedProposal.id,
+      status: "PROPOSED",
+    },
+  });
 
   return NextResponse.json({
     ok: true,
-    proposals: savedProposals.map((p, i) => ({
-      id: p.id,
-      proposalNumber: p.proposalNumber,
-      subtotal: p.subtotal.toString(),
-      taxTotal: p.taxTotal.toString(),
-      total: p.total.toString(),
-      items: p.items,
-      combinationHash: p.combinationHash,
-      difference: newProposals[i]?.difference ?? "0.00",
-    })),
+    proposal: {
+      id: savedProposal.id,
+      proposalNumber: savedProposal.proposalNumber,
+      subtotal: savedProposal.subtotal.toString(),
+      taxTotal: savedProposal.taxTotal.toString(),
+      total: savedProposal.total.toString(),
+      items: savedProposal.items,
+      combinationHash: savedProposal.combinationHash,
+      isExact: true,
+    },
   });
+}
+
+function hashCode(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
 }

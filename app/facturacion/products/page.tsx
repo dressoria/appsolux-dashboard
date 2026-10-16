@@ -1,17 +1,15 @@
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { getProducts } from "@/lib/core/inventory-products";
-import { getWarehouses } from "@/lib/core/inventory-warehouses";
-import { getBrands } from "@/lib/core/inventory-brands";
 import { ProductsListClient } from "./products-list-client";
 
-export default async function FacturacionProductsPage() {
+export default async function FacturacionProductsPage({ searchParams }: { searchParams: Promise<{ q?: string; type?: string; page?: string; saved?: string }> }) {
   const { tenant } = await requireDashboardSession();
-  const [productsResult, warehouses, brands] = await Promise.all([
-    getProducts(tenant.id, { take: 50 }),
-    getWarehouses(tenant.id),
-    getBrands(tenant.id),
-  ]);
+  const params = await searchParams;
+  const q = params.q?.trim() ?? "";
+  const type = ["PRODUCT", "SERVICE", "COMBO"].includes(params.type ?? "") ? params.type! : "";
+  const page = Math.max(1, Math.min(1000000, Math.floor(Number(params.page) || 1)));
+  const productsResult = await getProducts(tenant.id, { take: 50, skip: (page - 1) * 50, q, type: type || undefined });
 
   return (
     <DashboardShell>
@@ -23,8 +21,10 @@ export default async function FacturacionProductsPage() {
         <ProductsListClient
           initialProducts={JSON.parse(JSON.stringify(productsResult.items))}
           initialTotal={productsResult.total}
-          warehouses={JSON.parse(JSON.stringify(warehouses))}
-          brands={JSON.parse(JSON.stringify(brands))}
+          q={q}
+          type={type}
+          page={page}
+          saved={params.saved === "created" || params.saved === "updated" ? params.saved : undefined}
         />
       </div>
     </DashboardShell>
