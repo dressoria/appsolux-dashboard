@@ -649,6 +649,7 @@ model Tenant {
   inventoryOrders              InventoryOrder[]
   productPriceChanges          ProductPriceChange[]
   inventorySettings            InventorySettings?
+  sriCancellationRequests      SriCancellationRequest[]
 }
 
 model Plan {
@@ -1579,10 +1580,11 @@ model SriDocument {
   tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   establishment  SriEstablishment   @relation(fields: [establishmentId], references: [id])
   issuePoint     SriIssuePoint      @relation(fields: [issuePointId], references: [id])
-  lines            SriDocumentLine[]
-  signingJobs      SriSigningJob[]
-  submissionJobs   SriSubmissionJob[]
-  withholdingLines SriWithholdingLine[]
+  lines                SriDocumentLine[]
+  signingJobs          SriSigningJob[]
+  submissionJobs       SriSubmissionJob[]
+  withholdingLines     SriWithholdingLine[]
+  cancellationRequests SriCancellationRequest[]
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -3270,4 +3272,50 @@ model InventorySettings {
 
   tenant           Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   defaultWarehouse InventoryWarehouse? @relation("SettingsDefaultWarehouse", fields: [defaultWarehouseId], references: [id], onDelete: SetNull)
+}
+
+enum SriCancellationStatus {
+  QUEUED
+  RUNNING
+  SUBMITTED
+  CONFIRMED
+  FAILED
+  HUMAN_VERIFICATION_REQUIRED
+  NOT_ELIGIBLE
+  CANCELLED_BY_USER
+}
+
+enum SriCancellationReason {
+  EMISSION_ERROR
+  OPERATION_NOT_OCCURRED
+}
+
+model SriCancellationRequest {
+  id                  String                  @id @default(cuid())
+  tenantId            String
+  sriDocumentId       String
+  status              SriCancellationStatus   @default(QUEUED)
+  reasonCode          SriCancellationReason
+  reasonText          String?
+  requestedByUserId   String
+  requestedAt         DateTime                @default(now())
+  claimedAt           DateTime?
+  submittedAt         DateTime?
+  confirmedAt         DateTime?
+  failedAt            DateTime?
+  workerId            String?
+  attemptCount        Int                     @default(0)
+  sriRequestNumber    String?
+  lastErrorCode       String?
+  lastErrorMessage    String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sriDocument SriDocument @relation(fields: [sriDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([sriDocumentId])
+  @@index([status])
+  @@index([tenantId, sriDocumentId])
 }

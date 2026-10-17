@@ -85,6 +85,8 @@ export type ParsedAuthorizedSriInvoice = {
     propina: string;
     iva: RideTaxSummary[];
     importeTotal: string;
+    valorTotalSinSubsidio: string;
+    ahorroPorSubsidio: string;
   };
 };
 
@@ -138,13 +140,48 @@ function normalizeAmount(value: string) {
   return value.trim() || "0.00";
 }
 
-function getTaxBucketLabel(codigoPorcentaje: string, tarifa: string) {
+const KNOWN_CODIGO_PORCENTAJE_TARIFA: Record<string, number> = {
+  "0": 0,
+  "2": 12,
+  "4": 15,
+  "5": 5,
+  "6": 0,
+  "7": 0,
+  "8": 0,
+};
+
+function resolveTarifa(
+  codigoPorcentaje: string,
+  explicitTarifa: string,
+  detailTaxMap: Map<string, number>,
+  codigo: string,
+): number {
+  const explicit = Number(explicitTarifa);
+  if (explicitTarifa && !isNaN(explicit) && explicit > 0) return explicit;
+
+  const detailKey = `${codigo}:${codigoPorcentaje}`;
+  const fromDetail = detailTaxMap.get(detailKey);
+  if (fromDetail !== undefined && fromDetail > 0) return fromDetail;
+
+  const known = KNOWN_CODIGO_PORCENTAJE_TARIFA[codigoPorcentaje];
+  if (known !== undefined && known > 0) return known;
+
+  if (explicitTarifa && !isNaN(explicit)) return explicit;
+  if (fromDetail !== undefined) return fromDetail;
+  if (known !== undefined) return known;
+
+  return 0;
+}
+
+function formatTarifaLabel(rate: number): string {
+  return Number.isInteger(rate) ? String(rate) : rate.toFixed(2);
+}
+
+function getTaxBucketLabel(codigoPorcentaje: string, tarifa: number) {
   if (codigoPorcentaje === "6") return "SUBTOTAL NO OBJETO DE IVA";
   if (codigoPorcentaje === "7") return "SUBTOTAL EXENTO DE IVA";
 
-  const numericRate = Number(tarifa || "0");
-  if (numericRate > 0)
-    return `SUBTOTAL ${Number.isInteger(numericRate) ? numericRate : tarifa}%`;
+  if (tarifa > 0) return `SUBTOTAL ${formatTarifaLabel(tarifa)}%`;
 
   return "SUBTOTAL 0%";
 }
@@ -265,6 +302,23 @@ export function parseAuthorizedSriInvoiceXml(
     })
     .filter((p): p is RidePayment => p !== null);
 
+  // ── Build detail-level tax map (codigo:codigoPorcentaje → tarifa) ─────────
+
+  const detailTaxMap = new Map<string, number>();
+  for (const detailXml of detailBlocks) {
+    const impuestoBlocks = findAllBlocks(detailXml, "impuesto");
+    for (const impXml of impuestoBlocks) {
+      const impCodigo = findFirstTag(impXml, "codigo");
+      const impCodigoPct = findFirstTag(impXml, "codigoPorcentaje");
+      const impTarifa = findFirstTag(impXml, "tarifa");
+      if (impCodigo && impCodigoPct && impTarifa) {
+        const key = `${impCodigo}:${impCodigoPct}`;
+        const rate = Number(impTarifa);
+        if (!isNaN(rate)) detailTaxMap.set(key, rate);
+      }
+    }
+  }
+
   // ── Tax totals ─────────────────────────────────────────────────────────────
 
   const taxBlocks = findAllBlocks(documentXml, "totalImpuesto");
@@ -283,7 +337,7 @@ export function parseAuthorizedSriInvoiceXml(
       findFirstTag(taxXml, "baseImponible"),
     );
     const valor = normalizeAmount(findFirstTag(taxXml, "valor"));
-    const tarifa = normalizeAmount(findFirstTag(taxXml, "tarifa"));
+    const explicitTarifa = findFirstTag(taxXml, "tarifa");
 
     if (codigo === "3") {
       ice = valor;
@@ -294,6 +348,13 @@ export function parseAuthorizedSriInvoiceXml(
       irbpnr = valor;
       continue;
     }
+
+    const tarifa = resolveTarifa(
+      codigoPorcentaje,
+      explicitTarifa,
+      detailTaxMap,
+      codigo,
+    );
 
     const label = getTaxBucketLabel(codigoPorcentaje, tarifa);
 
@@ -311,15 +372,53 @@ export function parseAuthorizedSriInvoiceXml(
     }
 
     if (codigo === "2") {
-      iva.push({
-        label:
-          Number(tarifa) > 0
-            ? `IVA ${Number.isInteger(Number(tarifa)) ? Number(tarifa) : tarifa}%`
-            : "IVA 0%",
-        baseAmount: baseImponible,
-        value: valor,
-      });
+      if (tarifa > 0) {
+        iva.push({
+          label: `IVA ${formatTarifaLabel(tarifa)}%`,
+          baseAmount: baseImponible,
+          value: valor,
+        });
+      } else if (Number(valor) > 0) {
+        iva.push({
+          label: "IVA 0%",
+          baseAmount: baseImponible,
+          value: valor,
+        });
+      }
     }
+  }
+
+  // ── Subsidio ────────────────────────────────────────────────────────────────
+
+  let totalSubsidio = 0;
+  let totalSinSubsidio = 0;
+  for (const det of details) {
+    const qty = Number(det.quantity) || 0;
+    const sub = Number(det.subsidio) || 0;
+    const pss = Number(det.precioSinSubsidio) || 0;
+    totalSubsidio += qty * sub;
+    totalSinSubsidio += qty * pss;
+  }
+
+  const importeTotalNum = Number(
+    findFirstTag(infoFactura, "importeTotal") || "0",
+  );
+
+  let valorTotalSinSubsidio = "0.00";
+  let ahorroPorSubsidio = "0.00";
+  if (totalSubsidio > 0.005) {
+    const ivaRateForSubsidy = iva.length > 0
+      ? Number(iva.reduce((sum, r) => sum + Number(r.value), 0)) /
+        Math.max(Number(iva.reduce((sum, r) => sum + Number(r.baseAmount), 0)), 0.01)
+      : 0;
+    const sinSubsidioBase = totalSinSubsidio;
+    const sinSubsidioIva = sinSubsidioBase * ivaRateForSubsidy;
+    const vtss = sinSubsidioBase + sinSubsidioIva +
+      Number(ice) + Number(irbpnr) +
+      Number(findFirstTag(infoFactura, "propina") || "0");
+    valorTotalSinSubsidio = vtss.toFixed(2);
+    ahorroPorSubsidio = (vtss - importeTotalNum).toFixed(2);
+    if (Number(ahorroPorSubsidio) < 0) ahorroPorSubsidio = "0.00";
   }
 
   return {
@@ -397,6 +496,8 @@ export function parseAuthorizedSriInvoiceXml(
       propina: normalizeAmount(findFirstTag(infoFactura, "propina")),
       iva,
       importeTotal: normalizeAmount(findFirstTag(infoFactura, "importeTotal")),
+      valorTotalSinSubsidio,
+      ahorroPorSubsidio,
     },
   };
 }

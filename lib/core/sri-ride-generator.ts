@@ -731,7 +731,7 @@ export async function generateRidePdfFromAuthorizedXml(
 
   // ── Right: Totals ──
 
-  type SummaryRow = { label: string; value: string; isTotal?: boolean };
+  type SummaryRow = { label: string; value: string; isTotal?: boolean; isSubsidyNote?: boolean };
 
   const summaryRows: SummaryRow[] = [
     ...invoice.totals.subtotalTaxed.map((r) => ({ label: r.label, value: r.baseAmount })),
@@ -741,10 +741,12 @@ export async function generateRidePdfFromAuthorizedXml(
     { label: "SUBTOTAL SIN IMPUESTOS", value: invoice.totals.subtotalSinImpuestos },
     { label: "TOTAL DESCUENTO", value: invoice.totals.totalDescuento },
     { label: "ICE", value: invoice.totals.ice },
-    { label: "IRBPNR", value: invoice.totals.irbpnr },
     ...invoice.totals.iva.map((r) => ({ label: r.label, value: r.value })),
+    { label: "IRBPNR", value: invoice.totals.irbpnr },
     { label: "PROPINA", value: invoice.totals.propina },
     { label: "VALOR TOTAL", value: invoice.totals.importeTotal, isTotal: true },
+    { label: "VALOR TOTAL SIN SUBSIDIO", value: invoice.totals.valorTotalSinSubsidio ?? "0.00" },
+    { label: "AHORRO POR SUBSIDIO:", value: invoice.totals.ahorroPorSubsidio ?? "0.00", isSubsidyNote: true },
   ];
 
   let frY = footerTop;
@@ -772,6 +774,13 @@ export async function generateRidePdfFromAuthorizedXml(
     drawTextRight(currentPage, H, `$${money(row.value)}`, frValueX, frY + 2, fs, f, color);
 
     frY += rowH;
+
+    if (row.isSubsidyNote) {
+      const noteText = "(Incluye IVA cuando corresponda)";
+      drawText(currentPage, H, noteText, frLabelX, frY + 1, 5.5, fontR, C.muted, footerRightW * 0.65);
+      drawTextRight(currentPage, H, `$${money(row.value)}`, frValueX, frY + 1, 5.5, fontR, C.muted);
+      frY += 9;
+    }
   }
 
   // ────────────────────────────────────────────────────────────────────────────

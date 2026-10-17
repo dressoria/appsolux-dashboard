@@ -17,6 +17,7 @@ export function SaleDetailActions({
   pendingAmount,
   sriDocumentStatus,
   hasSriDocument = false,
+  sriDocumentId,
 }: {
   saleId: string;
   canCancel: boolean;
@@ -24,10 +25,12 @@ export function SaleDetailActions({
   pendingAmount: number;
   sriDocumentStatus?: string | null;
   hasSriDocument?: boolean;
+  sriDocumentId?: string | null;
 }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   async function cancelSale() {
     setMessage("");
@@ -94,13 +97,12 @@ export function SaleDetailActions({
           </Button>
         )}
 
-        {canCancel && sriDocumentStatus === "AUTHORIZED" && (
+        {canCancel && sriDocumentStatus === "AUTHORIZED" && sriDocumentId && (
           <Button
             type="button"
             variant="outline"
-            disabled
-            title="La anulación SRI se realizará con nota de crédito en una fase posterior."
-            className="border-amber-200 text-amber-700 opacity-60"
+            onClick={() => setShowCancelModal(true)}
+            className="border-red-200 text-red-700 hover:bg-red-50"
           >
             Anular factura SRI
           </Button>
@@ -139,6 +141,155 @@ export function SaleDetailActions({
 
       {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+      {showCancelModal && sriDocumentId && (
+        <SriCancellationModal
+          sriDocumentId={sriDocumentId}
+          onClose={() => setShowCancelModal(false)}
+          onSuccess={() => {
+            setShowCancelModal(false);
+            setMessage("Solicitud de anulación enviada. La factura no se marcará como anulada hasta que el SRI confirme la anulación.");
+            router.refresh();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function SriCancellationModal({
+  sriDocumentId,
+  onClose,
+  onSuccess,
+}: {
+  sriDocumentId: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [reason, setReason] = useState<string>("EMISSION_ERROR");
+  const [comment, setComment] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [eligibility, setEligibility] = useState<{
+    eligible: boolean;
+    reason?: string;
+    deadlineDate?: string;
+    hasCredentials: boolean;
+  } | null>(null);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useState(() => {
+    fetch(`/api/sri/documents/${sriDocumentId}/cancel`)
+      .then((r) => r.json())
+      .then((data) => {
+        setEligibility(data.eligibility ?? null);
+        setLoading(false);
+      })
+      .catch(() => {
+        setErrorMsg("No se pudo verificar elegibilidad.");
+        setLoading(false);
+      });
+  });
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    setErrorMsg("");
+    try {
+      const res = await fetch(`/api/sri/documents/${sriDocumentId}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reasonCode: reason, reasonText: comment }),
+      });
+      const data = (await res.json()) as { ok?: boolean; message?: string };
+      if (!res.ok || !data.ok) throw new Error(data.message ?? "Error al solicitar anulación.");
+      onSuccess();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Error inesperado.");
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="w-full max-w-lg rounded-2xl border bg-white p-6 shadow-xl">
+        <h2 className="text-lg font-bold text-red-700">Anular factura SRI</h2>
+
+        {loading ? (
+          <p className="mt-4 text-sm text-slate-500">Verificando elegibilidad...</p>
+        ) : eligibility && !eligibility.eligible ? (
+          <div className="mt-4 space-y-3">
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {eligibility.reason}
+            </p>
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={onClose}>Cerrar</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 space-y-4">
+            <p className="text-sm text-slate-600">
+              La factura no se marcará como anulada hasta que el SRI confirme la anulación.
+            </p>
+
+            {eligibility?.deadlineDate && (
+              <p className="text-xs text-slate-500">
+                Plazo de anulación en línea: hasta {eligibility.deadlineDate}
+              </p>
+            )}
+
+            <div className="space-y-1">
+              <Label>Motivo</Label>
+              <select
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="EMISSION_ERROR">Error de emisión</option>
+                <option value="OPERATION_NOT_OCCURRED">La operación no se realizó</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Comentario (opcional)</Label>
+              <textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                rows={3}
+                placeholder="Detalle adicional sobre la anulación..."
+              />
+            </div>
+
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+                className="mt-0.5"
+              />
+              Confirmo que deseo solicitar la anulación de este comprobante al SRI.
+            </label>
+
+            {errorMsg && (
+              <p className="text-sm text-red-600">{errorMsg}</p>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={onClose} disabled={submitting}>
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={!confirmed || submitting}
+                onClick={handleSubmit}
+              >
+                {submitting ? "Enviando..." : "Solicitar anulación al SRI"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

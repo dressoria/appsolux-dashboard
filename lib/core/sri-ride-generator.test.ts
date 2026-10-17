@@ -88,6 +88,8 @@ function makeInvoice(
       propina: "0.00",
       iva: [{ label: "IVA 15%", baseAmount: "20.00", value: "3.00" }],
       importeTotal: "23.00",
+      valorTotalSinSubsidio: "0.00",
+      ahorroPorSubsidio: "0.00",
       ...overrides.totals,
     },
   };
@@ -303,6 +305,8 @@ test("RIDE generator — totals render correctly", async () => {
       propina: "0.00",
       iva: [{ label: "IVA 15%", baseAmount: "100.00", value: "15.00" }],
       importeTotal: "155.00",
+      valorTotalSinSubsidio: "0.00",
+      ahorroPorSubsidio: "0.00",
     },
   });
 
@@ -321,10 +325,16 @@ test("RIDE — FACTUROM COM not Appsolux", async () => {
   });
 
   const buffer = await mod.generateRidePdfFromAuthorizedXml(invoice);
-  const pdfStr = buffer.toString("latin1");
 
-  assert.ok(!pdfStr.includes("Appsolux"), "RIDE must not contain Appsolux");
-  assert.ok(pdfStr.includes("FACTUROM"), "RIDE must contain FACTUROM");
+  const { PDFDocument } = await import("pdf-lib");
+  const loaded = await PDFDocument.load(buffer);
+  const creator = loaded.getCreator() ?? "";
+  const title = loaded.getTitle() ?? "";
+
+  assert.ok(creator.includes("FACTUROM"), "Creator must contain FACTUROM");
+  assert.ok(!creator.includes("Appsolux"), "Creator must not contain Appsolux");
+  assert.ok(title.includes("RIDE"), "Title must reference RIDE");
+  assert.ok(!title.includes("Appsolux"), "Title must not contain Appsolux");
 });
 
 test("RIDE — info adicional renders", async () => {

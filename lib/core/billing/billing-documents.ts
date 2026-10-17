@@ -27,6 +27,8 @@ export type BillingDocumentListItem = {
   sriDetailHref: string | null;
   itemsSummary: string | null;
   itemsUnavailable?: boolean;
+  cancellationStatus: string | null;
+  cancellationStatusLabel: string | null;
 };
 
 const INTERNAL_STATUS_LABELS: Record<string, string> = {
@@ -47,8 +49,23 @@ const SRI_STATUS_LABELS: Record<string, string> = {
   CANCELLED: "Anulado",
 };
 
+const CANCELLATION_STATUS_LABELS: Record<string, string> = {
+  QUEUED: "Anulación en cola",
+  RUNNING: "Anulando…",
+  SUBMITTED: "Anulación enviada al SRI",
+  CONFIRMED: "Anulación confirmada",
+  FAILED: "Anulación fallida",
+  HUMAN_VERIFICATION_REQUIRED: "Requiere verificación manual",
+  NOT_ELIGIBLE: "No elegible para anulación",
+  CANCELLED_BY_USER: "Anulación cancelada",
+};
+
 function sriLabel(status: string): string {
   return SRI_STATUS_LABELS[status] ?? status;
+}
+
+function cancellationLabel(status: string): string {
+  return CANCELLATION_STATUS_LABELS[status] ?? status;
 }
 
 function formatDisplayNumber(
@@ -159,6 +176,8 @@ async function loadBasicHistoryItems(
       sriDetailHref: sri ? `/sri/documents/${sri.id}` : null,
       itemsSummary:
         sale.items.map((i) => `${i.product.name} ×${i.quantity}`).join(", ") || null,
+      cancellationStatus: null,
+      cancellationStatusLabel: null,
     };
   });
 }
@@ -286,6 +305,19 @@ export async function loadCoreDocuments(
     sriDocs.filter((d) => d.sourceId).map((d) => [d.sourceId!, d])
   );
 
+  const sriDocIds = sriDocs.map((d) => d.id);
+  const cancellationRequests = sriDocIds.length > 0
+    ? await prisma.sriCancellationRequest.findMany({
+        where: { tenantId, sriDocumentId: { in: sriDocIds } },
+        orderBy: { createdAt: "desc" },
+        distinct: ["sriDocumentId"],
+        select: { sriDocumentId: true, status: true },
+      })
+    : [];
+  const cancelByDocId = Object.fromEntries(
+    cancellationRequests.map((c) => [c.sriDocumentId, c.status])
+  );
+
   return {
     items: sales.map((sale) => {
       const sri = sriBySourceId[sale.id] ?? null;
@@ -305,6 +337,8 @@ export async function loadCoreDocuments(
             sri.sequentialNumber
           )
         : null;
+
+      const cStatus = sri ? (cancelByDocId[sri.id] ?? null) : null;
 
       return {
         id: sale.id,
@@ -331,6 +365,8 @@ export async function loadCoreDocuments(
         itemsSummary:
           sale.items.map((i) => `${i.product.name} ×${i.quantity}`).join(", ") ||
           null,
+        cancellationStatus: cStatus,
+        cancellationStatusLabel: cStatus ? cancellationLabel(cStatus) : null,
       };
     }),
     total,
@@ -396,12 +432,27 @@ export async function loadErpDocuments(
       : Promise.resolve([]),
   ]);
 
+  const docIds = docs.map((d) => d.id);
+  const erpCancellations = docIds.length > 0
+    ? await prisma.sriCancellationRequest.findMany({
+        where: { tenantId, sriDocumentId: { in: docIds } },
+        orderBy: { createdAt: "desc" },
+        distinct: ["sriDocumentId"],
+        select: { sriDocumentId: true, status: true },
+      })
+    : [];
+  const erpCancelByDocId = Object.fromEntries(
+    erpCancellations.map((c) => [c.sriDocumentId, c.status])
+  );
+
   const sriItems: BillingDocumentListItem[] = docs.map((doc) => {
     const job = doc.submissionJobs[0] ?? null;
     const rejectionMessage =
       doc.status === "REJECTED"
         ? job?.errorMessage ?? job?.sriAuthorizationStatus ?? job?.sriReceiptStatus ?? null
         : null;
+
+    const cStatus = erpCancelByDocId[doc.id] ?? null;
 
     return {
       id: doc.id,
@@ -431,6 +482,8 @@ export async function loadErpDocuments(
       sriDetailHref: `/sri/documents/${doc.id}`,
       itemsSummary: null,
       itemsUnavailable: false,
+      cancellationStatus: cStatus,
+      cancellationStatusLabel: cStatus ? cancellationLabel(cStatus) : null,
     };
   });
 
