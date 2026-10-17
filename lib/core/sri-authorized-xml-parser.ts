@@ -390,36 +390,33 @@ export function parseAuthorizedSriInvoiceXml(
 
   // ── Subsidio ────────────────────────────────────────────────────────────────
 
-  let totalSubsidio = 0;
-  let totalSinSubsidio = 0;
-  for (const det of details) {
-    const qty = Number(det.quantity) || 0;
-    const sub = Number(det.subsidio) || 0;
-    const pss = Number(det.precioSinSubsidio) || 0;
-    totalSubsidio += qty * sub;
-    totalSinSubsidio += qty * pss;
+  const importeTotalNum = Number(findFirstTag(infoFactura, "importeTotal") || "0");
+  let subsidySavings = 0;
+  for (let i = 0; i < details.length; i++) {
+    const detail = details[i];
+    const qty = Number(detail.quantity) || 0;
+    const subsidy = qty * (Number(detail.subsidio) || 0);
+    if (subsidy <= 0) continue;
+    // Preserve the original discounted subtotal and add only this line's
+    // subsidy difference. Never apply one rate to the entire invoice.
+    const unsubsidizedBase = qty * Number(detail.precioSinSubsidio) - Number(detail.discount);
+    const priceDifference = unsubsidizedBase - Number(detail.subtotalExcludingTax);
+    const baseDifference = priceDifference > 0 ? priceDifference : subsidy;
+    let taxDifference = 0;
+    for (const taxXml of findAllBlocks(detailBlocks[i], "impuesto")) {
+      if (findFirstTag(taxXml, "codigo") !== "2") continue;
+      const rate = resolveTarifa(findFirstTag(taxXml, "codigoPorcentaje"), findFirstTag(taxXml, "tarifa"), detailTaxMap, "2");
+      if (rate <= 0) continue;
+      const base = Number(findFirstTag(taxXml, "baseImponible")) || 0;
+      const originalTax = Number(findFirstTag(taxXml, "valor")) || 0;
+      taxDifference += Number(((base + baseDifference) * rate / 100).toFixed(2)) - originalTax;
+    }
+    subsidySavings += baseDifference + taxDifference;
   }
-
-  const importeTotalNum = Number(
-    findFirstTag(infoFactura, "importeTotal") || "0",
-  );
-
-  let valorTotalSinSubsidio = "0.00";
-  let ahorroPorSubsidio = "0.00";
-  if (totalSubsidio > 0.005) {
-    const ivaRateForSubsidy = iva.length > 0
-      ? Number(iva.reduce((sum, r) => sum + Number(r.value), 0)) /
-        Math.max(Number(iva.reduce((sum, r) => sum + Number(r.baseAmount), 0)), 0.01)
-      : 0;
-    const sinSubsidioBase = totalSinSubsidio;
-    const sinSubsidioIva = sinSubsidioBase * ivaRateForSubsidy;
-    const vtss = sinSubsidioBase + sinSubsidioIva +
-      Number(ice) + Number(irbpnr) +
-      Number(findFirstTag(infoFactura, "propina") || "0");
-    valorTotalSinSubsidio = vtss.toFixed(2);
-    ahorroPorSubsidio = (vtss - importeTotalNum).toFixed(2);
-    if (Number(ahorroPorSubsidio) < 0) ahorroPorSubsidio = "0.00";
-  }
+  const ahorroPorSubsidio = Math.max(subsidySavings, 0).toFixed(2);
+  const valorTotalSinSubsidio = subsidySavings > 0.005
+    ? (importeTotalNum + Number(ahorroPorSubsidio)).toFixed(2)
+    : "0.00";
 
   return {
     emitter: {

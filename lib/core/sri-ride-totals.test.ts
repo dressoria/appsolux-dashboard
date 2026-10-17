@@ -4,19 +4,11 @@ import test from "node:test";
 type ParsedAuthorizedSriInvoice = import("./sri-authorized-xml-parser.ts").ParsedAuthorizedSriInvoice;
 
 async function loadParser() {
-  try {
-    return await import("./sri-authorized-xml-parser.ts");
-  } catch {
-    return null;
-  }
+  return import("./sri-authorized-xml-parser.ts");
 }
 
 async function loadGenerator() {
-  try {
-    return await import("./sri-ride-generator.ts");
-  } catch {
-    return null;
-  }
+  return import("./sri-ride-generator.ts");
 }
 
 function buildAuthorizedXml(opts: {
@@ -605,4 +597,30 @@ test("G-O: RIDE PDF still generates successfully with corrected parser", async (
 
   const header = buffer.subarray(0, 5).toString("ascii");
   assert.equal(header, "%PDF-");
+});
+
+test("RIDE resolves the codigoPorcentaje map when both total and detail tarifa are absent", async () => {
+  const { parseAuthorizedSriInvoiceXml } = await loadParser();
+  const invoice = parseAuthorizedSriInvoiceXml(buildAuthorizedXml({ details: [{ impuestos: [] }], totalImpuestos: [{ codigo: "2", codigoPorcentaje: "4", baseImponible: "100.00", valor: "15.00" }] }));
+  assert.equal(invoice.totals.iva[0].label, "IVA 15%");
+  assert.ok(!invoice.totals.iva.some((row) => row.label === "IVA 0%"));
+});
+test("RIDE uses detail tarifa before the code map and explicit total tarifa before detail", async () => {
+  const { parseAuthorizedSriInvoiceXml } = await loadParser();
+  const fixture = { details: [{ impuestos: [{ codigo: "2", codigoPorcentaje: "4", tarifa: "8", baseImponible: "100", valor: "8" }] }], totalImpuestos: [{ codigo: "2", codigoPorcentaje: "4", baseImponible: "100", valor: "8" }] };
+  assert.equal(parseAuthorizedSriInvoiceXml(buildAuthorizedXml(fixture)).totals.iva[0].label, "IVA 8%");
+  assert.equal(parseAuthorizedSriInvoiceXml(buildAuthorizedXml({ ...fixture, totalImpuestos: [{ ...fixture.totalImpuestos[0], tarifa: "12" }] })).totals.iva[0].label, "IVA 12%");
+});
+test("subsidy totals preserve discounts and each detail's VAT instead of applying average VAT to the whole invoice", async () => {
+  const { parseAuthorizedSriInvoiceXml } = await loadParser();
+  const invoice = parseAuthorizedSriInvoiceXml(buildAuthorizedXml({
+    details: [
+      { cantidad: "2", precioUnitario: "8", precioSinSubsidio: "10", subsidio: "2", descuento: "1", precioTotalSinImpuesto: "15", impuestos: [{ codigo: "2", codigoPorcentaje: "4", tarifa: "15", baseImponible: "15", valor: "2.25" }] },
+      { cantidad: "1", precioUnitario: "10", precioTotalSinImpuesto: "10", impuestos: [{ codigo: "2", codigoPorcentaje: "0", tarifa: "0", baseImponible: "10", valor: "0" }] },
+    ],
+    totalImpuestos: [ { codigo: "2", codigoPorcentaje: "4", baseImponible: "15", valor: "2.25" }, { codigo: "2", codigoPorcentaje: "0", baseImponible: "10", valor: "0" } ],
+    totalSinImpuestos: "25", totalDescuento: "1", importeTotal: "27.25",
+  }));
+  assert.equal(invoice.totals.valorTotalSinSubsidio, "31.85");
+  assert.equal(invoice.totals.ahorroPorSubsidio, "4.60");
 });

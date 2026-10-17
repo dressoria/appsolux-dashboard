@@ -25,23 +25,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: hmacResult.error }, { status: 403 });
   }
 
-  const body = JSON.parse(bodyText) as {
+  let body: {
     requestId?: string;
-    confirmedByUserId?: string;
+    tenantId?: string;
+    sriConfirmed?: boolean;
   };
+  try {
+    body = JSON.parse(bodyText);
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
+  }
 
-  if (!body.requestId || !tenantId) {
+  if (!body || typeof body.requestId !== "string" || !tenantId || !workerId ||
+      body.requestId !== jobId || body.tenantId !== tenantId) {
     return NextResponse.json(
       { error: "requestId and tenantId are required." },
       { status: 400 },
     );
   }
 
+  if (body.sriConfirmed !== true) {
+    return NextResponse.json({ error: "Real SRI confirmation is required; SUBMITTED is insufficient." }, { status: 409 });
+  }
+
   try {
     const result = await finalizeSriInvoiceCancellation(
       tenantId,
       body.requestId,
-      body.confirmedByUserId ?? "worker",
+      { sriConfirmed: true, workerId },
     );
 
     return NextResponse.json({ ok: true, ...result });

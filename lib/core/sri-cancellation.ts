@@ -2,7 +2,7 @@ import "@/lib/security/server-only";
 
 import { getPrismaClient } from "@/lib/db/prisma";
 import { requireTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
-import type { SriCancellationReason, SriCancellationStatus } from "@prisma/client";
+import { Prisma, type SriCancellationReason, type SriCancellationStatus } from "@prisma/client";
 
 const CONSUMER_FINAL_IDS = new Set(["9999999999999", "9999999999"]);
 
@@ -10,6 +10,7 @@ const ACTIVE_STATUSES: SriCancellationStatus[] = [
   "QUEUED",
   "RUNNING",
   "SUBMITTED",
+  "HUMAN_VERIFICATION_REQUIRED",
 ];
 
 const CANCELLATION_DEADLINE_DAY = 7;
@@ -31,7 +32,7 @@ export type CancellationEligibility = {
 
 export const LIVE_SRI_CANCELLATION_VERIFICATION_PENDING = true;
 
-function getDeadlineDate(authorizedAt: Date | string): Date {
+export function getDeadlineDate(authorizedAt: Date | string): Date {
   const auth = typeof authorizedAt === "string" ? new Date(authorizedAt) : authorizedAt;
   const ecParts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Guayaquil",
@@ -43,14 +44,14 @@ function getDeadlineDate(authorizedAt: Date | string): Date {
   const nextMonth = ecMonth === 12 ? 1 : ecMonth + 1;
   const nextYear = ecMonth === 12 ? ecYear + 1 : ecYear;
   // ECT = UTC-5, no DST. Day 7 at 23:59:59 ECT = day 8 at 04:59:59 UTC
-  return new Date(Date.UTC(nextYear, nextMonth - 1, CANCELLATION_DEADLINE_DAY + 1, 4, 59, 59));
+  return new Date(Date.UTC(nextYear, nextMonth - 1, CANCELLATION_DEADLINE_DAY + 1, 4, 59, 59, 999));
 }
 
 export async function checkCancellationEligibility(
   tenantId: string,
   sriDocumentId: string,
+  prisma: Prisma.TransactionClient = getPrismaClient(),
 ): Promise<CancellationEligibility> {
-  const prisma = getPrismaClient();
 
   const doc = await prisma.sriDocument.findFirst({
     where: { id: sriDocumentId, tenantId },
@@ -159,24 +160,24 @@ export async function requestSriInvoiceCancellation(
   await requireTenantOperationalAccess(input.tenantId);
   const prisma = getPrismaClient();
 
-  const eligibility = await checkCancellationEligibility(input.tenantId, input.sriDocumentId);
-
-  if (!eligibility.eligible) {
-    throw new Error(eligibility.reason ?? "No se puede anular esta factura.");
-  }
-
-  const request = await prisma.sriCancellationRequest.create({
-    data: {
-      tenantId: input.tenantId,
-      sriDocumentId: input.sriDocumentId,
-      reasonCode: input.reasonCode,
-      reasonText: input.reasonText?.trim() || null,
-      requestedByUserId: input.requestedByUserId,
-      status: "QUEUED",
-    },
+  return prisma.$transaction(async (tx) => {
+    // Serialize requests for the same tenant/document before checking eligibility.
+    await tx.$queryRaw`SELECT "id" FROM "SriDocument" WHERE "id"=${input.sriDocumentId} AND "tenantId"=${input.tenantId} FOR UPDATE`;
+    const eligibility = await checkCancellationEligibility(input.tenantId, input.sriDocumentId, tx);
+    if (!eligibility.eligible) {
+      throw new Error(eligibility.reason ?? "No se puede anular esta factura.");
+    }
+    return tx.sriCancellationRequest.create({
+      data: {
+        tenantId: input.tenantId,
+        sriDocumentId: input.sriDocumentId,
+        reasonCode: input.reasonCode,
+        reasonText: input.reasonText?.trim() || null,
+        requestedByUserId: input.requestedByUserId,
+        status: "QUEUED",
+      },
+    });
   });
-
-  return request;
 }
 
 export async function getCancellationRequestsForDocument(
@@ -193,160 +194,115 @@ export async function getCancellationRequestsForDocument(
 export async function finalizeSriInvoiceCancellation(
   tenantId: string,
   requestId: string,
-  confirmedByUserId: string,
+  confirmation: { sriConfirmed: true; workerId: string },
 ) {
+  if (confirmation.sriConfirmed !== true || !confirmation.workerId) {
+    throw new Error("Se requiere confirmación real del SRI.");
+  }
   const prisma = getPrismaClient();
-
-  const request = await prisma.sriCancellationRequest.findFirst({
-    where: { id: requestId, tenantId },
-    include: {
-      sriDocument: {
-        select: {
-          id: true,
-          status: true,
-          sourceType: true,
-          sourceId: true,
-          tenantId: true,
-        },
-      },
-    },
-  });
-
-  if (!request) throw new Error("Solicitud de anulación no encontrada.");
-  if (request.status === "CONFIRMED") return { alreadyConfirmed: true };
-
   return prisma.$transaction(async (tx) => {
-    await tx.sriCancellationRequest.update({
-      where: { id: requestId },
-      data: { status: "CONFIRMED", confirmedAt: new Date() },
+    const candidate = await tx.sriCancellationRequest.findFirst({
+      where: { id: requestId, tenantId },
+      select: { sriDocumentId: true },
     });
-
-    await tx.sriDocument.update({
-      where: { id: request.sriDocumentId },
-      data: { status: "CANCELLED" },
+    if (!candidate) throw new Error("Solicitud de anulación no encontrada.");
+    // The document lock also serializes different requests for the same invoice.
+    await tx.$queryRaw`SELECT "id" FROM "SriDocument" WHERE "id"=${candidate.sriDocumentId} AND "tenantId"=${tenantId} FOR UPDATE`;
+    const request = await tx.sriCancellationRequest.findFirst({
+      where: { id: requestId, tenantId },
+      include: { sriDocument: true },
     });
-
+    if (!request || request.sriDocument.tenantId !== tenantId) {
+      throw new Error("Solicitud de anulación no encontrada.");
+    }
+    if (request.workerId !== confirmation.workerId) {
+      throw new Error("El worker no corresponde a esta solicitud.");
+    }
+    if (request.status === "CONFIRMED" && request.sriDocument.status === "CANCELLED") {
+      return { alreadyConfirmed: true };
+    }
+    if (request.status !== "SUBMITTED" || request.sriDocument.status !== "AUTHORIZED") {
+      throw new Error("La solicitud no está pendiente de confirmación del SRI.");
+    }
+    const confirmedByUserId = request.requestedByUserId;
     if (request.sriDocument.sourceType === "BASIC_SALE" && request.sriDocument.sourceId) {
+      const saleId = request.sriDocument.sourceId;
+      await tx.$queryRaw`SELECT "id" FROM "LightweightSale" WHERE "id"=${saleId} AND "tenantId"=${tenantId} FOR UPDATE`;
       const sale = await tx.lightweightSale.findFirst({
-        where: { id: request.sriDocument.sourceId, tenantId },
+        where: { id: saleId, tenantId },
         include: {
-          items: {
-            include: {
-              product: {
-                include: { comboItems: { include: { componentProduct: true } } },
-              },
-            },
-          },
+          items: { include: { product: { include: { comboItems: { include: { componentProduct: true } } } } } },
           payments: true,
         },
       });
+      if (!sale) throw new Error("Venta no encontrada en esta empresa.");
+      if (sale.status !== "canceled") {
+        const { reverseSriCancelledSaleTreasury } = await import("@/lib/core/treasury/integration");
+        await reverseSriCancelledSaleTreasury(tx, { tenantId, userId: confirmedByUserId }, sale.id);
 
-      if (sale && sale.status !== "canceled") {
-        const { cancelTreasurySource, prepareTreasuryIntegration } = await import(
-          "@/lib/core/treasury/integration"
-        );
-        const treasury = await prepareTreasuryIntegration(tenantId);
-        if (treasury) {
-          await cancelTreasurySource(tx, treasury, "SALE", sale.id);
-        }
-
-        const inventoryRestore = new Map<string, number>();
-        for (const item of sale.items) {
-          if (item.product.type === "PRODUCT" && item.product.trackInventory) {
-            inventoryRestore.set(
-              item.productId,
-              (inventoryRestore.get(item.productId) ?? 0) + item.quantity,
-            );
-          }
-          if (item.product.type === "COMBO") {
-            for (const comp of item.product.comboItems) {
-              if (comp.componentProduct.trackInventory) {
-                inventoryRestore.set(
-                  comp.componentProductId,
-                  (inventoryRestore.get(comp.componentProductId) ?? 0) +
-                    comp.quantity * item.quantity,
-                );
+        // Prefer the immutable sale movements: combo definitions, tracking and
+        // the default warehouse may have changed since the sale was issued.
+        const originalMovements = await tx.inventoryMovement.findMany({
+          where: { tenantId, sourceType: "SALE", sourceId: sale.id, direction: "OUT", movementType: { in: ["SALE", "COMBO_CONSUMPTION"] } },
+        });
+        const restore: Array<{ productId: string; warehouseId: string; quantity: number }> = [];
+        if (originalMovements.length) {
+          restore.push(...originalMovements.map((m) => ({ productId: m.productId, warehouseId: m.warehouseId, quantity: Number(m.quantity) })));
+        } else {
+          // Legacy sales predate Inventory Core movements.
+          const quantities = new Map<string, number>();
+          for (const item of sale.items) {
+            if (item.product.tenantId !== tenantId) throw new Error("Producto fuera de esta empresa.");
+            if (item.product.type === "PRODUCT" && item.product.trackInventory) {
+              quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity);
+            }
+            if (item.product.type === "COMBO") {
+              for (const comp of item.product.comboItems) {
+                if (comp.componentProduct.tenantId !== tenantId) throw new Error("Componente fuera de esta empresa.");
+                if (comp.componentProduct.type === "PRODUCT" && comp.componentProduct.trackInventory) {
+                  quantities.set(comp.componentProductId, (quantities.get(comp.componentProductId) ?? 0) + comp.quantity * item.quantity);
+                }
               }
             }
           }
-        }
-
-        const defaultWarehouse = await tx.inventoryWarehouse.findFirst({
-          where: { tenantId, isDefault: true },
-        });
-
-        for (const [productId, quantity] of inventoryRestore) {
-          await tx.lightweightProduct.update({
-            where: { id: productId },
-            data: { stock: { increment: quantity } },
-          });
-          await tx.lightweightStockMovement.create({
-            data: { tenantId, productId, type: "adjustment", quantity },
-          });
-
-          if (defaultWarehouse) {
-            const existing = await tx.inventoryMovement.findFirst({
-              where: {
-                tenantId,
-                sourceType: "SRI_CANCELLATION",
-                sourceId: requestId,
-                productId,
-              },
-            });
-            if (!existing) {
-              await tx.inventoryMovement.create({
-                data: {
-                  tenantId,
-                  productId,
-                  warehouseId: defaultWarehouse.id,
-                  direction: "IN",
-                  movementType: "SALE_RETURN",
-                  quantity,
-                  date: new Date(),
-                  sourceType: "SRI_CANCELLATION",
-                  sourceId: requestId,
-                  createdByUserId: confirmedByUserId,
-                },
-              });
-              await tx.inventoryStockBalance.upsert({
-                where: {
-                  tenantId_warehouseId_productId: {
-                    tenantId,
-                    warehouseId: defaultWarehouse.id,
-                    productId,
-                  },
-                },
-                create: { tenantId, productId, warehouseId: defaultWarehouse.id, quantity },
-                update: { quantity: { increment: quantity } },
-              });
-            }
+          if (quantities.size) {
+            const warehouse = await tx.inventoryWarehouse.findFirst({ where: { tenantId, isDefault: true, active: true } });
+            if (!warehouse) throw new Error("Configura una bodega para restaurar el inventario.");
+            restore.push(...Array.from(quantities, ([productId, quantity]) => ({ productId, quantity, warehouseId: warehouse.id })));
           }
         }
-
-        try {
-          const { reverseJournalEntry } = await import("@/lib/core/accounting-journal");
-          const journalEntry = await tx.accountingJournalEntry.findFirst({
-            where: {
-              tenantId,
-              sourceType: "SALE",
-              sourceId: sale.id,
-              status: "POSTED",
-            },
+        for (const { productId, warehouseId, quantity } of restore) {
+          await tx.lightweightProduct.update({ where: { id: productId, tenantId }, data: { stock: { increment: quantity } } });
+          await tx.lightweightStockMovement.create({ data: { tenantId, productId, type: "adjustment", quantity } });
+          await tx.inventoryMovement.create({ data: {
+            tenantId, productId, warehouseId, direction: "IN", movementType: "SALE_RETURN", quantity,
+            date: new Date(), sourceType: "SRI_CANCELLATION", sourceId: requestId, createdByUserId: confirmedByUserId,
+          } });
+          await tx.inventoryStockBalance.upsert({
+            where: { tenantId_warehouseId_productId: { tenantId, warehouseId, productId } },
+            create: { tenantId, productId, warehouseId, quantity },
+            update: { quantity: { increment: quantity } },
           });
-          if (journalEntry) {
-            await reverseJournalEntry(tenantId, journalEntry.id, confirmedByUserId, new Date());
-          }
-        } catch {
-          // Accounting may not be set up
         }
-
-        await tx.lightweightSale.update({
-          where: { id: sale.id },
-          data: { status: "canceled" },
+        const { reverseJournalEntry } = await import("@/lib/core/accounting-journal");
+        const journalEntry = await tx.accountingJournalEntry.findFirst({
+          where: { tenantId, sourceType: "SALE", sourceId: sale.id, status: "POSTED" },
         });
+        if (journalEntry) {
+          await reverseJournalEntry(tenantId, journalEntry.id, confirmedByUserId, new Date(), tx);
+        }
+        const paid = sale.payments.reduce((sum, payment) => sum.plus(payment.amount), new Prisma.Decimal(0));
+        const unpaid = sale.total.minus(paid);
+        if (sale.customerId && unpaid.gt(0)) {
+          await tx.lightweightCustomer.update({ where: { id: sale.customerId, tenantId }, data: { balance: { decrement: unpaid } } });
+        }
+        await tx.lightweightSale.update({ where: { id: sale.id, tenantId }, data: { status: "canceled" } });
       }
     }
-
+    await tx.sriCancellationRequest.update({
+      where: { id: requestId, tenantId }, data: { status: "CONFIRMED", confirmedAt: new Date() },
+    });
+    await tx.sriDocument.update({ where: { id: request.sriDocumentId, tenantId }, data: { status: "CANCELLED" } });
     return { alreadyConfirmed: false };
-  });
+  }, { timeout: 20000 });
 }

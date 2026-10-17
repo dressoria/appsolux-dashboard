@@ -1,7 +1,7 @@
 import "@/lib/security/server-only";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
-import type { AccountingSourceType, AccountingJournalEntryStatus } from "@prisma/client";
+import type { Prisma, AccountingSourceType, AccountingJournalEntryStatus } from "@prisma/client";
 
 export type JournalLineInput = {
   accountId: string;
@@ -171,31 +171,31 @@ export async function reverseJournalEntry(
   entryId: string,
   reversedByUserId: string,
   reversalDate: Date,
+  transaction?: Prisma.TransactionClient,
 ) {
-  const prisma = getPrismaClient();
+  const reverse = async (tx: Prisma.TransactionClient) => {
+    await tx.$queryRaw`SELECT "id" FROM "AccountingJournalEntry" WHERE "id"=${entryId} AND "tenantId"=${tenantId} FOR UPDATE`;
+    const entry = await tx.accountingJournalEntry.findFirst({
+      where: { id: entryId, tenantId },
+      include: { lines: true },
+    });
 
-  const entry = await prisma.accountingJournalEntry.findFirst({
-    where: { id: entryId, tenantId },
-    include: { lines: true },
-  });
+    if (!entry) throw new Error("Asiento no encontrado");
+    if (entry.status !== "POSTED") throw new Error("Solo se pueden reversar asientos contabilizados");
 
-  if (!entry) throw new Error("Asiento no encontrado");
-  if (entry.status !== "POSTED") throw new Error("Solo se pueden reversar asientos contabilizados");
+    const reversalLines: JournalLineInput[] = entry.lines.map((line) => ({
+      accountId: line.accountId,
+      description: `Reversión: ${line.description ?? ""}`,
+      debit: line.credit.toString(),
+      credit: line.debit.toString(),
+      costCenterId: line.costCenterId ?? undefined,
+      counterpartyType: line.counterpartyType ?? undefined,
+      counterpartyId: line.counterpartyId ?? undefined,
+      reference: line.reference ?? undefined,
+    }));
 
-  const reversalLines: JournalLineInput[] = entry.lines.map((line) => ({
-    accountId: line.accountId,
-    description: `Reversión: ${line.description ?? ""}`,
-    debit: line.credit.toString(),
-    credit: line.debit.toString(),
-    costCenterId: line.costCenterId ?? undefined,
-    counterpartyType: line.counterpartyType ?? undefined,
-    counterpartyId: line.counterpartyId ?? undefined,
-    reference: line.reference ?? undefined,
-  }));
-
-  return prisma.$transaction(async (tx) => {
     await tx.accountingJournalEntry.update({
-      where: { id: entryId },
+      where: { id: entryId, tenantId },
       data: {
         status: "REVERSED",
         reversedByUserId,
@@ -250,7 +250,8 @@ export async function reverseJournalEntry(
     });
 
     return reversal;
-  });
+  };
+  return transaction ? reverse(transaction) : getPrismaClient().$transaction(reverse);
 }
 
 export async function getJournalEntries(

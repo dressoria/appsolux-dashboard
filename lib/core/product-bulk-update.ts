@@ -1,5 +1,6 @@
 import "@/lib/security/server-only";
 import { getPrismaClient } from "@/lib/db/prisma";
+import { Prisma } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import { productNumber, parseProductTax, ProductInputError } from "./inventory-product-input";
 import { requireTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
@@ -88,12 +89,15 @@ export async function previewBulkUpdate(
   tenantId: string,
   tab: BulkUpdateTab,
   rows: BulkUpdateRow[],
+  prisma: Prisma.TransactionClient = getPrismaClient(),
 ): Promise<BulkPreviewResult> {
   if (rows.length === 0 || rows.length > 5000) {
     throw new ProductInputError("Envía entre 1 y 5000 filas.");
   }
 
-  const prisma = getPrismaClient();
+  if (new Set(rows.map((row) => row.productId)).size !== rows.length) {
+    throw new ProductInputError("No repitas un producto en la misma actualización.");
+  }
   const productIds = rows.map((r) => r.productId);
   const products = await prisma.lightweightProduct.findMany({
     where: { tenantId, id: { in: productIds } },
@@ -151,8 +155,8 @@ export async function previewBulkUpdate(
           issues.push({ field, message: error instanceof Error ? error.message : "Valor inválido." });
           continue;
         }
-        if (product.type === "SERVICE") {
-          issues.push({ field: "stock", message: "Los servicios no tienen stock." });
+        if (product.type !== "PRODUCT") {
+          issues.push({ field: "stock", message: "Los servicios y combos virtuales no tienen stock propio." });
           continue;
         }
         if (!product.trackInventory) {
@@ -177,6 +181,17 @@ export async function previewBulkUpdate(
         continue;
       }
 
+      if (tab === "datos" && (field === "isActive" || field === "trackInventory")) {
+        if (![true, false, "true", "false"].includes(newValue as boolean | string)) {
+          issues.push({ field, message: "Usa true o false." });
+          continue;
+        }
+        if (field === "trackInventory" && product.type !== "PRODUCT" && (newValue === true || newValue === "true")) {
+          issues.push({ field, message: "Los servicios y combos virtuales no controlan inventario propio." });
+          continue;
+        }
+      }
+
       const oldStr = formatValue(oldValue);
       const newStr = formatValue(newValue);
       if (oldStr !== newStr) {
@@ -188,18 +203,14 @@ export async function previewBulkUpdate(
       const newCat = row.changes.taxCategory ?? product.taxCategory;
       const newRate = row.changes.taxRate ?? product.taxRate;
       try {
-        parseProductTax(
-          newCat === "NON_OBJECT" || newCat === "EXEMPT"
-            ? String(newCat)
-            : String(newRate ?? 0),
+        const tax = parseProductTax(
+          newCat === "NON_OBJECT" || newCat === "EXEMPT" ? String(newCat) : String(newRate ?? 0),
         );
-        const oldCat = product.taxCategory;
-        const oldRate = Number(product.taxRate ?? 0);
-        if (String(newCat) !== String(oldCat)) {
-          changes.push({ field: "taxCategory", label: "Categoría IVA", oldValue: oldCat, newValue: newCat });
+        if (tax.taxCategory !== product.taxCategory) {
+          changes.push({ field: "taxCategory", label: "Categoría IVA", oldValue: product.taxCategory, newValue: tax.taxCategory });
         }
-        if (Number(newRate) !== oldRate) {
-          changes.push({ field: "taxRate", label: "Tarifa IVA", oldValue: oldRate, newValue: newRate });
+        if (tax.taxRate !== Number(product.taxRate ?? 0)) {
+          changes.push({ field: "taxRate", label: "Tarifa IVA", oldValue: Number(product.taxRate ?? 0), newValue: tax.taxRate });
         }
       } catch (error) {
         issues.push({ field: "iva", message: error instanceof Error ? error.message : "IVA inválido." });
@@ -245,15 +256,12 @@ export async function confirmBulkUpdate(
   await requireTenantOperationalAccess(tenantId);
   const prisma = getPrismaClient();
 
-  const preview = await previewBulkUpdate(tenantId, tab, rows);
-  const ready = preview.rows.filter((r) => r.status === "READY");
-
-  if (ready.length === 0) {
-    return { updated: 0, skipped: preview.rows.length };
-  }
-
   return prisma.$transaction(
     async (tx) => {
+      const ids = [...new Set(rows.map((row) => row.productId))].sort();
+      if (ids.length) await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "LightweightProduct" WHERE "tenantId"=${tenantId} AND "id" IN (${Prisma.join(ids)}) ORDER BY "id" FOR UPDATE`);
+      const preview = await previewBulkUpdate(tenantId, tab, rows, tx);
+      const ready = preview.rows.filter((r) => r.status === "READY");
       let updated = 0;
 
       for (const row of ready) {
@@ -264,7 +272,7 @@ export async function confirmBulkUpdate(
             if (change.field === "taxCategory" || change.field === "taxRate") {
               data[change.field] = change.newValue;
             } else {
-              data[change.field] = Number(change.newValue ?? 0);
+              data[change.field] = productNumber(change.newValue, change.field);
             }
           } else if (tab === "datos") {
             if (change.field === "isActive" || change.field === "trackInventory") {
@@ -274,7 +282,7 @@ export async function confirmBulkUpdate(
             }
           } else if (tab === "stock") {
             if (change.field === "stock") {
-              const newStock = Number(change.newValue ?? 0);
+              const newStock = productNumber(change.newValue, "stock", true);
               const oldStock = Number(change.oldValue ?? 0);
               const diff = newStock - oldStock;
 
@@ -285,9 +293,18 @@ export async function confirmBulkUpdate(
                 select: { defaultWarehouseId: true },
               });
 
-              const warehouseId = product?.defaultWarehouseId;
+              const warehouse = await tx.inventoryWarehouse.findFirst({
+                where: { tenantId, active: true, ...(product?.defaultWarehouseId ? { id: product.defaultWarehouseId } : { isDefault: true }) },
+              });
+              if (!warehouse) throw new ProductInputError("Configura una bodega válida antes de ajustar stock.", "stock");
+              const warehouseId = warehouse.id;
 
               if (diff !== 0) {
+                const balances = await tx.inventoryStockBalance.findMany({ where: { tenantId, productId: row.productId } });
+                const coreStock = balances.reduce((sum, balance) => sum + Number(balance.quantity), 0);
+                const warehouseStock = Number(balances.find((balance) => balance.warehouseId === warehouseId)?.quantity ?? 0);
+                if (coreStock !== oldStock) throw new ProductInputError("El stock no coincide con Inventory Core. Reconcilia los saldos antes de ajustar.", "stock");
+                if (warehouseStock + diff < 0) throw new ProductInputError("Stock insuficiente en la bodega de ajuste.", "stock");
                 await tx.lightweightStockMovement.create({
                   data: {
                     tenantId,
@@ -304,7 +321,7 @@ export async function confirmBulkUpdate(
                       productId: row.productId,
                       warehouseId,
                       direction: diff > 0 ? "IN" : "OUT",
-                      movementType: "ADJUSTMENT",
+                      movementType: diff > 0 ? "ADJUSTMENT_IN" : "ADJUSTMENT_OUT",
                       quantity: new Decimal(Math.abs(diff)),
                       date: new Date(),
                       description: "Ajuste masivo de stock",
@@ -326,7 +343,7 @@ export async function confirmBulkUpdate(
                       tenantId,
                       productId: row.productId,
                       warehouseId,
-                      quantity: new Decimal(newStock),
+                      quantity: new Decimal(diff),
                     },
                     update: { quantity: { increment: diff } },
                   });
@@ -335,7 +352,7 @@ export async function confirmBulkUpdate(
             } else if (change.field === "minStock") {
               data[change.field] = change.newValue == null || change.newValue === ""
                 ? null
-                : Number(change.newValue);
+                : productNumber(change.newValue, "minStock", true);
             }
           }
         }

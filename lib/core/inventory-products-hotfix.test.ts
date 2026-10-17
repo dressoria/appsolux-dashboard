@@ -214,7 +214,7 @@ test("POST/PATCH HTTP contract: three creates, duplicate 409, invalid 400, updat
   const malformed = await POST(new NextRequest("http://localhost/api/inventory/products", { method: "POST", body: "{invalid" }));
   assert.equal(malformed.status, 400);
   const { GET: template } = await import("../../app/api/inventory/products/import/template/route");
-  const format = await template();
+  const format = await template(new NextRequest("http://localhost/api/inventory/products/import/template"));
   assert.equal(format.status, 200); assert.match(format.headers.get("content-type")!, /spreadsheetml/);
   assert.equal(Buffer.from(await format.arrayBuffer()).subarray(0,2).toString(), "PK");
   const { POST: importRows } = await import("../../app/api/inventory/products/import/route");

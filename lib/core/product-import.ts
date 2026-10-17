@@ -1,6 +1,7 @@
 import "@/lib/security/server-only";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
+import type { Prisma } from "@prisma/client";
 import { createProduct } from "./inventory-products";
 import {
   normalizeProductInput,
@@ -136,7 +137,7 @@ function normalizeProductRow(
 
   const resolvedType = TYPE_MAP[data.tipo.toUpperCase()] ?? "";
   if ((resolvedType === "COMBO" || resolvedType === "SERVICE") && data.controlar_inventario) {
-    const wantsTracking = parseBool(data.controlar_inventario, false);
+    const wantsTracking = ["true", "1", "si", "sí"].includes(data.controlar_inventario.toLowerCase());
     if (wantsTracking) {
       data.controlar_inventario = "false";
       autofilledFields.push("controlar_inventario");
@@ -155,8 +156,7 @@ type ImportContext = {
   warehouses: Array<{ id: string; name: string; code?: string; isDefault: boolean }>;
 };
 
-export async function loadProductImportContext(tenantId: string): Promise<ImportContext> {
-  const prisma = getPrismaClient();
+export async function loadProductImportContext(tenantId: string, prisma: Prisma.TransactionClient = getPrismaClient()): Promise<ImportContext> {
   const [products, categories, brands, units, warehouses] = await Promise.all([
     prisma.lightweightProduct.findMany({
       where: { tenantId },
@@ -164,10 +164,10 @@ export async function loadProductImportContext(tenantId: string): Promise<Import
     }),
     prisma.lightweightProductCategory.findMany({ where: { tenantId }, select: { id: true, name: true } }),
     prisma.inventoryBrand.findMany({ where: { tenantId }, select: { id: true, name: true } }),
-    prisma.inventoryUnit.findMany({ where: { tenantId }, select: { id: true, name: true } }),
+    prisma.inventoryUnit.findMany({ where: { tenantId }, select: { id: true, name: true, code: true } }),
     prisma.inventoryWarehouse.findMany({
       where: { tenantId, active: true },
-      select: { id: true, name: true, isDefault: true },
+      select: { id: true, name: true, code: true, isDefault: true },
     }),
   ]);
   return {
@@ -297,6 +297,9 @@ export function processProductImportRows(
   rows: ProductImportRow[],
   ctx: ImportContext,
 ): ProductImportPreviewResult {
+  if (rows.length === 0 || rows.length > MAX_PRODUCT_IMPORT_ROWS) {
+    throw new ProductInputError(`Envía entre 1 y ${MAX_PRODUCT_IMPORT_ROWS} filas.`);
+  }
   const seenCodes = new Set<string>();
   const seenBarcodes = new Set<string>();
   const result: ProductImportPreviewRow[] = [];
@@ -387,7 +390,7 @@ export async function confirmProductImport(
 
   return prisma.$transaction(
     async (tx) => {
-      const ctx = await loadProductImportContext(tenantId);
+      const ctx = await loadProductImportContext(tenantId, tx);
       const revalidated = processProductImportRows(
         selected.map((r) => r.data),
         ctx,

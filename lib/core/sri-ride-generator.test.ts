@@ -99,16 +99,7 @@ function makeInvoice(
 // The test verifies that the PDF is generated and contains expected data.
 
 async function loadGenerator() {
-  // The sri-ride-generator uses server-only import which fails outside Next.
-  // We patch it by registering a shim module.
-  // Alternative: use tsx with --import or inline skip.
-  // Since "server-only" throws on import, we try/catch.
-  try {
-    return await import("./sri-ride-generator.ts");
-  } catch {
-    // If server-only blocks, skip tests gracefully
-    return null;
-  }
+  return import("./sri-ride-generator.ts");
 }
 
 test("RIDE generator — smoke test: generates PDF buffer", async () => {

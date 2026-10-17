@@ -352,6 +352,56 @@ export async function cancelTreasurySource(
     );
   }
 }
+// SRI has already confirmed the cancellation. Compensate linked collections
+// in the caller's transaction; never require a browser session for a worker.
+export async function reverseSriCancelledSaleTreasury(tx: Tx, actor: Actor, saleId: string) {
+  await lock(tx, "LightweightSale", actor.tenantId, [saleId]);
+  const obligation = await tx.treasuryObligation.findFirst({ where: { tenantId: actor.tenantId, saleId } });
+  if (obligation) await lockObligation(tx, actor.tenantId, obligation.id);
+  const cards = await tx.cardTransaction.findMany({ where: { tenantId: actor.tenantId, saleId } });
+  if (cards.length) await lock(tx, "CardTransaction", actor.tenantId, cards.map((c) => c.id));
+  // A settled card requires its linked bank/fee refund flow, not a reversal
+  // against the empty pending-card account.
+  if (cards.some((c) => c.status === "SETTLED")) {
+    throw new TreasuryError("La venta tiene tarjetas acreditadas. Requiere una devolución vinculada antes de finalizar la anulación SRI.", 409);
+  }
+  if (obligation && (await tx.advanceApplication.count({ where: { tenantId: actor.tenantId, obligationId: obligation.id } }) ||
+      await tx.postdatedCheck.count({ where: { tenantId: actor.tenantId, obligationId: obligation.id, status: { not: "CANCELLED" } } }))) {
+    throw new TreasuryError("La venta tiene anticipos o cheques vinculados. Requiere una devolución vinculada.", 409);
+  }
+  const movements = await tx.treasuryMovement.findMany({
+    where: { tenantId: actor.tenantId, OR: [
+      { salePayment: { saleId } },
+      ...(obligation ? [{ obligationId: obligation.id }] : []),
+    ] },
+    include: { reversal: true },
+    orderBy: { id: "asc" },
+  });
+  for (const movement of movements) {
+    await lock(tx, "TreasuryMovement", actor.tenantId, [movement.id]);
+    if (movement.reversal || movement.status === "CANCELLED") continue;
+    if (movement.direction !== "IN" || !["SALE_COLLECTION", "CARD_COLLECTION"].includes(movement.movementType)) {
+      throw new TreasuryError("El cobro requiere una devolución vinculada.", 409);
+    }
+    await appendMovement(tx, actor, {
+      accountId: movement.accountId, amount: movement.amount, date: new Date(),
+      direction: "OUT", movementType: "ADJUSTMENT", sourceType: "REVERSAL",
+      sourceId: movement.id, reversalOfId: movement.id,
+      description: "Reverso por anulación confirmada del SRI",
+    });
+    await tx.treasuryMovement.update({ where: { id: movement.id, tenantId: actor.tenantId }, data: {
+      cancelledByUserId: actor.userId, cancelledAt: new Date(), cancellationReason: "Anulación confirmada del SRI",
+    } });
+  }
+  for (const card of cards) {
+    if (card.status === "PENDING") await tx.cardTransaction.update({ where: { id: card.id, tenantId: actor.tenantId }, data: { status: "CANCELLED" } });
+  }
+  if (obligation && obligation.status !== "CANCELLED") {
+    await tx.treasuryObligation.update({ where: { id: obligation.id, tenantId: actor.tenantId }, data: { status: "CANCELLED", balance: dec(0), paidAmount: dec(0) } });
+    await audit(tx, actor, "obligation_cancelled_with_source", "TreasuryObligation", obligation.id);
+  }
+}
+
 export async function linkNewPurchasePayable(
   actor: Actor,
   input: Record<string, unknown>,

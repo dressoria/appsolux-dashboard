@@ -19,7 +19,7 @@ export async function productImportTemplate() {
     ["IVA", "15, 5, 8, 12, 0, NON_OBJECT, EXEMPT; también 15%, 5%, 8%, 12%, 0%, NO_OBJETO, EXENTO"],
     ["Precios", "Netos sin IVA; vacíos = 0; nunca negativos. Usa punto decimal."],
     ["Catálogos", "Usa nombre existente; unidad y bodega también aceptan código. Vacíos usan defaults existentes."],
-    ["Stock", "Stock inicial y mínimo: enteros no negativos. Servicios sin inventario."],
+    ["Stock", "Stock inicial y mínimo: enteros no negativos. SERVICIO y COMBO sin stock propio."],
     ["Códigos", "Texto; conserva ceros iniciales. Código y barcode únicos dentro del tenant."],
     ["Límite", "2000 filas por archivo; 5 MB. CSV UTF-8 separado por comas o XLSX."],
   ]);
@@ -125,9 +125,9 @@ export async function productImportTemplateV2() {
     ["IVA", "15, 5, 8, 12, 0, NON_OBJECT, EXEMPT; también 15%, 5%, 8%, 12%, 0%, NO_OBJETO, EXENTO"],
     ["Precios", "Netos sin IVA; vacíos = 0; nunca negativos. Usa punto decimal."],
     ["Catálogos", "Usa nombre existente; unidad y bodega también aceptan código. Vacíos usan defaults existentes."],
-    ["Stock", "Stock inicial y mínimo: enteros no negativos. Servicios sin inventario."],
+    ["Stock", "Stock inicial y mínimo: enteros no negativos. SERVICIO y COMBO sin stock propio."],
     ["Códigos", "Texto; conserva ceros iniciales. Código y barcode únicos dentro del tenant."],
-    ["Controlar inventario", "true/false. PRODUCTO: default true. SERVICIO: siempre false. COMBO: opcional, default true."],
+    ["Controlar inventario", "true/false. PRODUCTO: default true. SERVICIO: siempre false. COMBO: siempre false; virtual, sin stock propio."],
     ["Límite", "2000 filas por archivo; 5 MB. CSV UTF-8 separado por comas o XLSX."],
   ]);
   help.getColumn(1).width = 25; help.getColumn(2).width = 120;

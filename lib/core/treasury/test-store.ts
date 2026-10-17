@@ -22,7 +22,7 @@ function compare(a: unknown, b: unknown) {
     return new Date(a as string).getTime() - new Date(b as string).getTime();
   return a === b ? 0 : (a as string) < (b as string) ? -1 : 1;
 }
-export function treasuryStore(t: TestContext) {
+export function treasuryStore(t: TestContext, additionalTables: string[] = []) {
   let state: State = {},
     sequence = 0,
     txCount = 0,
@@ -47,6 +47,7 @@ export function treasuryStore(t: TestContext) {
     "purchasePayment",
     "auditLog",
     "membership",
+    ...additionalTables,
   ];
   for (const table of tables) state[table] = [];
   const failures = new Map<string, number>();
@@ -60,6 +61,7 @@ export function treasuryStore(t: TestContext) {
       rows: state[target].filter((r) => r.id === keyValue),
     });
     if (key === "account") return one("treasuryAccount", row.accountId);
+    if (key === "sriDocument") return one("sriDocument", row.sriDocumentId);
     if (key === "cashAccount") return one("treasuryAccount", row.cashAccountId);
     if (key === "bankAccount") return one("treasuryAccount", row.bankAccountId);
     if (key === "cardAccount") return one("treasuryAccount", row.cardAccountId);
@@ -413,6 +415,11 @@ export function treasuryStore(t: TestContext) {
       createMany: async (args: R) => {
         let count = 0;
         for (const input of args.data as R[]) {
+          const remaining = failures.get(model);
+          if (remaining !== undefined) {
+            if (remaining === 0) throw new Error("INJECTED_FAILURE");
+            failures.set(model, remaining - 1);
+          }
           const row = defaults(model, input);
           try {
             assertUnique(model, row);
@@ -434,6 +441,14 @@ export function treasuryStore(t: TestContext) {
         const found = rows(model, { where: args.where });
         for (const row of found) update(model, row, args.data as R);
         return { count: found.length };
+      },
+      upsert: async (args: R) => {
+        const row = rows(model, { where: args.where })[0];
+        if (row) return update(model, row, args.update as R);
+        const created = defaults(model, args.create as R);
+        assertUnique(model, created);
+        state[model].push(created);
+        return copy(created);
       },
       aggregate: async (args: R) => ({
         _sum: Object.fromEntries(
@@ -491,7 +506,7 @@ export function treasuryStore(t: TestContext) {
     const before = copy(state);
     txCount++;
     try {
-      return await operation(client);
+      return await operation({ ...client, $transaction: undefined });
     } catch (error) {
       state = before;
       throw error;
