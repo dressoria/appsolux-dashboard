@@ -1,6 +1,7 @@
 import "@/lib/security/server-only";
 import type { LightweightPaymentStatus, LightweightSaleStatus, Prisma } from "@prisma/client";
 
+import { SRI_CANCELLATION_LABELS } from "@/lib/sri-cancellation-status";
 import { getPrismaClient } from "@/lib/db/prisma";
 
 export type BillingDocumentListItem = {
@@ -18,6 +19,7 @@ export type BillingDocumentListItem = {
   sriStatus: string | null;
   sriStatusLabel: string | null;
   sriDocumentId: string | null;
+  sriDocumentType?: string | null;
   accessKey: string | null;
   authorizationNumber: string | null;
   authorizationDate: string | null;
@@ -49,23 +51,13 @@ const SRI_STATUS_LABELS: Record<string, string> = {
   CANCELLED: "Anulado",
 };
 
-const CANCELLATION_STATUS_LABELS: Record<string, string> = {
-  QUEUED: "Anulación en cola",
-  RUNNING: "Anulando…",
-  SUBMITTED: "Anulación enviada al SRI",
-  CONFIRMED: "Anulación confirmada",
-  FAILED: "Anulación fallida",
-  HUMAN_VERIFICATION_REQUIRED: "Requiere verificación manual",
-  NOT_ELIGIBLE: "No elegible para anulación",
-  CANCELLED_BY_USER: "Anulación cancelada",
-};
 
 function sriLabel(status: string): string {
   return SRI_STATUS_LABELS[status] ?? status;
 }
 
 function cancellationLabel(status: string): string {
-  return CANCELLATION_STATUS_LABELS[status] ?? status;
+  return SRI_CANCELLATION_LABELS[status] ?? status;
 }
 
 function formatDisplayNumber(
@@ -91,95 +83,13 @@ const VALID_SRI_STATUSES = [
 
 async function loadBasicHistoryItems(
   tenantId: string,
-  limit = 30
+  limit = 30,
+  type: "all" | "receipt" | "canceled" = "all",
 ): Promise<BillingDocumentListItem[]> {
-  const prisma = getPrismaClient();
-  const sales = await prisma.lightweightSale.findMany({
-    where: { tenantId, status: { not: "canceled" } },
-    include: {
-      customer: { select: { name: true, identification: true } },
-      items: { include: { product: { select: { name: true } } }, take: 4 },
-    },
-    orderBy: { createdAt: "desc" },
-    take: limit,
-  });
-
-  if (sales.length === 0) return [];
-
-  const saleIds = sales.map((s) => s.id);
-  const sriDocs = await prisma.sriDocument.findMany({
-    where: { tenantId, sourceType: "BASIC_SALE", sourceId: { in: saleIds } },
-    select: {
-      id: true,
-      sourceId: true,
-      status: true,
-      environment: true,
-      accessKey: true,
-      customerIdentification: true,
-      establishment: { select: { code: true } },
-      issuePoint: { select: { code: true } },
-      sequentialNumber: true,
-      submissionJobs: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: {
-          sriAuthorizationNumber: true,
-          authorizedAt: true,
-          errorMessage: true,
-          sriReceiptStatus: true,
-          sriAuthorizationStatus: true,
-        },
-      },
-    },
-  });
-
-  const sriBySourceId = Object.fromEntries(
-    sriDocs.filter((d) => d.sourceId).map((d) => [d.sourceId!, d])
-  );
-
-  return sales.map((sale) => {
-    const sri = sriBySourceId[sale.id] ?? null;
-    const job = sri?.submissionJobs[0] ?? null;
-    const rejectionMessage =
-      sri?.status === "REJECTED"
-        ? job?.errorMessage ?? job?.sriAuthorizationStatus ?? job?.sriReceiptStatus ?? null
-        : null;
-    const displayNumber = sri
-      ? formatDisplayNumber(
-          sri.establishment?.code ?? "???",
-          sri.issuePoint?.code ?? "???",
-          sri.sequentialNumber
-        )
-      : null;
-
-    return {
-      id: sale.id,
-      type: "BASIC_SALE" as const,
-      displayNumber,
-      customerName: sale.customer?.name ?? null,
-      customerIdentification: sri?.customerIdentification ?? sale.customer?.identification ?? null,
-      total: sale.total.toString(),
-      issuedAt: sale.createdAt.toISOString(),
-      source: "BASIC_HISTORY" as const,
-      sourceLabel: "Historial Básico",
-      internalStatus: sale.status,
-      internalStatusLabel: INTERNAL_STATUS_LABELS[sale.status] ?? sale.status,
-      sriStatus: sri?.status ?? null,
-      sriStatusLabel: sri ? sriLabel(sri.status) : null,
-      sriDocumentId: sri?.id ?? null,
-      accessKey: sri?.accessKey ?? null,
-      authorizationNumber: job?.sriAuthorizationNumber ?? null,
-      authorizationDate: job?.authorizedAt ? job.authorizedAt.toISOString() : null,
-      environment: sri?.environment ?? null,
-      rejectionMessage,
-      saleDetailHref: `/basic/sales/${sale.id}`,
-      sriDetailHref: sri ? `/sri/documents/${sri.id}` : null,
-      itemsSummary:
-        sale.items.map((i) => `${i.product.name} ×${i.quantity}`).join(", ") || null,
-      cancellationStatus: null,
-      cancellationStatusLabel: null,
-    };
-  });
+  // Linked invoices are already included by the SRI query. History adds only
+  // internal receipts, including canceled ones when that filter is selected.
+  const result = await loadCoreDocuments(tenantId, { perPage: limit, type: "receipt", status: type === "canceled" ? "canceled" : undefined });
+  return result.items.map((item) => ({ ...item, source: "BASIC_HISTORY", sourceLabel: "Historial Básico" }));
 }
 
 export async function loadCoreDocuments(
@@ -207,12 +117,13 @@ export async function loadCoreDocuments(
     const sequentialNumber = sequentialCandidate && /^\d{1,9}$/.test(sequentialCandidate) ? Number(sequentialCandidate) : undefined;
     const sriFilter = options.type;
     const sriStatuses = sriFilter === "authorized" ? ["AUTHORIZED"] : sriFilter === "rejected" ? ["REJECTED"] : sriFilter === "pending" ? ["DRAFT", "READY_FOR_TESTING", "SIGNED", "SENT"] : undefined;
-    const needsSriLookup = Boolean(search || sriFilter === "receipt" || sriFilter === "sri" || sriStatuses);
+    const needsSriLookup = Boolean(search || sriFilter === "receipt" || sriFilter === "sri" || sriFilter === "canceled" || sriStatuses);
     const matchingSri = needsSriLookup ? await prisma.sriDocument.findMany({
       where: {
         tenantId,
         sourceType: "BASIC_SALE",
         ...(sriStatuses ? { status: { in: sriStatuses as never[] } } : {}),
+        ...(sriFilter === "canceled" ? { AND: [{ OR: [{ status: "CANCELLED" as const }, { cancellationRequests: { some: { tenantId, status: "CONFIRMED" as const } } }] }] } : {}),
         ...(search ? { OR: [
           { customerName: { contains: search, mode: "insensitive" } },
           { customerIdentification: { contains: search, mode: "insensitive" } },
@@ -244,7 +155,7 @@ export async function loadCoreDocuments(
         { id: { in: sriSaleIds } },
         { status: { not: "canceled" as LightweightSaleStatus }, paymentStatus: { in: ["pending", "partial"] as LightweightPaymentStatus[] } },
       ] }] } : {}),
-      ...(sriFilter === "canceled" ? { status: "canceled" as LightweightSaleStatus } : {}),
+      ...(sriFilter === "canceled" ? { AND: [{ OR: [{ status: "canceled" as LightweightSaleStatus }, { id: { in: sriSaleIds } }] }] } : {}),
     };
     if (s === "paid") return { ...base, paymentStatus: "paid" as LightweightPaymentStatus };
     if (s === "pending") return {
@@ -280,6 +191,7 @@ export async function loadCoreDocuments(
     select: {
       id: true,
       sourceId: true,
+      documentType: true,
       status: true,
       environment: true,
       accessKey: true,
@@ -355,6 +267,7 @@ export async function loadCoreDocuments(
         sriStatus: sri?.status ?? null,
         sriStatusLabel: sri ? sriLabel(sri.status) : null,
         sriDocumentId: sri?.id ?? null,
+        sriDocumentType: sri?.documentType ?? null,
         accessKey: sri?.accessKey ?? null,
         authorizationNumber: job?.sriAuthorizationNumber ?? null,
         authorizationDate: job?.authorizedAt ? job.authorizedAt.toISOString() : null,
@@ -380,6 +293,7 @@ export async function loadErpDocuments(
     page?: number;
     perPage?: number;
     includeBasicHistory?: boolean;
+    type?: "all" | "receipt" | "sri" | "authorized" | "pending" | "rejected" | "canceled";
   } = {}
 ): Promise<{ items: BillingDocumentListItem[]; total: number; basicHistoryCount: number }> {
   const prisma = getPrismaClient();
@@ -391,7 +305,15 @@ export async function loadErpDocuments(
       ? options.status
       : undefined;
 
-  const where = { tenantId, ...(statusValue ? { status: statusValue as never } : {}) };
+  const type = options.type ?? "all";
+  const typeStatuses = type === "authorized" ? ["AUTHORIZED"] as const : type === "pending" ? ["DRAFT", "READY_FOR_TESTING", "SIGNED", "SENT"] as const : type === "rejected" ? ["REJECTED"] as const : undefined;
+  const where: Prisma.SriDocumentWhereInput = {
+    tenantId,
+    ...(statusValue ? { status: statusValue as never } : {}),
+    ...(typeStatuses ? { status: { in: [...typeStatuses] } } : {}),
+    ...(type === "receipt" ? { id: { in: [] } } : {}),
+    ...(type === "canceled" ? { OR: [{ status: "CANCELLED" }, { cancellationRequests: { some: { tenantId, status: "CONFIRMED" } } }] } : {}),
+  };
 
   const [docs, total, basicHistory] = await Promise.all([
     prisma.sriDocument.findMany({
@@ -421,8 +343,8 @@ export async function loadErpDocuments(
       take: perPage,
     }),
     prisma.sriDocument.count({ where }),
-    options.includeBasicHistory
-      ? loadBasicHistoryItems(tenantId, 20).catch((error) => {
+    options.includeBasicHistory && (type === "all" || type === "receipt" || type === "canceled")
+      ? loadBasicHistoryItems(tenantId, 20, type).catch((error) => {
           console.warn("[billing-documents] Basic history could not be loaded; continuing", {
             tenantId,
             message: error instanceof Error ? error.message : "Unknown error",
@@ -473,6 +395,7 @@ export async function loadErpDocuments(
       sriStatus: doc.status,
       sriStatusLabel: sriLabel(doc.status),
       sriDocumentId: doc.id,
+      sriDocumentType: doc.documentType,
       accessKey: doc.accessKey ?? null,
       authorizationNumber: job?.sriAuthorizationNumber ?? null,
       authorizationDate: job?.authorizedAt ? job.authorizedAt.toISOString() : null,

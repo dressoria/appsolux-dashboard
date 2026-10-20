@@ -4,7 +4,8 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { ImportPreviewResult, ImportRow } from "@/lib/core/inventory-import";
+import type { ProductImportPreviewResult, ProductImportPreviewRow } from "@/lib/core/product-import";
+import { PRODUCT_IMPORT_URLS, previewProductImport, canConfirmProductImport, confirmProductImportPreview, toggleProductImportRow } from "@/lib/client/product-import";
 
 type PriceChange = { id: string; name: string; oldPrice: string; newPrice: string };
 type Props = { selected: string[]; q: string; type: string };
@@ -28,7 +29,7 @@ export function ProductActionsClient({ selected, q, type }: Props) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [panel, setPanel] = useState<"import" | "prices" | null>(null);
-  const [preview, setPreview] = useState<(ImportPreviewResult & { rows: ImportRow[] }) | null>(null);
+  const [preview, setPreview] = useState<ProductImportPreviewResult | null>(null);
   const [changes, setChanges] = useState<PriceChange[] | null>(null);
   const [scope, setScope] = useState("filtered");
   const [channel, setChannel] = useState("price");
@@ -55,9 +56,9 @@ export function ProductActionsClient({ selected, q, type }: Props) {
       const file = event.target.files?.[0]; event.target.value = "";
       if (!file) return;
       setPanel("import"); setPreview(null);
-      void run(async () => { const data = new FormData(); data.append("file", file); setPreview(await (await request("/api/inventory/products/import", data)).json()); });
+      void run(async () => { setPreview(await previewProductImport(file)); });
     }} />
-    <Button size="sm" variant="outline" onClick={() => void download("/api/inventory/products/import/template", "productos.xlsx")}>Descargar formato</Button>
+    <Button asChild size="sm" variant="outline"><a href={PRODUCT_IMPORT_URLS.template} download="productos.xlsx" onClick={(event) => { event.preventDefault(); void download(PRODUCT_IMPORT_URLS.template, "productos.xlsx"); }}>Descargar formato</a></Button>
     <Button size="sm" variant="outline" onClick={() => router.push(type === "COMBO" ? "/facturacion/products" : "/facturacion/products?type=COMBO")}>{type === "COMBO" ? "Ver todos los productos" : "Combos"}</Button>
     <span title={selected.length === 0 ? "Selecciona al menos un producto." : undefined}>
       <Button size="sm" variant="outline" disabled={selected.length === 0} onClick={() => void download(`/api/inventory/products/barcodes?${new URLSearchParams({ ids: selected.join(",") })}`, "codigos-de-barras.pdf")}>Imprimir códigos de barras</Button>
@@ -67,18 +68,15 @@ export function ProductActionsClient({ selected, q, type }: Props) {
     {message && <p className="w-full rounded border border-green-300 p-3 text-green-800" role="status">{message}</p>}
     {panel && <section aria-label={panel === "import" ? "Importar productos" : "Actualizar precios"} className="w-full rounded-md border bg-card p-4 space-y-3">
       <div className="flex justify-between items-center"><h2 className="font-semibold">{panel === "import" ? "Vista previa de importación" : "Actualizar precios"}</h2><Button size="sm" variant="ghost" disabled={busy} onClick={() => setPanel(null)}>Cerrar</Button></div>
-      {panel === "import" && preview && <>
-        <p>{preview.valid.length} filas válidas; {preview.errors.length + preview.duplicates.length} errores. La vista previa no guarda productos.</p>
-        {preview.errors.map((e, i) => <p key={`error-${i}`} className="text-sm text-red-800">Fila {e.row} · {e.field}: {e.message}</p>)}
-        {preview.duplicates.map((e, i) => <p key={`duplicate-${i}`} className="text-sm text-red-800">Fila {e.row} · {e.field}: código {e.value} duplicado.</p>)}
-        <div className="max-h-72 overflow-auto"><table className="w-full text-sm"><thead><tr><th className="text-left">Código</th><th className="text-left">Nombre</th><th>IVA</th><th>PVP público</th></tr></thead><tbody>
-          {preview.valid.map((row, i) => <tr key={i}><td>{String(row.codigo ?? "")}</td><td>{row.nombre}</td><td className="text-center">{String(row.iva ?? 0)}</td><td className="text-center">{String(row.pvp_publico || 0)}</td></tr>)}
-        </tbody></table></div>
-        <Button disabled={busy || preview.valid.length === 0 || !!preview.errors.length || !!preview.duplicates.length} onClick={() => void run(async () => {
-          const result = await (await request("/api/inventory/products/import", { action: "confirm", rows: preview.rows })).json();
-          setPreview(null); setPanel(null); setMessage(`${result.created} productos importados correctamente.`); router.refresh();
-        })}>Confirmar importación</Button>
-      </>}
+      {panel === "import" && preview && <ProductImportPreview
+        preview={preview}
+        busy={busy}
+        onToggle={(index) => setPreview((current) => current ? { ...current, rows: current.rows.map((row, i) => i === index ? toggleProductImportRow(row) : row) } : current)}
+        onConfirm={() => void run(async () => {
+          const result = await confirmProductImportPreview(preview.rows, setPreview);
+          setPreview(null); setPanel(null); setMessage(`${result.imported} productos importados correctamente.`); router.refresh();
+        })}
+      />}
       {panel === "prices" && <>
         <div className="flex flex-wrap gap-3">
           <label className="text-sm">Aplicar a<select className="block rounded border p-2" value={scope} onChange={(e) => { setScope(e.target.value); setChanges(null); }}>
@@ -104,5 +102,35 @@ export function ProductActionsClient({ selected, q, type }: Props) {
           })}>Confirmar precios</Button></>}
       </>}
     </section>}
+  </>;
+}
+
+const IMPORT_STATUS_LABELS: Record<ProductImportPreviewRow["status"], string> = {
+  READY: "Listo", SKIP_EXISTING: "Ya existe", SKIP_DUPLICATE_FILE: "Duplicado en archivo",
+  NEEDS_REVIEW: "Requiere revisión", EXCLUDED: "Excluido",
+};
+
+export function ProductImportPreview({ preview, busy, onToggle, onConfirm }: {
+  preview: ProductImportPreviewResult;
+  busy: boolean;
+  onToggle: (index: number) => void;
+  onConfirm: () => void;
+}) {
+  const selected = preview.rows.filter((row) => row.selectedForImport);
+  return <>
+    <p>{selected.filter((row) => row.status === "READY").length} filas listas seleccionadas; {selected.filter((row) => row.status === "NEEDS_REVIEW").length} requieren revisión. La vista previa no guarda productos.</p>
+    <p className="text-sm text-muted-foreground">Puedes excluir filas con errores. Los servicios y combos virtuales no tienen inventario propio.</p>
+    <div className="max-h-96 overflow-auto"><table className="w-full text-sm"><thead><tr>
+      {["Incluir", "Fila", "Tipo", "Código", "Nombre", "IVA", "PVP público", "Stock inicial", "Controlar inventario", "Estado", "Errores"].map((label) => <th key={label} scope="col" className="px-2 py-1 text-left">{label}</th>)}
+    </tr></thead><tbody>{preview.rows.map((row, index) => {
+      const tracksStock = row.data.tipo === "SERVICIO" || row.data.tipo === "SERVICE" || row.data.tipo === "COMBO" ? "false" : row.data.controlar_inventario || "true";
+      return <tr key={row.rowNumber} className={row.status === "EXCLUDED" ? "text-muted-foreground" : undefined}>
+        <td className="px-2"><input type="checkbox" aria-label={`Incluir fila ${row.rowNumber}`} checked={row.selectedForImport} disabled={busy || row.status === "SKIP_EXISTING" || row.status === "SKIP_DUPLICATE_FILE"} onChange={() => onToggle(index)} /></td>
+        <td>{row.rowNumber}</td><td>{row.data.tipo}</td><td>{row.data.codigo}</td><td>{row.data.nombre}</td><td>{row.data.iva}</td><td>{row.data.pvp_publico || "0"}</td><td>{row.data.stock_inicial || "0"}</td><td>{tracksStock}</td>
+        <td className="px-2">{IMPORT_STATUS_LABELS[row.status]} ({row.status})</td>
+        <td className="min-w-48 text-red-700">{row.issues.map((issue, i) => <p key={`${issue.field}-${i}`}>{issue.field}: {issue.message}</p>)}</td>
+      </tr>;
+    })}</tbody></table></div>
+    <Button disabled={busy || !canConfirmProductImport(preview.rows)} onClick={onConfirm}>Confirmar importación</Button>
   </>;
 }

@@ -992,3 +992,85 @@ test("AP-05 – 6-decimal unit price survives round-trip through calculator", ()
   assert.ok(result.total.gt(0), "Total must be positive");
   assert.ok(result.total.toDecimalPlaces(2).eq(result.total.toDecimalPlaces(2)), "Total must have 2 decimal precision");
 });
+
+// Quantity-first generation: catalog search and the automatic price guardrail.
+function assertSafeExact(result: AiExactProposalResult | null, amount: string, products: AiProductCandidate[], tier: 1 | 2 | 3 | 4 = 1) {
+  assert.ok(result, `Expected a safe exact proposal for ${amount}`);
+  assert.equal(result.total, new Decimal(amount).toFixed(2));
+  const calculation = calculateSaleTotals(result.items.map((item) => ({ quantity: item.quantity, unitPrice: new Decimal(item.unitPrice), discountAmount: new Decimal(item.discountAmount), taxRate: new Decimal(item.taxRate) })));
+  assert.equal(calculation.total.toFixed(2), result.total);
+  const stockUsed = new Map<string, number>();
+  for (const item of result.items) {
+    const product = products.find((p) => p.id === item.productId)!;
+    const catalog = tier === 2 ? product.price2 ?? product.price : tier === 3 ? product.price3 ?? product.price : tier === 4 ? product.price4 ?? product.price : product.price;
+    const deviation = new Decimal(item.unitPrice).sub(catalog).abs().mul(100).div(catalog);
+    assert.ok(deviation.lte(5), `${product.id}: ${deviation}% exceeds 5%`);
+    assert.equal(item.priceAdjusted, !new Decimal(item.unitPrice).eq(catalog));
+    assert.ok(Number.isInteger(item.quantity) && item.quantity > 0);
+    stockUsed.set(product.id, (stockUsed.get(product.id) ?? 0) + item.quantity);
+    if (product.trackInventory && product.type !== "SERVICE") assert.ok(stockUsed.get(product.id)! <= product.stock);
+  }
+  return result;
+}
+
+test("quantity-first A/B: $10 catalog product uses 10 units for $100 without altering price", () => {
+  const products = [makeProduct({ price: new Decimal(10), taxRate: new Decimal(0), stock: 100 })];
+  const result = assertSafeExact(generateExactProposal({ products, requestedAmount: new Decimal(100), taxMode: "IVA_0" }), "100", products);
+  assert.equal(result.items[0].quantity, 10); assert.equal(result.items[0].unitPrice, "10.000000");
+  assert.ok(result.items.every((i) => !i.priceAdjusted));
+});
+test("catalog combinations take priority even when one adjusted line could close the total", () => {
+  const products = [makeProduct({ id: "six", price: new Decimal(6), taxRate: new Decimal(0) }), makeProduct({ id: "seven", price: new Decimal(7), taxRate: new Decimal(0) })];
+  const result = assertSafeExact(generateExactProposal({ products, requestedAmount: new Decimal(20), taxMode: "IVA_0" }), "20", products);
+  assert.ok(result.items.every((i) => !i.priceAdjusted));
+  assert.equal(result.items.length, 2);
+});
+test("C: unavoidable adjustment is at most 5%; an unsafe exact solution returns null", () => {
+  const products = [makeProduct({ price: new Decimal(10), taxRate: new Decimal(0), stock: 100 })];
+  const result = assertSafeExact(generateExactProposal({ products, requestedAmount: new Decimal("101"), taxMode: "IVA_0" }), "101", products);
+  assert.equal(result.items[0].quantity, 10); assert.ok(result.items[0].priceAdjusted);
+  assert.equal(generateExactProposal({ products: [makeProduct({ price: new Decimal(10), taxRate: new Decimal(0), stock: 1 })], requestedAmount: new Decimal(40), taxMode: "IVA_0" }), null);
+});
+test("D: even an exact catalog amount cannot exceed tracked inventory", () => {
+  const products = [makeProduct({ price: new Decimal(10), taxRate: new Decimal(0), stock: 3 })];
+  assert.equal(generateExactProposal({ products, requestedAmount: new Decimal(100), taxMode: "IVA_0" }), null);
+  assertSafeExact(generateExactProposal({ products, requestedAmount: new Decimal(30), taxMode: "IVA_0" }), "30", products);
+});
+for (const type of ["PRODUCT", "SERVICE"]) test(`E: ${type} without inventory derives quantities from the target regardless of stock`, () => {
+  const products = [makeProduct({ price: new Decimal(10), taxRate: new Decimal(0), stock: 0, trackInventory: false, type })];
+  const result = assertSafeExact(generateExactProposal({ products, requestedAmount: new Decimal(2000), taxMode: "IVA_0" }), "2000", products);
+  assert.equal(result.items[0].quantity, 200);
+});
+for (const taxMode of ["IVA_0", "IVA_15", "MIXED"] as const) {
+  for (const amount of ["100", "333.33", "500", "1000", "2000"]) test(`F–I: ${taxMode} ${amount} is exact and bounded at catalog tier prices`, () => {
+    const products = Array.from({ length: 8 }, (_, i) => makeProduct({ id: `p-${i}`, price: new Decimal(5 + i * 3), taxRate: new Decimal(taxMode === "IVA_0" ? 0 : taxMode === "IVA_15" ? 15 : i % 2 ? 15 : 0), stock: 1000 }));
+    const result = assertSafeExact(generateExactProposal({ products, requestedAmount: new Decimal(amount), taxMode }), amount, products);
+    if (taxMode === "IVA_0") assert.ok(result.items.every((i) => i.taxRate === "0.00"));
+    if (taxMode === "IVA_15") assert.ok(result.items.every((i) => i.taxRate === "15.00"));
+  });
+}
+test("H: an exact mixed-tax catalog combination retains both tax rates", () => {
+  const products = [makeProduct({ id: "zero", price: new Decimal(10), taxRate: new Decimal(0) }), makeProduct({ id: "taxed", price: new Decimal(10), taxRate: new Decimal(15) })];
+  const result = assertSafeExact(generateExactProposal({ products, requestedAmount: new Decimal("21.50"), taxMode: "MIXED" }), "21.50", products);
+  assert.deepEqual(new Set(result.items.map((i) => i.taxRate)), new Set(["0.00", "15.00"]));
+  assert.ok(result.items.every((i) => !i.priceAdjusted));
+});
+test("J: former $50 balancing item at $5.999995 is replaced with more catalog-priced units", () => {
+  const products = [makeProduct({ id: "catalog-50", price: new Decimal(50) }), makeProduct({ id: "catalog-10", price: new Decimal(10), stock: 2 }), makeProduct({ id: "catalog-1", price: new Decimal(1), stock: 0, trackInventory: false })];
+  const result = assertSafeExact(generateExactProposal({ products, requestedAmount: new Decimal("40.25"), taxMode: "IVA_15" }), "40.25", products);
+  assert.ok(result.items.every((i) => !i.priceAdjusted));
+  assert.ok(result.items.reduce((sum, i) => sum + i.quantity, 0) > 12);
+  assert.ok(!result.items.some((i) => i.productId === "catalog-50"));
+});
+for (const tier of [2, 3, 4] as const) test(`guardrail is measured against tier ${tier}, never the public price`, () => {
+  const products = [makeProduct({ price: new Decimal(100), price2: new Decimal(10), price3: new Decimal(20), price4: new Decimal(25), taxRate: new Decimal(0), stock: 200 })];
+  const catalog = tier === 2 ? 10 : tier === 3 ? 20 : 25;
+  const amount = String(catalog * 10 + 1);
+  const result = assertSafeExact(generateExactProposal({ products, requestedAmount: new Decimal(amount), taxMode: "IVA_0", priceTier: tier }), amount, products, tier);
+  assert.equal(result.items[0].catalogUnitPrice, new Decimal(catalog).toFixed(2));
+});
+test("two stock-limited products can share an adjustment while both remain within 5%", () => {
+  const products = [makeProduct({ id: "a", price: new Decimal(10), taxRate: new Decimal(0), stock: 1 }), makeProduct({ id: "b", price: new Decimal(10), taxRate: new Decimal(0), stock: 1 })];
+  const result = assertSafeExact(generateExactProposal({ products, requestedAmount: new Decimal(21), taxMode: "IVA_0" }), "21", products);
+  assert.equal(result.items.length, 2);
+});

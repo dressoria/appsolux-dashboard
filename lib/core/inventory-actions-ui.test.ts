@@ -10,7 +10,7 @@ test.before(async () => { ({ ProductActionsClient } = await import("../../app/fa
 test("AA–AF: actions enabled without selection; only barcode disabled and explained", () => {
   const html = renderToStaticMarkup(createElement(ProductActionsClient, { selected: [], q: "", type: "" }));
   for (const label of ["Actualizar precios", "Importar", "Descargar formato", "Combos"]) {
-    const button = html.match(new RegExp(`<button[^>]*>${label}</button>`))?.[0];
+    const button = html.match(new RegExp(`<(?:button|a)[^>]*>${label}</(?:button|a)>`))?.[0];
     assert.ok(button, label); assert.ok(!button.includes(' disabled=""'), label);
   }
   assert.match(html, /<button[^>]* disabled=""[^>]*>Imprimir códigos de barras<\/button>/);

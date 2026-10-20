@@ -2,7 +2,7 @@ import "@/lib/security/server-only";
 
 import { createHash } from "crypto";
 import { Prisma } from "@prisma/client";
-import { calculateSaleTotals, type CalcLineInput } from "@/lib/core/sale-totals-calculator";
+import { calculateSaleTotals } from "@/lib/core/sale-totals-calculator";
 
 type Decimal = Prisma.Decimal;
 const Decimal = Prisma.Decimal;
@@ -70,11 +70,6 @@ function filterByTaxMode(products: AiProductCandidate[], taxMode: TaxMode): AiPr
   return products;
 }
 
-function maxAvailableQuantity(product: AiProductCandidate): number {
-  if (product.trackInventory) return Math.max(product.stock, 0);
-  return 999999;
-}
-
 export function desiredDistinctProductCount(amount: number): number {
   if (amount <= 100) return 5;
   if (amount <= 500) return 6;
@@ -105,308 +100,197 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
   return result;
 }
 
-function tryFindExactUnitPrice(
-  targetRemainder: Decimal,
-  quantity: number,
-  taxRate: Decimal,
-): Decimal | null {
-  const taxMul = taxRate.div(100).add(1);
-  const estimatedSubtotal = targetRemainder.div(taxMul);
-  const estimatedUnitPrice = estimatedSubtotal.div(quantity);
+// Automatic generation must remain within the selected tier's real catalog price.
+export const MAX_PRICE_ADJUSTMENT_PERCENT = 5;
+const MAX_CATALOG_PRODUCTS = 48;
+const CATALOG_BEAM_WIDTH = 128;
 
-  for (let delta = -5; delta <= 5; delta++) {
-    const candidatePrice = estimatedUnitPrice.add(new Decimal(delta).mul(new Decimal("0.000001")));
-    if (candidatePrice.lte(0)) continue;
-    const candidate6 = candidatePrice.toDecimalPlaces(6);
+type Selection = { product: AiProductCandidate; quantity: number; unitPrice: Decimal; catalogUnitPrice: Decimal };
+type Candidate = { product: AiProductCandidate; price: Decimal; gross: number; maxQuantity: number };
+type SearchState = { items: Selection[]; cents: number; units: number };
 
-    const lineInput: CalcLineInput = {
-      quantity,
-      unitPrice: candidate6,
-      discountAmount: new Decimal(0),
-      taxRate,
-    };
-    const calc = calculateSaleTotals([lineInput]);
-    if (calc.total.toDecimalPlaces(2).eq(targetRemainder.toDecimalPlaces(2))) {
-      return candidate6;
-    }
+function withinPriceGuardrail(price: Decimal, catalog: Decimal) {
+  return price.gt(0) && price.sub(catalog).abs().mul(100).lte(catalog.mul(MAX_PRICE_ADJUSTMENT_PERCENT));
+}
+
+function tryFindExactUnitPrice(target: Decimal, quantity: number, taxRate: Decimal, catalogPrice: Decimal): Decimal | null {
+  const lower = catalogPrice.mul(1 - MAX_PRICE_ADJUSTMENT_PERCENT / 100).mul(1e6).ceil();
+  const upper = catalogPrice.mul(1 + MAX_PRICE_ADJUSTMENT_PERCENT / 100).mul(1e6).floor();
+  const estimate = target.div(taxRate.div(100).add(1)).div(quantity).toDecimalPlaces(6);
+  const totalAt = (price: Decimal) => calculateSaleTotals([{ quantity, unitPrice: price, discountAmount: new Decimal(0), taxRate }]).total.toDecimalPlaces(2);
+  // Try the closest catalog-preserving price first; then search the monotonic
+  // six-decimal price lattice with the same calculator used to create sales.
+  for (const price of [catalogPrice, estimate]) {
+    if (withinPriceGuardrail(price, catalogPrice) && totalAt(price).eq(target.toDecimalPlaces(2))) return price;
   }
-
-  for (let delta = -200; delta <= 200; delta++) {
-    const candidatePrice = estimatedUnitPrice.add(new Decimal(delta).mul(new Decimal("0.000001")));
-    if (candidatePrice.lte(0)) continue;
-    const candidate6 = candidatePrice.toDecimalPlaces(6);
-
-    const lineInput: CalcLineInput = {
-      quantity,
-      unitPrice: candidate6,
-      discountAmount: new Decimal(0),
-      taxRate,
-    };
-    const calc = calculateSaleTotals([lineInput]);
-    if (calc.total.toDecimalPlaces(2).eq(targetRemainder.toDecimalPlaces(2))) {
-      return candidate6;
-    }
+  let lo = Decimal.max(lower, estimate.sub(new Decimal("0.02").div(quantity)).mul(1e6).floor());
+  let hi = Decimal.min(upper, estimate.add(new Decimal("0.02").div(quantity)).mul(1e6).ceil());
+  while (lo.lte(hi)) {
+    const mid = lo.add(hi).div(2).floor();
+    const price = mid.div(1e6);
+    const comparison = totalAt(price).cmp(target.toDecimalPlaces(2));
+    if (comparison === 0) return withinPriceGuardrail(price, catalogPrice) ? price : null;
+    if (comparison < 0) lo = mid.add(1); else hi = mid.sub(1);
   }
-
   return null;
 }
 
-function tryFindExactTwoLines(
-  targetRemainder: Decimal,
-  product1: AiProductCandidate,
-  qty1: number,
-  catalogPrice1: Decimal,
-  product2: AiProductCandidate,
-  qty2: number,
-  catalogPrice2: Decimal,
-): { price1: Decimal; price2: Decimal } | null {
-  const tax1 = new Decimal(product1.taxRate);
-  const tax2 = new Decimal(product2.taxRate);
-
-  for (const p1delta of [0, 1, -1, 2, -2, 5, -5, 10, -10]) {
-    const price1 = catalogPrice1.add(new Decimal(p1delta).mul(new Decimal("0.01"))).toDecimalPlaces(6);
-    if (price1.lte(0)) continue;
-
-    const line1Calc = calculateSaleTotals([{
-      quantity: qty1, unitPrice: price1, discountAmount: new Decimal(0), taxRate: tax1,
-    }]);
-    const remainForLine2 = targetRemainder.sub(line1Calc.total);
-    if (remainForLine2.lte(0)) continue;
-
-    const price2 = tryFindExactUnitPrice(remainForLine2, qty2, tax2);
-    if (price2 && price2.gt(0)) {
-      return { price1, price2 };
+function quantityOptions(max: number, gross: number, remainder: number, distinct: number): number[] {
+  const limit = Math.min(max, Math.max(0, Math.ceil((remainder + 0.01) / (gross * 0.95))));
+  if (limit <= 64) return Array.from({ length: limit }, (_, i) => i + 1);
+  const values = new Set<number>([1, 2, 3, 4, 5, 6, 7, 8, limit]);
+  for (const center of [remainder / gross, remainder / (gross * Math.max(2, distinct)), limit / 2]) {
+    for (let delta = -4; delta <= 4; delta++) {
+      const quantity = Math.round(center) + delta;
+      if (quantity >= 1 && quantity <= limit) values.add(quantity);
     }
   }
+  return [...values].sort((a, b) => b - a);
+}
 
-  return null;
+function compareSelections(a: Selection[], b: Selection[], desired: number) {
+  const score = (items: Selection[]) => {
+    const adjusted = items.filter((i) => !i.unitPrice.eq(i.catalogUnitPrice));
+    const deviations = adjusted.map((i) => i.unitPrice.sub(i.catalogUnitPrice).abs().div(i.catalogUnitPrice).toNumber());
+    return [adjusted.length, Math.max(0, ...deviations), deviations.reduce((sum, n) => sum + n, 0), Math.abs(desired - items.length), -items.reduce((sum, i) => sum + i.quantity, 0)];
+  };
+  const left = score(a), right = score(b);
+  for (let i = 0; i < left.length; i++) if (left[i] !== right[i]) return left[i] - right[i];
+  return 0;
+}
+
+function buildProposal(selected: Selection[], requestedAmount: Decimal): AiExactProposalResult | null {
+  if (!selected.length || selected.some((s) => !withinPriceGuardrail(s.unitPrice, s.catalogUnitPrice))) return null;
+  const totals = calculateSaleTotals(selected.map((s) => ({ quantity: s.quantity, unitPrice: s.unitPrice, discountAmount: new Decimal(0), taxRate: new Decimal(s.product.taxRate) })));
+  if (!totals.total.toDecimalPlaces(2).eq(requestedAmount.toDecimalPlaces(2))) return null;
+  const items = selected.map((s, i): AiExactLineItem => ({
+    productId: s.product.id, productName: s.product.name, primaryCode: s.product.primaryCode,
+    quantity: s.quantity, unitPrice: s.unitPrice.toDecimalPlaces(6).toFixed(6),
+    catalogUnitPrice: s.catalogUnitPrice.toFixed(2), priceAdjusted: !s.unitPrice.eq(s.catalogUnitPrice),
+    discountAmount: "0.00", taxRate: round2(new Decimal(s.product.taxRate)),
+    subtotal: round2(totals.lines[i].lineSubtotal), taxAmount: round2(totals.lines[i].taxAmount), total: round2(totals.lines[i].lineTotal),
+  }));
+  return { items, subtotal: round2(totals.subtotal), taxTotal: round2(totals.taxTotal), total: round2(totals.total), combinationHash: computeHash(items), isExact: true };
 }
 
 export function generateExactProposal(input: ExactSolverInput): AiExactProposalResult | null {
   const { requestedAmount, taxMode, priceTier = 1, excludedHashes, seed = 0 } = input;
-  if (requestedAmount.lte(0)) return null;
-
-  const eligible = filterByTaxMode(input.products, taxMode).filter((p) => {
-    const price = getEffectivePrice(p, priceTier);
-    if (price.lte(0)) return false;
-    if (p.trackInventory && p.stock <= 0) return false;
-    if (p.type === "SERVICE") return true;
-    return true;
+  if (!requestedAmount.isFinite() || requestedAmount.lte(0)) return null;
+  const targetCents = requestedAmount.toDecimalPlaces(2).mul(100).toNumber();
+  if (!Number.isSafeInteger(targetCents)) return null;
+  const candidates: Candidate[] = seededShuffle(filterByTaxMode(input.products, taxMode), seed).flatMap((product) => {
+    const price = getEffectivePrice(product, priceTier);
+    if (!price.isFinite() || price.lte(0)) return [];
+    const gross = price.mul(new Decimal(product.taxRate).div(100).add(1)).toNumber();
+    const demand = Math.min(2147483647, Math.ceil((requestedAmount.toNumber() + 0.01) / (gross * 0.95)));
+    const maxQuantity = product.trackInventory && product.type !== "SERVICE" ? Math.min(Math.max(Math.floor(product.stock), 0), demand) : demand;
+    return maxQuantity > 0 && gross * 0.95 <= requestedAmount.toNumber() + 0.01 ? [{ product, price, gross, maxQuantity }] : [];
   });
-
-  if (eligible.length === 0) return null;
-
-  const targetCount = Math.min(
-    desiredDistinctProductCount(requestedAmount.toNumber()),
-    eligible.length,
-  );
-
-  const shuffled = seededShuffle(eligible, seed);
-
-  const sortedByPriceDesc = [...shuffled].sort((a, b) => {
-    const pa = getEffectivePrice(a, priceTier);
-    const pb = getEffectivePrice(b, priceTier);
-    return pb.sub(pa).toNumber();
-  });
-
-  const selected: Array<{
-    product: AiProductCandidate;
-    quantity: number;
-    unitPrice: Decimal;
-    catalogUnitPrice: Decimal;
-    priceAdjusted: boolean;
-  }> = [];
-
-  let remaining = requestedAmount;
-  const usedProductIds = new Set<string>();
-  const stockUsed = new Map<string, number>();
-
-  for (let i = 0; i < sortedByPriceDesc.length && selected.length < targetCount - 1; i++) {
-    const product = sortedByPriceDesc[i];
-    if (usedProductIds.has(product.id)) continue;
-
-    const catalogPrice = getEffectivePrice(product, priceTier);
-    const taxRate = new Decimal(product.taxRate);
-    const priceWithTax = catalogPrice.mul(taxRate.div(100).add(1));
-    const maxQty = maxAvailableQuantity(product) - (stockUsed.get(product.id) ?? 0);
-
-    if (maxQty <= 0) continue;
-
-    const rawQty = remaining.div(priceWithTax).toNumber();
-    if (rawQty < 0.5) continue;
-
-    let quantity = Math.min(Math.max(Math.floor(rawQty * 0.6), 1), maxQty);
-
-    const lineInput: CalcLineInput = {
-      quantity,
-      unitPrice: catalogPrice,
-      discountAmount: new Decimal(0),
-      taxRate,
-    };
-    const lineCalc = calculateSaleTotals([lineInput]);
-    if (lineCalc.total.gte(remaining)) {
-      quantity = 1;
-      const singleCalc = calculateSaleTotals([{ ...lineInput, quantity: 1 }]);
-      if (singleCalc.total.gte(remaining)) continue;
+  if (!candidates.length) return null;
+  const desired = Math.min(desiredDistinctProductCount(requestedAmount.toNumber()), candidates.length);
+  const select = (candidate: Candidate, quantity: number, unitPrice = candidate.price): Selection => ({ product: candidate.product, quantity, unitPrice, catalogUnitPrice: candidate.price });
+  const lineCents = new Map<string, number>();
+  function catalogCents(candidate: Candidate, quantity: number) {
+    const key = `${candidate.product.id}:${quantity}`;
+    let cents = lineCents.get(key);
+    if (cents === undefined) {
+      cents = calculateSaleTotals([{ quantity, unitPrice: candidate.price, discountAmount: new Decimal(0), taxRate: new Decimal(candidate.product.taxRate) }]).total.mul(100).round().toNumber();
+      lineCents.set(key, cents);
     }
-
-    const finalCalc = calculateSaleTotals([{ ...lineInput, quantity }]);
-    remaining = remaining.sub(finalCalc.total);
-    usedProductIds.add(product.id);
-    stockUsed.set(product.id, (stockUsed.get(product.id) ?? 0) + quantity);
-
-    selected.push({
-      product,
-      quantity,
-      unitPrice: catalogPrice,
-      catalogUnitPrice: catalogPrice,
-      priceAdjusted: false,
-    });
-
-    if (remaining.lte(0)) break;
+    return cents;
   }
-
-  if (remaining.gt(0)) {
-    let balancingProduct: AiProductCandidate | null = null;
-    for (const p of sortedByPriceDesc) {
-      const maxQty = maxAvailableQuantity(p) - (stockUsed.get(p.id) ?? 0);
-      if (maxQty <= 0) continue;
-      balancingProduct = p;
-      break;
+  let best: Selection[] | null = null;
+  function consider(items: Selection[]) {
+    if ((!best || compareSelections(items, best, desired) < 0) && buildProposal(items, requestedAmount)) best = items;
+  }
+  // Check every product, even outside the bounded combination-search pool.
+  for (const candidate of candidates) {
+    const quantity = Math.round(requestedAmount.toNumber() / candidate.gross);
+    for (const q of [quantity - 1, quantity, quantity + 1]) {
+      if (q > 0 && q <= candidate.maxQuantity && catalogCents(candidate, q) === targetCents) consider([select(candidate, q)]);
     }
-
-    if (!balancingProduct) return null;
-
-    const catalogPrice = getEffectivePrice(balancingProduct, priceTier);
-    const taxRate = new Decimal(balancingProduct.taxRate);
-    const maxQty = maxAvailableQuantity(balancingProduct) - (stockUsed.get(balancingProduct.id) ?? 0);
-    const priceWithTax = catalogPrice.mul(taxRate.div(100).add(1));
-    let balancingQty = Math.min(Math.max(Math.round(remaining.div(priceWithTax).toNumber()), 1), maxQty);
-
-    let exactPrice = tryFindExactUnitPrice(remaining, balancingQty, taxRate);
-
-    if (!exactPrice && balancingQty > 1) {
-      for (let q = balancingQty - 1; q >= 1; q--) {
-        exactPrice = tryFindExactUnitPrice(remaining, q, taxRate);
-        if (exactPrice) { balancingQty = q; break; }
+  }
+  const byPrice = [...candidates].sort((a, b) => a.gross - b.gross);
+  const pool = candidates.length <= MAX_CATALOG_PRODUCTS ? candidates : [...new Set([
+    ...candidates.slice(0, 16), ...byPrice.slice(0, 16), ...byPrice.slice(-16),
+  ])];
+  let states: SearchState[] = [{ items: [], cents: 0, units: 0 }];
+  for (const candidate of pool) {
+    const next = new Map<string, SearchState>();
+    function keep(state: SearchState) {
+      const key = `${state.cents}:${state.items.length}`;
+      const previous = next.get(key);
+      if (!previous || state.units > previous.units) next.set(key, state);
+    }
+    for (const state of states) {
+      keep(state);
+      if (state.items.length >= desired) continue;
+      const remainder = (targetCents - state.cents) / 100;
+      for (const quantity of quantityOptions(candidate.maxQuantity, candidate.gross, remainder, desired - state.items.length)) {
+        const cents = state.cents + catalogCents(candidate, quantity);
+        if (cents > targetCents || cents <= state.cents) continue;
+        const items = [...state.items, select(candidate, quantity)];
+        if (cents === targetCents) consider(items);
+        else keep({ items, cents, units: state.units + quantity });
       }
     }
-
-    if (!exactPrice) {
-      for (let q = balancingQty + 1; q <= Math.min(balancingQty + 5, maxQty); q++) {
-        exactPrice = tryFindExactUnitPrice(remaining, q, taxRate);
-        if (exactPrice) { balancingQty = q; break; }
-      }
+    const ordered = [...next.values()].sort((a, b) => a.cents - b.cents || b.items.length - a.items.length || b.units - a.units);
+    if (ordered.length <= CATALOG_BEAM_WIDTH) states = ordered;
+    else {
+      // Keep close candidates and a spread of smaller remainders so a greedy
+      // near-match cannot eliminate a later exact catalog combination.
+      const half = CATALOG_BEAM_WIDTH / 2;
+      states = ordered.slice(-half);
+      for (let i = 0; i < half; i++) states.push(ordered[Math.floor(i * (ordered.length - half) / half)]);
     }
-
-    if (!exactPrice && selected.length > 0) {
-      const lastSelected = selected[selected.length - 1];
-      const result = tryFindExactTwoLines(
-        remaining.add(calculateSaleTotals([{
-          quantity: lastSelected.quantity,
-          unitPrice: lastSelected.unitPrice,
-          discountAmount: new Decimal(0),
-          taxRate: new Decimal(lastSelected.product.taxRate),
-        }]).total),
-        lastSelected.product,
-        lastSelected.quantity,
-        lastSelected.catalogUnitPrice,
-        balancingProduct,
-        balancingQty,
-        catalogPrice,
-      );
-
-      if (result) {
-        lastSelected.unitPrice = result.price1;
-        lastSelected.priceAdjusted = !result.price1.eq(lastSelected.catalogUnitPrice);
-        exactPrice = result.price2;
-      }
-    }
-
-    if (!exactPrice || exactPrice.lte(0)) return null;
-
-    const priceAdjusted = !exactPrice.toDecimalPlaces(2).eq(catalogPrice.toDecimalPlaces(2));
-
-    if (usedProductIds.has(balancingProduct.id)) {
-      const existing = selected.find((s) => s.product.id === balancingProduct!.id);
-      if (existing) {
-        const combinedRemaining = remaining.add(
-          calculateSaleTotals([{
-            quantity: existing.quantity,
-            unitPrice: existing.unitPrice,
-            discountAmount: new Decimal(0),
-            taxRate: new Decimal(existing.product.taxRate),
-          }]).total,
-        );
-        const combinedQty = existing.quantity + balancingQty;
-        const combinedPrice = tryFindExactUnitPrice(combinedRemaining, combinedQty, taxRate);
-        if (combinedPrice && combinedPrice.gt(0)) {
-          existing.quantity = combinedQty;
-          existing.unitPrice = combinedPrice;
-          existing.priceAdjusted = !combinedPrice.toDecimalPlaces(2).eq(existing.catalogUnitPrice.toDecimalPlaces(2));
-        } else {
-          selected.push({
-            product: balancingProduct,
-            quantity: balancingQty,
-            unitPrice: exactPrice,
-            catalogUnitPrice: catalogPrice,
-            priceAdjusted,
-          });
+  }
+  // Catalog-only search finishes before any automatic price alteration.
+  if (!best) {
+    for (const state of states) {
+      for (const candidate of pool) {
+        const base = state.items.filter((s) => s.product.id !== candidate.product.id);
+        if (base.length >= desired) continue;
+        const baseTotal = calculateSaleTotals(base.map((s) => ({ quantity: s.quantity, unitPrice: s.unitPrice, discountAmount: new Decimal(0), taxRate: new Decimal(s.product.taxRate) }))).total;
+        const remainder = requestedAmount.sub(baseTotal);
+        if (remainder.lte(0)) continue;
+        const center = Math.round(remainder.toNumber() / candidate.gross);
+        const min = Math.max(1, Math.ceil((remainder.toNumber() - 0.01) / (candidate.gross * 1.05)));
+        const max = Math.min(candidate.maxQuantity, Math.floor((remainder.toNumber() + 0.01) / (candidate.gross * 0.95)));
+        const quantities = max - min <= 12 ? Array.from({ length: Math.max(0, max - min + 1) }, (_, i) => min + i) : [min, max, center - 1, center, center + 1];
+        for (const quantity of quantities) {
+          if (quantity < min || quantity > max) continue;
+          const price = tryFindExactUnitPrice(remainder, quantity, new Decimal(candidate.product.taxRate), candidate.price);
+          if (price) consider([...base, select(candidate, quantity, price)]);
         }
       }
-    } else {
-      selected.push({
-        product: balancingProduct,
-        quantity: balancingQty,
-        unitPrice: exactPrice,
-        catalogUnitPrice: catalogPrice,
-        priceAdjusted,
-      });
     }
   }
-
-  const calcLines: CalcLineInput[] = selected.map((s) => ({
-    quantity: s.quantity,
-    unitPrice: s.unitPrice,
-    discountAmount: new Decimal(0),
-    taxRate: new Decimal(s.product.taxRate),
-  }));
-
-  const totals = calculateSaleTotals(calcLines);
-  const isExact = totals.total.toDecimalPlaces(2).eq(requestedAmount.toDecimalPlaces(2));
-
-  if (!isExact) return null;
-
-  const items: AiExactLineItem[] = selected.map((s, i) => {
-    const lineResult = totals.lines[i];
-    return {
-      productId: s.product.id,
-      productName: s.product.name,
-      primaryCode: s.product.primaryCode,
-      quantity: s.quantity,
-      unitPrice: s.unitPrice.toDecimalPlaces(6).toFixed(6),
-      catalogUnitPrice: s.catalogUnitPrice.toDecimalPlaces(2).toFixed(2),
-      priceAdjusted: s.priceAdjusted,
-      discountAmount: "0.00",
-      taxRate: round2(new Decimal(s.product.taxRate)),
-      subtotal: round2(lineResult.lineSubtotal),
-      taxAmount: round2(lineResult.taxAmount),
-      total: round2(lineResult.lineTotal),
-    };
-  });
-
-  const hash = computeHash(
-    items.map((i) => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice })),
-  );
-
-  if (excludedHashes?.has(hash)) return null;
-
-  return {
-    items,
-    subtotal: round2(totals.subtotal),
-    taxTotal: round2(totals.taxTotal),
-    total: round2(totals.total),
-    combinationHash: hash,
-    isExact: true,
-  };
+  // Tight stock can require two small adjustments rather than one unsafe one.
+  if (!best) {
+    const pairPool = pool.slice(0, 16);
+    for (let i = 0; i < pairPool.length; i++) for (let j = i + 1; j < pairPool.length; j++) {
+      const first = pairPool[i], second = pairPool[j];
+      for (const state of states.slice(-8)) {
+        const base = state.items.filter((s) => s.product.id !== first.product.id && s.product.id !== second.product.id);
+        if (base.length + 2 > desired) continue;
+        const baseTotal = calculateSaleTotals(base.map((s) => ({ quantity: s.quantity, unitPrice: s.unitPrice, discountAmount: new Decimal(0), taxRate: new Decimal(s.product.taxRate) }))).total;
+        const remainder = requestedAmount.sub(baseTotal);
+        if (remainder.lte(0)) continue;
+        const share = remainder.toNumber() / (first.gross + second.gross);
+        const qty1 = Math.min(first.maxQuantity, Math.max(1, Math.round(share)));
+        for (const percent of [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5]) {
+          const price1 = first.price.mul(new Decimal(100 + percent).div(100)).toDecimalPlaces(6);
+          if (!withinPriceGuardrail(price1, first.price)) continue;
+          const line1 = calculateSaleTotals([{ quantity: qty1, unitPrice: price1, discountAmount: new Decimal(0), taxRate: new Decimal(first.product.taxRate) }]).total;
+          const rest = remainder.sub(line1);
+          if (rest.lte(0)) continue;
+          const qty2 = Math.min(second.maxQuantity, Math.max(1, Math.round(rest.toNumber() / second.gross)));
+          const price2 = tryFindExactUnitPrice(rest, qty2, new Decimal(second.product.taxRate), second.price);
+          if (price2) consider([...base, select(first, qty1, price1), select(second, qty2, price2)]);
+        }
+      }
+    }
+  }
+  const result = best ? buildProposal(best, requestedAmount) : null;
+  return result && !excludedHashes?.has(result.combinationHash) ? result : null;
 }

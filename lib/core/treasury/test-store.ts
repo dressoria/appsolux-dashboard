@@ -62,6 +62,11 @@ export function treasuryStore(t: TestContext, additionalTables: string[] = []) {
     });
     if (key === "account") return one("treasuryAccount", row.accountId);
     if (key === "sriDocument") return one("sriDocument", row.sriDocumentId);
+    if (key === "cancellationRequests") return {
+      model: "sriCancellationRequest",
+      rows: state.sriCancellationRequest.filter((r) => r.sriDocumentId === row.id),
+      many: true,
+    };
     if (key === "cashAccount") return one("treasuryAccount", row.cashAccountId);
     if (key === "bankAccount") return one("treasuryAccount", row.bankAccountId);
     if (key === "cardAccount") return one("treasuryAccount", row.cardAccountId);
@@ -150,6 +155,7 @@ export function treasuryStore(t: TestContext, additionalTables: string[] = []) {
       const relation = rel(model, row, key);
       if (relation && wanted && typeof wanted === "object") {
         const query = wanted as R;
+        if (Object.hasOwn(query, "some")) return relation.rows.some((r) => matches(relation.model, r, query.some as R));
         if (Object.hasOwn(query, "is"))
           return query.is === null
             ? !relation.rows.length
@@ -223,7 +229,14 @@ export function treasuryStore(t: TestContext, additionalTables: string[] = []) {
         }
       return 0;
     });
-    return result.slice(
+    const distinct = args.distinct as string[] | undefined;
+    const seen = new Set<string>();
+    const unique = distinct ? result.filter((row) => {
+      const key = JSON.stringify(distinct.map((field) => row[field]));
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    }) : result;
+    return unique.slice(
       Number(args.skip ?? 0),
       args.take === undefined
         ? undefined

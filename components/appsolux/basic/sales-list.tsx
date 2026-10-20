@@ -9,6 +9,7 @@ import { SriDownloadButton } from "@/components/appsolux/sri/sri-download-button
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SriCancellationModal } from "@/components/appsolux/sri/sri-cancellation-modal";
 
 type Sale = {
   id: string;
@@ -471,7 +472,7 @@ export function SalesList({
         </div>
       )}
       {sriCancelDocId && (
-        <SriCancellationModalInline
+        <SriCancellationModal
           sriDocumentId={sriCancelDocId}
           onClose={() => setSriCancelDocId(null)}
           onSuccess={() => {
@@ -481,75 +482,6 @@ export function SalesList({
           }}
         />
       )}
-    </div>
-  );
-}
-
-function SriCancellationModalInline({
-  sriDocumentId,
-  onClose,
-  onSuccess,
-}: {
-  sriDocumentId: string;
-  onClose: () => void;
-  onSuccess: () => void;
-}) {
-  const [reason, setReason] = useState("EMISSION_ERROR");
-  const [comment, setComment] = useState("");
-  const [confirmed, setConfirmed] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-
-  async function handleSubmit() {
-    setSubmitting(true);
-    setErrorMsg("");
-    try {
-      const res = await fetch(`/api/sri/documents/${sriDocumentId}/cancel`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reasonCode: reason, reasonText: comment }),
-      });
-      const data = (await res.json()) as { ok?: boolean; message?: string };
-      if (!res.ok || !data.ok) throw new Error(data.message ?? "Error al solicitar anulación.");
-      onSuccess();
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Error inesperado.");
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-lg rounded-2xl border bg-white p-6 shadow-xl">
-        <h2 className="text-lg font-bold text-red-700">Anular factura SRI</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          La factura no se marcará como anulada hasta que el SRI confirme la anulación.
-        </p>
-        <div className="mt-4 space-y-3">
-          <div className="space-y-1">
-            <Label>Motivo</Label>
-            <select value={reason} onChange={(e) => setReason(e.target.value)} className="h-9 w-full rounded-md border bg-background px-3 text-sm">
-              <option value="EMISSION_ERROR">Error de emisión</option>
-              <option value="OPERATION_NOT_OCCURRED">La operación no se realizó</option>
-            </select>
-          </div>
-          <div className="space-y-1">
-            <Label>Comentario (opcional)</Label>
-            <textarea value={comment} onChange={(e) => setComment(e.target.value)} className="w-full rounded-md border bg-background px-3 py-2 text-sm" rows={2} />
-          </div>
-          <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="mt-0.5" />
-            Confirmo que deseo solicitar la anulación de este comprobante al SRI.
-          </label>
-          {errorMsg && <p className="text-sm text-red-600">{errorMsg}</p>}
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose} disabled={submitting}>Cancelar</Button>
-            <Button variant="destructive" disabled={!confirmed || submitting} onClick={handleSubmit}>
-              {submitting ? "Enviando..." : "Solicitar anulación al SRI"}
-            </Button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

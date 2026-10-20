@@ -278,8 +278,8 @@ function validateRow(
   }
 
   const resolvedType = TYPE_MAP[typeKey];
-  const needsWarehouse = resolvedType && resolvedType !== "SERVICE" && resolvedType !== "COMBO";
-  if (needsWarehouse && data.bodega && !findCatalogItem(ctx.warehouses, data.bodega)) {
+  const needsWarehouse = resolvedType === "PRODUCT" && resolveTrackInventory(resolvedType, data.controlar_inventario);
+  if (resolvedType === "PRODUCT" && data.bodega && !findCatalogItem(ctx.warehouses, data.bodega)) {
     issues.push({ field: "bodega", message: `Bodega "${data.bodega}" no encontrada.` });
   }
 

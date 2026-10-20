@@ -21,7 +21,7 @@ export default async function FacturacionDocumentsPage({ searchParams }: Props) 
   const page = integer(params.page, 1); const perPageCandidate = integer(params.perPage, 10); const perPage = [10,25,50].includes(perPageCandidate) ? perPageCandidate : 10;
   const type = FILTERS.has(params.type as FilterKey) ? params.type as FilterKey : "all"; const sort = params.sort === "total" ? "total" as const : "date" as const;
   const result = mode.canUseAdvancedErp
-    ? await loadErpDocuments(tenant.id, { page, perPage, includeBasicHistory: true })
+    ? await loadErpDocuments(tenant.id, { page, perPage, includeBasicHistory: true, type })
     : await loadCoreDocuments(tenant.id, { page, perPage, type, search: params.q, from: dateValue(params.from), to: dateValue(params.to,true), sort });
   const totalPages = Math.max(1, Math.ceil(result.total / perPage));
   const sriCount = result.items.filter((item) => item.sriDocumentId).length; const pending = result.items.filter((item) => ["DRAFT","READY_FOR_TESTING","SIGNED","SENT"].includes(item.sriStatus ?? "")).length; const authorized = result.items.filter((item) => item.sriStatus === "AUTHORIZED").length;
