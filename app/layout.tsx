@@ -1,15 +1,10 @@
 import type { Metadata } from "next";
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 
-const facturomIconPath = path.join(process.cwd(), "public", "brand", "facturom-icon.svg");
-const hasFacturomIcon = existsSync(facturomIconPath);
-
 export const metadata: Metadata = {
   title: {
-    default: "Facturom | Facturación electrónica para Ecuador",
+    default: "Facturom",
     template: "%s | Facturom",
   },
   description:
@@ -28,15 +23,11 @@ export const metadata: Metadata = {
     title: "Facturom",
     description: "Facturación electrónica simple para negocios en Ecuador.",
   },
-  ...(hasFacturomIcon
-    ? {
-        icons: {
-          icon: "/brand/facturom-icon.svg",
-          shortcut: "/brand/facturom-icon.svg",
-          apple: "/brand/facturom-icon.svg",
-        },
-      }
-    : {}),
+  icons: {
+    icon: { url: "/brand/facturom-icon.png", type: "image/png", sizes: "512x512" },
+    shortcut: "/brand/facturom-icon.png",
+    apple: "/brand/facturom-icon.png",
+  },
 };
 
 export default function RootLayout({

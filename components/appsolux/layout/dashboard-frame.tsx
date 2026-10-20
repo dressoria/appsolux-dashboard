@@ -85,6 +85,8 @@ function FacturomBrand({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+const sidebarBackground = "bg-linear-to-b from-[#132B68] via-[#1E52F1] to-[#1769E0]";
+
 function matchesPath(pathname: string, href: string, exact = false) {
   return exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -196,12 +198,13 @@ export function DashboardFrame({
       <Link
         key={key}
         href={item.href}
+        aria-current={active ? "page" : undefined}
         className={cn(
           "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
           nested && "ml-2 pl-4 text-[13px]",
           active
-            ? "bg-facturom-primary text-white"
-            : "text-white/70 hover:bg-white/[0.07] hover:text-white"
+            ? "bg-white/95 font-semibold text-[#132B68] shadow-sm"
+            : "text-white hover:bg-black/10"
         )}
       >
         {Icon ? <Icon className="h-4 w-4 shrink-0" /> : <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-60" />}
@@ -223,7 +226,7 @@ export function DashboardFrame({
           <button
             type="button"
             onClick={() => toggleSubmenu(submenuKey)}
-            className="flex w-full items-center gap-2 px-4 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35 hover:text-white/50 transition-colors"
+            className="flex w-full items-center gap-2 px-4 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white transition-colors"
             aria-expanded={submenuOpen}
           >
             <span className="flex-1 text-left">{entry.title}</span>
@@ -278,7 +281,7 @@ export function DashboardFrame({
                   title={group.title}
                   className={cn(
                     "flex items-center justify-center rounded-xl px-2 py-2.5 transition-colors",
-                    groupActive ? "bg-facturom-primary text-white" : "text-white/70 hover:bg-white/[0.07] hover:text-white"
+                    groupActive ? "bg-white/95 font-semibold text-[#132B68] shadow-sm" : "text-white hover:bg-black/10"
                   )}
                 >
                   <Icon className="h-5 w-5" />
@@ -293,7 +296,7 @@ export function DashboardFrame({
                   href={firstLink.href}
                   className={cn(
                     "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                    groupActive ? "bg-facturom-primary text-white" : "text-white/75 hover:bg-white/[0.07] hover:text-white"
+                    groupActive ? "bg-white/95 font-semibold text-[#132B68] shadow-sm" : "text-white hover:bg-black/10"
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -310,7 +313,7 @@ export function DashboardFrame({
                   onClick={() => toggleGroup(group.key)}
                   className={cn(
                     "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                    groupActive ? "text-white" : "text-white/75 hover:bg-white/[0.07] hover:text-white"
+                    groupActive ? "text-white" : "text-white hover:bg-black/10"
                   )}
                   aria-expanded={open}
                 >
@@ -334,8 +337,8 @@ export function DashboardFrame({
   return (
     <div className="min-h-screen bg-facturom-bg">
       <div className="lg:flex">
-        <div className="hidden bg-facturom-sidebar lg:block">
-          <aside className={cn("sticky top-0 h-screen transition-[width] duration-300", sidebarWidth)}>
+        <div className="hidden lg:block">
+          <aside className={cn("sticky top-0 h-screen transition-[width] duration-300", sidebarWidth, sidebarBackground)}>
             {sidebarContent}
           </aside>
         </div>
@@ -346,7 +349,8 @@ export function DashboardFrame({
 
         <aside
           className={cn(
-            "fixed inset-y-0 left-0 z-50 w-[88vw] max-w-[320px] bg-facturom-sidebar shadow-2xl transition-transform duration-300 lg:hidden",
+            "fixed inset-y-0 left-0 z-50 w-[88vw] max-w-[320px] shadow-2xl transition-transform duration-300 lg:hidden",
+            sidebarBackground,
             mobileOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >

@@ -2,16 +2,17 @@ import Link from "next/link";
 import {
   AlertTriangle,
   CircleDollarSign,
+  BookOpen,
+  Building2,
   FileCheck2,
-  FileText,
   Package,
   ReceiptText,
-  Settings2,
   ShoppingCart,
   Sparkles,
   Users,
   Wallet,
 } from "lucide-react";
+import { HomeTabs } from "@/components/appsolux/facturacion/home-tabs";
 import { SalesPeriodChart } from "@/components/appsolux/facturacion/sales-period-chart";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { routes } from "@/config/routes";
 import { getBasicReports } from "@/lib/core/lightweight-pos";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
-import { getSriDocuments, getSriModuleStatus } from "@/lib/core/sri";
+import { getSriDocuments } from "@/lib/core/sri";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getPrismaClient } from "@/lib/db/prisma";
 
@@ -62,7 +63,7 @@ async function getDashboardData(tenantId: string) {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   thirtyDaysAgo.setHours(0, 0, 0, 0);
-  const [sales, documentRows, recentDocuments, inventoryRows] =
+  const [sales, documentRows, recentDocuments] =
     await Promise.all([
       prisma.lightweightSale.findMany({
         where: {
@@ -78,10 +79,6 @@ async function getDashboardData(tenantId: string) {
         select: { status: true, createdAt: true },
       }),
       getSriDocuments(tenantId, { take: 6 }),
-      prisma.lightweightProduct.findMany({
-        where: { tenantId, isActive: true, trackInventory: true },
-        select: { stock: true, minStock: true },
-      }),
     ]);
   const dailySales = Array.from({ length: 31 }, (_, index) => {
     const date = new Date(thirtyDaysAgo);
@@ -115,9 +112,6 @@ async function getDashboardData(tenantId: string) {
       ),
       rejected: statusCounts.REJECTED ?? 0,
     },
-    lowStockCount: inventoryRows.filter(
-      (item) => item.minStock !== null && item.stock <= item.minStock,
-    ).length,
   };
 }
 
@@ -126,22 +120,24 @@ function MetricCard({
   value,
   helper,
   icon: Icon,
+  tone = "blue",
 }: {
   title: string;
   value: string;
   helper: string;
   icon: typeof ShoppingCart;
+  tone?: "blue" | "orange";
 }) {
   return (
     <Card className="rounded-xl border border-[#E4E9F0] bg-white shadow-none ring-0">
       <CardContent className="p-4">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm font-medium text-[#667085]">{title}</p>
-          <span className="flex size-8 items-center justify-center rounded-lg bg-[#EEF5FF] text-[#1769E0]">
+          <span className={`flex size-9 items-center justify-center rounded-xl ${tone === "orange" ? "bg-amber-50 text-amber-700" : "bg-[#EEF5FF] text-[#1769E0]"}`}>
             <Icon className="size-4" />
           </span>
         </div>
-        <p className="mt-3 text-2xl font-semibold tracking-tight text-[#172033]">
+        <p className={`mt-3 text-2xl font-semibold tracking-tight ${tone === "orange" ? "text-amber-700" : "text-[#1769E0]"}`}>
           {value}
         </p>
         <p className="mt-1 text-xs text-[#667085]">{helper}</p>
@@ -151,71 +147,49 @@ function MetricCard({
 }
 
 const quickActions = [
-  { title: "Nueva venta", href: routes.facturacionPos, icon: ShoppingCart },
-  { title: "Documentos", href: routes.facturacionDocuments, icon: FileText },
-  { title: "Nuevo cliente", href: routes.facturacionCustomers, icon: Users },
-  { title: "Productos", href: routes.facturacionProducts, icon: Package },
-  { title: "SRI", href: routes.facturacionSri, icon: ReceiptText },
-  { title: "Caja", href: routes.facturacionCash, icon: Wallet },
+  { title: "Emitir factura", description: "Una nueva venta, lista en minutos", href: routes.facturacionPos, icon: ReceiptText, tone: "orange" },
+  { title: "Crear compra", description: "Registra una compra de tu negocio", href: routes.facturacionPurchasesNew, icon: ShoppingCart, tone: "blue" },
+  { title: "Libro diario", description: "Consulta tus asientos contables", href: routes.facturacionAccountingJournal, icon: BookOpen, tone: "blue" },
+  { title: "Productos", description: "Tu catálogo, siempre a mano", href: routes.facturacionProducts, icon: Package, tone: "orange" },
+  { title: "Clientes", description: "Gestiona tus contactos", href: routes.facturacionCustomers, icon: Users, tone: "blue" },
+  { title: "Caja", description: "Consulta los movimientos de caja", href: routes.facturacionCash, icon: Wallet, tone: "orange" },
+  { title: "Empresa", description: "La configuración de tu negocio", href: routes.facturacionSettings, icon: Building2, tone: "blue" },
 ];
 
+function QuickActions() {
+  return <section aria-labelledby="quick-actions-title">
+    <h2 id="quick-actions-title" className="text-lg font-semibold text-[#172033]">Acciones rápidas</h2>
+    <p className="mt-1 text-sm text-[#667085]">Lo que necesitas para seguir con tu día.</p>
+    <div className="mt-5 grid grid-cols-1 gap-4 min-[375px]:grid-cols-2 md:grid-cols-3 2xl:grid-cols-4">
+      {quickActions.map(({ title, description, href, icon: Icon, tone }) => <Link key={title} href={href}
+        className={`group flex min-h-44 min-w-0 flex-col items-start rounded-2xl border border-[#E4E9F0] bg-white p-5 shadow-sm transition duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-facturom-primary sm:p-6 ${tone === "orange" ? "hover:border-amber-300 hover:bg-amber-50/40 hover:shadow-amber-100/60" : "hover:border-blue-300 hover:bg-blue-50/40 hover:shadow-blue-100/60"}`}>
+        <span className={`mb-5 flex size-12 shrink-0 items-center justify-center rounded-2xl ${tone === "orange" ? "bg-amber-50 text-amber-700" : "bg-blue-50 text-[#1769E0]"}`}><Icon className="size-6" aria-hidden="true" /></span>
+        <span className="text-base font-semibold text-[#172033]">{title}</span>
+        <span className="mt-1 text-xs leading-5 text-[#667085]">{description}</span>
+      </Link>)}
+    </div>
+  </section>;
+}
+
 export default async function FacturacionPage() {
-  const { tenant } = await requireDashboardSession();
-  const [reports, sriStatus, dashboard, tenantMode] = await Promise.all([
+  const { user, tenant } = await requireDashboardSession();
+  const [reports, dashboard, tenantMode] = await Promise.all([
     getBasicReports(tenant.id),
-    getSriModuleStatus(tenant.id),
     getDashboardData(tenant.id),
     getTenantModeState(tenant),
   ]);
-  const alerts = [
-    ...(dashboard.documentCounts.rejected > 0
-      ? [
-          {
-            label: `${dashboard.documentCounts.rejected} comprobante(s) rechazado(s)`,
-            href: routes.facturacionDocuments,
-            tone: "red" as const,
-          },
-        ]
-      : []),
-    ...(dashboard.documentCounts.pending > 0
-      ? [
-          {
-            label: `${dashboard.documentCounts.pending} comprobante(s) pendiente(s)`,
-            href: routes.facturacionDocuments,
-            tone: "amber" as const,
-          },
-        ]
-      : []),
-    ...(sriStatus.readinessLabel === "incomplete" ||
-    sriStatus.readinessLabel === "not_started"
-      ? [
-          {
-            label: "La configuración SRI está incompleta",
-            href: routes.facturacionSri,
-            tone: "amber" as const,
-          },
-        ]
-      : []),
-    ...(dashboard.lowStockCount > 0
-      ? [
-          {
-            label: `${dashboard.lowStockCount} producto(s) con stock bajo`,
-            href: routes.facturacionProducts,
-            tone: "amber" as const,
-          },
-        ]
-      : []),
-  ];
+  const name = user.name?.trim();
+
   return (
     <DashboardShell
       mainClassName="px-4 py-5 sm:px-6 sm:py-6"
       contentClassName="mx-auto max-w-[1440px]"
     >
-      <div className="space-y-5">
+      <div className="min-w-0 space-y-5 pb-24">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-[#172033]">
-              Panel de control
+          <div className="min-w-0">
+            <h1 className="break-words text-2xl font-semibold tracking-tight text-[#172033]">
+              {name ? `Hola, ${name} 👋` : "Hola 👋"}
             </h1>
             <p className="mt-1 text-sm text-[#667085]">
               Resumen general de tu empresa
@@ -224,7 +198,7 @@ export default async function FacturacionPage() {
           <Button
             asChild
             size="lg"
-            className="w-full bg-[#1769E0] text-white hover:bg-[#155DC4] sm:w-auto"
+            className="w-full bg-[#F59E0B] font-semibold text-[#172033] hover:bg-[#D97706] sm:w-auto sm:shrink-0"
           >
             <Link href={routes.facturacionPos}>
               <ShoppingCart />
@@ -232,6 +206,7 @@ export default async function FacturacionPage() {
             </Link>
           </Button>
         </header>
+        <HomeTabs shortcuts={<QuickActions />} summary={<>
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             title="Ventas del día"
@@ -240,6 +215,7 @@ export default async function FacturacionPage() {
             icon={CircleDollarSign}
           />
           <MetricCard
+            tone="orange"
             title="Facturado este mes"
             value={formatMoney(reports.salesMonth)}
             helper="Acumulado del mes actual"
@@ -252,6 +228,7 @@ export default async function FacturacionPage() {
             icon={FileCheck2}
           />
           <MetricCard
+            tone="orange"
             title="Pendientes SRI"
             value={String(dashboard.documentCounts.pending)}
             helper="Comprobantes pendientes de procesamiento"
@@ -314,23 +291,6 @@ export default async function FacturacionPage() {
           </Card>
         </section>
         <section>
-          <h2 className="font-semibold text-[#172033]">Accesos rápidos</h2>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-            {quickActions.map(({ title, href, icon: Icon }) => (
-              <Link
-                key={title}
-                href={href}
-                className="flex min-h-20 items-center gap-3 rounded-xl border border-[#E4E9F0] bg-white p-3 text-sm font-medium text-[#172033] transition-colors hover:border-[#1769E0]/40 hover:bg-[#F7FAFF]"
-              >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#EEF5FF] text-[#1769E0]">
-                  <Icon className="size-4" />
-                </span>
-                {title}
-              </Link>
-            ))}
-          </div>
-        </section>
-        <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
           <Card className="rounded-xl border border-[#E4E9F0] bg-white shadow-none ring-0">
             <CardContent className="p-0">
               <div className="flex items-center justify-between border-b border-[#E4E9F0] px-4 py-4 sm:px-5">
@@ -388,51 +348,15 @@ export default async function FacturacionPage() {
               )}
             </CardContent>
           </Card>
-          <Card className="rounded-xl border border-[#E4E9F0] bg-white shadow-none ring-0">
-            <CardContent className="p-4 sm:p-5">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="size-4 text-[#667085]" />
-                <h2 className="font-semibold text-[#172033]">
-                  Alertas operativas
-                </h2>
-              </div>
-              <div className="mt-4 space-y-2">
-                {alerts.length ? (
-                  alerts.map((alert) => (
-                    <Link
-                      key={alert.label}
-                      href={alert.href}
-                      className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${alert.tone === "red" ? "border-red-200 bg-red-50 text-red-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}
-                    >
-                      <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                      <span>{alert.label}</span>
-                    </Link>
-                  ))
-                ) : (
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-                    No hay alertas operativas pendientes.
-                  </div>
-                )}
-              </div>
-              {sriStatus.readinessLabel === "incomplete" ||
-              sriStatus.readinessLabel === "not_started" ? (
-                <Button asChild variant="outline" className="mt-3 w-full">
-                  <Link href={routes.facturacionSri}>
-                    <Settings2 />
-                    Revisar configuración
-                  </Link>
-                </Button>
-              ) : null}
-            </CardContent>
-          </Card>
         </section>
+        </>} />
       </div>
       {tenantMode.canAccessAiInvoicing && (
         <Link
           href={routes.facturacionAi}
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-[#1769E0] px-5 py-3 text-sm font-medium text-white shadow-lg transition-colors hover:bg-[#155DC4]"
+          className="fixed bottom-5 right-4 z-30 flex max-w-[calc(100vw_-_2rem)] items-center gap-2 rounded-full border border-amber-300 bg-white px-4 py-3 text-sm font-semibold text-amber-800 shadow-lg shadow-amber-950/10 transition-colors hover:bg-amber-50 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-600 sm:bottom-6 sm:right-6 sm:px-5"
         >
-          <Sparkles className="size-4" />
+          <Sparkles className="size-4 shrink-0 text-amber-600" />
           Facturación inteligente
         </Link>
       )}
