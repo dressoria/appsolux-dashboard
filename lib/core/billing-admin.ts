@@ -52,7 +52,7 @@ export const manualBillingStatuses = [
   "canceled",
   "manual",
 ] as const;
-export const billingModes = ["stripe", "manual", "internal", "trial"] as const;
+export const billingModes = ["stripe", "paddle", "kushki", "payphone", "crypto", "manual", "internal", "trial"] as const;
 export const businessSuiteStatuses = [
   "locked",
   "pending_migration",

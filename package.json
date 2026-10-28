@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:billing": "node --test --experimental-strip-types lib/core/billing-access-policy.test.ts lib/core/billing/stripe-billing.test.ts",
+    "test:billing": "node --test --experimental-strip-types lib/core/billing-access-policy.test.ts lib/core/billing/stripe-billing.test.ts lib/core/billing/paddle-billing.test.ts",
+    "test:paddle-portal": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/billing/paddle-portal.test.ts",
     "test:ecuador-tax-id": "node --test --experimental-strip-types lib/core/ecuador-tax-id.test.ts",
     "test:sri-taxpayer-lookup": "node --test --experimental-strip-types lib/core/sri-taxpayer-lookup.test.ts",
     "test:sri-data-service": "node --test --experimental-strip-types lib/core/sri-data-service.test.ts",
@@ -39,6 +40,8 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.5.6",
+    "@paddle/paddle-js": "^1.6.5",
+    "@paddle/paddle-node-sdk": "^3.10.0",
     "@prisma/client": "^6.19.3",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.1",

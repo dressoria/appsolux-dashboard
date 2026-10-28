@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 
 type LegacyPlanKey = "free" | "trial" | "pro" | "enterprise";
 type SubscriptionStatus = "active" | "trialing" | "past_due" | "suspended" | "canceled" | "manual";
-type BillingMode = "stripe" | "manual" | "internal" | "trial";
+type BillingMode = "stripe" | "paddle" | "kushki" | "payphone" | "crypto" | "manual" | "internal" | "trial";
 type CommercialPlan = "BASIC" | "PLUS" | "ADVANCED" | "ENTERPRISE";
 type OperatingMode = "CORE" | "SHARED_ERP" | "DEDICATED_ERP";
 type OperationalStatus = "active" | "pending_setup" | "suspended" | "disabled";
@@ -152,7 +152,7 @@ const statusOptions: SubscriptionStatus[] = [
   "suspended",
   "canceled",
 ];
-const billingModeOptions: BillingMode[] = ["manual", "internal", "trial", "stripe"];
+const billingModeOptions: BillingMode[] = ["manual", "internal", "trial", "stripe", "paddle", "kushki", "payphone", "crypto"];
 const operatingModeOptions: OperatingMode[] = [
   "CORE",
   "SHARED_ERP",

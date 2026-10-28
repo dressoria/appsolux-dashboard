@@ -110,6 +110,10 @@ enum TenantSubscriptionStatus {
 
 enum TenantBillingMode {
   stripe
+  paddle
+  kushki
+  payphone
+  crypto
   manual
   internal
   trial
@@ -684,6 +688,11 @@ model TenantSubscription {
   currentPeriodStartsAt    DateTime?
   cancelAtPeriodEnd        Boolean                  @default(false)
   lastStripeEventCreatedAt Int?
+  providerCustomerId       String?
+  providerSubscriptionId   String?
+  providerPriceId          String?
+  providerLastEventAt      DateTime?
+  providerMetadata         Json?
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
 
@@ -693,6 +702,7 @@ model TenantSubscription {
   @@index([tenantId])
   @@index([planId])
   @@index([status])
+  @@index([providerSubscriptionId])
 }
 
 model BillingWebhookEvent {

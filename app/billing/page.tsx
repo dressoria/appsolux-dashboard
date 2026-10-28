@@ -8,7 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { isTenantOwner } from "@/lib/auth/permissions";
 import { getCommercialPlanByInternalKey } from "@/lib/core/billing/commercial-plans";
-import { getStripeBillingAvailability } from "@/lib/core/billing/stripe-config";
+import { ensureBillingProvidersInitialized } from "@/lib/core/billing/providers/init";
+import { getOnlinePaymentsAvailability } from "@/lib/core/billing/providers/registry";
 import { getTenantSubscription } from "@/lib/core/plans";
 import { getTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
@@ -31,7 +32,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
     searchParams,
   ]);
   const plan = getCommercialPlanByInternalKey(subscription?.plan.key);
-  const stripeAvailable = getStripeBillingAvailability().configured;
+  ensureBillingProvidersInitialized();
+  const onlinePayments = getOnlinePaymentsAvailability();
   const isTrial = subscription?.status === "trialing" && access.canOperate;
   const isSuspended = !access.canOperate;
   const trialDays = access.trialDaysRemaining ?? 0;
@@ -83,12 +85,12 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           context="billing"
           currentInterval={subscription?.billingInterval ?? null}
           currentPlanCode={plan.code}
-          hasActiveSubscription={Boolean(subscription?.status === "active" && subscription.stripeSubscriptionId)}
-          hasBillingCustomer={Boolean(subscription?.stripeCustomerId)}
-          onlinePaymentsAvailable={stripeAvailable}
+          hasActiveSubscription={Boolean(subscription?.status === "active" && (subscription.stripeSubscriptionId || subscription.providerSubscriptionId))}
+          hasBillingCustomer={Boolean(subscription?.stripeCustomerId || subscription?.providerCustomerId)}
+          onlinePaymentsAvailable={onlinePayments}
         />
 
-        {!stripeAvailable ? <div className="rounded-2xl border bg-muted/30 p-6 text-center"><h2 className="font-bold">¿Necesitas continuar ahora?</h2><p className="mt-2 text-sm text-muted-foreground">Nuestro equipo puede orientarte mientras habilitamos los pagos en línea.</p><Button asChild className="mt-4" variant="outline"><Link href="/contacto">Contactar soporte</Link></Button></div> : null}
+        {!onlinePayments ? <div className="rounded-2xl border bg-muted/30 p-6 text-center"><h2 className="font-bold">¿Necesitas continuar ahora?</h2><p className="mt-2 text-sm text-muted-foreground">Nuestro equipo puede orientarte mientras habilitamos los pagos en línea.</p><Button asChild className="mt-4" variant="outline"><Link href="/contacto">Contactar soporte</Link></Button></div> : null}
       </div>
     </DashboardShell>
   );
