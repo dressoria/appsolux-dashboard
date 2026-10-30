@@ -544,39 +544,108 @@ function ImportTab() {
 
 // ── Automatic Tab ────────────────────────────────────────────────────────────
 
+type SyncConfig = {
+  enabled: boolean;
+  sriEnabled: boolean;
+  apiEnabled: boolean;
+  syncFrequency: string;
+  lastSyncAt: string | null;
+  lastSuccessAt: string | null;
+  nextSyncAt: string | null;
+  lastError: string | null;
+};
+
+type SyncFrequency = "DAILY" | "EVERY_3_DAYS" | "WEEKLY" | "EVERY_15_DAYS" | "MONTHLY";
+
+const FREQUENCY_LABELS: Record<string, string> = {
+  DAILY: "Una vez al día",
+  EVERY_3_DAYS: "Cada 3 días",
+  WEEKLY: "Una vez por semana",
+  EVERY_15_DAYS: "Cada 15 días",
+  MONTHLY: "Una vez al mes",
+};
+
+const FREQUENCY_OPTIONS: SyncFrequency[] = ["DAILY", "EVERY_3_DAYS", "WEEKLY", "EVERY_15_DAYS", "MONTHLY"];
+
+function formatDate(v: string | null) {
+  if (!v) return "—";
+  return new Date(v).toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
 function AutomaticTab() {
+  const [config, setConfig] = useState<SyncConfig | null>(null);
+  const [hasFeature, setHasFeature] = useState<boolean | null>(null);
   const [tokens, setTokens] = useState<Token[]>([]);
   const [newToken, setNewToken] = useState<string | null>(null);
-  const [newSource, setNewSource] = useState<"API" | "TELEGRAM">("API");
   const [newLabel, setNewLabel] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showApiConfig, setShowApiConfig] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
-  const fetchTokens = useCallback(async () => {
-    const res = await fetch("/api/sales-import/tokens");
-    const data = await res.json();
-    if (data.ok) setTokens(data.tokens);
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [syncRes, tokenRes] = await Promise.all([
+        fetch("/api/sales-import/auto-sync"),
+        fetch("/api/sales-import/tokens"),
+      ]);
+      const syncData = await syncRes.json();
+      const tokenData = await tokenRes.json();
+      if (syncData.ok) {
+        setConfig(syncData.config);
+        setHasFeature(syncData.hasFeature);
+      }
+      if (tokenData.ok) setTokens(tokenData.tokens);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useEffect(() => { fetchTokens(); }, [fetchTokens]);
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  async function updateConfig(patch: Record<string, unknown>) {
+    setError(""); setMessage("");
+    try {
+      const res = await fetch("/api/sales-import/auto-sync", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const data = await res.json();
+      if (data.ok) { setConfig(data.config); setMessage("Configuración guardada."); }
+      else setError(data.error ?? "Error al guardar.");
+    } catch { setError("Error de conexión."); }
+  }
+
+  async function manualSync() {
+    setError(""); setMessage(""); setSyncing(true);
+    try {
+      const res = await fetch("/api/sales-import/auto-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "manual_sync" }),
+      });
+      const data = await res.json();
+      if (data.ok) setMessage("Sincronización manual iniciada.");
+      else setError(data.error ?? "Error al sincronizar.");
+    } catch { setError("Error de conexión."); }
+    finally { setSyncing(false); }
+  }
 
   async function generateToken() {
-    setLoading(true);
+    setError("");
     try {
       const res = await fetch("/api/sales-import/tokens", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: newSource, label: newLabel || undefined }),
+        body: JSON.stringify({ source: "API", label: newLabel || undefined }),
       });
       const data = await res.json();
-      if (data.ok) {
-        setNewToken(data.plaintext);
-        setNewLabel("");
-        fetchTokens();
-      }
-    } finally {
-      setLoading(false);
-    }
+      if (data.ok) { setNewToken(data.plaintext); setNewLabel(""); fetchData(); }
+    } catch { setError("Error al generar token."); }
   }
 
   async function revokeToken(id: string) {
@@ -586,7 +655,7 @@ function AutomaticTab() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tokenId: id }),
     });
-    fetchTokens();
+    fetchData();
   }
 
   function copyToken() {
@@ -595,6 +664,35 @@ function AutomaticTab() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  }
+
+  if (loading) return <p className="py-8 text-center text-slate-400">Cargando...</p>;
+
+  if (hasFeature === false) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              Importación automática
+              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">Premium</span>
+            </h2>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="py-12 text-center space-y-4">
+            <Shield className="mx-auto h-12 w-12 text-slate-300" />
+            <div>
+              <p className="text-lg font-semibold text-slate-900">Disponible en el plan Empresarial</p>
+              <p className="mt-1 text-sm text-slate-600">La importación automática desde el SRI y por API está disponible en el plan Empresarial.</p>
+            </div>
+            <Button asChild className="bg-[#1E52F1] hover:bg-[#1E52F1]/90">
+              <a href="/facturacion/settings/billing">Ver planes</a>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -610,136 +708,175 @@ function AutomaticTab() {
         </div>
       </div>
 
-      {/* Source cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardContent className="pt-5 space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-blue-50 p-2"><Zap className="h-5 w-5 text-blue-600" /></div>
-              <div>
-                <p className="font-semibold text-sm">Facturom</p>
-                <p className="text-xs text-slate-500">Siempre conectado</p>
-              </div>
-            </div>
-            <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Activo
-            </p>
-          </CardContent>
-        </Card>
+      {error && <p className="rounded border border-red-300 p-3 text-sm text-red-800">{error}</p>}
+      {message && <p className="rounded border border-green-300 p-3 text-sm text-green-800">{message}</p>}
 
-        <Card>
-          <CardContent className="pt-5 space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-violet-50 p-2"><Key className="h-5 w-5 text-violet-600" /></div>
-              <div>
-                <p className="font-semibold text-sm">API / Telegram</p>
-                <p className="text-xs text-slate-500">Configurable</p>
-              </div>
-            </div>
-            <p className="text-xs text-slate-500 font-medium">
-              {tokens.filter((t) => t.enabled).length} token(s) activo(s)
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-5 space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-amber-50 p-2"><Shield className="h-5 w-5 text-amber-600" /></div>
-              <div>
-                <p className="font-semibold text-sm">Facturador SRI</p>
-                <p className="text-xs text-slate-500">Conector SRI</p>
-              </div>
-            </div>
-            <p className="text-xs text-amber-600 font-medium flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" /> Pendiente de configuración
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Token management */}
+      {/* SRI Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Key className="h-5 w-5" /> Tokens de integración
+            <Shield className="h-5 w-5 text-amber-600" /> SRI / Facturador SRI
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <div>
-              <label className="text-xs font-medium text-slate-500 block mb-1">Fuente</label>
-              <select className="h-9 rounded-md border bg-white px-3 text-sm" value={newSource} onChange={(e) => setNewSource(e.target.value as "API" | "TELEGRAM")}>
-                <option value="API">API externa</option>
-                <option value="TELEGRAM">Telegram / n8n</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-500 block mb-1">Etiqueta (opcional)</label>
-              <Input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} className="h-9 w-48" placeholder="Mi integración" />
-            </div>
-            <Button onClick={generateToken} disabled={loading} className="bg-[#1E52F1] hover:bg-[#1E52F1]/90">
-              <Key className="mr-1 h-4 w-4" /> Generar token
-            </Button>
-          </div>
+          <p className="text-sm text-slate-600">Facturom revisa periódicamente los comprobantes emitidos en tu cuenta del SRI e importa únicamente los que aún no existen.</p>
 
-          {newToken && (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 space-y-2">
-              <p className="text-sm font-medium text-emerald-800">Token generado — cópialo ahora, no se mostrará de nuevo.</p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap rounded bg-white px-3 py-1.5 font-mono text-xs border">{newToken}</code>
-                <Button variant="outline" size="sm" onClick={copyToken}>
-                  <Copy className="mr-1 h-3.5 w-3.5" /> {copied ? "Copiado" : "Copiar"}
+          {!config?.sriEnabled ? (
+            <Button onClick={() => updateConfig({ sriEnabled: true })} className="bg-[#1E52F1] hover:bg-[#1E52F1]/90">
+              <Shield className="mr-1 h-4 w-4" /> Conectar SRI
+            </Button>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium text-emerald-600 flex items-center gap-1">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Conectado
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium">Importación automática</label>
+                <button
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${config.enabled ? "bg-[#1E52F1]" : "bg-slate-200"}`}
+                  onClick={() => updateConfig({ enabled: !config.enabled })}
+                >
+                  <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${config.enabled ? "translate-x-6" : "translate-x-1"}`} />
+                </button>
+              </div>
+
+              {config.enabled && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium block mb-1">Frecuencia</label>
+                    <select
+                      className="h-9 rounded-md border bg-white px-3 text-sm"
+                      value={config.syncFrequency}
+                      onChange={(e) => updateConfig({ syncFrequency: e.target.value })}
+                    >
+                      {FREQUENCY_OPTIONS.map((f) => (
+                        <option key={f} value={f}>{FREQUENCY_LABELS[f]}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2 text-sm">
+                    <div>
+                      <p className="text-slate-500">Última sincronización</p>
+                      <p className="font-medium">{formatDate(config.lastSyncAt)}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">Próxima sincronización</p>
+                      <p className="font-medium">{formatDate(config.nextSyncAt)}</p>
+                    </div>
+                  </div>
+
+                  {config.lastError && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <div>
+                        {config.lastError === "HUMAN_VERIFICATION_REQUIRED" ? (
+                          <>
+                            <p className="font-medium">Se requiere verificación manual en el SRI.</p>
+                            <Button variant="outline" size="sm" className="mt-2" onClick={manualSync} disabled={syncing}>Verificar conexión</Button>
+                          </>
+                        ) : (
+                          <p>{config.lastError}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <Button variant="outline" onClick={manualSync} disabled={syncing}>
+                    <RefreshCw className={`mr-1 h-4 w-4 ${syncing ? "animate-spin" : ""}`} /> Sincronizar ahora
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* API Integration Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Key className="h-5 w-5 text-violet-600" /> Integración por API
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-slate-600">Conecta sistemas externos con Facturom mediante una API segura.</p>
+
+          {!showApiConfig ? (
+            <Button variant="outline" onClick={() => setShowApiConfig(true)}>
+              <Key className="mr-1 h-4 w-4" /> Configurar API
+            </Button>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">Etiqueta (opcional)</label>
+                  <Input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} className="h-9 w-48" placeholder="Mi integración" />
+                </div>
+                <Button onClick={generateToken} className="bg-[#1E52F1] hover:bg-[#1E52F1]/90">
+                  <Key className="mr-1 h-4 w-4" /> Generar token
                 </Button>
               </div>
-            </div>
-          )}
 
-          {tokens.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    <th className="px-3 py-2">Prefijo</th>
-                    <th className="px-3 py-2">Fuente</th>
-                    <th className="px-3 py-2">Etiqueta</th>
-                    <th className="px-3 py-2">Estado</th>
-                    <th className="px-3 py-2">Último uso</th>
-                    <th className="px-3 py-2">Creado</th>
-                    <th className="px-3 py-2"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tokens.map((t) => (
-                    <tr key={t.id} className="border-b last:border-0">
-                      <td className="px-3 py-2 font-mono text-xs">{t.tokenPrefix}...</td>
-                      <td className="px-3 py-2">{t.source}</td>
-                      <td className="px-3 py-2">{t.label ?? "—"}</td>
-                      <td className="px-3 py-2">
-                        <span className={`text-xs font-medium ${t.enabled ? "text-emerald-700" : "text-red-600"}`}>
-                          {t.enabled ? "Activo" : "Revocado"}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-xs">{t.lastUsedAt ? new Date(t.lastUsedAt).toLocaleDateString("es-EC") : "Nunca"}</td>
-                      <td className="px-3 py-2 text-xs">{new Date(t.createdAt).toLocaleDateString("es-EC")}</td>
-                      <td className="px-3 py-2">
-                        {t.enabled && (
-                          <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => revokeToken(t.id)}>
-                            <Trash2 className="mr-1 h-3.5 w-3.5" /> Revocar
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+              {newToken && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 space-y-2">
+                  <p className="text-sm font-medium text-emerald-800">Token generado — cópialo ahora, no se mostrará de nuevo.</p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap rounded bg-white px-3 py-1.5 font-mono text-xs border">{newToken}</code>
+                    <Button variant="outline" size="sm" onClick={copyToken}>
+                      <Copy className="mr-1 h-3.5 w-3.5" /> {copied ? "Copiado" : "Copiar"}
+                    </Button>
+                  </div>
+                </div>
+              )}
 
-          {/* Documentation box */}
-          <div className="rounded-lg border bg-slate-50 p-4 space-y-2">
-            <p className="text-sm font-medium">Ejemplo de uso (n8n / API externa)</p>
-            <pre className="rounded bg-white border p-3 text-xs overflow-x-auto">{`POST /api/sales-import/ingest
+              {tokens.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                        <th className="px-3 py-2">Prefijo</th>
+                        <th className="px-3 py-2">Fuente</th>
+                        <th className="px-3 py-2">Etiqueta</th>
+                        <th className="px-3 py-2">Estado</th>
+                        <th className="px-3 py-2">Último uso</th>
+                        <th className="px-3 py-2">Creado</th>
+                        <th className="px-3 py-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tokens.map((t) => (
+                        <tr key={t.id} className="border-b last:border-0">
+                          <td className="px-3 py-2 font-mono text-xs">{t.tokenPrefix}...</td>
+                          <td className="px-3 py-2">{t.source === "TELEGRAM" ? "Telegram" : "API"}</td>
+                          <td className="px-3 py-2">{t.label ?? "—"}</td>
+                          <td className="px-3 py-2">
+                            <span className={`text-xs font-medium ${t.enabled ? "text-emerald-700" : "text-red-600"}`}>
+                              {t.enabled ? "Activo" : "Revocado"}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-xs">{t.lastUsedAt ? new Date(t.lastUsedAt).toLocaleDateString("es-EC") : "Nunca"}</td>
+                          <td className="px-3 py-2 text-xs">{new Date(t.createdAt).toLocaleDateString("es-EC")}</td>
+                          <td className="px-3 py-2">
+                            {t.enabled && (
+                              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => revokeToken(t.id)}>
+                                <Trash2 className="mr-1 h-3.5 w-3.5" /> Revocar
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="rounded-lg border bg-slate-50 p-4 space-y-2">
+                <p className="text-sm font-medium">Ejemplo de uso</p>
+                <pre className="rounded bg-white border p-3 text-xs overflow-x-auto">{`POST /api/sales-import/ingest
 Authorization: Bearer fsi_...
 
 {
@@ -753,7 +890,9 @@ Authorization: Bearer fsi_...
     "name": "Cliente ejemplo"
   }
 }`}</pre>
-          </div>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -517,15 +517,15 @@ test("Z – ManualXmlPurchaseSourceAdapter fetchReceivedDocuments returns empty 
   assert.deepEqual(docs, []);
 });
 
-test("AA – SriPurchaseSourceAdapter throws SRI_AUTOMATIC_SOURCE_NOT_CONFIGURED", async () => {
-  const adapter = new SriPurchaseSourceAdapter();
-  const result = await adapter.testConnection();
-  assert.equal(result.ok, false);
-  assert.ok(result.message.includes("SRI_AUTOMATIC_SOURCE_NOT_CONFIGURED"));
-
+test("AA – SriPurchaseSourceAdapter requires tenantId and delegates to worker", async () => {
+  const adapter = new SriPurchaseSourceAdapter("tenant-test");
   await assert.rejects(
     () => adapter.fetchReceivedDocuments({ from: new Date(), to: new Date() }),
-    (err: Error) => err.message.includes("SRI_AUTOMATIC_SOURCE_NOT_CONFIGURED"),
+    (err: Error) => err.message.includes("worker SRI"),
+  );
+  await assert.rejects(
+    () => adapter.downloadXml("ref"),
+    (err: Error) => err.message.includes("worker SRI"),
   );
 });
 

@@ -150,7 +150,18 @@ export function PurchaseDocumentsClient() {
                       <td className="px-4 py-3 text-xs">{doc.accountingCategory?.name ?? "—"}</td>
                       <td className="px-4 py-3"><span className="rounded bg-muted px-2 py-0.5 text-xs">{STATUS_LABELS[doc.status] ?? doc.status}</span></td>
                       <td className="px-4 py-3">
-                        <Link href={`/facturacion/purchases/documents/${doc.id}`} className="text-primary hover:underline text-xs">Ver</Link>
+                        <div className="flex gap-2 flex-wrap">
+                          <Link href={`/facturacion/purchases/documents/${doc.id}`} className="text-primary hover:underline text-xs">Ver</Link>
+                          {doc.status === "DRAFT" && (
+                            <Link href={`/facturacion/purchases/new?edit=${doc.id}`} className="text-primary hover:underline text-xs">Editar</Link>
+                          )}
+                          {(doc.status === "REGISTERED" || doc.status === "AUTHORIZED") && doc.documentType === "INVOICE" && (
+                            <>
+                              <Link href={`/facturacion/purchases/received?purchaseId=${doc.id}`} className="text-primary hover:underline text-xs">Recepción</Link>
+                              <Link href={`/facturacion/purchases/withholdings/new?purchaseDocumentId=${doc.id}`} className="text-primary hover:underline text-xs">Retención</Link>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

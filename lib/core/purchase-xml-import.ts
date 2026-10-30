@@ -7,11 +7,13 @@ export type ParsedPurchaseXml = {
   authorizationNumber: string | null;
   rucEmitter: string | null;
   legalName: string | null;
+  tradeName: string | null;
   documentNumber: string | null;
   issueDate: string | null;
   buyerIdentification: string | null;
   documentType: string | null;
   items: Array<{
+    xmlProductCode: string | null;
     description: string;
     quantity: number;
     unitPrice: number;
@@ -22,11 +24,16 @@ export type ParsedPurchaseXml = {
     total: number;
   }>;
   subtotal0: number;
+  subtotal5: number;
   subtotal15: number;
+  subtotalNoTax: number;
+  subtotalExempt: number;
   ivaTotal: number;
+  iceTotal: number;
   discountTotal: number;
+  tipAmount: number;
   total: number;
-  paymentMethod: string | null;
+  sriPaymentCode: string | null;
 };
 
 function extractTag(xml: string, tag: string): string | null {
@@ -51,6 +58,7 @@ export function parsePurchaseXml(xmlString: string): ParsedPurchaseXml {
   const accessKey = extractTag(infoTributaria, "claveAcceso");
   const rucEmitter = extractTag(infoTributaria, "ruc");
   const legalName = extractTag(infoTributaria, "razonSocial");
+  const tradeName = extractTag(infoTributaria, "nombreComercial");
   const estab = extractTag(infoTributaria, "estab") ?? "";
   const ptoEmi = extractTag(infoTributaria, "ptoEmi") ?? "";
   const secuencial = extractTag(infoTributaria, "secuencial") ?? "";
@@ -63,32 +71,54 @@ export function parsePurchaseXml(xmlString: string): ParsedPurchaseXml {
   else if (codDoc === "05") documentType = "DEBIT_NOTE";
   else if (codDoc === "03") documentType = "PURCHASE_SETTLEMENT";
 
-  const infoFactura = extractTag(xmlString, "infoFactura") ?? "";
+  const infoFactura = extractTag(xmlString, "infoFactura")
+    ?? extractTag(xmlString, "infoLiquidacionCompra")
+    ?? extractTag(xmlString, "infoNotaCredito")
+    ?? extractTag(xmlString, "infoNotaDebito")
+    ?? "";
   const issueDate = extractTag(infoFactura, "fechaEmision");
   const buyerIdentification = extractTag(infoFactura, "identificacionComprador");
   const totalSinImpuestos = Number(extractTag(infoFactura, "totalSinImpuestos") ?? "0");
   const totalDescuento = Number(extractTag(infoFactura, "totalDescuento") ?? "0");
   const importeTotal = Number(extractTag(infoFactura, "importeTotal") ?? "0");
+  const propina = Number(extractTag(infoFactura, "propina") ?? "0");
 
   const totalImpuestos = extractTag(infoFactura, "totalConImpuestos") ?? "";
   const taxBlocks = extractAllBlocks(totalImpuestos, "totalImpuesto");
   let subtotal0 = 0;
+  let subtotal5 = 0;
   let subtotal15 = 0;
+  let subtotalNoTax = 0;
+  let subtotalExempt = 0;
   let ivaTotal = 0;
+  let iceTotal = 0;
+
   for (const block of taxBlocks) {
+    const codigo = extractTag(block, "codigo") ?? "";
     const codigoPct = extractTag(block, "codigoPorcentaje") ?? "";
     const base = Number(extractTag(block, "baseImponible") ?? "0");
     const valor = Number(extractTag(block, "valor") ?? "0");
-    if (codigoPct === "0") {
-      subtotal0 += base;
-    } else {
-      subtotal15 += base;
-      ivaTotal += valor;
+
+    if (codigo === "3") {
+      iceTotal += valor;
+      continue;
     }
+
+    if (codigoPct === "0") subtotal0 += base;
+    else if (codigoPct === "5") { subtotal5 += base; ivaTotal += valor; }
+    else if (codigoPct === "2" || codigoPct === "4") { subtotal15 += base; ivaTotal += valor; }
+    else if (codigoPct === "6") subtotalNoTax += base;
+    else if (codigoPct === "7") subtotalExempt += base;
+    else { subtotal15 += base; ivaTotal += valor; }
+  }
+
+  if (subtotal0 === 0 && subtotal15 === 0 && subtotal5 === 0 && totalSinImpuestos > 0) {
+    subtotal0 = totalSinImpuestos;
   }
 
   const detalles = extractAllBlocks(xmlString, "detalle");
   const items = detalles.map((d) => {
+    const xmlProductCode = extractTag(d, "codigoPrincipal");
     const desc = extractTag(d, "descripcion") ?? "";
     const qty = Number(extractTag(d, "cantidad") ?? "0");
     const price = Number(extractTag(d, "precioUnitario") ?? "0");
@@ -99,6 +129,7 @@ export function parsePurchaseXml(xmlString: string): ParsedPurchaseXml {
     const tarifa = Number(extractTag(taxBlock, "tarifa") ?? "0");
     const taxAmt = Number(extractTag(taxBlock, "valor") ?? "0");
     return {
+      xmlProductCode,
       description: desc,
       quantity: qty,
       unitPrice: price,
@@ -112,24 +143,30 @@ export function parsePurchaseXml(xmlString: string): ParsedPurchaseXml {
 
   const pagos = extractTag(xmlString, "pagos") ?? "";
   const pagoBlock = extractTag(pagos, "pago") ?? "";
-  const formaPago = extractTag(pagoBlock, "formaPago");
+  const sriPaymentCode = extractTag(pagoBlock, "formaPago");
 
   return {
     accessKey,
     authorizationNumber: accessKey,
     rucEmitter,
     legalName,
+    tradeName,
     documentNumber,
     issueDate,
     buyerIdentification,
     documentType,
     items,
-    subtotal0: subtotal0 || totalSinImpuestos - subtotal15,
+    subtotal0,
+    subtotal5,
     subtotal15,
+    subtotalNoTax,
+    subtotalExempt,
     ivaTotal,
+    iceTotal,
     discountTotal: totalDescuento,
+    tipAmount: propina,
     total: importeTotal,
-    paymentMethod: formaPago,
+    sriPaymentCode,
   };
 }
 
@@ -194,15 +231,20 @@ export async function importPurchaseXml(
     issueDate: parsedDate,
     subtotal0: parsed.subtotal0,
     subtotal15: parsed.subtotal15,
+    subtotalNoTax: parsed.subtotalNoTax,
+    subtotalExempt: parsed.subtotalExempt,
+    iceTotal: parsed.iceTotal,
     ivaTotal: parsed.ivaTotal,
     discountTotal: parsed.discountTotal,
+    tipAmount: parsed.tipAmount,
     total: parsed.total,
-    paymentMethod: parsed.paymentMethod,
+    sriPaymentCode: parsed.sriPaymentCode,
     status: parsed.accessKey ? "AUTHORIZED" : "REGISTERED",
     origin: "XML_IMPORT",
     supplierName: parsed.legalName,
     supplierIdentification: parsed.rucEmitter,
     items: parsed.items.map((item) => ({
+      xmlProductCode: item.xmlProductCode,
       description: item.description,
       quantity: item.quantity,
       unitPrice: item.unitPrice,

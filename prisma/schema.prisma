@@ -338,12 +338,25 @@ enum SalesSriSyncJobStatus {
   HUMAN_VERIFICATION_REQUIRED
 }
 
+enum SalesAutoSyncFrequency {
+  DAILY
+  EVERY_3_DAYS
+  WEEKLY
+  EVERY_15_DAYS
+  MONTHLY
+}
+
 enum PurchaseDocumentType {
   INVOICE
   CREDIT_NOTE
   DEBIT_NOTE
   PURCHASE_SETTLEMENT
   OTHER
+}
+
+enum PurchaseType {
+  MERCHANDISE
+  EXPENSE_SERVICE
 }
 
 enum PurchaseDocumentOrigin {
@@ -2089,6 +2102,13 @@ model PurchaseDocument {
   supplierName           String?
   supplierIdentification String?
 
+  taxSupportCode          String?
+  purchaseType            PurchaseType?
+  sriPaymentCode          String?
+  accountingCostCenterId  String?
+  accountingProjectId     String?
+  tipAmount               Decimal          @default(0) @db.Decimal(12, 2)
+
   notes String?
 
   createdByUserId String
@@ -2098,6 +2118,8 @@ model PurchaseDocument {
   tenant             Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   supplier           LightweightSupplier?        @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   accountingCategory PurchaseAccountingCategory? @relation(fields: [accountingCategoryId], references: [id], onDelete: SetNull)
+  costCenter         AccountingCostCenter?       @relation("PurchaseCostCenter", fields: [accountingCostCenterId], references: [id], onDelete: SetNull)
+  project            AccountingCostCenter?       @relation("PurchaseProject", fields: [accountingProjectId], references: [id], onDelete: SetNull)
   createdBy          User                        @relation("PurchaseDocumentsCreatedBy", fields: [createdByUserId], references: [id])
   items              PurchaseDocumentItem[]
   payments           PurchasePayment[]
@@ -2120,6 +2142,7 @@ model PurchaseDocumentItem {
   id                 String   @id @default(cuid())
   purchaseDocumentId String
   productId          String?
+  xmlProductCode     String?
   description        String
   quantity           Decimal  @db.Decimal(12, 4)
   unitPrice          Decimal  @db.Decimal(12, 4)
@@ -2937,9 +2960,11 @@ model AccountingCostCenter {
   updatedAt   DateTime                 @updatedAt
 
   tenant       Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  parent       AccountingCostCenter?   @relation("CostCenterHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children     AccountingCostCenter[]  @relation("CostCenterHierarchy")
-  journalLines AccountingJournalLine[]
+  parent                 AccountingCostCenter?   @relation("CostCenterHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children               AccountingCostCenter[]  @relation("CostCenterHierarchy")
+  journalLines           AccountingJournalLine[]
+  purchasesByCostCenter  PurchaseDocument[]       @relation("PurchaseCostCenter")
+  purchasesByProject     PurchaseDocument[]       @relation("PurchaseProject")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -3722,16 +3747,18 @@ model ExternalSalesDocumentItem {
 }
 
 model SalesAutoSyncSettings {
-  id            String    @id @default(cuid())
-  tenantId      String    @unique
-  enabled       Boolean   @default(false)
-  sriEnabled    Boolean   @default(false)
-  apiEnabled    Boolean   @default(false)
+  id            String                  @id @default(cuid())
+  tenantId      String                  @unique
+  enabled       Boolean                 @default(false)
+  sriEnabled    Boolean                 @default(false)
+  apiEnabled    Boolean                 @default(false)
+  syncFrequency SalesAutoSyncFrequency  @default(DAILY)
   lastSyncAt    DateTime?
   lastSuccessAt DateTime?
+  nextSyncAt    DateTime?
   lastError     String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
@@ -3767,6 +3794,7 @@ model SalesSriSyncJob {
   lockedBy            String?
   startedAt           DateTime?
   finishedAt          DateTime?
+  durationMs          Int?
   documentsFound      Int                   @default(0)
   documentsImported   Int                   @default(0)
   documentsSkipped    Int                   @default(0)

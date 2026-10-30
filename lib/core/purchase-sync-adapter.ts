@@ -31,30 +31,46 @@ export class ManualXmlPurchaseSourceAdapter implements PurchaseDocumentSourceAda
 }
 
 export class SriPurchaseSourceAdapter implements PurchaseDocumentSourceAdapter {
+  constructor(private tenantId: string) {}
+
   async testConnection(): Promise<{ ok: boolean; message: string }> {
-    return {
-      ok: false,
-      message: "SRI_AUTOMATIC_SOURCE_NOT_CONFIGURED: Conector automático pendiente de configuración.",
-    };
+    const prisma = getPrismaClient();
+    const credential = await prisma.purchaseSriCredential.findUnique({
+      where: { tenantId: this.tenantId },
+      select: { status: true },
+    });
+    if (!credential) {
+      return { ok: false, message: "No hay credenciales SRI configuradas." };
+    }
+    if (credential.status === "VERIFIED") {
+      return { ok: true, message: "Conexión SRI verificada." };
+    }
+    if (credential.status === "HUMAN_VERIFICATION_REQUIRED") {
+      return { ok: false, message: "Se requiere verificación manual en SRI." };
+    }
+    if (credential.status === "INVALID") {
+      return { ok: false, message: "Credenciales SRI inválidas." };
+    }
+    return { ok: false, message: `Estado de credencial: ${credential.status}` };
   }
 
   async fetchReceivedDocuments(_range: { from: Date; to: Date }): Promise<FetchedDocument[]> {
-    throw new Error("SRI_AUTOMATIC_SOURCE_NOT_CONFIGURED");
+    throw new Error("La descarga de documentos recibidos se ejecuta a través del worker SRI.");
   }
 
   async downloadXml(_documentRef: string): Promise<string> {
-    throw new Error("SRI_AUTOMATIC_SOURCE_NOT_CONFIGURED");
+    throw new Error("La descarga XML individual se ejecuta a través del worker SRI.");
   }
 }
 
 export function getAdapterForTenant(
-  _tenantId: string,
+  tenantId: string,
   provider?: string | null,
 ): PurchaseDocumentSourceAdapter {
   if (provider === "manual" || !provider) {
     return new ManualXmlPurchaseSourceAdapter();
   }
-  return new SriPurchaseSourceAdapter();
+  return new SriPurchaseSourceAdapter(tenantId);
 }
 
 export async function getSyncConfig(tenantId: string) {

@@ -34,11 +34,18 @@ export type CreatePurchaseDocumentInput = {
   status?: PurchaseDocumentStatus;
   origin?: PurchaseDocumentOrigin;
   accountingCategoryId?: string | null;
+  taxSupportCode?: string | null;
+  purchaseType?: "MERCHANDISE" | "EXPENSE_SERVICE" | null;
+  sriPaymentCode?: string | null;
+  accountingCostCenterId?: string | null;
+  accountingProjectId?: string | null;
+  tipAmount?: number;
   supplierName?: string | null;
   supplierIdentification?: string | null;
   notes?: string | null;
   items?: Array<{
     productId?: string | null;
+    xmlProductCode?: string | null;
     description: string;
     quantity: number;
     unitPrice: number;
@@ -83,6 +90,7 @@ export async function createPurchaseDocument(input: CreatePurchaseDocumentInput)
     const { subtotal, taxAmount, total } = computeLineAmounts(item);
     return {
       productId: item.productId ?? undefined,
+      xmlProductCode: item.xmlProductCode ?? undefined,
       description: item.description,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
@@ -123,6 +131,12 @@ export async function createPurchaseDocument(input: CreatePurchaseDocumentInput)
       accountingCategoryId: input.accountingCategoryId ?? undefined,
       supplierName: input.supplierName,
       supplierIdentification: input.supplierIdentification,
+      taxSupportCode: input.taxSupportCode,
+      purchaseType: input.purchaseType ?? undefined,
+      sriPaymentCode: input.sriPaymentCode,
+      accountingCostCenterId: input.accountingCostCenterId ?? undefined,
+      accountingProjectId: input.accountingProjectId ?? undefined,
+      tipAmount: input.tipAmount ?? 0,
       notes: input.notes,
       items: itemsData.length > 0 ? { create: itemsData } : undefined,
       payments:

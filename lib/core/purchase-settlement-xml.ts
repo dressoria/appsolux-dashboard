@@ -70,9 +70,10 @@ function resolveIdentificacion(
 function resolveIvaCodigoPorcentaje(taxRate: number): string {
   if (taxRate === 0) return "0";
   if (taxRate === 5) return "5";
+  if (taxRate === 8) return "8";
   if (taxRate === 12) return "2";
   if (taxRate === 15) return "4";
-  return "2";
+  throw new Error(`Tarifa IVA no soportada: ${taxRate}%. Verifique los datos del documento.`);
 }
 
 export function buildSettlementXml(params: SettlementXmlParams): string {

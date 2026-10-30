@@ -314,11 +314,27 @@ export function AutomaticDownloadClient() {
           <div className="flex items-center gap-3">
             <span className="inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
             <span className="font-medium text-sm">Descarga automática activa</span>
+            {cred?.status === "HUMAN_VERIFICATION_REQUIRED" && (
+              <span className="inline-flex items-center rounded-full border border-yellow-300 bg-yellow-50 px-2.5 py-0.5 text-xs font-medium text-yellow-800 dark:border-yellow-700 dark:bg-yellow-950 dark:text-yellow-200">
+                CAPTCHA requerido
+              </span>
+            )}
           </div>
+          {cred?.status === "HUMAN_VERIFICATION_REQUIRED" && (
+            <p className="text-sm text-yellow-700 dark:text-yellow-300">
+              El SRI está solicitando verificación manual (CAPTCHA). Actualiza tus credenciales para re-verificar la conexión.
+            </p>
+          )}
           {cred?.usernameMasked && (
             <p className="text-sm text-muted-foreground">
               Usuario configurado: {cred.usernameMasked}
             </p>
+          )}
+          {sync?.activeJob && ["QUEUED", "RUNNING"].includes(sync.activeJob.status) && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              Sincronización en curso...
+            </div>
           )}
           {sync?.lastSuccessfulSyncAt && (
             <p className="text-sm text-muted-foreground">

@@ -278,7 +278,7 @@ test("External import creates NO operational side effects", async () => {
 
 // ── 70. FEATURE ──────────────────────────────────────────────────────────────
 
-test("sales_auto_sync feature exists and is BASIC=false, ADVANCED/ENTERPRISE=true", async () => {
+test("sales_auto_sync feature exists and is BASIC=false, ADVANCED=false, ENTERPRISE=true", async () => {
   const source = await readFile(
     new URL("./commercial-plans.ts", import.meta.url),
     "utf8",
@@ -290,10 +290,10 @@ test("sales_auto_sync feature exists and is BASIC=false, ADVANCED/ENTERPRISE=tru
   assert.ok(basicBlock);
   assert.doesNotMatch(basicBlock![1], /sales_auto_sync/);
 
-  // Check ADVANCED has it
+  // Check ADVANCED doesn't have it (Enterprise-only)
   const advBlock = source.match(/case "ADVANCED"[\s\S]*?buildFeatureMap\(\[([\s\S]*?)\]\)/);
   assert.ok(advBlock);
-  assert.match(advBlock![1], /sales_auto_sync/);
+  assert.doesNotMatch(advBlock![1], /sales_auto_sync/);
 
   // Check ENTERPRISE has it
   const entBlock = source.match(/case "ENTERPRISE"[\s\S]*?buildFeatureMap\(\[([\s\S]*?)\]\)/);

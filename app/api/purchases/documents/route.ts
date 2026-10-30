@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/current-user";
-import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import {
   listPurchaseDocuments,
   createPurchaseDocument,
 } from "@/lib/core/purchase-documents";
+import { isValidTaxSupportCombination } from "@/lib/core/tax-support-catalog";
 
 export async function GET(req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
-  const tenant = await getCurrentTenant(user);
+  const { tenant } = await requireDashboardSession();
 
   const sp = req.nextUrl.searchParams;
   const result = await listPurchaseDocuments(tenant.id, {
@@ -28,12 +26,20 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
-  const tenant = await getCurrentTenant(user);
+  const { user, tenant } = await requireDashboardSession();
 
   try {
     const body = await req.json();
+
+    if (body.taxSupportCode && body.documentType) {
+      if (!isValidTaxSupportCombination(body.taxSupportCode, body.documentType)) {
+        return NextResponse.json(
+          { ok: false, error: "Combinación de sustento tributario y tipo de documento inválida." },
+          { status: 400 },
+        );
+      }
+    }
+
     const doc = await createPurchaseDocument({
       ...body,
       tenantId: tenant.id,
