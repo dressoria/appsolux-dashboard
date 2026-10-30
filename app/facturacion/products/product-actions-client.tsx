@@ -8,6 +8,7 @@ import type { ProductImportPreviewResult, ProductImportPreviewRow } from "@/lib/
 import { PRODUCT_IMPORT_URLS, previewProductImport, canConfirmProductImport, confirmProductImportPreview, toggleProductImportRow } from "@/lib/client/product-import";
 
 type PriceChange = { id: string; name: string; oldPrice: string; newPrice: string };
+type ExportScope = "all" | "filtered" | "selected";
 type Props = { selected: string[]; q: string; type: string };
 
 async function request(url: string, body?: unknown) {
@@ -35,6 +36,8 @@ export function ProductActionsClient({ selected, q, type }: Props) {
   const [channel, setChannel] = useState("price");
   const [method, setMethod] = useState("increase_percent");
   const [value, setValue] = useState("0");
+  const [exportPanel, setExportPanel] = useState(false);
+  const [exportScope, setExportScope] = useState<ExportScope>("all");
 
   const run = async (operation: () => Promise<void>) => {
     if (busyRef.current) return;
@@ -63,6 +66,7 @@ export function ProductActionsClient({ selected, q, type }: Props) {
     <span title={selected.length === 0 ? "Selecciona al menos un producto." : undefined}>
       <Button size="sm" variant="outline" disabled={selected.length === 0} onClick={() => void download(`/api/inventory/products/barcodes?${new URLSearchParams({ ids: selected.join(",") })}`, "codigos-de-barras.pdf")}>Imprimir códigos de barras</Button>
     </span>
+    <Button size="sm" variant="outline" onClick={() => { setExportPanel(true); setExportScope(selected.length ? "selected" : "all"); }}>Exportar</Button>
     {busy && <p className="w-full text-sm" role="status">Procesando...</p>}
     {error && <p className="w-full rounded border border-red-300 p-3 text-red-800" role="alert">{error}</p>}
     {message && <p className="w-full rounded border border-green-300 p-3 text-green-800" role="status">{message}</p>}
@@ -101,6 +105,24 @@ export function ProductActionsClient({ selected, q, type }: Props) {
             setChanges(null); setPanel(null); setMessage("Precios actualizados correctamente."); router.refresh();
           })}>Confirmar precios</Button></>}
       </>}
+    </section>}
+    {exportPanel && <section aria-label="Exportar productos" className="w-full rounded-md border bg-card p-4 space-y-3">
+      <div className="flex justify-between items-center"><h2 className="font-semibold">Exportar productos</h2><Button size="sm" variant="ghost" disabled={busy} onClick={() => setExportPanel(false)}>Cerrar</Button></div>
+      <div className="space-y-2">
+        <label className="text-sm">Alcance<select className="block rounded border p-2 mt-1" value={exportScope} onChange={(e) => setExportScope(e.target.value as ExportScope)}>
+          <option value="all">Todos los productos</option>
+          <option value="filtered">Productos filtrados</option>
+          <option value="selected" disabled={selected.length === 0}>Productos seleccionados ({selected.length})</option>
+        </select></label>
+        <p className="text-sm text-muted-foreground">Formato: Excel (.xlsx) compatible con Importar productos.</p>
+      </div>
+      <Button disabled={busy} onClick={() => {
+        const params = new URLSearchParams({ scope: exportScope });
+        if (exportScope === "filtered") { if (q) params.set("q", q); if (type) params.set("type", type); }
+        if (exportScope === "selected") params.set("ids", selected.join(","));
+        const today = new Date().toISOString().slice(0, 10);
+        void download(`/api/inventory/products/export?${params}`, `facturom-productos-${today}.xlsx`);
+      }}>Exportar</Button>
     </section>}
   </>;
 }
