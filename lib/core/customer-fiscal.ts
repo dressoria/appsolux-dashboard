@@ -3,10 +3,9 @@ import "@/lib/security/server-only";
 import type { LightweightCustomerIdentificationType } from "@prisma/client";
 
 import {
-  isValidEcuadorCedula,
-  isValidEcuadorRuc,
-  normalizeEcuadorIdentification,
-} from "@/lib/core/ecuador-tax-id";
+  normalizeIdentification,
+  validateIdentification,
+} from "@/lib/core/identification-rules";
 
 export type CustomerFiscalData = {
   name: string;
@@ -18,26 +17,14 @@ export function normalizeCustomerIdentification(
   type: LightweightCustomerIdentificationType,
   value: string
 ) {
-  return type === "RUC" || type === "CEDULA"
-    ? normalizeEcuadorIdentification(value)
-    : value.trim().toUpperCase();
+  return normalizeIdentification(type, value);
 }
 
 export function validateCustomerIdentification(
   type: LightweightCustomerIdentificationType,
   value: string
 ) {
-  if (type === "RUC" && !isValidEcuadorRuc(value)) {
-    throw new Error("Ingresa un RUC ecuatoriano valido de 13 digitos.");
-  }
-  if (type === "CEDULA" && !isValidEcuadorCedula(value)) {
-    throw new Error("Ingresa una cedula ecuatoriana valida de 10 digitos.");
-  }
-  const normalized = normalizeCustomerIdentification(type, value);
-  if ((type === "PASSPORT" || type === "FOREIGN_ID") && !/^[A-Z0-9][A-Z0-9 .\/-]{2,29}$/.test(normalized)) {
-    throw new Error("La identificacion debe tener entre 3 y 30 caracteres validos.");
-  }
-  return normalized;
+  return validateIdentification(type, value);
 }
 
 export function validateCustomerForSriInvoice(customer: CustomerFiscalData | null) {

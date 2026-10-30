@@ -5,6 +5,10 @@ import {
   type SupplierInput,
 } from "@/lib/core/lightweight-suppliers";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import {
+  validateTenantMembership,
+  validateRelatedSupplier,
+} from "@/lib/core/people-validation";
 
 type Context = { params: Promise<{ supplierId: string }> };
 
@@ -22,6 +26,23 @@ export async function PATCH(request: Request, context: Context) {
       SupplierInput,
       "tenantId" | "supplierId"
     >;
+
+    if (body.assignedBuyerId) {
+      await validateTenantMembership(
+        tenant.id,
+        body.assignedBuyerId,
+        "comprador",
+      );
+    }
+
+    if (body.relatedSupplierId) {
+      await validateRelatedSupplier(
+        tenant.id,
+        body.relatedSupplierId,
+        supplierId,
+      );
+    }
+
     return NextResponse.json({
       supplier: await updateSupplier({
         ...body,

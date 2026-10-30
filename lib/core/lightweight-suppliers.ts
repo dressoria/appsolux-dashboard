@@ -3,7 +3,7 @@ import type {
   Prisma,
 } from "@prisma/client";
 
-import { isValidEcuadorCedula, isValidEcuadorRuc } from "./ecuador-tax-id";
+import { validateIdentification } from "./identification-rules";
 import { getPrismaClient } from "../db/prisma";
 import { requireTenantOperationalAccess } from "./tenant-operational-access";
 
@@ -29,6 +29,7 @@ export type SupplierInput = {
   supplierOrigin?: string;
   groupName?: string;
   assignedBuyerId?: string;
+  relatedSupplierId?: string;
   isRelated?: boolean;
   isForeign?: boolean;
   taxpayerStatus?: string;
@@ -57,11 +58,7 @@ export function validateSupplierIdentification(
   const identification = raw?.trim() ?? "";
   if (!type || !identification)
     throw new Error("Completa el tipo y la identificación fiscal.");
-  if (type === "RUC" && !isValidEcuadorRuc(identification))
-    throw new Error("El RUC no es válido.");
-  if (type === "CEDULA" && !isValidEcuadorCedula(identification))
-    throw new Error("La cédula no es válida.");
-  return identification;
+  return validateIdentification(type, identification);
 }
 
 export function normalizeSupplierContacts(
@@ -125,6 +122,7 @@ function dataFromInput(
     supplierOrigin: clean(input.supplierOrigin),
     groupName: clean(input.groupName),
     assignedBuyerId: clean(input.assignedBuyerId),
+    relatedSupplierId: clean(input.relatedSupplierId),
     isRelated: input.isRelated ?? false,
     isForeign: input.isForeign ?? false,
     taxpayerStatus: clean(input.taxpayerStatus),

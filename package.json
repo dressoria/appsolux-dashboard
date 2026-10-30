@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test:billing": "node --test --experimental-strip-types lib/core/billing-access-policy.test.ts lib/core/billing/stripe-billing.test.ts lib/core/billing/paddle-billing.test.ts",
     "test:paddle-portal": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/billing/paddle-portal.test.ts",
+    "test:home": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/home-preferences.test.ts lib/core/home-financial-summary.test.ts",
     "test:ecuador-tax-id": "node --test --experimental-strip-types lib/core/ecuador-tax-id.test.ts",
     "test:sri-taxpayer-lookup": "node --test --experimental-strip-types lib/core/sri-taxpayer-lookup.test.ts",
     "test:sri-data-service": "node --test --experimental-strip-types lib/core/sri-data-service.test.ts",

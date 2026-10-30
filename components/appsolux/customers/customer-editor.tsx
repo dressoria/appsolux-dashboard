@@ -1,17 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
-import { LoaderCircle, Plus, Search, X } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+import { LoaderCircle, Plus, Search, X, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EcuadorLocationPicker } from "@/components/appsolux/people/ecuador-location-picker";
+import { TenantUserSelect } from "@/components/appsolux/people/tenant-user-select";
+import { TenantValueCombobox } from "@/components/appsolux/people/tenant-value-combobox";
+import { EntityCombobox } from "@/components/appsolux/people/entity-combobox";
 import {
-  ECUADOR_LOCATIONS,
-  getEcuadorCantons,
-  getEcuadorParishes,
-} from "@/lib/core/ecuador-locations";
+  getIdentificationMaxLength,
+  getIdentificationInputMode,
+  isForeignIdentificationType,
+} from "@/lib/core/identification-rules";
+import type { LightweightCustomerIdentificationType } from "@prisma/client";
+
 type Customer = Record<string, string | string[] | boolean | null> & {
   id: string;
   name: string;
@@ -41,12 +47,49 @@ type Lookup = {
   withholdingAgent?: boolean;
   queriedAt?: string;
 };
+type OtherCustomer = { id: string; name: string; identification: string | null };
 
-export function CustomerEditor({ customer }: { customer?: Customer }) {
+const ORIGIN_OPTIONS = [
+  { value: "NATIONAL", label: "Nacional" },
+  { value: "FOREIGN", label: "Extranjero" },
+  { value: "MIXED", label: "Mixto" },
+];
+
+const CUSTOMER_TYPES = [
+  "Público",
+  "Distribuidor",
+  "Mayorista",
+  "Tarjeta",
+  "Precio E",
+  "Precio F",
+];
+
+const GENDER_OPTIONS = [
+  { value: "", label: "No especificado" },
+  { value: "M", label: "Masculino" },
+  { value: "F", label: "Femenino" },
+  { value: "O", label: "Otro" },
+];
+
+export function CustomerEditor({
+  customer,
+  tenantCustomers = [],
+  existingSectors = [],
+  existingGroups = [],
+  existingZones = [],
+}: {
+  customer?: Customer;
+  tenantCustomers?: OtherCustomer[];
+  existingSectors?: string[];
+  existingGroups?: string[];
+  existingZones?: string[];
+}) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [type, setType] = useState(customer?.identificationType ?? "RUC");
+  const [type, setType] = useState<LightweightCustomerIdentificationType>(
+    (customer?.identificationType as LightweightCustomerIdentificationType) ?? "RUC",
+  );
   const [identification, setIdentification] = useState(
     String(customer?.identification ?? ""),
   );
@@ -58,70 +101,87 @@ export function CustomerEditor({ customer }: { customer?: Customer }) {
     String(customer?.phone ?? "+593"),
     ...(customer?.phoneNumbers ?? []),
   ]);
-  const [lookup, setLookup] = useState<Lookup | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
-  const [lookupMessage, setLookupMessage] = useState("");
-  const [suggested, setSuggested] = useState<Lookup | null>(null);
+  const [lookupFeedback, setLookupFeedback] = useState("");
+  const [lookupData, setLookupData] = useState<Lookup | null>(null);
   const [name, setName] = useState(String(customer?.name ?? ""));
   const [tradeName, setTradeName] = useState(String(customer?.tradeName ?? ""));
   const [address, setAddress] = useState(String(customer?.address ?? ""));
   const [province, setProvince] = useState(String(customer?.province ?? ""));
-  const [canton, setCanton] = useState(String(customer?.city ?? ""));
+  const [city, setCity] = useState(String(customer?.city ?? ""));
   const [parish, setParish] = useState(String(customer?.parish ?? ""));
+  const [country, setCountry] = useState(String(customer?.country ?? "Ecuador"));
+  const [isForeign, setIsForeign] = useState(Boolean(customer?.isForeign));
+  const [isRelated, setIsRelated] = useState(Boolean(customer?.isRelated));
+  const [invoiceThirdParty, setInvoiceThirdParty] = useState(
+    Boolean(customer?.invoiceThirdParty),
+  );
+  const [assignedSellerId, setAssignedSellerId] = useState(
+    String(customer?.assignedSellerId ?? ""),
+  );
+  const [customerOrigin, setCustomerOrigin] = useState(
+    String(customer?.customerOrigin ?? ""),
+  );
+  const [gender, setGender] = useState(String(customer?.gender ?? ""));
+  const [sector, setSector] = useState(String(customer?.sector ?? ""));
+  const [zone, setZone] = useState(String(customer?.zone ?? ""));
+  const [groupName, setGroupName] = useState(
+    String(customer?.groupName ?? "SIN GRUPO"),
+  );
+  const [relatedCustomerId, setRelatedCustomerId] = useState(
+    String(customer?.relatedCustomerId ?? ""),
+  );
+  const [invoiceThirdPartyCustomerId, setInvoiceThirdPartyCustomerId] =
+    useState(String(customer?.invoiceThirdPartyCustomerId ?? ""));
+
+  useEffect(() => {
+    const foreign = isForeignIdentificationType(type);
+    if (foreign && !isForeign) {
+      setIsForeign(true);
+    }
+    if (!foreign && isForeign && (type === "RUC" || type === "CEDULA")) {
+      setIsForeign(false);
+      setCountry("Ecuador");
+    }
+  }, [type]);
+
+  useEffect(() => {
+    if (!isForeign) {
+      setCountry("Ecuador");
+    }
+  }, [isForeign]);
+
   async function searchTaxpayer() {
     setError("");
-    setLookupMessage("");
+    setLookupFeedback("");
     setLookupLoading(true);
-    setSuggested(null);
+    setLookupData(null);
     try {
       const response = await fetch(
         `/api/sri/taxpayer-lookup?identification=${encodeURIComponent(identification)}`,
       );
       const data = (await response.json()) as Lookup;
-      if (!response.ok) {
-        setLookup(null);
-        setLookupMessage(
+      if (!response.ok || !data.found) {
+        setLookupFeedback(
           data.message ??
-            "No pudimos consultar la información tributaria en este momento. Puedes continuar manualmente.",
+            "No encontramos información tributaria. Puedes completar los datos manualmente.",
         );
         return;
       }
-      setLookup(data);
-      if (!data.found) {
-        setLookupMessage(
-          "No encontramos información tributaria para esta identificación. Puedes completar los datos manualmente.",
-        );
-        return;
-      }
-      const conflicts =
-        (data.legalName && name && data.legalName !== name) ||
-        (data.tradeName && tradeName && data.tradeName !== tradeName) ||
-        (data.address && address && data.address !== address) ||
-        (data.province && province && data.province !== province) ||
-        (data.city && canton && data.city !== canton) ||
-        (data.parish && parish && data.parish !== parish);
-      if (!name && data.legalName) setName(data.legalName);
-      if (!tradeName && data.tradeName) setTradeName(data.tradeName);
-      if (!address && data.address) setAddress(data.address);
-      if (!province && data.province) setProvince(data.province);
-      if (!canton && data.city) setCanton(data.city);
-      if (!parish && data.parish) setParish(data.parish);
-      if (conflicts) setSuggested(data);
-      setLookupMessage("Datos tributarios encontrados.");
+      setLookupData(data);
+      if (data.legalName) setName(data.legalName);
+      if (data.tradeName) setTradeName(data.tradeName);
+      if (data.address) setAddress(data.address);
+      if (data.province) setProvince(data.province);
+      if (data.city) setCity(data.city);
+      if (data.parish) setParish(data.parish);
+      setLookupFeedback("✓ Datos del SRI cargados");
+      setTimeout(() => setLookupFeedback(""), 4000);
     } finally {
       setLookupLoading(false);
     }
   }
-  function useSuggested() {
-    if (!suggested) return;
-    if (suggested.legalName) setName(suggested.legalName);
-    if (suggested.tradeName) setTradeName(suggested.tradeName);
-    if (suggested.address) setAddress(suggested.address);
-    if (suggested.province) setProvince(suggested.province);
-    if (suggested.city) setCanton(suggested.city);
-    if (suggested.parish) setParish(suggested.parish);
-    setSuggested(null);
-  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
@@ -134,31 +194,36 @@ export function CustomerEditor({ customer }: { customer?: Customer }) {
       identificationType: type,
       identification,
       address,
-      country: string("country"),
-      province: string("province"),
-      city: string("city"),
-      parish: string("parish"),
-      sector: string("sector"),
-      zone: string("zone"),
+      country: isForeign ? country : "Ecuador",
+      province,
+      city,
+      parish,
+      sector,
+      zone,
       customerType: string("customerType"),
-      customerOrigin: string("customerOrigin"),
-      groupName: string("groupName"),
-      assignedSellerId: string("assignedSellerId"),
-      isRelated: form.get("isRelated") === "on",
-      isForeign: form.get("isForeign") === "on",
-      invoiceThirdParty: form.get("invoiceThirdParty") === "on",
+      customerOrigin,
+      groupName,
+      assignedSellerId,
+      isRelated,
+      isForeign,
+      invoiceThirdParty,
       notes: string("notes"),
       emails,
       phone: phones[0],
       phoneNumbers: phones.slice(1),
       isActive: form.get("isActive") === "on",
-      taxpayerStatus: lookup?.taxpayerStatus,
-      taxpayerLegalName: lookup?.legalName,
-      taxpayerTradeName: lookup?.tradeName,
-      taxpayerType: lookup?.taxpayerType,
-      economicActivity: lookup?.economicActivity,
-      taxDataSource: lookup?.source,
-      taxDataQueriedAt: lookup?.queriedAt,
+      gender,
+      relatedCustomerId: isRelated ? relatedCustomerId : "",
+      invoiceThirdPartyCustomerId: invoiceThirdParty
+        ? invoiceThirdPartyCustomerId
+        : "",
+      taxpayerStatus: lookupData?.taxpayerStatus,
+      taxpayerLegalName: lookupData?.legalName,
+      taxpayerTradeName: lookupData?.tradeName,
+      taxpayerType: lookupData?.taxpayerType,
+      economicActivity: lookupData?.economicActivity,
+      taxDataSource: lookupData?.source,
+      taxDataQueriedAt: lookupData?.queriedAt,
     };
     const response = await fetch(
       customer ? `/api/basic/customers/${customer.id}` : "/api/basic/customers",
@@ -177,6 +242,11 @@ export function CustomerEditor({ customer }: { customer?: Customer }) {
     router.push(`/facturacion/customers/${customer?.id ?? data.customer?.id}`);
     router.refresh();
   }
+
+  const maxLen = getIdentificationMaxLength(type);
+  const inputMode = getIdentificationInputMode(type);
+  const showEcuadorLocation = !isForeign || country === "Ecuador";
+
   return (
     <form onSubmit={submit} className="pb-8">
       <header className="sticky top-0 z-20 -mx-4 mb-5 flex items-center justify-between gap-3 border-b border-[#E4E9F0] bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
@@ -200,18 +270,21 @@ export function CustomerEditor({ customer }: { customer?: Customer }) {
           </Button>
         </div>
       </header>
+
       <div className="space-y-4">
-        <Section title="Datos principales">
+        <Section title="Identificación">
           <Field label="Tipo de identificación">
             <select
               value={type}
-              onChange={(e) => setType(e.target.value)}
+              onChange={(e) =>
+                setType(e.target.value as LightweightCustomerIdentificationType)
+              }
               className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm"
             >
               <option value="RUC">RUC</option>
               <option value="CEDULA">Cédula</option>
               <option value="PASSPORT">Pasaporte</option>
-              <option value="FOREIGN_ID">Exterior</option>
+              <option value="FOREIGN_ID">Identificación exterior</option>
             </select>
           </Field>
           <Field label="Identificación">
@@ -219,9 +292,15 @@ export function CustomerEditor({ customer }: { customer?: Customer }) {
               <Input
                 value={identification}
                 onChange={(e) => {
-                  setIdentification(e.target.value);
-                  setLookup(null);
+                  const v =
+                    inputMode === "numeric"
+                      ? e.target.value.replace(/\D/g, "")
+                      : e.target.value;
+                  setIdentification(v);
+                  setLookupData(null);
                 }}
+                maxLength={maxLen}
+                inputMode={inputMode}
                 required
               />
               <Button
@@ -245,105 +324,28 @@ export function CustomerEditor({ customer }: { customer?: Customer }) {
           </Field>
           <Field label="Razón social / Nombres completos">
             <Input
-              name="name"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(e) => setName(e.target.value)}
               required
             />
           </Field>
           <Field label="Nombre comercial">
             <Input
-              name="tradeName"
               value={tradeName}
-              onChange={(event) => setTradeName(event.target.value)}
+              onChange={(e) => setTradeName(e.target.value)}
             />
           </Field>
-          <Field label="Dirección">
-            <Input
-              name="address"
-              value={address}
-              onChange={(event) => setAddress(event.target.value)}
-            />
-          </Field>
-          {type === "FOREIGN_ID" || type === "PASSPORT" ? (
-            <Field label="País exterior">
-              <Input
-                name="country"
-                defaultValue={String(
-                  customer?.country === "Ecuador"
-                    ? ""
-                    : (customer?.country ?? ""),
-                )}
-                required
-              />
-            </Field>
-          ) : (
-            <input type="hidden" name="country" value="Ecuador" />
-          )}
         </Section>
-        {lookupMessage ? (
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-[#E4E9F0] bg-white px-3 py-2 text-sm text-[#667085]">
-            <span>{lookupMessage}</span>
-            {suggested ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={useSuggested}
-              >
-                Usar datos encontrados
-              </Button>
-            ) : null}
+
+        {lookupFeedback && (
+          <div
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${lookupFeedback.startsWith("✓") ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
+          >
+            {lookupFeedback.startsWith("✓") && <Check className="size-4" />}
+            <span>{lookupFeedback}</span>
           </div>
-        ) : null}
-        {lookup?.found ? (
-          <section className="rounded-xl border border-[#E4E9F0] bg-[#F8FAFD] p-4">
-            <>
-              <p className="font-medium text-[#172033]">
-                Datos tributarios encontrados
-              </p>
-              <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                {lookup.taxpayerStatus ? (
-                  <Read
-                    label="Estado contribuyente RUC"
-                    value={lookup.taxpayerStatus}
-                  />
-                ) : null}
-                {lookup.taxpayerType ? (
-                  <Read
-                    label="Tipo contribuyente"
-                    value={lookup.taxpayerType}
-                  />
-                ) : null}
-                {lookup.economicActivity ? (
-                  <Read
-                    label="Actividad económica"
-                    value={lookup.economicActivity}
-                  />
-                ) : null}
-                {lookup.ciiuCode ? (
-                  <Read label="CIIU" value={lookup.ciiuCode} />
-                ) : null}
-                {lookup.source ? (
-                  <Read label="Fuente" value={lookup.source} />
-                ) : null}
-                {lookup.queriedAt ? (
-                  <Read
-                    label="Fecha de búsqueda"
-                    value={new Intl.DateTimeFormat("es-EC", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    }).format(new Date(lookup.queriedAt))}
-                  />
-                ) : null}
-              </div>
-              <p className="mt-3 text-xs text-[#667085]">
-                Se guardarán como datos de solo lectura. Copia manualmente los
-                valores que quieras usar en los campos principales.
-              </p>
-            </>
-          </section>
-        ) : null}
+        )}
+
         <Section title="Contacto">
           <div className="sm:col-span-2">
             <ArrayFields
@@ -364,120 +366,177 @@ export function CustomerEditor({ customer }: { customer?: Customer }) {
             />
           </div>
         </Section>
-        <div className="flex flex-wrap gap-x-6 gap-y-2 rounded-xl border border-[#E4E9F0] bg-white px-4 py-3">
-          <Switch
-            name="isRelated"
-            label="Relacionado"
-            defaultChecked={Boolean(customer?.isRelated)}
-          />
-          <Switch
-            name="isForeign"
+
+        <Section title="Ubicación">
+          <Field label="Dirección" wide>
+            <Input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+          </Field>
+          {isForeign && country !== "Ecuador" ? (
+            <>
+              <Field label="País">
+                <Input
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  required
+                />
+              </Field>
+              <Field label="Ciudad">
+                <Input value={city} onChange={(e) => setCity(e.target.value)} />
+              </Field>
+            </>
+          ) : (
+            <div className="sm:col-span-2">
+              <EcuadorLocationPicker
+                province={province}
+                city={city}
+                parish={parish}
+                onProvinceChange={setProvince}
+                onCityChange={setCity}
+                onParishChange={setParish}
+              />
+            </div>
+          )}
+        </Section>
+
+        <div className="flex flex-wrap gap-x-6 gap-y-3 rounded-xl border border-[#E4E9F0] bg-white px-4 py-3">
+          <Toggle
             label="Extranjero"
-            defaultChecked={Boolean(customer?.isForeign)}
+            checked={isForeign}
+            onChange={(v) => {
+              setIsForeign(v);
+              if (v && type !== "PASSPORT" && type !== "FOREIGN_ID") {
+                setType("PASSPORT");
+              }
+            }}
           />
-          <Switch
-            name="invoiceThirdParty"
+          <Toggle label="Relacionado" checked={isRelated} onChange={setIsRelated} />
+          <Toggle
             label="Facturar otra persona"
-            defaultChecked={Boolean(customer?.invoiceThirdParty)}
+            checked={invoiceThirdParty}
+            onChange={(v) => {
+              setInvoiceThirdParty(v);
+              if (!v) setInvoiceThirdPartyCustomerId("");
+            }}
           />
         </div>
+
+        {isRelated && (
+          <Section title="Cliente relacionado">
+            <Field label="Cliente vinculado" wide>
+              <EntityCombobox
+                name="relatedCustomerId"
+                value={relatedCustomerId}
+                onChange={setRelatedCustomerId}
+                entities={tenantCustomers}
+                excludeId={customer?.id}
+                label="Buscar cliente..."
+                emptyLabel="Solo marcar como parte relacionada"
+              />
+            </Field>
+          </Section>
+        )}
+
+        {invoiceThirdParty && (
+          <Section title="Facturar por defecto a">
+            <Field label="Cliente destinatario fiscal" wide>
+              <EntityCombobox
+                name="invoiceThirdPartyCustomerId"
+                value={invoiceThirdPartyCustomerId}
+                onChange={setInvoiceThirdPartyCustomerId}
+                entities={tenantCustomers}
+                excludeId={customer?.id}
+                label="Buscar cliente..."
+              />
+            </Field>
+          </Section>
+        )}
+
         <Section title="Datos adicionales">
-          <Field label="Provincia">
+          <Field label="Vendedor">
+            <TenantUserSelect
+              name="assignedSellerId"
+              value={assignedSellerId}
+              onChange={setAssignedSellerId}
+              label="Vendedor"
+              emptyLabel="Sin vendedor"
+            />
+          </Field>
+          <Field label="Origen de ingresos">
             <select
-              name="province"
-              value={province}
-              onChange={(event) => {
-                setProvince(event.target.value);
-                setCanton("");
-              }}
+              value={customerOrigin}
+              onChange={(e) => setCustomerOrigin(e.target.value)}
               className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm"
             >
               <option value="">Seleccionar</option>
-              {province &&
-              !ECUADOR_LOCATIONS.some((item) => item.name === province) ? (
-                <option value={province}>{province}</option>
-              ) : null}
-              {ECUADOR_LOCATIONS.map((item) => (
-                <option key={item.name}>{item.name}</option>
+              {ORIGIN_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
               ))}
+              {customerOrigin &&
+                !ORIGIN_OPTIONS.some((o) => o.value === customerOrigin) && (
+                  <option value={customerOrigin}>{customerOrigin}</option>
+                )}
             </select>
           </Field>
-          <Field label="Cantón / Ciudad">
-            <select
-              name="city"
-              value={canton}
-              onChange={(event) => setCanton(event.target.value)}
-              disabled={!province}
-              className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm disabled:bg-slate-50"
-            >
-              <option value="">Seleccionar</option>
-              {canton &&
-              !getEcuadorCantons(province).some(
-                (item) => item.name === canton,
-              ) ? (
-                <option value={canton}>{canton}</option>
-              ) : null}
-              {getEcuadorCantons(province).map((item) => (
-                <option key={item.name}>{item.name}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Parroquia">
-            <select
-              name="parish"
-              value={parish}
-              onChange={(event) => setParish(event.target.value)}
-              disabled={!canton}
-              className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm disabled:bg-slate-50"
-            >
-              <option value="">Seleccionar</option>
-              {parish &&
-              !getEcuadorParishes(province, canton).includes(parish) ? (
-                <option value={parish}>{parish}</option>
-              ) : null}
-              {getEcuadorParishes(province, canton).map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
-          </Field>
-          {[
-            "sector:Sector",
-            "zone:Zona",
-            "assignedSellerId:Vendedor",
-            "customerOrigin:Origen de ingresos",
-          ].map((item) => {
-            const [name, label] = item.split(":");
-            return (
-              <Field key={name} label={label}>
-                <Input
-                  name={name}
-                  defaultValue={String(customer?.[name] ?? "")}
-                />
-              </Field>
-            );
-          })}
           <Field label="Tipo de cliente">
             <select
               name="customerType"
               defaultValue={String(customer?.customerType ?? "Público")}
               className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm"
             >
-              {[
-                "Público",
-                "Distribuidor",
-                "Mayorista",
-                "Tarjeta",
-                "Precio E",
-                "Precio F",
-              ].map((item) => (
+              {CUSTOMER_TYPES.map((item) => (
                 <option key={item}>{item}</option>
               ))}
             </select>
           </Field>
+          <Field label="Género">
+            <select
+              value={gender}
+              onChange={(e) => setGender(e.target.value)}
+              className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm"
+            >
+              {GENDER_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Sector">
+            <TenantValueCombobox
+              name="sector"
+              value={sector}
+              onChange={setSector}
+              existingValues={existingSectors}
+              label="Sector"
+              emptyLabel="Sin sector"
+              addLabel="+ Nuevo sector"
+            />
+          </Field>
+          <Field label="Zona">
+            <TenantValueCombobox
+              name="zone"
+              value={zone}
+              onChange={setZone}
+              existingValues={existingZones}
+              label="Zona"
+              emptyLabel="Sin zona"
+              addLabel="+ Nueva zona"
+            />
+          </Field>
           <Field label="Grupo">
-            <Input
+            <TenantValueCombobox
               name="groupName"
-              defaultValue={String(customer?.groupName ?? "SIN GRUPO")}
+              value={groupName}
+              onChange={setGroupName}
+              existingValues={existingGroups}
+              label="Grupo"
+              emptyLabel="SIN GRUPO"
+              addLabel="+ Nuevo grupo"
             />
           </Field>
           <Field label="Observaciones" wide>
@@ -496,6 +555,7 @@ export function CustomerEditor({ customer }: { customer?: Customer }) {
             Cliente activo
           </label>
         </Section>
+
         {error ? (
           <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
             {error}
@@ -505,6 +565,7 @@ export function CustomerEditor({ customer }: { customer?: Customer }) {
     </form>
   );
 }
+
 function Section({
   title,
   children,
@@ -537,31 +598,28 @@ function Field({
     </div>
   );
 }
-function Read({ label, value }: { label: string; value?: string }) {
-  return (
-    <p>
-      <span className="text-[#667085]">{label}:</span> {value || "—"}
-    </p>
-  );
-}
-function Switch({
-  name,
+function Toggle({
   label,
-  defaultChecked,
+  checked,
+  onChange,
 }: {
-  name: string;
   label: string;
-  defaultChecked: boolean;
+  checked: boolean;
+  onChange: (v: boolean) => void;
 }) {
   return (
     <label className="flex items-center gap-2 text-sm text-[#172033]">
-      <input
-        name={name}
-        type="checkbox"
-        defaultChecked={defaultChecked}
-        className="peer sr-only"
-      />
-      <span className="relative h-5 w-9 rounded-full bg-slate-300 transition-colors peer-checked:bg-[#1E52F1] after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-4" />
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative h-5 w-9 rounded-full transition-colors ${checked ? "bg-[#1E52F1]" : "bg-slate-300"}`}
+      >
+        <span
+          className={`absolute left-0.5 top-0.5 size-4 rounded-full bg-white transition-transform ${checked ? "translate-x-4" : ""}`}
+        />
+      </button>
       {label}
     </label>
   );

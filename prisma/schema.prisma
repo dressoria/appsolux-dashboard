@@ -230,9 +230,25 @@ enum LightweightPaymentStatus {
 
 enum LightweightPaymentMethod {
   cash
+  check
+  deposit
   transfer
+  debit_card
+  credit_card
   card
   credit
+}
+
+enum InvoiceKind {
+  NORMAL
+  EXPORT
+  REIMBURSEMENT
+}
+
+enum SalesInvoiceDraftStatus {
+  DRAFT
+  CONVERTED
+  CANCELLED
 }
 
 enum LightweightStockMovementType {
@@ -564,6 +580,7 @@ model User {
   purchaseDocumentsCreated             PurchaseDocument[]   @relation("PurchaseDocumentsCreatedBy")
   purchaseReceiptsCreated              PurchaseReceipt[]    @relation("PurchaseReceiptsCreatedBy")
   purchaseSyncJobsRequested            PurchaseSriSyncJob[] @relation("PurchaseSyncJobsRequestedBy")
+  homePreferences                      UserHomePreference[]
 }
 
 model Tenant {
@@ -654,6 +671,8 @@ model Tenant {
   productPriceChanges          ProductPriceChange[]
   inventorySettings            InventorySettings?
   sriCancellationRequests      SriCancellationRequest[]
+  userHomePreferences          UserHomePreference[]
+  salesInvoiceDrafts           SalesInvoiceDraft[]
 }
 
 model Plan {
@@ -966,16 +985,23 @@ model LightweightCustomer {
   economicActivity   String?
   taxDataSource      String?
   taxDataQueriedAt   DateTime?
-  notes              String?
-  isActive           Boolean                                @default(true)
-  balance            Decimal                                @default(0) @db.Decimal(12, 2)
-  createdAt          DateTime                               @default(now())
-  updatedAt          DateTime                               @updatedAt
+  gender                       String?
+  notes                        String?
+  isActive                     Boolean                                @default(true)
+  balance                      Decimal                                @default(0) @db.Decimal(12, 2)
+  relatedCustomerId            String?
+  invoiceThirdPartyCustomerId  String?
+  createdAt                    DateTime                               @default(now())
+  updatedAt                    DateTime                               @updatedAt
 
-  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  sales           LightweightSale[]
-  proformas       LightweightProforma[]
-  aiInvoiceDrafts AiInvoiceDraft[]
+  tenant                  Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  relatedCustomer         LightweightCustomer?  @relation("CustomerRelated", fields: [relatedCustomerId], references: [id], onDelete: SetNull)
+  relatedByCustomers      LightweightCustomer[] @relation("CustomerRelated")
+  invoiceThirdPartyTarget LightweightCustomer?  @relation("CustomerInvoiceThirdParty", fields: [invoiceThirdPartyCustomerId], references: [id], onDelete: SetNull)
+  invoiceThirdPartyOf     LightweightCustomer[] @relation("CustomerInvoiceThirdParty")
+  sales                   LightweightSale[]
+  proformas               LightweightProforma[]
+  aiInvoiceDrafts         AiInvoiceDraft[]
 
   @@unique([tenantId, identification])
   @@index([tenantId])
@@ -1073,10 +1099,13 @@ model LightweightSupplier {
   taxDataSourceUpdatedAt DateTime?
   taxDataQueriedAt       DateTime?
   isActive               Boolean                                @default(true)
+  relatedSupplierId      String?
   createdAt              DateTime                               @default(now())
   updatedAt              DateTime                               @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant            Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  relatedSupplier   LightweightSupplier? @relation("SupplierRelated", fields: [relatedSupplierId], references: [id], onDelete: SetNull)
+  relatedBySuppliers LightweightSupplier[] @relation("SupplierRelated")
 
   purchaseDocuments PurchaseDocument[]
   purchaseReceipts  PurchaseReceipt[]
@@ -1094,23 +1123,31 @@ model LightweightSupplier {
 }
 
 model LightweightSale {
-  id                String                   @id @default(cuid())
-  tenantId          String
-  customerId        String?
-  status            LightweightSaleStatus    @default(paid)
-  subtotal          Decimal                  @default(0) @db.Decimal(12, 2)
-  taxTotal          Decimal                  @default(0) @db.Decimal(12, 2)
-  discountTotal     Decimal                  @default(0) @db.Decimal(12, 2)
-  total             Decimal                  @db.Decimal(12, 2)
-  paymentStatus     LightweightPaymentStatus @default(paid)
-  sriPaymentCode    String?
-  notes             String?
-  origin            LightweightSaleOrigin    @default(NORMAL)
-  externalReference String?
-  originalIssuedAt  DateTime?
-  importBatchId     String?
-  createdAt         DateTime                 @default(now())
-  updatedAt         DateTime                 @updatedAt
+  id                  String                   @id @default(cuid())
+  tenantId            String
+  customerId          String?
+  warehouseId         String?
+  invoiceKind         InvoiceKind              @default(NORMAL)
+  dueDate             DateTime?
+  shipmentGuideId     String?
+  exportData          Json?
+  reimbursementData   Json?
+  status              LightweightSaleStatus    @default(paid)
+  subtotal            Decimal                  @default(0) @db.Decimal(12, 2)
+  taxTotal            Decimal                  @default(0) @db.Decimal(12, 2)
+  discountTotal       Decimal                  @default(0) @db.Decimal(12, 2)
+  total               Decimal                  @db.Decimal(12, 2)
+  paymentStatus       LightweightPaymentStatus @default(paid)
+  sriPaymentCode      String?
+  notes               String?
+  origin              LightweightSaleOrigin    @default(NORMAL)
+  externalReference   String?
+  originalIssuedAt    DateTime?
+  importBatchId       String?
+  establishmentId     String?
+  issuePointId        String?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
 
   tenant      Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer    LightweightCustomer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -1131,16 +1168,18 @@ model LightweightSale {
 }
 
 model LightweightSaleItem {
-  id             String  @id @default(cuid())
+  id             String              @id @default(cuid())
   saleId         String
   productId      String
   quantity       Int
-  price          Decimal @db.Decimal(14, 6)
-  discountAmount Decimal @default(0) @db.Decimal(12, 2)
-  taxRate        Decimal @default(0) @db.Decimal(5, 2)
-  taxAmount      Decimal @default(0) @db.Decimal(12, 2)
-  total          Decimal @db.Decimal(12, 2)
+  price          Decimal             @db.Decimal(14, 6)
+  discountAmount Decimal             @default(0) @db.Decimal(12, 2)
+  taxRate        Decimal             @default(0) @db.Decimal(5, 2)
+  taxAmount      Decimal             @default(0) @db.Decimal(12, 2)
+  total          Decimal             @db.Decimal(12, 2)
   description    String?
+  unitCost       Decimal?            @db.Decimal(14, 6)
+  taxCategory    ProductTaxCategory?
 
   sale    LightweightSale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product LightweightProduct @relation(fields: [productId], references: [id])
@@ -1150,11 +1189,16 @@ model LightweightSaleItem {
 }
 
 model LightweightPayment {
-  id        String                   @id @default(cuid())
-  saleId    String
-  method    LightweightPaymentMethod
-  amount    Decimal                  @db.Decimal(12, 2)
-  createdAt DateTime                 @default(now())
+  id                 String                   @id @default(cuid())
+  saleId             String
+  method             LightweightPaymentMethod
+  amount             Decimal                  @db.Decimal(12, 2)
+  treasuryAccountId  String?
+  referenceNumber    String?
+  batchNumber        String?
+  voucherNumber      String?
+  dueDate            DateTime?
+  createdAt          DateTime                 @default(now())
 
   sale LightweightSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
@@ -1591,6 +1635,7 @@ model SriDocument {
   establishment  SriEstablishment   @relation(fields: [establishmentId], references: [id])
   issuePoint     SriIssuePoint      @relation(fields: [issuePointId], references: [id])
   lines                SriDocumentLine[]
+  sriPayments          SriDocumentPayment[]
   signingJobs          SriSigningJob[]
   submissionJobs       SriSubmissionJob[]
   withholdingLines     SriWithholdingLine[]
@@ -1676,23 +1721,56 @@ model SriSubmissionJob {
 }
 
 model SriDocumentLine {
-  id                 String   @id @default(cuid())
+  id                 String              @id @default(cuid())
   documentId         String
   itemName           String
   itemCode           String?
   itemAuxiliaryCode  String?
-  quantity           Decimal  @db.Decimal(12, 4)
-  unitPrice      Decimal  @db.Decimal(12, 4)
-  discountAmount Decimal  @default(0) @db.Decimal(12, 2)
-  subtotal       Decimal  @db.Decimal(12, 2)
-  taxRate        Decimal  @default(0) @db.Decimal(5, 2)
-  taxAmount      Decimal  @default(0) @db.Decimal(12, 2)
-  total          Decimal  @db.Decimal(12, 2)
-  createdAt      DateTime @default(now())
+  quantity           Decimal             @db.Decimal(12, 4)
+  unitPrice          Decimal             @db.Decimal(12, 4)
+  discountAmount     Decimal             @default(0) @db.Decimal(12, 2)
+  subtotal           Decimal             @db.Decimal(12, 2)
+  taxRate            Decimal             @default(0) @db.Decimal(5, 2)
+  taxAmount          Decimal             @default(0) @db.Decimal(12, 2)
+  total              Decimal             @db.Decimal(12, 2)
+  taxCategory        ProductTaxCategory?
+  createdAt          DateTime            @default(now())
 
   document SriDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@index([documentId])
+}
+
+model SriDocumentPayment {
+  id                      String   @id @default(cuid())
+  documentId              String
+  commercialMethod        String
+  sriPaymentCode          String
+  total                   Decimal  @db.Decimal(12, 2)
+  termDays                Int      @default(0)
+  timeUnit                String   @default("dias")
+  createdAt               DateTime @default(now())
+
+  document SriDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
+
+model SalesInvoiceDraft {
+  id              String                   @id @default(cuid())
+  tenantId        String
+  createdByUserId String
+  status          SalesInvoiceDraftStatus  @default(DRAFT)
+  payload         Json
+  convertedSaleId String?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, createdByUserId])
+  @@index([tenantId, status])
 }
 
 model BusinessSettings {
@@ -3328,4 +3406,19 @@ model SriCancellationRequest {
   @@index([sriDocumentId])
   @@index([status])
   @@index([tenantId, sriDocumentId])
+}
+
+model UserHomePreference {
+  id           String   @id @default(cuid())
+  userId       String
+  tenantId     String
+  shortcutKeys Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
 }

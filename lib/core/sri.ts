@@ -665,19 +665,31 @@ export async function createDraftSriDocumentFromBasicSale({
 
   const VALID_SRI_PAYMENT_CODES = new Set(["01", "16", "17", "18", "19", "20", "21"]);
 
+  const COMMERCIAL_TO_SRI: Record<string, string> = {
+    cash: "01", check: "20", deposit: "20", transfer: "20",
+    debit_card: "16", credit_card: "19", card: "19", credit: "20",
+  };
+
+  const allPayments = await prisma.lightweightPayment.findMany({
+    where: { saleId },
+    orderBy: { createdAt: "asc" },
+  });
+
   const sriPaymentCode = sale.sriPaymentCode?.trim() || null;
-  if (!sriPaymentCode) {
+  if (!sriPaymentCode && allPayments.length <= 1) {
     throw new Error(
       "SRI_PAYMENT_CODE_MISSING: La venta no tiene código de forma de pago SRI asignado.",
     );
   }
-  if (!VALID_SRI_PAYMENT_CODES.has(sriPaymentCode)) {
+  if (sriPaymentCode && !VALID_SRI_PAYMENT_CODES.has(sriPaymentCode)) {
     throw new Error(
       `SRI_PAYMENT_CODE_INVALID: Código de forma de pago SRI "${sriPaymentCode}" no es válido.`,
     );
   }
 
-  const commercialPaymentMethod = sale.payments[0]?.method?.trim() || null;
+  const commercialPaymentMethod = allPayments.length > 1
+    ? "multiple"
+    : (allPayments[0]?.method?.trim() || null);
   if (!commercialPaymentMethod) {
     throw new Error(
       "SRI_COMMERCIAL_PAYMENT_MISSING: La venta no tiene forma de pago comercial registrada.",
@@ -710,6 +722,7 @@ export async function createDraftSriDocumentFromBasicSale({
       taxRate: new Prisma.Decimal(taxRate),
       taxAmount: new Prisma.Decimal(taxAmount),
       total: new Prisma.Decimal(lineSubtotal + taxAmount),
+      taxCategory: ((item as { taxCategory?: string }).taxCategory as import("@prisma/client").ProductTaxCategory) ?? null,
     };
   });
 
@@ -719,6 +732,22 @@ export async function createDraftSriDocumentFromBasicSale({
     (acc, l) => acc + Number(l.discountAmount),
     0,
   );
+
+  // Build SRI payment snapshots
+  const sriPaymentRecords = allPayments.map((p) => {
+    const code = COMMERCIAL_TO_SRI[p.method] ?? "20";
+    let termDays = 0;
+    if (p.method === "credit" && p.dueDate) {
+      termDays = Math.max(0, Math.ceil((p.dueDate.getTime() - Date.now()) / 86400000));
+    }
+    return {
+      commercialMethod: p.method,
+      sriPaymentCode: code,
+      total: p.amount,
+      termDays,
+      timeUnit: "dias" as const,
+    };
+  });
 
   const document = await prisma.sriDocument.create({
     data: {
@@ -745,9 +774,10 @@ export async function createDraftSriDocumentFromBasicSale({
       taxTotal: new Prisma.Decimal(sriTaxTotal),
       discountTotal: new Prisma.Decimal(sriDiscountTotal),
       grandTotal: new Prisma.Decimal(sriSubtotal + sriTaxTotal),
-      sriPaymentCode,
+      sriPaymentCode: allPayments.length <= 1 ? sriPaymentCode : (sriPaymentRecords[0]?.sriPaymentCode ?? sriPaymentCode),
       commercialPaymentMethod,
       lines: { create: lines },
+      sriPayments: allPayments.length > 0 ? { create: sriPaymentRecords } : undefined,
     },
     select: { id: true },
   });

@@ -18,8 +18,18 @@ export default async function NewInvoicePage({
   const params = await searchParams;
   const aiProposalId = typeof params.aiProposalId === "string" ? params.aiProposalId : undefined;
   const aiDraftId = typeof params.aiDraftId === "string" ? params.aiDraftId : undefined;
+  const draftIdParam = typeof params.draftId === "string" ? params.draftId : undefined;
 
-  const [customers, products, establishments, issuePoints] = await Promise.all([
+  const [
+    customers,
+    products,
+    establishments,
+    issuePoints,
+    warehouses,
+    warehouseStocks,
+    shipmentGuides,
+    treasuryAccounts,
+  ] = await Promise.all([
     prisma.lightweightCustomer.findMany({
       where: { tenantId: tenant.id, isActive: true },
       orderBy: { name: "asc" },
@@ -33,6 +43,23 @@ export default async function NewInvoicePage({
     }),
     listSriEstablishments(tenant.id),
     listSriIssuePoints(tenant.id),
+    prisma.inventoryWarehouse.findMany({
+      where: { tenantId: tenant.id, active: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.inventoryStockBalance.findMany({
+      where: { tenantId: tenant.id },
+      select: { warehouseId: true, productId: true, quantity: true },
+    }),
+    prisma.shipmentGuide.findMany({
+      where: { tenantId: tenant.id, saleId: null, status: { in: ["DRAFT", "ISSUED"] } },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    }),
+    prisma.treasuryAccount.findMany({
+      where: { tenantId: tenant.id, active: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   let initialCustomerId: string | undefined;
@@ -73,8 +100,19 @@ export default async function NewInvoicePage({
     }
   }
 
+  let draftPayload: Record<string, unknown> | undefined;
+  if (draftIdParam) {
+    const draft = await prisma.salesInvoiceDraft.findFirst({
+      where: { id: draftIdParam, tenantId: tenant.id, status: "DRAFT" },
+    });
+    if (draft) {
+      draftPayload = draft.payload as Record<string, unknown>;
+    }
+  }
+
   const activeEstablishments = establishments.filter((item) => item.isActive);
   const activeIssuePoints = issuePoints.filter((item) => item.isActive);
+
   return (
     <DashboardShell
       contentClassName="mx-auto max-w-[1700px]"
@@ -125,6 +163,25 @@ export default async function NewInvoicePage({
                 ? item.stock
                 : 999999,
           taxRate: item.taxRate.toString(),
+          taxCategory: item.taxCategory ?? null,
+          cost: item.cost?.toString() ?? null,
+        }))}
+        warehouses={warehouses.map((w) => ({
+          id: w.id,
+          code: w.code,
+          name: w.name,
+          isDefault: w.isDefault,
+        }))}
+        warehouseStocks={warehouseStocks.map((s) => ({
+          warehouseId: s.warehouseId,
+          productId: s.productId,
+          quantity: Number(s.quantity),
+        }))}
+        shipmentGuides={shipmentGuides.map((g) => ({
+          id: g.id,
+          number: g.number,
+          status: g.status,
+          destinationAddress: g.destinationAddress,
         }))}
         establishments={activeEstablishments.map((item) => ({
           id: item.id,
@@ -137,12 +194,22 @@ export default async function NewInvoicePage({
           name: item.name,
           establishmentId: item.establishmentId,
         }))}
+        treasuryAccounts={treasuryAccounts.map((a) => ({
+          id: a.id,
+          name: a.name,
+          type: a.type,
+          bankName: a.bankName,
+          provider: a.provider,
+          balance: a.openingBalance.toString(),
+        }))}
         initialCustomerId={initialCustomerId}
         initialLines={initialLines}
         initialPaymentMethod={initialPaymentMethod}
         initialSriPaymentCode={initialSriPaymentCode}
         aiDraftId={aiDraftId}
         aiProposalId={aiProposalId}
+        draftId={draftIdParam}
+        draftPayload={draftPayload as any}
       />
     </DashboardShell>
   );

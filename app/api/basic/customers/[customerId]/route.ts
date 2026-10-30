@@ -5,6 +5,10 @@ import { updateCustomer } from "@/lib/core/lightweight-pos";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { requireTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
+import {
+  validateTenantMembership,
+  validateRelatedCustomer,
+} from "@/lib/core/people-validation";
 
 type RouteContext = {
   params: Promise<{
@@ -44,6 +48,29 @@ export async function PATCH(request: Request, context: RouteContext) {
     await requireTenantOperationalAccess(tenant.id);
     const { customerId } = await context.params;
     const body = (await request.json()) as Record<string, unknown>;
+
+    const assignedSellerId = getString(body, "assignedSellerId");
+    if (assignedSellerId) {
+      await validateTenantMembership(tenant.id, assignedSellerId, "vendedor");
+    }
+
+    const relatedCustomerId = getString(body, "relatedCustomerId");
+    if (relatedCustomerId) {
+      await validateRelatedCustomer(tenant.id, relatedCustomerId, customerId);
+    }
+
+    const invoiceThirdPartyCustomerId = getString(
+      body,
+      "invoiceThirdPartyCustomerId",
+    );
+    if (invoiceThirdPartyCustomerId) {
+      await validateRelatedCustomer(
+        tenant.id,
+        invoiceThirdPartyCustomerId,
+        customerId,
+      );
+    }
+
     const emails = getEmails(body);
     const identificationType = getString(body, "identificationType");
     const customer = await updateCustomer({
@@ -65,7 +92,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       customerType: getString(body, "customerType"),
       customerOrigin: getString(body, "customerOrigin"),
       groupName: getString(body, "groupName"),
-      assignedSellerId: getString(body, "assignedSellerId"),
+      assignedSellerId,
       isRelated:
         typeof body.isRelated === "boolean" ? body.isRelated : undefined,
       isForeign:
@@ -88,6 +115,9 @@ export async function PATCH(request: Request, context: RouteContext) {
         : undefined,
       notes: getString(body, "notes"),
       isActive: typeof body.isActive === "boolean" ? body.isActive : undefined,
+      gender: getString(body, "gender"),
+      relatedCustomerId,
+      invoiceThirdPartyCustomerId,
     });
 
     return NextResponse.json({ ok: true, customer });

@@ -1,18 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { LoaderCircle, Plus, Search, X } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { LoaderCircle, Plus, Search, X, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EcuadorLocationPicker } from "@/components/appsolux/people/ecuador-location-picker";
+import { TenantUserSelect } from "@/components/appsolux/people/tenant-user-select";
+import { TenantValueCombobox } from "@/components/appsolux/people/tenant-value-combobox";
+import { EntityCombobox } from "@/components/appsolux/people/entity-combobox";
 import {
-  ECUADOR_LOCATIONS,
-  getEcuadorCantons,
-  getEcuadorParishes,
-} from "@/lib/core/ecuador-locations";
-import { applySupplierLookup } from "@/lib/core/lightweight-supplier-utils";
+  getIdentificationMaxLength,
+  getIdentificationInputMode,
+  isForeignIdentificationType,
+} from "@/lib/core/identification-rules";
+import type { LightweightCustomerIdentificationType } from "@prisma/client";
 
 type Supplier = Record<string, string | string[] | boolean | null> & {
   id: string;
@@ -24,37 +28,55 @@ type Supplier = Record<string, string | string[] | boolean | null> & {
 type Lookup = {
   found: boolean;
   message?: string;
+  source?: string;
+  identification?: string;
   legalName?: string;
   tradeName?: string;
-  province?: string;
-  city?: string;
-  parish?: string;
+  address?: string;
   taxpayerStatus?: string;
   taxpayerClass?: string;
   taxpayerType?: string;
+  province?: string;
+  city?: string;
+  parish?: string;
   economicActivity?: string;
   ciiuCode?: string;
   accountingRequired?: boolean;
   specialTaxpayer?: boolean;
   withholdingAgent?: boolean;
-  source?: string;
   sourceUpdatedAt?: string;
   queriedAt?: string;
 };
+type OtherSupplier = { id: string; name: string; identification: string | null };
 
-export function SupplierEditor({ supplier }: { supplier?: Supplier }) {
+const ORIGIN_OPTIONS = [
+  { value: "NATIONAL", label: "Nacional" },
+  { value: "FOREIGN", label: "Extranjero" },
+  { value: "MIXED", label: "Mixto" },
+];
+
+export function SupplierEditor({
+  supplier,
+  tenantSuppliers = [],
+  existingSectors = [],
+  existingZones = [],
+  existingTypes = [],
+}: {
+  supplier?: Supplier;
+  tenantSuppliers?: OtherSupplier[];
+  existingSectors?: string[];
+  existingZones?: string[];
+  existingTypes?: string[];
+}) {
   const router = useRouter();
-  const [type, setType] = useState(
-    String(supplier?.identificationType ?? "RUC"),
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [type, setType] = useState<LightweightCustomerIdentificationType>(
+    (supplier?.identificationType as LightweightCustomerIdentificationType) ?? "RUC",
   );
   const [identification, setIdentification] = useState(
     String(supplier?.identification ?? ""),
   );
-  const [name, setName] = useState(supplier?.name ?? "");
-  const [tradeName, setTradeName] = useState(String(supplier?.tradeName ?? ""));
-  const [province, setProvince] = useState(String(supplier?.province ?? ""));
-  const [city, setCity] = useState(String(supplier?.city ?? ""));
-  const [parish, setParish] = useState(String(supplier?.parish ?? ""));
   const [emails, setEmails] = useState([
     String(supplier?.email ?? ""),
     ...(supplier?.additionalEmails ?? []),
@@ -63,94 +85,129 @@ export function SupplierEditor({ supplier }: { supplier?: Supplier }) {
     String(supplier?.phone ?? "+593"),
     ...(supplier?.phoneNumbers ?? []),
   ]);
-  const [lookup, setLookup] = useState<Lookup | null>(null);
-  const [suggested, setSuggested] = useState<Lookup | null>(null);
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  async function search() {
-    setLoading(true);
-    setMessage("");
-    setSuggested(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupFeedback, setLookupFeedback] = useState("");
+  const [lookupData, setLookupData] = useState<Lookup | null>(null);
+  const [name, setName] = useState(String(supplier?.name ?? ""));
+  const [tradeName, setTradeName] = useState(String(supplier?.tradeName ?? ""));
+  const [address, setAddress] = useState(String(supplier?.address ?? ""));
+  const [province, setProvince] = useState(String(supplier?.province ?? ""));
+  const [city, setCity] = useState(String(supplier?.city ?? ""));
+  const [parish, setParish] = useState(String(supplier?.parish ?? ""));
+  const [country, setCountry] = useState(String(supplier?.country ?? "Ecuador"));
+  const [isForeign, setIsForeign] = useState(Boolean(supplier?.isForeign));
+  const [isRelated, setIsRelated] = useState(Boolean(supplier?.isRelated));
+  const [assignedBuyerId, setAssignedBuyerId] = useState(
+    String(supplier?.assignedBuyerId ?? ""),
+  );
+  const [supplierOrigin, setSupplierOrigin] = useState(
+    String(supplier?.supplierOrigin ?? ""),
+  );
+  const [sector, setSector] = useState(String(supplier?.sector ?? ""));
+  const [zone, setZone] = useState(String(supplier?.zone ?? ""));
+  const [supplierType, setSupplierType] = useState(
+    String(supplier?.supplierType ?? ""),
+  );
+  const [groupName, setGroupName] = useState(
+    String(supplier?.groupName ?? "SIN GRUPO"),
+  );
+  const [relatedSupplierId, setRelatedSupplierId] = useState(
+    String(supplier?.relatedSupplierId ?? ""),
+  );
+
+  useEffect(() => {
+    const foreign = isForeignIdentificationType(type);
+    if (foreign && !isForeign) {
+      setIsForeign(true);
+    }
+    if (!foreign && isForeign && (type === "RUC" || type === "CEDULA")) {
+      setIsForeign(false);
+      setCountry("Ecuador");
+    }
+  }, [type]);
+
+  useEffect(() => {
+    if (!isForeign) {
+      setCountry("Ecuador");
+    }
+  }, [isForeign]);
+
+  async function searchTaxpayer() {
+    setError("");
+    setLookupFeedback("");
+    setLookupLoading(true);
+    setLookupData(null);
     try {
       const response = await fetch(
         `/api/sri/taxpayer-lookup?identification=${encodeURIComponent(identification)}`,
       );
       const data = (await response.json()) as Lookup;
       if (!response.ok || !data.found) {
-        setLookup(null);
-        setMessage(
+        setLookupFeedback(
           data.message ??
-            "No encontramos información tributaria para esta identificación. Puedes completar los datos manualmente.",
+            "No encontramos información tributaria. Puedes completar los datos manualmente.",
         );
         return;
       }
-      setLookup(data);
-      const merged = applySupplierLookup(
-        { name, tradeName, province, city, parish },
-        data,
-      );
-      setName(merged.values.name);
-      setTradeName(merged.values.tradeName);
-      setProvince(merged.values.province);
-      setCity(merged.values.city);
-      setParish(merged.values.parish);
-      if (merged.conflicts) setSuggested(data);
-      setMessage("Datos tributarios encontrados.");
+      setLookupData(data);
+      if (data.legalName) setName(data.legalName);
+      if (data.tradeName) setTradeName(data.tradeName);
+      if (data.address) setAddress(data.address);
+      if (data.province) setProvince(data.province);
+      if (data.city) setCity(data.city);
+      if (data.parish) setParish(data.parish);
+      setLookupFeedback("✓ Datos del SRI cargados");
+      setTimeout(() => setLookupFeedback(""), 4000);
     } finally {
-      setLoading(false);
+      setLookupLoading(false);
     }
   }
-  function useFound() {
-    if (!suggested) return;
-    if (suggested.legalName) setName(suggested.legalName);
-    if (suggested.tradeName) setTradeName(suggested.tradeName);
-    if (suggested.province) setProvince(suggested.province);
-    if (suggested.city) setCity(suggested.city);
-    if (suggested.parish) setParish(suggested.parish);
-    setSuggested(null);
-  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
+    setError("");
     const form = new FormData(event.currentTarget);
-    const value = (key: string) => String(form.get(key) ?? "");
+    const string = (key: string) => String(form.get(key) ?? "");
     const payload = {
-      identificationType: type,
-      identification,
       name,
       tradeName,
+      identificationType: type,
+      identification,
+      address,
+      country: isForeign ? country : "Ecuador",
+      province,
+      city,
+      parish,
+      sector,
+      zone,
+      supplierType,
+      supplierOrigin,
+      groupName,
+      assignedBuyerId,
+      isRelated,
+      isForeign,
+      notes: string("notes"),
+      emails,
       email: emails[0],
       additionalEmails: emails.slice(1),
       phone: phones[0],
       phoneNumbers: phones.slice(1),
-      address: value("address"),
-      country: value("country"),
-      province,
-      city,
-      parish,
-      sector: value("sector"),
-      zone: value("zone"),
-      supplierType: value("supplierType"),
-      supplierOrigin: value("supplierOrigin"),
-      groupName: value("groupName"),
-      assignedBuyerId: value("assignedBuyerId"),
-      isRelated: form.get("isRelated") === "on",
-      isForeign: form.get("isForeign") === "on",
       isActive: form.get("isActive") === "on",
-      taxpayerStatus: lookup?.taxpayerStatus,
-      taxpayerLegalName: lookup?.legalName,
-      taxpayerTradeName: lookup?.tradeName,
-      taxpayerClass: lookup?.taxpayerClass,
-      taxpayerType: lookup?.taxpayerType,
-      economicActivity: lookup?.economicActivity,
-      ciiuCode: lookup?.ciiuCode,
-      accountingRequired: lookup?.accountingRequired,
-      specialTaxpayer: lookup?.specialTaxpayer,
-      withholdingAgent: lookup?.withholdingAgent,
-      taxDataSource: lookup?.source,
-      taxDataSourceUpdatedAt: lookup?.sourceUpdatedAt,
-      taxDataQueriedAt: lookup?.queriedAt,
+      relatedSupplierId: isRelated ? relatedSupplierId : "",
+      taxpayerStatus: lookupData?.taxpayerStatus,
+      taxpayerLegalName: lookupData?.legalName,
+      taxpayerTradeName: lookupData?.tradeName,
+      taxpayerClass: lookupData?.taxpayerClass,
+      taxpayerType: lookupData?.taxpayerType,
+      economicActivity: lookupData?.economicActivity,
+      ciiuCode: lookupData?.ciiuCode,
+      accountingRequired: lookupData?.accountingRequired,
+      specialTaxpayer: lookupData?.specialTaxpayer,
+      withholdingAgent: lookupData?.withholdingAgent,
+      taxDataSource: lookupData?.source,
+      taxDataSourceUpdatedAt: lookupData?.sourceUpdatedAt,
+      taxDataQueriedAt: lookupData?.queriedAt,
     };
     const response = await fetch(
       supplier ? `/api/basic/suppliers/${supplier.id}` : "/api/basic/suppliers",
@@ -165,15 +222,19 @@ export function SupplierEditor({ supplier }: { supplier?: Supplier }) {
       supplier?: { id: string };
     };
     setSaving(false);
-    if (!response.ok) return setMessage(data.message ?? "No se pudo guardar.");
+    if (!response.ok) return setError(data.message ?? "No se pudo guardar.");
     router.push(`/facturacion/suppliers/${supplier?.id ?? data.supplier?.id}`);
     router.refresh();
   }
+
+  const maxLen = getIdentificationMaxLength(type);
+  const inputMode = getIdentificationInputMode(type);
+
   return (
-    <form onSubmit={submit} className="space-y-4 pb-8">
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b bg-white/95 py-3">
+    <form onSubmit={submit} className="pb-8">
+      <header className="sticky top-0 z-20 -mx-4 mb-5 flex items-center justify-between gap-3 border-b border-[#E4E9F0] bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
         <div>
-          <h1 className="text-xl font-semibold">
+          <h1 className="text-xl font-semibold text-[#172033]">
             {supplier ? "Editar proveedor" : "Nuevo proveedor"}
           </h1>
           <p className="text-xs text-[#667085]">
@@ -184,224 +245,274 @@ export function SupplierEditor({ supplier }: { supplier?: Supplier }) {
           <Button asChild variant="outline">
             <Link href="/facturacion/suppliers">Cancelar</Link>
           </Button>
-          <Button disabled={saving} className="bg-[#1E52F1] text-white">
+          <Button
+            disabled={saving}
+            className="bg-[#1E52F1] text-white hover:bg-[#1745CE]"
+          >
             {saving ? "Guardando..." : "Guardar proveedor"}
           </Button>
         </div>
       </header>
-      <Section title="Datos principales">
-        <Field label="Tipo de identificación">
-          <Select
-            value={type}
-            onChange={setType}
-            options={["RUC", "CEDULA", "PASSPORT", "FOREIGN_ID"]}
-          />
-        </Field>
-        <Field label="Identificación">
-          <div className="flex gap-2">
-            <Input
-              value={identification}
-              onChange={(e) => {
-                setIdentification(e.target.value);
-                setLookup(null);
-              }}
-            />
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              title="Consultar datos tributarios"
-              onClick={search}
-              disabled={loading || !["RUC", "CEDULA"].includes(type)}
+
+      <div className="space-y-4">
+        <Section title="Identificación">
+          <Field label="Tipo de identificación">
+            <select
+              value={type}
+              onChange={(e) =>
+                setType(e.target.value as LightweightCustomerIdentificationType)
+              }
+              className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm"
             >
-              {loading ? <LoaderCircle className="animate-spin" /> : <Search />}
-            </Button>
-          </div>
-        </Field>
-        <Field label="Razón social / Nombres completos">
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-        </Field>
-        <Field label="Nombre comercial">
-          <Input
-            value={tradeName}
-            onChange={(e) => setTradeName(e.target.value)}
-          />
-        </Field>
-        <Field label="Dirección">
-          <Input
-            name="address"
-            defaultValue={String(supplier?.address ?? "")}
-          />
-        </Field>
-        {["FOREIGN_ID", "PASSPORT"].includes(type) ? (
-          <Field label="País exterior">
+              <option value="RUC">RUC</option>
+              <option value="CEDULA">Cédula</option>
+              <option value="PASSPORT">Pasaporte</option>
+              <option value="FOREIGN_ID">Identificación exterior</option>
+            </select>
+          </Field>
+          <Field label="Identificación">
+            <div className="flex gap-2">
+              <Input
+                value={identification}
+                onChange={(e) => {
+                  const v =
+                    inputMode === "numeric"
+                      ? e.target.value.replace(/\D/g, "")
+                      : e.target.value;
+                  setIdentification(v);
+                  setLookupData(null);
+                }}
+                maxLength={maxLen}
+                inputMode={inputMode}
+                required
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                title="Consultar datos tributarios"
+                aria-label="Consultar datos tributarios"
+                onClick={searchTaxpayer}
+                disabled={
+                  lookupLoading || (type !== "RUC" && type !== "CEDULA")
+                }
+              >
+                {lookupLoading ? (
+                  <LoaderCircle className="animate-spin" />
+                ) : (
+                  <Search />
+                )}
+              </Button>
+            </div>
+          </Field>
+          <Field label="Razón social / Nombres completos">
             <Input
-              name="country"
-              defaultValue={String(
-                supplier?.country === "Ecuador"
-                  ? ""
-                  : (supplier?.country ?? ""),
-              )}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               required
             />
           </Field>
-        ) : (
-          <input type="hidden" name="country" value="Ecuador" />
-        )}
-      </Section>
-      {message ? (
-        <div className="flex items-center justify-between rounded-lg border bg-white px-3 py-2 text-sm text-[#667085]">
-          <span>{message}</span>
-          {suggested ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={useFound}
-            >
-              Usar datos encontrados
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-      {lookup?.found ? (
-        <section className="rounded-xl border bg-[#F8FAFD] p-4">
-          <h2 className="font-medium">Datos tributarios encontrados</h2>
-          <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-            {[
-              ["Estado", lookup.taxpayerStatus],
-              ["Clase", lookup.taxpayerClass],
-              ["Tipo contribuyente", lookup.taxpayerType],
-              ["Actividad económica", lookup.economicActivity],
-              ["CIIU", lookup.ciiuCode],
-              [
-                "Obligado a llevar contabilidad",
-                yesNo(lookup.accountingRequired),
-              ],
-              ["Contribuyente especial", yesNo(lookup.specialTaxpayer)],
-              ["Agente de retención", yesNo(lookup.withholdingAgent)],
-              ["Fuente", lookup.source],
-              ["Fecha de actualización", lookup.sourceUpdatedAt],
-            ]
-              .filter((item) => item[1] !== undefined)
-              .map(([label, value]) => (
-                <p key={String(label)}>
-                  <span className="text-[#667085]">{label}:</span>{" "}
-                  {String(value)}
-                </p>
-              ))}
-          </div>
-        </section>
-      ) : null}
-      <Section title="Contacto">
-        <ArrayInput
-          label="Correos electrónicos"
-          values={emails}
-          setValues={setEmails}
-          max={5}
-          type="email"
-        />
-        <ArrayInput
-          label="Teléfonos"
-          values={phones}
-          setValues={setPhones}
-          max={3}
-          type="tel"
-        />
-      </Section>
-      <div className="flex gap-6 rounded-xl border bg-white px-4 py-3">
-        <Switch
-          name="isRelated"
-          label="Relacionado"
-          checked={Boolean(supplier?.isRelated)}
-        />
-        <Switch
-          name="isForeign"
-          label="Extranjero"
-          checked={Boolean(supplier?.isForeign)}
-        />
-      </div>
-      <Section title="Datos adicionales">
-        <Field label="Provincia">
-          <select
-            className="h-8 rounded-lg border px-2"
-            value={province}
-            onChange={(e) => {
-              setProvince(e.target.value);
-              setCity("");
-              setParish("");
-            }}
-          >
-            <option value="">Seleccionar</option>
-            {ECUADOR_LOCATIONS.map((item) => (
-              <option key={item.name}>{item.name}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Cantón / Ciudad">
-          <select
-            className="h-8 rounded-lg border px-2"
-            value={city}
-            disabled={!province}
-            onChange={(e) => {
-              setCity(e.target.value);
-              setParish("");
-            }}
-          >
-            <option value="">Seleccionar</option>
-            {getEcuadorCantons(province).map((item) => (
-              <option key={item.name}>{item.name}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Parroquia">
-          <select
-            className="h-8 rounded-lg border px-2"
-            value={parish}
-            disabled={!city}
-            onChange={(e) => setParish(e.target.value)}
-          >
-            <option value="">Seleccionar</option>
-            {getEcuadorParishes(province, city).map((item) => (
-              <option key={item}>{item}</option>
-            ))}
-          </select>
-        </Field>
-        {[
-          ["Sector", "sector"],
-          ["Zona", "zone"],
-          ["Tipo de proveedor", "supplierType"],
-          ["Origen", "supplierOrigin"],
-          ["Grupo", "groupName"],
-          ["Responsable / Comprador asignado", "assignedBuyerId"],
-        ].map(([label, key]) => (
-          <Field key={key} label={label}>
+          <Field label="Nombre comercial">
             <Input
-              name={key}
-              defaultValue={String(
-                supplier?.[key] ?? (key === "groupName" ? "SIN GRUPO" : ""),
-              )}
+              value={tradeName}
+              onChange={(e) => setTradeName(e.target.value)}
             />
           </Field>
-        ))}
-      </Section>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          name="isActive"
-          type="checkbox"
-          defaultChecked={supplier?.isActive ?? true}
-        />
-        Proveedor activo
-      </label>
+        </Section>
+
+        {lookupFeedback && (
+          <div
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${lookupFeedback.startsWith("✓") ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
+          >
+            {lookupFeedback.startsWith("✓") && <Check className="size-4" />}
+            <span>{lookupFeedback}</span>
+          </div>
+        )}
+
+        <Section title="Contacto">
+          <div className="sm:col-span-2">
+            <ArrayFields
+              title="Correos electrónicos"
+              values={emails}
+              setValues={setEmails}
+              max={5}
+              type="email"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <ArrayFields
+              title="Teléfonos"
+              values={phones}
+              setValues={setPhones}
+              max={3}
+              type="tel"
+            />
+          </div>
+        </Section>
+
+        <Section title="Ubicación">
+          <Field label="Dirección" wide>
+            <Input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+          </Field>
+          {isForeign && country !== "Ecuador" ? (
+            <>
+              <Field label="País">
+                <Input
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  required
+                />
+              </Field>
+              <Field label="Ciudad">
+                <Input value={city} onChange={(e) => setCity(e.target.value)} />
+              </Field>
+            </>
+          ) : (
+            <div className="sm:col-span-2">
+              <EcuadorLocationPicker
+                province={province}
+                city={city}
+                parish={parish}
+                onProvinceChange={setProvince}
+                onCityChange={setCity}
+                onParishChange={setParish}
+              />
+            </div>
+          )}
+        </Section>
+
+        <div className="flex flex-wrap gap-x-6 gap-y-3 rounded-xl border border-[#E4E9F0] bg-white px-4 py-3">
+          <Toggle
+            label="Extranjero"
+            checked={isForeign}
+            onChange={(v) => {
+              setIsForeign(v);
+              if (v && type !== "PASSPORT" && type !== "FOREIGN_ID") {
+                setType("PASSPORT");
+              }
+            }}
+          />
+          <Toggle label="Relacionado" checked={isRelated} onChange={setIsRelated} />
+        </div>
+
+        {isRelated && (
+          <Section title="Proveedor relacionado">
+            <Field label="Proveedor vinculado" wide>
+              <EntityCombobox
+                name="relatedSupplierId"
+                value={relatedSupplierId}
+                onChange={setRelatedSupplierId}
+                entities={tenantSuppliers}
+                excludeId={supplier?.id}
+                label="Buscar proveedor..."
+                emptyLabel="Solo marcar como parte relacionada"
+              />
+            </Field>
+          </Section>
+        )}
+
+        <Section title="Datos adicionales">
+          <Field label="Comprador asignado">
+            <TenantUserSelect
+              name="assignedBuyerId"
+              value={assignedBuyerId}
+              onChange={setAssignedBuyerId}
+              label="Comprador"
+              emptyLabel="Sin comprador"
+            />
+          </Field>
+          <Field label="Origen">
+            <select
+              value={supplierOrigin}
+              onChange={(e) => setSupplierOrigin(e.target.value)}
+              className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm"
+            >
+              <option value="">Seleccionar</option>
+              {ORIGIN_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+              {supplierOrigin &&
+                !ORIGIN_OPTIONS.some((o) => o.value === supplierOrigin) && (
+                  <option value={supplierOrigin}>{supplierOrigin}</option>
+                )}
+            </select>
+          </Field>
+          <Field label="Tipo de proveedor">
+            <TenantValueCombobox
+              name="supplierType"
+              value={supplierType}
+              onChange={setSupplierType}
+              existingValues={existingTypes}
+              label="Tipo"
+              emptyLabel="Sin tipo"
+              addLabel="+ Nuevo tipo"
+            />
+          </Field>
+          <Field label="Sector">
+            <TenantValueCombobox
+              name="sector"
+              value={sector}
+              onChange={setSector}
+              existingValues={existingSectors}
+              label="Sector"
+              emptyLabel="Sin sector"
+              addLabel="+ Nuevo sector"
+            />
+          </Field>
+          <Field label="Zona">
+            <TenantValueCombobox
+              name="zone"
+              value={zone}
+              onChange={setZone}
+              existingValues={existingZones}
+              label="Zona"
+              emptyLabel="Sin zona"
+              addLabel="+ Nueva zona"
+            />
+          </Field>
+          <Field label="Grupo">
+            <TenantValueCombobox
+              name="groupName"
+              value={groupName}
+              onChange={setGroupName}
+              existingValues={[]}
+              label="Grupo"
+              emptyLabel="SIN GRUPO"
+              addLabel="+ Nuevo grupo"
+            />
+          </Field>
+          <Field label="Observaciones" wide>
+            <textarea
+              name="notes"
+              defaultValue={String(supplier?.notes ?? "")}
+              className="min-h-24 w-full rounded-lg border border-[#E4E9F0] px-3 py-2 text-sm"
+            />
+          </Field>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              name="isActive"
+              type="checkbox"
+              defaultChecked={supplier?.isActive ?? true}
+            />
+            Proveedor activo
+          </label>
+        </Section>
+
+        {error ? (
+          <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            {error}
+          </p>
+        ) : null}
+      </div>
     </form>
   );
 }
-const yesNo = (value: boolean | undefined) =>
-  value === undefined ? undefined : value ? "Sí" : "No";
+
 function Section({
   title,
   children,
@@ -410,8 +521,10 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border bg-white p-4">
-      <h2 className="mb-4 font-semibold">{title}</h2>
+    <section className="rounded-xl border border-[#E4E9F0] bg-white p-4">
+      <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-[#172033]">
+        {title}
+      </h2>
       <div className="grid gap-4 sm:grid-cols-2">{children}</div>
     </section>
   );
@@ -419,62 +532,53 @@ function Section({
 function Field({
   label,
   children,
+  wide,
 }: {
   label: string;
   children: React.ReactNode;
+  wide?: boolean;
 }) {
   return (
-    <label className="grid gap-1.5 text-sm">
+    <div className={`space-y-1.5 ${wide ? "sm:col-span-2" : ""}`}>
       <Label>{label}</Label>
       {children}
-    </label>
+    </div>
   );
 }
-function Select({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: string[];
-}) {
-  return (
-    <select
-      className="h-8 rounded-lg border px-2"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    >
-      {options.map((item) => (
-        <option key={item}>{item}</option>
-      ))}
-    </select>
-  );
-}
-function Switch({
-  name,
+function Toggle({
   label,
   checked,
+  onChange,
 }: {
-  name: string;
   label: string;
   checked: boolean;
+  onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex items-center gap-2 text-sm">
-      <input name={name} type="checkbox" defaultChecked={checked} />
+    <label className="flex items-center gap-2 text-sm text-[#172033]">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative h-5 w-9 rounded-full transition-colors ${checked ? "bg-[#1E52F1]" : "bg-slate-300"}`}
+      >
+        <span
+          className={`absolute left-0.5 top-0.5 size-4 rounded-full bg-white transition-transform ${checked ? "translate-x-4" : ""}`}
+        />
+      </button>
       {label}
     </label>
   );
 }
-function ArrayInput({
-  label,
+function ArrayFields({
+  title,
   values,
   setValues,
   max,
   type,
 }: {
-  label: string;
+  title: string;
   values: string[];
   setValues: (values: string[]) => void;
   max: number;
@@ -482,8 +586,13 @@ function ArrayInput({
 }) {
   return (
     <div>
-      <div className="mb-2 flex justify-between">
-        <Label>{label}</Label>
+      <div className="mb-2 flex items-center justify-between">
+        <div>
+          <Label>{title}</Label>
+          <p className="text-xs text-[#667085]">
+            El primero es el principal. Máximo {max}.
+          </p>
+        </div>
         <Button
           type="button"
           size="sm"
@@ -497,14 +606,14 @@ function ArrayInput({
       </div>
       <div className="space-y-2">
         {values.map((value, index) => (
-          <div className="flex gap-2" key={index}>
+          <div key={index} className="flex gap-2">
             <Input
               type={type}
               value={value}
               onChange={(e) =>
                 setValues(
-                  values.map((item, i) =>
-                    i === index ? e.target.value : item,
+                  values.map((current, i) =>
+                    i === index ? e.target.value : current,
                   ),
                 )
               }

@@ -44,6 +44,10 @@ export type SriXmlPreviewParams = {
     sriPaymentCode?: string;
     issuedAt: Date | null;
     createdAt: Date;
+    guideNumber?: string | null;
+    invoiceKind?: "NORMAL" | "EXPORT" | "REIMBURSEMENT";
+    exportData?: Record<string, unknown> | null;
+    reimbursementData?: Record<string, unknown> | null;
   };
   lines: Array<{
     itemName: string;
@@ -55,6 +59,13 @@ export type SriXmlPreviewParams = {
     subtotal: string | number;
     taxRate: string | number;
     taxAmount: string | number;
+    taxCategory?: "TAXABLE" | "ZERO" | "NON_OBJECT" | "EXEMPT" | null;
+  }>;
+  payments?: Array<{
+    sriPaymentCode: string;
+    total: string | number;
+    termDays: number;
+    timeUnit: string;
   }>;
 };
 
@@ -132,11 +143,16 @@ function resolveIdentificacion(
   };
 }
 
-function resolveIvaCodigoPorcentaje(taxRate: number): string {
-  if (taxRate === 0) return "0"; // IVA 0%
-  if (taxRate === 5) return "5"; // IVA 5% (bienes específicos)
-  if (taxRate === 12) return "2"; // IVA 12% (tarifa histórica)
-  if (taxRate === 15) return "4"; // IVA 15% (tarifa vigente desde abril 2024)
+function resolveIvaCodigoPorcentaje(
+  taxRate: number,
+  taxCategory?: "TAXABLE" | "ZERO" | "NON_OBJECT" | "EXEMPT" | null,
+): string {
+  if (taxCategory === "NON_OBJECT") return "6";
+  if (taxCategory === "EXEMPT") return "7";
+  if (taxRate === 0) return taxCategory === "ZERO" ? "0" : "0";
+  if (taxRate === 5) return "5";
+  if (taxRate === 12) return "2";
+  if (taxRate === 15) return "4";
   return "2";
 }
 
@@ -150,7 +166,7 @@ function buildLineXml(
     );
   }
   const taxRate = Number(line.taxRate);
-  const codigoPct = resolveIvaCodigoPorcentaje(taxRate);
+  const codigoPct = resolveIvaCodigoPorcentaje(taxRate, line.taxCategory);
   const codigoPrincipal = xmlEscape(line.itemCode.trim());
   const auxLine = line.itemAuxiliaryCode?.trim()
     ? `\n      <codigoAuxiliar>${xmlEscape(line.itemAuxiliaryCode.trim())}</codigoAuxiliar>`
@@ -173,6 +189,27 @@ function buildLineXml(
         </impuesto>
       </impuestos>
     </detalle>`;
+}
+
+function buildPaymentsXml(params: SriXmlPreviewParams): string {
+  if (params.payments && params.payments.length > 0) {
+    return params.payments
+      .map(
+        (p) => `      <pago>
+        <formaPago>${xmlEscape(p.sriPaymentCode)}</formaPago>
+        <total>${dec(p.total)}</total>
+        <plazo>${p.termDays}</plazo>
+        <unidadTiempo>${xmlEscape(p.timeUnit || "dias")}</unidadTiempo>
+      </pago>`,
+      )
+      .join("\n");
+  }
+  return `      <pago>
+        <formaPago>${xmlEscape(params.document.sriPaymentCode || "")}</formaPago>
+        <total>${dec(params.document.grandTotal)}</total>
+        <plazo>0</plazo>
+        <unidadTiempo>dias</unidadTiempo>
+      </pago>`;
 }
 
 export function buildSriDocumentDisplayNumber(
@@ -279,22 +316,22 @@ export function buildUnsignedSriInvoiceXmlPreview(
   );
   const linesXml = params.lines.map((l, i) => buildLineXml(l, i)).join("\n");
 
-  // Agrupar impuestos por tasa para totalConImpuestos
+  // Agrupar impuestos por codigoPorcentaje para totalConImpuestos
   const taxMap = new Map<
-    number,
+    string,
     { codigoPorcentaje: string; baseImponible: number; valor: number }
   >();
   for (const line of params.lines) {
     const rate = Number(line.taxRate);
-    const cp = resolveIvaCodigoPorcentaje(rate);
+    const cp = resolveIvaCodigoPorcentaje(rate, line.taxCategory);
     const base = Number(line.subtotal);
     const tax = Number(line.taxAmount);
-    const existing = taxMap.get(rate);
+    const existing = taxMap.get(cp);
     if (existing) {
       existing.baseImponible += base;
       existing.valor += tax;
     } else {
-      taxMap.set(rate, {
+      taxMap.set(cp, {
         codigoPorcentaje: cp,
         baseImponible: base,
         valor: tax,
@@ -411,13 +448,8 @@ ${taxGroupsXml}
     <importeTotal>${dec(params.document.grandTotal)}</importeTotal>
     <moneda>DOLAR</moneda>
     <pagos>
-      <pago>
-        <formaPago>${xmlEscape(params.document.sriPaymentCode || "")}</formaPago>
-        <total>${dec(params.document.grandTotal)}</total>
-        <plazo>0</plazo>
-        <unidadTiempo>dias</unidadTiempo>
-      </pago>
-    </pagos>
+${buildPaymentsXml(params)}
+    </pagos>${params.document.guideNumber ? `\n    <guiaRemision>${xmlEscape(params.document.guideNumber)}</guiaRemision>` : ""}
   </infoFactura>
   <detalles>
 ${linesXml}

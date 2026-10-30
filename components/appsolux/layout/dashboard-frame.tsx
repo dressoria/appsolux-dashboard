@@ -389,6 +389,13 @@ export function DashboardFrame({
                 </div>
 
                 <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                  <Link
+                    href={routes.billing}
+                    className="hidden items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:border-[#1769E0] hover:text-[#1769E0] sm:inline-flex"
+                  >
+                    <CreditCard className="size-3.5" />
+                    Mi plan
+                  </Link>
                   <div className="hidden rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-500 shadow-sm sm:block">
                     {modeLabel}
                   </div>

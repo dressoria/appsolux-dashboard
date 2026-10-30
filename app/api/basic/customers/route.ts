@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { createCustomer, listCustomers } from "@/lib/core/lightweight-pos";
+import { createCustomer } from "@/lib/core/lightweight-pos";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import {
+  validateTenantMembership,
+  validateRelatedCustomer,
+} from "@/lib/core/people-validation";
 
 function getString(body: Record<string, unknown>, key: string) {
   const value = body[key];
@@ -18,30 +22,7 @@ function getEmails(body: Record<string, unknown>) {
 function getStrings(body: Record<string, unknown>, key: string) {
   return Array.isArray(body[key])
     ? body[key].filter((value): value is string => typeof value === "string")
-    : [];
-}
-
-export async function GET(request: Request) {
-  const user = await getCurrentUser();
-
-  if (!user) {
-    return NextResponse.json(
-      { ok: false, message: "Sesion requerida." },
-      { status: 401 },
-    );
-  }
-
-  const tenant = await getCurrentTenant(user);
-  const { searchParams } = new URL(request.url);
-  const customers = await listCustomers(tenant.id, {
-    search: searchParams.get("q") ?? undefined,
-    status: (searchParams.get("status") || undefined) as
-      "active" | "inactive" | undefined,
-    fiscalStatus: (searchParams.get("fiscalStatus") || undefined) as
-      "ready" | "pending" | undefined,
-  });
-
-  return NextResponse.json({ ok: true, customers });
+    : undefined;
 }
 
 export async function POST(request: Request) {
@@ -57,6 +38,24 @@ export async function POST(request: Request) {
 
     const tenant = await getCurrentTenant(user);
     const body = (await request.json()) as Record<string, unknown>;
+
+    const assignedSellerId = getString(body, "assignedSellerId") || undefined;
+    if (assignedSellerId) {
+      await validateTenantMembership(tenant.id, assignedSellerId, "vendedor");
+    }
+
+    const relatedCustomerId =
+      getString(body, "relatedCustomerId") || undefined;
+    if (relatedCustomerId) {
+      await validateRelatedCustomer(tenant.id, relatedCustomerId);
+    }
+
+    const invoiceThirdPartyCustomerId =
+      getString(body, "invoiceThirdPartyCustomerId") || undefined;
+    if (invoiceThirdPartyCustomerId) {
+      await validateRelatedCustomer(tenant.id, invoiceThirdPartyCustomerId);
+    }
+
     const customer = await createCustomer({
       tenantId: tenant.id,
       name: getString(body, "name"),
@@ -75,7 +74,7 @@ export async function POST(request: Request) {
       customerType: getString(body, "customerType") || undefined,
       customerOrigin: getString(body, "customerOrigin") || undefined,
       groupName: getString(body, "groupName") || undefined,
-      assignedSellerId: getString(body, "assignedSellerId") || undefined,
+      assignedSellerId,
       isRelated: body.isRelated === true,
       isForeign: body.isForeign === true,
       invoiceThirdParty: body.invoiceThirdParty === true,
@@ -93,6 +92,9 @@ export async function POST(request: Request) {
         : undefined,
       notes: getString(body, "notes") || undefined,
       isActive: typeof body.isActive === "boolean" ? body.isActive : undefined,
+      gender: getString(body, "gender") || undefined,
+      relatedCustomerId,
+      invoiceThirdPartyCustomerId,
     });
 
     return NextResponse.json({ ok: true, customer });

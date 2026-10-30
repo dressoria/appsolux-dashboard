@@ -6,13 +6,13 @@ import { startSriFlowFromBasicSale } from "@/lib/core/basic-sales-sri";
 import { createSale, listSales } from "@/lib/core/lightweight-pos";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
+const VALID_PAYMENT_METHODS = new Set([
+  "cash", "check", "deposit", "transfer",
+  "debit_card", "credit_card", "card", "credit",
+]);
+
 function isPaymentMethod(value: unknown): value is LightweightPaymentMethod {
-  return (
-    value === "cash" ||
-    value === "transfer" ||
-    value === "card" ||
-    value === "credit"
-  );
+  return typeof value === "string" && VALID_PAYMENT_METHODS.has(value);
 }
 
 function readItems(value: unknown) {
@@ -96,6 +96,18 @@ export async function POST(request: Request) {
       ? body.outputMode
       : "internal_receipt";
 
+    const payments = Array.isArray(body.payments)
+      ? (body.payments as Array<Record<string, unknown>>).map((p) => ({
+          method: isPaymentMethod(p.method) ? p.method : ("cash" as LightweightPaymentMethod),
+          amount: typeof p.amount === "number" ? p.amount : Number(p.amount ?? 0),
+          treasuryAccountId: typeof p.treasuryAccountId === "string" ? p.treasuryAccountId : undefined,
+          referenceNumber: typeof p.referenceNumber === "string" ? p.referenceNumber : undefined,
+          batchNumber: typeof p.batchNumber === "string" ? p.batchNumber : undefined,
+          voucherNumber: typeof p.voucherNumber === "string" ? p.voucherNumber : undefined,
+          dueDate: typeof p.dueDate === "string" ? p.dueDate : undefined,
+        }))
+      : undefined;
+
     const sale = await createSale({
       tenantId: tenant.id,
       createdByUserId: user.id,
@@ -104,6 +116,14 @@ export async function POST(request: Request) {
         typeof body.customerId === "string" && body.customerId
           ? body.customerId
           : undefined,
+      warehouseId: typeof body.warehouseId === "string" ? body.warehouseId : undefined,
+      invoiceKind: body.invoiceKind === "EXPORT" || body.invoiceKind === "REIMBURSEMENT" ? body.invoiceKind : undefined,
+      dueDate: typeof body.dueDate === "string" ? body.dueDate : undefined,
+      shipmentGuideId: typeof body.shipmentGuideId === "string" ? body.shipmentGuideId : undefined,
+      exportData: body.exportData && typeof body.exportData === "object" ? body.exportData as Record<string, unknown> : undefined,
+      reimbursementData: body.reimbursementData && typeof body.reimbursementData === "object" ? body.reimbursementData as Record<string, unknown> : undefined,
+      establishmentId: typeof body.establishmentId === "string" ? body.establishmentId : undefined,
+      issuePointId: typeof body.issuePointId === "string" ? body.issuePointId : undefined,
       paymentMethod: method,
       paidAmount:
         typeof body.paidAmount === "number"
@@ -114,6 +134,7 @@ export async function POST(request: Request) {
           ? body.sriPaymentCode
           : undefined,
       notes: typeof body.notes === "string" ? body.notes : undefined,
+      payments,
       items: readItems(body.items),
     });
 

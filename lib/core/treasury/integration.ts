@@ -56,31 +56,39 @@ export async function prepareTreasuryIntegration(
     activatedAt: activation.createdAt,
   };
 }
+function methodToAccountType(method: string): "CASH" | "BANK" | "CARD" | null {
+  switch (method) {
+    case "cash": return "CASH";
+    case "check": return "CASH";
+    case "deposit": return "BANK";
+    case "transfer": return "BANK";
+    case "debit_card": return "BANK";
+    case "credit_card": return "CARD";
+    case "card": return "CARD";
+    default: return null;
+  }
+}
+
 async function paymentAccount(
   tx: Tx,
   context: IntegrationContext,
   method: string,
+  perPaymentAccountId?: string | null,
 ) {
-  const type =
-    method === "cash"
-      ? "CASH"
-      : method === "transfer"
-        ? "BANK"
-        : method === "card"
-          ? "CARD"
-          : null;
+  const type = methodToAccountType(method);
   if (!type) return null;
+  const explicitId = perPaymentAccountId || context.accountId;
   const account = await tx.treasuryAccount.findFirst({
     where: {
       tenantId: context.actor.tenantId,
       active: true,
       type,
-      ...(context.accountId
-        ? { id: context.accountId }
+      ...(explicitId
+        ? { id: explicitId }
         : { defaultAccount: true }),
     },
   });
-  if (context.accountId && !account)
+  if (explicitId && !account)
     throw new TreasuryError("Cuenta incompatible con el método de pago.");
   return account;
 }
@@ -113,7 +121,7 @@ export async function allocatePayment(
       include: { sale: { include: { treasuryObligation: true } } },
     });
     if (!payment) throw new TreasuryError("Pago nuevo de venta no disponible.");
-    const account = await paymentAccount(tx, context, payment.method);
+    const account = await paymentAccount(tx, context, payment.method, payment.treasuryAccountId);
     if (!account) return null;
     const date = at ?? payment.createdAt;
     if (account.type === "CARD")
@@ -190,7 +198,7 @@ export async function integrateSale(
   const paid = sale.payments.reduce((sum, p) => sum.plus(p.amount), dec(0)),
     balance = sale.total.minus(paid);
   if (sale.customerId && (balance.gt(0) || sale.treasuryObligation)) {
-    const dueDate = sale.treasuryObligation?.dueDate ?? sale.createdAt;
+    const dueDate = sale.treasuryObligation?.dueDate ?? sale.dueDate ?? sale.createdAt;
     const data = {
       paidAmount: paid,
       ...obligationState(sale.total, paid, dueDate),

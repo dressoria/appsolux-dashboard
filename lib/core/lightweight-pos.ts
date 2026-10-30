@@ -92,6 +92,9 @@ type CreateCustomerInput = {
   taxDataQueriedAt?: Date | null;
   notes?: string;
   isActive?: boolean;
+  gender?: string;
+  relatedCustomerId?: string;
+  invoiceThirdPartyCustomerId?: string;
 };
 
 type UpdateCustomerInput = Partial<Omit<CreateCustomerInput, "tenantId">> & {
@@ -99,15 +102,34 @@ type UpdateCustomerInput = Partial<Omit<CreateCustomerInput, "tenantId">> & {
   customerId: string;
 };
 
+export type SalePaymentInput = {
+  method: LightweightPaymentMethod;
+  amount: number;
+  treasuryAccountId?: string;
+  referenceNumber?: string;
+  batchNumber?: string;
+  voucherNumber?: string;
+  dueDate?: string;
+};
+
 export type CreateSaleInput = {
   tenantId: string;
   createdByUserId?: string;
   treasuryAccountId?: string;
   customerId?: string;
+  warehouseId?: string;
+  invoiceKind?: "NORMAL" | "EXPORT" | "REIMBURSEMENT";
+  dueDate?: string;
+  shipmentGuideId?: string;
+  exportData?: Record<string, unknown>;
+  reimbursementData?: Record<string, unknown>;
+  establishmentId?: string;
+  issuePointId?: string;
   paymentMethod: LightweightPaymentMethod;
   paidAmount?: number;
   sriPaymentCode?: string;
   notes?: string;
+  payments?: SalePaymentInput[];
   items: Array<{
     productId: string;
     quantity: number;
@@ -731,6 +753,9 @@ export async function createCustomer(input: CreateCustomerInput) {
       taxDataQueriedAt: input.taxDataQueriedAt ?? undefined,
       notes: input.notes?.trim() || undefined,
       isActive: input.isActive ?? true,
+      gender: input.gender?.trim() || undefined,
+      relatedCustomerId: input.relatedCustomerId || undefined,
+      invoiceThirdPartyCustomerId: input.invoiceThirdPartyCustomerId || undefined,
     },
   });
 }
@@ -758,7 +783,7 @@ export async function updateCustomer(input: UpdateCustomerInput) {
     throw new Error("Cliente no encontrado.");
   }
 
-  const data: Prisma.LightweightCustomerUpdateInput = {};
+  const data: Prisma.LightweightCustomerUncheckedUpdateInput = {};
 
   if (
     input.identificationType !== undefined ||
@@ -838,6 +863,12 @@ export async function updateCustomer(input: UpdateCustomerInput) {
     data.invoiceThirdParty = input.invoiceThirdParty;
   if (input.notes !== undefined) data.notes = input.notes.trim() || null;
   if (input.isActive !== undefined) data.isActive = input.isActive;
+  if (input.gender !== undefined) data.gender = input.gender?.trim() || null;
+  if (input.relatedCustomerId !== undefined)
+    data.relatedCustomerId = input.relatedCustomerId || null;
+  if (input.invoiceThirdPartyCustomerId !== undefined)
+    data.invoiceThirdPartyCustomerId =
+      input.invoiceThirdPartyCustomerId || null;
 
   return prisma.lightweightCustomer.update({
     where: { id: input.customerId },
@@ -981,6 +1012,17 @@ export async function createSale(input: CreateSaleInput) {
 
   const treasury = await prepareTreasuryIntegration(input.tenantId, input.createdByUserId, input.treasuryAccountId);
 
+  // Resolve warehouse: explicit > default from settings > isDefault > first active
+  let resolvedWarehouseId: string | null = null;
+  if (input.warehouseId) {
+    const wh = await prisma.inventoryWarehouse.findFirst({
+      where: { id: input.warehouseId, tenantId: input.tenantId, active: true },
+      select: { id: true },
+    });
+    if (!wh) throw new Error("Almacén no encontrado o no pertenece a este tenant.");
+    resolvedWarehouseId = wh.id;
+  }
+
   return prisma.$transaction(async (tx) => {
     const productIds = [...new Set(input.items.map((item) => item.productId))];
     const products = await tx.lightweightProduct.findMany({
@@ -1010,6 +1052,45 @@ export async function createSale(input: CreateSaleInput) {
 
       if (!customer) {
         throw new Error("El cliente no pertenece a este tenant.");
+      }
+    }
+
+    // Validate warehouse stock if specific warehouse
+    if (resolvedWarehouseId) {
+      for (const item of input.items) {
+        const product = productById.get(item.productId);
+        if (!product || !product.trackInventory) continue;
+        if (product.type === "COMBO") {
+          for (const ci of product.comboItems) {
+            if (!ci.componentProduct.trackInventory) continue;
+            const required = Number(ci.quantity) * item.quantity;
+            const bal = await tx.inventoryStockBalance.findUnique({
+              where: {
+                tenantId_warehouseId_productId: {
+                  tenantId: input.tenantId,
+                  warehouseId: resolvedWarehouseId,
+                  productId: ci.componentProductId,
+                },
+              },
+            });
+            if (!bal || Number(bal.quantity) < required) {
+              throw new Error(`Stock insuficiente para ${ci.componentProduct.name} en el almacén seleccionado.`);
+            }
+          }
+        } else {
+          const bal = await tx.inventoryStockBalance.findUnique({
+            where: {
+              tenantId_warehouseId_productId: {
+                tenantId: input.tenantId,
+                warehouseId: resolvedWarehouseId,
+                productId: item.productId,
+              },
+            },
+          });
+          if (!bal || Number(bal.quantity) < item.quantity) {
+            throw new Error(`Stock insuficiente para ${product.name} en el almacén seleccionado.`);
+          }
+        }
       }
     }
 
@@ -1070,21 +1151,60 @@ export async function createSale(input: CreateSaleInput) {
         taxRate,
         taxAmount: calc.taxAmount,
         total: calc.lineTotal,
+        unitCost: product.cost,
+        taxCategory: product.taxCategory ?? null,
       };
     });
 
     const total = subtotal.add(taxTotal);
 
-    const requestedPaidAmount =
-      input.paymentMethod === "credit"
-        ? 0
-        : (input.paidAmount ?? Number(total));
-    assertPositiveMoney(requestedPaidAmount, "El pago");
+    // Resolve payments: new multi-payment array or legacy single payment
+    const resolvedPayments: Array<{
+      method: LightweightPaymentMethod;
+      amount: Prisma.Decimal;
+      treasuryAccountId?: string;
+      referenceNumber?: string;
+      batchNumber?: string;
+      voucherNumber?: string;
+      dueDate?: Date;
+    }> = [];
 
-    const paidAmount = Prisma.Decimal.min(
-      new Prisma.Decimal(requestedPaidAmount),
-      total,
-    );
+    if (input.payments && input.payments.length > 0) {
+      let paymentSum = new Prisma.Decimal(0);
+      for (const p of input.payments) {
+        const amt = new Prisma.Decimal(Math.max(0, p.amount));
+        paymentSum = paymentSum.add(amt);
+        resolvedPayments.push({
+          method: p.method,
+          amount: amt,
+          treasuryAccountId: p.treasuryAccountId,
+          referenceNumber: p.referenceNumber,
+          batchNumber: p.batchNumber,
+          voucherNumber: p.voucherNumber,
+          dueDate: p.dueDate ? new Date(p.dueDate) : undefined,
+        });
+      }
+      if (paymentSum.greaterThan(total.add(new Prisma.Decimal("0.01")))) {
+        throw new Error("El total de pagos supera el total de la factura.");
+      }
+    } else {
+      const requestedPaidAmount =
+        input.paymentMethod === "credit"
+          ? 0
+          : (input.paidAmount ?? Number(total));
+      assertPositiveMoney(requestedPaidAmount, "El pago");
+      const paidAmt = Prisma.Decimal.min(new Prisma.Decimal(requestedPaidAmount), total);
+      resolvedPayments.push({
+        method: input.paymentMethod,
+        amount: paidAmt,
+        treasuryAccountId: input.treasuryAccountId,
+      });
+    }
+
+    const paidAmount = resolvedPayments
+      .filter((p) => p.method !== "credit")
+      .reduce((s, p) => s.add(p.amount), new Prisma.Decimal(0));
+
     const paymentStatus = resolvePaymentStatus(total, paidAmount);
     const status = resolveSaleStatus(paymentStatus);
     const balanceImpact = total.sub(paidAmount);
@@ -1093,10 +1213,22 @@ export async function createSale(input: CreateSaleInput) {
       throw new Error("Las ventas fiadas requieren un cliente.");
     }
 
+    const creditPayment = resolvedPayments.find((p) => p.method === "credit");
+    const saleDueDate = creditPayment?.dueDate
+      ?? (input.dueDate ? new Date(input.dueDate) : null);
+
     const sale = await tx.lightweightSale.create({
       data: {
         tenantId: input.tenantId,
         customerId: input.customerId,
+        warehouseId: resolvedWarehouseId,
+        invoiceKind: input.invoiceKind ?? "NORMAL",
+        dueDate: saleDueDate,
+        shipmentGuideId: input.shipmentGuideId,
+        exportData: input.exportData ? (input.exportData as Prisma.InputJsonValue) : undefined,
+        reimbursementData: input.reimbursementData ? (input.reimbursementData as Prisma.InputJsonValue) : undefined,
+        establishmentId: input.establishmentId,
+        issuePointId: input.issuePointId,
         status,
         subtotal,
         taxTotal,
@@ -1115,13 +1247,20 @@ export async function createSale(input: CreateSaleInput) {
             taxAmount: item.taxAmount,
             total: item.total,
             description: item.description,
+            unitCost: item.unitCost,
+            taxCategory: item.taxCategory,
           })),
         },
         payments: {
-          create: {
-            method: input.paymentMethod,
-            amount: paidAmount,
-          },
+          create: resolvedPayments.map((p) => ({
+            method: p.method,
+            amount: p.amount,
+            treasuryAccountId: p.treasuryAccountId,
+            referenceNumber: p.referenceNumber,
+            batchNumber: p.batchNumber,
+            voucherNumber: p.voucherNumber,
+            dueDate: p.dueDate,
+          })),
         },
       },
       include: {
@@ -1185,16 +1324,17 @@ export async function createSale(input: CreateSaleInput) {
     }
 
     try {
-      const defaultWarehouse = await tx.inventoryWarehouse.findFirst({
-        where: { tenantId: input.tenantId, isDefault: true },
-      });
-      if (defaultWarehouse) {
+      const warehouseId = resolvedWarehouseId
+        ?? (await tx.inventoryWarehouse.findFirst({
+            where: { tenantId: input.tenantId, isDefault: true },
+          }))?.id;
+      if (warehouseId) {
         for (const [productId, quantity] of inventoryDemand) {
           await tx.inventoryMovement.create({
             data: {
               tenantId: input.tenantId,
               productId,
-              warehouseId: defaultWarehouse.id,
+              warehouseId,
               direction: "OUT",
               movementType: "SALE",
               quantity: new Prisma.Decimal(quantity),
@@ -1208,14 +1348,14 @@ export async function createSale(input: CreateSaleInput) {
             where: {
               tenantId_warehouseId_productId: {
                 tenantId: input.tenantId,
-                warehouseId: defaultWarehouse.id,
+                warehouseId,
                 productId,
               },
             },
             create: {
               tenantId: input.tenantId,
               productId,
-              warehouseId: defaultWarehouse.id,
+              warehouseId,
               quantity: new Prisma.Decimal(-quantity),
             },
             update: {
@@ -1239,7 +1379,27 @@ export async function createSale(input: CreateSaleInput) {
       });
     }
 
-    if (treasury) await integrateSale(tx, treasury, sale.id, sale.payments.map((payment) => payment.id));
+    // Link shipment guide
+    if (input.shipmentGuideId) {
+      try {
+        await tx.shipmentGuide.updateMany({
+          where: {
+            id: input.shipmentGuideId,
+            tenantId: input.tenantId,
+            saleId: null,
+          },
+          data: { saleId: sale.id },
+        });
+      } catch {
+        // guide table may not exist
+      }
+    }
+
+    const salePayments = await tx.lightweightPayment.findMany({
+      where: { saleId: sale.id },
+      select: { id: true },
+    });
+    if (treasury) await integrateSale(tx, treasury, sale.id, salePayments.map((p) => p.id));
     return sale;
   });
 }
