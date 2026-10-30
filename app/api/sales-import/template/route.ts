@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { generateSalesImportTemplate } from "@/lib/core/sales-import";
+import { generateImportTemplate } from "@/lib/core/sales-import-template";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -9,14 +9,13 @@ export async function GET() {
     return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
   }
 
-  const csv = generateSalesImportTemplate();
+  const buffer = await generateImportTemplate();
 
-  return new Response(csv, {
+  return new Response(new Uint8Array(buffer), {
     status: 200,
     headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition":
-        'attachment; filename="plantilla-importar-ventas.csv"',
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": 'attachment; filename="facturom-importar-ventas.xlsx"',
     },
   });
 }

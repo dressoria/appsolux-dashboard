@@ -25,6 +25,7 @@ export const allTenantFeatureKeys = [
   "beta_access",
   "ai_invoicing",
   "purchase_sri_sync",
+  "sales_auto_sync",
 ] as const satisfies readonly FeatureKey[];
 
 function buildFeatureMap(enabledKeys: readonly FeatureKey[]): TenantFeatureMap {
@@ -88,6 +89,7 @@ export function getDefaultFeaturesForPlan(plan: CommercialPlan): TenantFeatureMa
         "kardex",
         "advanced_reports",
         "shared_erp",
+        "sales_auto_sync",
       ]);
     case "ENTERPRISE":
       return buildFeatureMap([
@@ -107,6 +109,7 @@ export function getDefaultFeaturesForPlan(plan: CommercialPlan): TenantFeatureMa
         "dedicated_erp",
         "erp_provisioning",
         "beta_access",
+        "sales_auto_sync",
       ]);
     case "BASIC":
     default:

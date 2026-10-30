@@ -40,7 +40,8 @@ type FeatureKey =
   | "admin_access"
   | "beta_access"
   | "ai_invoicing"
-  | "purchase_sri_sync";
+  | "purchase_sri_sync"
+  | "sales_auto_sync";
 type OverrideState = "default" | "enabled" | "disabled";
 
 type TenantBillingRow = {

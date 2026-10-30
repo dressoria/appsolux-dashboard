@@ -1750,14 +1750,16 @@ export function BasicPosClient({
                       establishmentId: establishmentId || null,
                       issuePointId: issuePointId || null,
                       paymentMethod,
-                      items: cart.map((ci) => {
+                      lines: cart.map((ci) => {
                         const p = productById.get(ci.productId);
+                        const unitPrice = p ? toNumber(p.price) : 0;
+                        const gross = unitPrice * ci.quantity;
+                        const discountPct = gross > 0 ? (ci.discountAmount / gross) * 100 : 0;
                         return {
                           productId: ci.productId,
                           quantity: ci.quantity,
-                          price: p ? toNumber(p.price) : 0,
-                          discountAmount: ci.discountAmount,
-                          taxRate: p ? toNumber(p.taxRate) : 0,
+                          unitPrice,
+                          discountPct: Math.round(discountPct * 100) / 100,
                           description: lineNotes[ci.productId] ?? "",
                         };
                       }),
@@ -1768,8 +1770,8 @@ export function BasicPosClient({
                       body: JSON.stringify({ payload: draftPayload }),
                     });
                     const data = await res.json();
-                    if (data.id) {
-                      router.push(`${routes.facturacionSalesNew}?draftId=${data.id}`);
+                    if (data.draft?.id) {
+                      router.push(`${routes.facturacionSalesNew}?draftId=${data.draft.id}`);
                     }
                   } catch {
                     setError("No se pudo crear el borrador.");

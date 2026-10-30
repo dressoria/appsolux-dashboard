@@ -165,6 +165,8 @@ export default async function NewInvoicePage({
           taxRate: item.taxRate.toString(),
           taxCategory: item.taxCategory ?? null,
           cost: item.cost?.toString() ?? null,
+          trackInventory: item.trackInventory,
+          type: item.type,
         }))}
         warehouses={warehouses.map((w) => ({
           id: w.id,

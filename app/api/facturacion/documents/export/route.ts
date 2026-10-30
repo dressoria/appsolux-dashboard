@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 
 import { loadCoreDocuments } from "@/lib/core/billing/billing-documents";
+import { generatePdfTable } from "@/lib/core/pdf-table";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { getPrismaClient } from "@/lib/db/prisma";
 
@@ -45,74 +46,36 @@ export async function GET(request: NextRequest) {
   };
 
   if (format === "pdf") {
-    const PDFDocument = (await import("pdfkit")).default;
-    const doc = new PDFDocument({ layout: "landscape", size: "A4", margin: 40 });
-    const chunks: Buffer[] = [];
-    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+    const totalAmount = items.reduce((s, i) => s + Number(i.total ?? 0), 0);
+    const pdfBytes = await generatePdfTable({
+      title: "REPORTE DE DOCUMENTOS",
+      subtitle: `${profile?.legalName ?? tenant.name} · RUC: ${profile?.ruc ?? "—"} · Generado: ${now.toLocaleDateString("es-EC")} · Rango: ${from ?? "inicio"} a ${to ?? "actual"} · Documentos: ${items.length} · Total: $${totalAmount.toFixed(2)}`,
+      landscape: true,
+      columns: [
+        { header: "Fecha", key: "fecha", width: 70 },
+        { header: "Tipo", key: "tipo", width: 60 },
+        { header: "Número", key: "numero", width: 110 },
+        { header: "Cliente", key: "cliente", width: 150 },
+        { header: "Identificación", key: "identificacion", width: 90 },
+        { header: "Total", key: "total", width: 70, align: "right" },
+        { header: "Estado", key: "estado", width: 70 },
+        { header: "SRI", key: "sri", width: 70 },
+        { header: "Autorización", key: "autorizacion", width: 90 },
+      ],
+      rows: items.map((item) => ({
+        fecha: dateLabel(item.issuedAt),
+        tipo: item.sriDocumentId ? "Factura" : "Recibo",
+        numero: item.displayNumber ?? "—",
+        cliente: (item.customerName ?? "Consumidor Final").substring(0, 30),
+        identificacion: item.customerIdentification ?? "—",
+        total: item.total ? `$${Number(item.total).toFixed(2)}` : "—",
+        estado: item.internalStatusLabel ?? "—",
+        sri: item.sriStatusLabel ?? "—",
+        autorizacion: item.authorizationNumber ? item.authorizationNumber.substring(0, 20) + "..." : "—",
+      })),
+    });
 
-    const blue = "#1E52F1";
-    doc.rect(0, 0, doc.page.width, 60).fill(blue);
-    doc.fillColor("#ffffff").fontSize(16).text("REPORTE DE DOCUMENTOS", 40, 18, { align: "left" });
-    doc.fontSize(9).text(`${profile?.legalName ?? tenant.name} · RUC: ${profile?.ruc ?? "—"}`, 40, 38, { align: "left" });
-    doc.text(`Generado: ${now.toLocaleDateString("es-EC")} · Rango: ${from ?? "inicio"} a ${to ?? "actual"}`, 40, 38, { align: "right" });
-
-    doc.fillColor("#000000");
-    let y = 75;
-    const cols = [40, 110, 170, 290, 400, 475, 545, 625, 700];
-    const headers = ["Fecha", "Tipo", "Número", "Cliente", "Identificación", "Total", "Estado", "SRI", "Autorización"];
-
-    function drawHeaders() {
-      doc.rect(40, y - 5, doc.page.width - 80, 18).fill("#E8EDFF");
-      doc.fillColor("#333333").fontSize(7).font("Helvetica-Bold");
-      headers.forEach((h, i) => doc.text(h, cols[i], y, { width: (cols[i + 1] ?? doc.page.width - 40) - cols[i], lineBreak: false }));
-      doc.font("Helvetica");
-      y += 20;
-    }
-
-    drawHeaders();
-
-    let totalAmount = 0;
-    for (let idx = 0; idx < items.length; idx++) {
-      const item = items[idx];
-      if (y > doc.page.height - 60) {
-        doc.addPage({ layout: "landscape", size: "A4", margin: 40 });
-        y = 40;
-        drawHeaders();
-      }
-      if (idx % 2 === 1) doc.rect(40, y - 3, doc.page.width - 80, 15).fill("#F9FAFB");
-      doc.fillColor("#333333").fontSize(7);
-      const row = [
-        dateLabel(item.issuedAt),
-        item.sriDocumentId ? "Factura" : "Recibo",
-        item.displayNumber ?? "—",
-        (item.customerName ?? "Consumidor Final").substring(0, 30),
-        item.customerIdentification ?? "—",
-        item.total ? `$${Number(item.total).toFixed(2)}` : "—",
-        item.internalStatusLabel ?? "—",
-        item.sriStatusLabel ?? "—",
-        item.authorizationNumber ? item.authorizationNumber.substring(0, 20) + "..." : "—",
-      ];
-      row.forEach((val, i) => doc.text(val, cols[i], y, { width: (cols[i + 1] ?? doc.page.width - 40) - cols[i], lineBreak: false }));
-      totalAmount += Number(item.total ?? 0);
-      y += 15;
-    }
-
-    y += 10;
-    doc.fontSize(9).font("Helvetica-Bold");
-    doc.text(`Documentos: ${items.length}   Total: $${totalAmount.toFixed(2)}`, 40, y);
-
-    const pageCount = doc.bufferedPageRange();
-    for (let i = 0; i < pageCount.count; i++) {
-      doc.switchToPage(i);
-      doc.fontSize(7).font("Helvetica").fillColor("#999999")
-        .text(`Página ${i + 1} de ${pageCount.count}`, 40, doc.page.height - 30, { align: "right", width: doc.page.width - 80 });
-    }
-
-    doc.end();
-    await new Promise<void>((resolve) => doc.on("end", resolve));
-    const pdfBuffer = Buffer.concat(chunks);
-
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="documentos_${from ?? "all"}_${to ?? "all"}.pdf"`,

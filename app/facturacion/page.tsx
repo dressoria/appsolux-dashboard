@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   Sparkles,
+  Star,
   TrendingUp,
   Users,
   Wallet,
@@ -22,6 +23,7 @@ import {
 } from "lucide-react";
 import { SalesPeriodChart } from "@/components/appsolux/facturacion/sales-period-chart";
 import { HomeShortcutsEditor } from "@/components/appsolux/facturacion/home-shortcuts-editor";
+import { HomeTabs } from "@/components/appsolux/facturacion/home-tabs";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -148,44 +150,6 @@ const iconMap: Record<string, LucideIcon> = {
   Settings2,
 };
 
-function MetricCard({
-  title,
-  value,
-  helper,
-  icon: Icon,
-  tone = "blue",
-}: {
-  title: string;
-  value: string;
-  helper: string;
-  icon: LucideIcon;
-  tone?: "blue" | "orange";
-}) {
-  return (
-    <Card className="overflow-hidden rounded-xl border border-[#E4E9F0] bg-white shadow-sm ring-0">
-      <div
-        className={`h-1 ${tone === "orange" ? "bg-gradient-to-r from-amber-400 to-amber-300" : "bg-gradient-to-r from-[#1769E0] to-[#1E52F1]"}`}
-      />
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-medium text-[#667085]">{title}</p>
-          <span
-            className={`flex size-10 items-center justify-center rounded-xl ${tone === "orange" ? "bg-amber-50 text-amber-600" : "bg-[#EEF5FF] text-[#1769E0]"}`}
-          >
-            <Icon className="size-5" />
-          </span>
-        </div>
-        <p
-          className={`mt-3 text-2xl font-bold tracking-tight ${tone === "orange" ? "text-amber-700" : "text-[#1769E0]"}`}
-        >
-          {value}
-        </p>
-        <p className="mt-1 text-xs text-[#667085]">{helper}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
 function FinancialCard({
   title,
   amount,
@@ -258,6 +222,255 @@ export default async function FacturacionPage() {
   const salesChange = formatPercentChange(financial.salesMonth, financial.salesPrevMonth);
   const purchasesChange = formatPercentChange(financial.purchasesMonth, financial.purchasesPrevMonth);
 
+  /* ── Shortcuts tab ────────────────────────────────────────────────── */
+  const shortcutsContent = (
+    <div className="space-y-6">
+      <section aria-labelledby="quick-actions-title">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2
+              id="quick-actions-title"
+              className="text-lg font-semibold text-[#172033]"
+            >
+              Acciones rápidas
+            </h2>
+            <p className="mt-1 text-sm text-[#667085]">
+              Lo que necesitas para seguir con tu día.
+            </p>
+          </div>
+          <HomeShortcutsEditor
+            initialKeys={shortcutKeys}
+            catalog={catalog}
+          />
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {shortcuts.map(({ key, title, description, icon, href, tone }) => {
+            const Icon = iconMap[icon] || FileCheck2;
+            return (
+              <Link
+                key={key}
+                href={href}
+                className={`group flex min-h-[140px] min-w-0 flex-col items-start rounded-2xl border border-[#E4E9F0] p-5 shadow-sm transition duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1769E0] ${
+                  tone === "orange"
+                    ? "bg-amber-50/20 hover:border-amber-300 hover:bg-amber-50/50 hover:shadow-md hover:shadow-amber-100/60"
+                    : "bg-blue-50/20 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-md hover:shadow-blue-100/60"
+                }`}
+              >
+                <span
+                  className={`mb-4 flex size-11 shrink-0 items-center justify-center rounded-2xl ${tone === "orange" ? "bg-amber-50 text-amber-600" : "bg-blue-50 text-[#1769E0]"}`}
+                >
+                  <Icon className="size-5" aria-hidden="true" />
+                </span>
+                <span className="text-sm font-semibold text-[#172033]">
+                  {title}
+                </span>
+                <span className="mt-1 text-xs leading-5 text-[#667085]">
+                  {description}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+
+  /* ── Summary tab ──────────────────────────────────────────────────── */
+  const summaryContent = (
+    <>
+      {/* Welcome banner */}
+      <div className="overflow-hidden rounded-xl bg-gradient-to-r from-[#0D3B8F] via-[#1E52F1] to-[#1E52F1] p-5 text-white shadow-sm sm:p-6">
+        <div className="flex items-start gap-3">
+          <Star className="mt-0.5 size-5 shrink-0 text-amber-300" />
+          <div>
+            <h2 className="text-lg font-semibold">
+              Bienvenido a Facturom{name ? `, ${name}` : ""} 👋
+            </h2>
+            <p className="mt-1 text-sm text-blue-100">
+              Tu aliado para facturar, controlar y hacer crecer tu negocio.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* KPIs — compact single card */}
+      <Card className="overflow-hidden rounded-xl border border-[#E4E9F0] shadow-sm ring-0">
+        <CardContent className="p-4 sm:p-5">
+          <h3 className="mb-3 text-sm font-semibold text-[#172033]">Resumen rápido</h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiMetric
+              label="Ventas del día"
+              value={formatMoney(reports.salesToday)}
+              icon={CircleDollarSign}
+              tone="blue"
+            />
+            <KpiMetric
+              label="Facturado este mes"
+              value={formatMoney(reports.salesMonth)}
+              icon={ShoppingCart}
+              tone="amber"
+            />
+            <KpiMetric
+              label="Documentos este mes"
+              value={String(dashboard.documentCounts.thisMonth)}
+              icon={FileCheck2}
+              tone="blue"
+            />
+            <KpiMetric
+              label="Pendientes SRI"
+              value={String(dashboard.documentCounts.pending)}
+              icon={AlertTriangle}
+              tone="amber"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Comprobantes chips */}
+      <section className="flex flex-wrap items-center gap-2">
+        <Link
+          href={routes.facturacionDocuments}
+          className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+        >
+          <span className="size-2 rounded-full bg-emerald-500" />
+          Autorizados: {dashboard.documentCounts.authorized}
+        </Link>
+        <Link
+          href={routes.facturacionDocuments}
+          className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100"
+        >
+          <span className="size-2 rounded-full bg-amber-500" />
+          Pendientes: {dashboard.documentCounts.pending}
+        </Link>
+        <Link
+          href={routes.facturacionDocuments}
+          className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50/60 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100"
+        >
+          <span className="size-2 rounded-full bg-red-500" />
+          Rechazados: {dashboard.documentCounts.rejected}
+        </Link>
+        <Link
+          href={routes.facturacionDocuments}
+          className="ml-auto text-xs font-medium text-[#1769E0] hover:underline"
+        >
+          Ver documentos →
+        </Link>
+      </section>
+
+      {/* Financial summary */}
+      <section>
+        <h2 className="mb-3 text-lg font-semibold text-[#172033]">
+          Resumen financiero
+        </h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <FinancialCard
+            title="Ventas mensuales"
+            amount={formatMoney(financial.salesMonth)}
+            subtitle="Mes actual"
+            change={salesChange}
+            icon={TrendingUp}
+            tone="emerald"
+          />
+          <FinancialCard
+            title="Compras mensuales"
+            amount={formatMoney(financial.purchasesMonth)}
+            subtitle="Mes actual"
+            change={purchasesChange}
+            icon={ShoppingCart}
+            tone="orange"
+          />
+          <FinancialCard
+            title="Cuentas por cobrar"
+            amount={formatMoney(financial.receivables)}
+            subtitle={
+              financial.receivablesCount > 0
+                ? `${financial.receivablesCount} obligación${financial.receivablesCount > 1 ? "es" : ""} pendiente${financial.receivablesCount > 1 ? "s" : ""}`
+                : "Saldo pendiente"
+            }
+            icon={BadgeDollarSign}
+            tone="blue"
+          />
+          <FinancialCard
+            title="Cuentas por pagar"
+            amount={formatMoney(financial.payables)}
+            subtitle={
+              financial.payablesCount > 0
+                ? `${financial.payablesCount} obligación${financial.payablesCount > 1 ? "es" : ""} pendiente${financial.payablesCount > 1 ? "s" : ""}`
+                : "Saldo pendiente"
+            }
+            icon={Wallet}
+            tone="amber"
+          />
+        </div>
+      </section>
+
+      {/* Chart + Activity — 50/50 */}
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <Card className="overflow-hidden rounded-xl border border-[#E4E9F0] bg-white shadow-sm ring-0">
+          <CardContent className="p-4 sm:p-5">
+            <SalesPeriodChart items={dashboard.dailySales} />
+          </CardContent>
+        </Card>
+        <Card className="overflow-hidden rounded-xl border border-[#E4E9F0] bg-white shadow-sm ring-0">
+          <div className="border-b border-[#E4E9F0] bg-[#F8FAFD] px-4 py-3 sm:px-5">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-[#172033]">
+                Actividad reciente
+              </h2>
+              <Link
+                href={routes.facturacionDocuments}
+                className="text-xs font-medium text-[#1769E0] hover:underline"
+              >
+                Ver todos
+              </Link>
+            </div>
+          </div>
+          <div>
+            {dashboard.recentDocuments.length ? (
+              <div className="divide-y divide-[#E4E9F0]">
+                {dashboard.recentDocuments.slice(0, 6).map((doc) => {
+                  const status = documentStatus(doc.status);
+                  return (
+                    <div
+                      key={doc.id}
+                      className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-blue-50/30 sm:px-5"
+                    >
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#EEF5FF] text-[#1769E0]">
+                        <ReceiptText className="size-3.5" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[#172033]">
+                          {doc.customerName}
+                        </p>
+                        <p className="text-xs text-[#667085]">
+                          {formatDate(doc.issuedAt ?? doc.createdAt)}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-semibold text-[#172033]">
+                          {formatMoney(doc.grandTotal)}
+                        </p>
+                        <span
+                          className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset ${status.className}`}
+                        >
+                          {status.label}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="px-5 py-8 text-center text-sm text-[#667085]">
+                Aún no hay comprobantes recientes.
+              </p>
+            )}
+          </div>
+        </Card>
+      </section>
+    </>
+  );
+
   return (
     <DashboardShell
       mainClassName="px-4 py-5 sm:px-6 sm:py-6"
@@ -290,227 +503,7 @@ export default async function FacturacionPage() {
           </div>
         </header>
 
-        {/* ── KPI cards ── */}
-        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard
-            title="Ventas del día"
-            value={formatMoney(reports.salesToday)}
-            helper="Ventas registradas hoy"
-            icon={CircleDollarSign}
-          />
-          <MetricCard
-            tone="orange"
-            title="Facturado este mes"
-            value={formatMoney(reports.salesMonth)}
-            helper="Acumulado del mes actual"
-            icon={ShoppingCart}
-          />
-          <MetricCard
-            title="Documentos este mes"
-            value={String(dashboard.documentCounts.thisMonth)}
-            helper="Comprobantes registrados este mes"
-            icon={FileCheck2}
-          />
-          <MetricCard
-            tone="orange"
-            title="Pendientes SRI"
-            value={String(dashboard.documentCounts.pending)}
-            helper="Comprobantes pendientes de procesamiento"
-            icon={AlertTriangle}
-          />
-        </section>
-
-        {/* ── Comprobantes chips ── */}
-        <section className="flex flex-wrap items-center gap-2">
-          <Link
-            href={routes.facturacionDocuments}
-            className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
-          >
-            <span className="size-2 rounded-full bg-emerald-500" />
-            Autorizados: {dashboard.documentCounts.authorized}
-          </Link>
-          <Link
-            href={routes.facturacionDocuments}
-            className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100"
-          >
-            <span className="size-2 rounded-full bg-amber-500" />
-            Pendientes: {dashboard.documentCounts.pending}
-          </Link>
-          <Link
-            href={routes.facturacionDocuments}
-            className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50/60 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100"
-          >
-            <span className="size-2 rounded-full bg-red-500" />
-            Rechazados: {dashboard.documentCounts.rejected}
-          </Link>
-          <Link
-            href={routes.facturacionDocuments}
-            className="ml-auto text-xs font-medium text-[#1769E0] hover:underline"
-          >
-            Ver documentos →
-          </Link>
-        </section>
-
-        {/* ── Financial summary ── */}
-        <section>
-          <h2 className="mb-3 text-lg font-semibold text-[#172033]">
-            Resumen financiero
-          </h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <FinancialCard
-              title="Ventas mensuales"
-              amount={formatMoney(financial.salesMonth)}
-              subtitle="Mes actual"
-              change={salesChange}
-              icon={TrendingUp}
-              tone="emerald"
-            />
-            <FinancialCard
-              title="Compras mensuales"
-              amount={formatMoney(financial.purchasesMonth)}
-              subtitle="Mes actual"
-              change={purchasesChange}
-              icon={ShoppingCart}
-              tone="orange"
-            />
-            <FinancialCard
-              title="Cuentas por cobrar"
-              amount={formatMoney(financial.receivables)}
-              subtitle={
-                financial.receivablesCount > 0
-                  ? `${financial.receivablesCount} obligación${financial.receivablesCount > 1 ? "es" : ""} pendiente${financial.receivablesCount > 1 ? "s" : ""}`
-                  : "Saldo pendiente"
-              }
-              icon={BadgeDollarSign}
-              tone="blue"
-            />
-            <FinancialCard
-              title="Cuentas por pagar"
-              amount={formatMoney(financial.payables)}
-              subtitle={
-                financial.payablesCount > 0
-                  ? `${financial.payablesCount} obligación${financial.payablesCount > 1 ? "es" : ""} pendiente${financial.payablesCount > 1 ? "s" : ""}`
-                  : "Saldo pendiente"
-              }
-              icon={Wallet}
-              tone="amber"
-            />
-          </div>
-        </section>
-
-        {/* ── Chart + Activity ── */}
-        <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(300px,1fr)]">
-          <Card className="overflow-hidden rounded-xl border border-[#E4E9F0] bg-white shadow-sm ring-0">
-            <CardContent className="p-4 sm:p-5">
-              <SalesPeriodChart items={dashboard.dailySales} />
-            </CardContent>
-          </Card>
-          <Card className="overflow-hidden rounded-xl border border-[#E4E9F0] bg-white shadow-sm ring-0">
-            <div className="border-b border-[#E4E9F0] bg-[#F8FAFD] px-4 py-3 sm:px-5">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-[#172033]">
-                  Actividad reciente
-                </h2>
-                <Link
-                  href={routes.facturacionDocuments}
-                  className="text-xs font-medium text-[#1769E0] hover:underline"
-                >
-                  Ver todos
-                </Link>
-              </div>
-            </div>
-            <div>
-              {dashboard.recentDocuments.length ? (
-                <div className="divide-y divide-[#E4E9F0]">
-                  {dashboard.recentDocuments.slice(0, 6).map((doc) => {
-                    const status = documentStatus(doc.status);
-                    return (
-                      <div
-                        key={doc.id}
-                        className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-blue-50/30 sm:px-5"
-                      >
-                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#EEF5FF] text-[#1769E0]">
-                          <ReceiptText className="size-3.5" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-[#172033]">
-                            {doc.customerName}
-                          </p>
-                          <p className="text-xs text-[#667085]">
-                            {formatDate(doc.issuedAt ?? doc.createdAt)}
-                          </p>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <p className="text-sm font-semibold text-[#172033]">
-                            {formatMoney(doc.grandTotal)}
-                          </p>
-                          <span
-                            className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset ${status.className}`}
-                          >
-                            {status.label}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="px-5 py-8 text-center text-sm text-[#667085]">
-                  Aún no hay comprobantes recientes.
-                </p>
-              )}
-            </div>
-          </Card>
-        </section>
-
-        {/* ── Quick actions ── */}
-        <section aria-labelledby="quick-actions-title">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2
-                id="quick-actions-title"
-                className="text-lg font-semibold text-[#172033]"
-              >
-                Acciones rápidas
-              </h2>
-              <p className="mt-1 text-sm text-[#667085]">
-                Lo que necesitas para seguir con tu día.
-              </p>
-            </div>
-            <HomeShortcutsEditor
-              initialKeys={shortcutKeys}
-              catalog={catalog}
-            />
-          </div>
-          <div className="mt-4 grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {shortcuts.map(({ key, title, description, icon, href, tone }) => {
-              const Icon = iconMap[icon] || FileCheck2;
-              return (
-                <Link
-                  key={key}
-                  href={href}
-                  className={`group flex min-h-[140px] min-w-0 flex-col items-start rounded-2xl border border-[#E4E9F0] p-5 shadow-sm transition duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1769E0] ${
-                    tone === "orange"
-                      ? "bg-amber-50/20 hover:border-amber-300 hover:bg-amber-50/50 hover:shadow-md hover:shadow-amber-100/60"
-                      : "bg-blue-50/20 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-md hover:shadow-blue-100/60"
-                  }`}
-                >
-                  <span
-                    className={`mb-4 flex size-11 shrink-0 items-center justify-center rounded-2xl ${tone === "orange" ? "bg-amber-50 text-amber-600" : "bg-blue-50 text-[#1769E0]"}`}
-                  >
-                    <Icon className="size-5" aria-hidden="true" />
-                  </span>
-                  <span className="text-sm font-semibold text-[#172033]">
-                    {title}
-                  </span>
-                  <span className="mt-1 text-xs leading-5 text-[#667085]">
-                    {description}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
+        <HomeTabs shortcuts={shortcutsContent} summary={summaryContent} />
       </div>
 
       {/* ── AI invoicing FAB ── */}
@@ -524,5 +517,32 @@ export default async function FacturacionPage() {
         </Link>
       )}
     </DashboardShell>
+  );
+}
+
+function KpiMetric({
+  label,
+  value,
+  icon: Icon,
+  tone,
+}: {
+  label: string;
+  value: string;
+  icon: LucideIcon;
+  tone: "blue" | "amber";
+}) {
+  const colors = tone === "amber"
+    ? { icon: "bg-amber-50 text-amber-600", value: "text-amber-700" }
+    : { icon: "bg-[#EEF5FF] text-[#1769E0]", value: "text-[#1769E0]" };
+  return (
+    <div className="flex items-center gap-3">
+      <span className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${colors.icon}`}>
+        <Icon className="size-4" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-xs text-[#667085]">{label}</p>
+        <p className={`text-lg font-bold tracking-tight ${colors.value}`}>{value}</p>
+      </div>
+    </div>
   );
 }

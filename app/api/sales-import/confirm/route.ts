@@ -3,11 +3,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { getPrismaClient } from "@/lib/db/prisma";
-import {
-  readSalesImportFile,
-  buildSalesImportPreview,
-  confirmSalesImport,
-} from "@/lib/core/sales-import";
+import { readImportFile, buildImportPreview, confirmImportV2 } from "@/lib/core/sales-import-v2";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -21,45 +17,32 @@ export async function POST(request: Request) {
   try {
     formData = await request.formData();
   } catch {
-    return NextResponse.json(
-      { ok: false, error: "Archivo no recibido." },
-      { status: 400 },
-    );
+    return NextResponse.json({ ok: false, error: "Archivo no recibido." }, { status: 400 });
   }
 
   const file = formData.get("file");
   if (!(file instanceof File)) {
-    return NextResponse.json(
-      { ok: false, error: "Archivo no válido." },
-      { status: 400 },
-    );
+    return NextResponse.json({ ok: false, error: "Archivo no válido." }, { status: 400 });
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const rows = await readSalesImportFile(buffer, file.name);
+  const rows = await readImportFile(buffer, file.name);
 
   if (rows.length === 0) {
-    return NextResponse.json(
-      { ok: false, error: "El archivo no contiene filas." },
-      { status: 400 },
-    );
+    return NextResponse.json({ ok: false, error: "El archivo no contiene filas." }, { status: 400 });
   }
 
-  const preview = await buildSalesImportPreview(tenant.id, rows);
-  if (preview.hasBlockingErrors) {
+  const preview = await buildImportPreview(tenant.id, rows);
+  if (preview.errorDocuments > 0) {
     return NextResponse.json(
-      {
-        ok: false,
-        error: "El archivo contiene errores que impiden la importación.",
-        preview,
-      },
+      { ok: false, error: "El archivo contiene errores que impiden la importación.", preview },
       { status: 400 },
     );
   }
 
   const prisma = getPrismaClient();
   const ext = file.name.toLowerCase();
-  const sourceType = ext.endsWith(".csv") ? "csv" : "xlsx";
+  const sourceType = ext.endsWith(".csv") ? "CSV" : "XLSX";
 
   const batch = await prisma.salesImportBatch.create({
     data: {
@@ -69,18 +52,14 @@ export async function POST(request: Request) {
       sourceType,
       status: "PROCESSING",
       totalRows: preview.totalRows,
-      validRows: preview.validRows,
-      warningRows: preview.warningRows,
-      errorRows: preview.errorRows,
+      validRows: preview.validDocuments,
+      warningRows: preview.warningDocuments,
+      errorRows: preview.errorDocuments,
+      totalDocuments: preview.totalDocuments,
     },
   });
 
-  const result = await confirmSalesImport(
-    tenant.id,
-    user.id,
-    batch.id,
-    rows,
-  );
+  const result = await confirmImportV2(tenant.id, user.id, batch.id, rows);
 
   return NextResponse.json({
     ok: true,

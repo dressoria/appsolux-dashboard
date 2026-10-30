@@ -247,10 +247,26 @@ export function PaymentModal({ method, accounts, invoiceTotal, pendingAmount, cu
           )}
 
           {config.requiresDueDate && (
-            <div>
-              <Label>Fecha de vencimiento</Label>
-              <Input className="mt-1" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-            </div>
+            <>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={dueDate === new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      const d = new Date();
+                      setDueDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+                    }
+                  }}
+                  className="size-4 rounded border-slate-300"
+                />
+                Vence hoy
+              </label>
+              <div>
+                <Label>Fecha de vencimiento</Label>
+                <Input className="mt-1" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+              </div>
+            </>
           )}
 
           <div>

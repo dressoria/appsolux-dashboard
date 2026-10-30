@@ -21,7 +21,6 @@ import {
   PaymentModal,
   MultiplePaymentModal,
   COMMERCIAL_LABELS,
-  COMMERCIAL_TO_SRI,
   type PaymentEntry,
   type TreasuryAccountOption,
 } from "./payment-modal";
@@ -48,6 +47,8 @@ type Product = {
   taxRate: string;
   taxCategory: string | null;
   cost: string | null;
+  trackInventory: boolean;
+  type: string;
 };
 type Warehouse = {
   id: string;
@@ -91,6 +92,7 @@ type DraftPayload = {
   customerId: string;
   lines: Line[];
   paymentMethod: string;
+  sriPaymentCode: string;
   payments: PaymentEntry[];
   notes: string;
   priceTier: string;
@@ -101,6 +103,7 @@ type DraftPayload = {
   shipmentGuideId: string;
   establishmentId: string;
   issuePointId: string;
+  costMode: string;
   exportData: ExportData;
   reimbursementData: ReimbursementData;
 };
@@ -125,6 +128,17 @@ const PAYMENT_METHODS = [
   { value: "credit_card", label: "Tarjeta de crédito" },
   { value: "credit", label: "Crédito" },
   { value: "multiple", label: "Múltiple" },
+];
+
+const SRI_PAYMENT_CODES = [
+  { code: "01", label: "01 — Sin utilización del sistema financiero" },
+  { code: "15", label: "15 — Compensación de deudas" },
+  { code: "16", label: "16 — Tarjeta de débito" },
+  { code: "17", label: "17 — Dinero electrónico" },
+  { code: "18", label: "18 — Tarjeta prepago" },
+  { code: "19", label: "19 — Tarjeta de crédito" },
+  { code: "20", label: "20 — Otros con utilización del sistema financiero" },
+  { code: "21", label: "21 — Endoso de títulos" },
 ];
 
 const money = (value: number) =>
@@ -193,6 +207,9 @@ export function InvoiceEditor({
   const [lines, setLines] = useState<Line[]>(draftPayload?.lines ?? initialLines ?? []);
   const [priceTier, setPriceTier] = useState(draftPayload?.priceTier ?? "PVP1");
   const [paymentMethod, setPaymentMethod] = useState(draftPayload?.paymentMethod ?? initialPaymentMethod ?? "cash");
+  const [sriPaymentCode, setSriPaymentCode] = useState(
+    draftPayload?.sriPaymentCode ?? initialSriPaymentCode ?? "20",
+  );
   const [payments, setPayments] = useState<PaymentEntry[]>(draftPayload?.payments ?? []);
   const [notes, setNotes] = useState(draftPayload?.notes ?? "");
   const [globalPct, setGlobalPct] = useState(draftPayload?.globalPct ?? 0);
@@ -208,12 +225,14 @@ export function InvoiceEditor({
   const [guideDropdownOpen, setGuideDropdownOpen] = useState(false);
   const [establishmentId, setEstablishmentId] = useState(draftPayload?.establishmentId ?? defaultEstablishment?.id ?? "");
   const [issuePointId, setIssuePointId] = useState(draftPayload?.issuePointId ?? defaultIssuePoint?.id ?? "");
+  const [costMode, setCostMode] = useState(draftPayload?.costMode ?? "GENERAL");
   const [exportData, setExportData] = useState<ExportData>(draftPayload?.exportData ?? { incoterm: "", destinationPort: "", countryCode: "", countryName: "" });
   const [reimbursementData, setReimbursementData] = useState<ReimbursementData>(draftPayload?.reimbursementData ?? { reimbursementDocType: "", reimbursementDocNumber: "", reimbursementTaxpayerId: "" });
   const [draftId, setDraftId] = useState(initialDraftId ?? "");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showMultipleModal, setShowMultipleModal] = useState(false);
   const [singlePaymentMethod, setSinglePaymentMethod] = useState<string | null>(null);
+  const prevPaymentMethodRef = useRef(paymentMethod);
 
   const customerSearchRef = useRef<HTMLDivElement>(null);
   const productSearchRef = useRef<HTMLDivElement>(null);
@@ -239,11 +258,11 @@ export function InvoiceEditor({
 
   const getStock = useCallback(
     (productId: string) => {
-      if (!warehouseId) {
-        const product = productById.get(productId);
-        return product?.stock ?? 0;
-      }
-      return stockByWarehouseProduct.get(`${warehouseId}:${productId}`) ?? 0;
+      const product = productById.get(productId);
+      if (!product) return 0;
+      if (!product.trackInventory) return 999999;
+      if (!warehouseId) return product.stock;
+      return stockByWarehouseProduct.get(`${warehouseId}:${productId}`) ?? product.stock;
     },
     [warehouseId, productById, stockByWarehouseProduct],
   );
@@ -329,8 +348,15 @@ export function InvoiceEditor({
     Math.max(0, requestedGlobal),
   );
 
-  const taxBuckets = useMemo(() => {
-    const buckets: Record<string, { label: string; base: number; rate: number }> = {};
+  // Compute fixed totals buckets
+  const totalsData = useMemo(() => {
+    let taxableBase = 0;
+    let zeroBase = 0;
+    let nonObjectBase = 0;
+    let exemptBase = 0;
+    let ivaTotal = 0;
+    let ivaRate = 0;
+
     for (const item of calculated) {
       const share = baseBeforeGlobal
         ? (appliedGlobal * item.subtotal) / baseBeforeGlobal
@@ -338,44 +364,53 @@ export function InvoiceEditor({
       const adjusted = item.subtotal - share;
       const cat = item.taxCategory;
       const rate = item.effectiveRate;
-      let key: string;
-      let label: string;
+
       if (cat === "NON_OBJECT") {
-        key = "non_object";
-        label = "No Objeto de Impuesto";
+        nonObjectBase += adjusted;
       } else if (cat === "EXEMPT") {
-        key = "exempt";
-        label = "Exento de IVA";
+        exemptBase += adjusted;
       } else if (rate === 0) {
-        key = "zero";
-        label = "Subtotal 0%";
+        zeroBase += adjusted;
       } else {
-        key = `rate_${rate}`;
-        label = `Subtotal ${rate}%`;
+        taxableBase += adjusted;
+        ivaTotal += (adjusted * rate) / 100;
+        if (rate > 0) ivaRate = rate;
       }
-      if (!buckets[key]) buckets[key] = { label, base: 0, rate };
-      buckets[key].base += adjusted;
     }
-    return buckets;
+
+    const lineDiscount = calculated.reduce((sum, item) => sum + item.discount, 0);
+    const totalDiscount = lineDiscount + appliedGlobal;
+    const subtotalAfterDiscount = Math.max(0, baseBeforeGlobal - appliedGlobal);
+    const totalFactura = subtotalAfterDiscount + ivaTotal;
+
+    return {
+      subtotalBruto: baseBeforeGlobal,
+      taxableBase,
+      zeroBase,
+      nonObjectBase,
+      exemptBase,
+      totalDiscount,
+      subtotalAfterDiscount,
+      ivaTotal,
+      ivaRate,
+      totalFactura,
+      totalRetencion: 0,
+      totalPagar: totalFactura,
+    };
   }, [calculated, baseBeforeGlobal, appliedGlobal]);
 
-  const lineDiscount = calculated.reduce((sum, item) => sum + item.discount, 0);
-  const taxTotal = Object.values(taxBuckets).reduce(
-    (sum, b) => sum + (b.rate * b.base) / 100,
-    0,
-  );
-  const subtotalAfterDiscount = Math.max(0, baseBeforeGlobal - appliedGlobal);
-  const total = subtotalAfterDiscount + taxTotal;
+  const total = totalsData.totalPagar;
   const dirty = lines.length > 0 || Boolean(customerId || notes);
 
   function addProduct(product: Product) {
     const stock = getStock(product.id);
+    const canTrack = product.trackInventory;
     setLines((current) => {
       const existing = current.find((item) => item.productId === product.id);
       return existing
         ? current.map((item) =>
             item.productId === product.id
-              ? { ...item, quantity: Math.min(stock, item.quantity + 1) }
+              ? { ...item, quantity: canTrack ? Math.min(stock, item.quantity + 1) : item.quantity + 1 }
               : item,
           )
         : [
@@ -415,10 +450,12 @@ export function InvoiceEditor({
     setSaved(null);
     setMessage("");
     setPaymentMethod("cash");
+    setSriPaymentCode("20");
     setPayments([]);
     setInvoiceKind("NORMAL");
     setShipmentGuideId("");
     setShipmentGuideSearch("");
+    setCostMode("GENERAL");
     setExportData({ incoterm: "", destinationPort: "", countryCode: "", countryName: "" });
     setReimbursementData({ reimbursementDocType: "", reimbursementDocNumber: "", reimbursementTaxpayerId: "" });
     setDraftId("");
@@ -466,11 +503,17 @@ export function InvoiceEditor({
     return undefined;
   }
 
-  function openPaymentSelection(method: string) {
-    if (method === "multiple") {
+  function handlePaymentMethodChange(newMethod: string) {
+    prevPaymentMethodRef.current = paymentMethod;
+    setPaymentMethod(newMethod);
+    if (newMethod !== "multiple") {
+      setPayments([]);
+    }
+    // Auto-open modal immediately
+    if (newMethod === "multiple") {
       setShowMultipleModal(true);
     } else {
-      setSinglePaymentMethod(method);
+      setSinglePaymentMethod(newMethod);
       setShowPaymentModal(true);
     }
   }
@@ -481,8 +524,24 @@ export function InvoiceEditor({
     setSinglePaymentMethod(null);
   }
 
+  function handlePaymentModalCancel() {
+    // Rollback to previous method if no payment was configured
+    if (payments.length === 0) {
+      setPaymentMethod(prevPaymentMethodRef.current);
+    }
+    setShowPaymentModal(false);
+    setSinglePaymentMethod(null);
+  }
+
   function handleMultiplePaymentSave(entries: PaymentEntry[]) {
     setPayments(entries);
+    setShowMultipleModal(false);
+  }
+
+  function handleMultiplePaymentCancel() {
+    if (payments.length === 0) {
+      setPaymentMethod(prevPaymentMethodRef.current);
+    }
     setShowMultipleModal(false);
   }
 
@@ -496,6 +555,7 @@ export function InvoiceEditor({
         customerId,
         lines,
         paymentMethod,
+        sriPaymentCode,
         payments,
         notes,
         priceTier,
@@ -506,6 +566,7 @@ export function InvoiceEditor({
         shipmentGuideId,
         establishmentId,
         issuePointId,
+        costMode,
         exportData,
         reimbursementData,
       };
@@ -566,7 +627,7 @@ export function InvoiceEditor({
           paymentMethod: effectiveMethod,
           paidAmount: effectiveMethod === "credit" ? 0 : total,
           outputMode: sendToSri ? "sri_invoice" : "internal_receipt",
-          sriPaymentCode: COMMERCIAL_TO_SRI[effectiveMethod] ?? "01",
+          sriPaymentCode,
           notes,
           items: buildItems(),
           payments: paymentsPayload,
@@ -851,52 +912,117 @@ export function InvoiceEditor({
                   }).format(new Date())}
                 />
               </Field>
-              <Field label="Tipo de factura">
-                <select
-                  className="h-8 rounded-lg border px-2 text-sm"
-                  value={invoiceKind}
-                  onChange={(e) => setInvoiceKind(e.target.value as InvoiceKind)}
-                >
-                  <option value="NORMAL">Normal</option>
-                  <option value="EXPORT">Exportación</option>
-                  <option value="REIMBURSEMENT">Reembolso</option>
-                </select>
-              </Field>
               <Field label="Vendedor">
                 <Input readOnly value={currentUserName} />
               </Field>
               <Field label="Forma de pago">
-                <div className="flex gap-1">
-                  <select
-                    className="h-8 flex-1 rounded-lg border px-2 text-sm"
-                    value={paymentMethod}
+                <select
+                  className="h-8 rounded-lg border px-2 text-sm"
+                  value={paymentMethod}
+                  onChange={(e) => handlePaymentMethodChange(e.target.value)}
+                >
+                  {PAYMENT_METHODS.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Pag. SRI">
+                <select
+                  className="h-8 rounded-lg border px-2 text-sm"
+                  value={sriPaymentCode}
+                  onChange={(e) => setSriPaymentCode(e.target.value)}
+                >
+                  {SRI_PAYMENT_CODES.map((c) => (
+                    <option key={c.code} value={c.code}>{c.label}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Costo">
+                <select
+                  className="h-8 rounded-lg border px-2 text-sm"
+                  value={costMode}
+                  onChange={(e) => setCostMode(e.target.value)}
+                >
+                  <option value="GENERAL">Costo General</option>
+                </select>
+              </Field>
+              <Field label="N.Guía">
+                <div className="relative" ref={guideSearchRef}>
+                  <Search className="absolute left-2 top-2 size-3.5 text-slate-400" />
+                  <Input
+                    className="h-8 pl-7 pr-7 text-sm"
+                    value={shipmentGuideSearch || (shipmentGuideId ? shipmentGuides.find((g) => g.id === shipmentGuideId)?.number ?? "" : "")}
                     onChange={(e) => {
-                      const m = e.target.value;
-                      setPaymentMethod(m);
-                      if (m !== "multiple") {
-                        setPayments([]);
-                      }
+                      setShipmentGuideSearch(e.target.value);
+                      setGuideDropdownOpen(true);
                     }}
-                  >
-                    {PAYMENT_METHODS.map((m) => (
-                      <option key={m.value} value={m.value}>{m.label}</option>
-                    ))}
-                  </select>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => openPaymentSelection(paymentMethod)}
-                  >
-                    Configurar
-                  </Button>
+                    onFocus={() => setGuideDropdownOpen(true)}
+                    placeholder="Seleccionar guía..."
+                  />
+                  {shipmentGuideId && (
+                    <button
+                      type="button"
+                      className="absolute right-1.5 top-2 text-slate-400 hover:text-slate-600"
+                      onClick={() => {
+                        setShipmentGuideId("");
+                        setShipmentGuideSearch("");
+                        setGuideDropdownOpen(false);
+                      }}
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  )}
+                  {guideDropdownOpen && guideMatches.length > 0 ? (
+                    <div className="absolute z-20 mt-1 w-full rounded-lg border bg-white shadow-lg">
+                      {guideMatches.map((g) => (
+                        <button
+                          type="button"
+                          className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                          key={g.id}
+                          onClick={() => {
+                            setShipmentGuideId(g.id);
+                            setShipmentGuideSearch(g.number);
+                            setGuideDropdownOpen(false);
+                          }}
+                        >
+                          {g.number} · {g.destinationAddress} · <span className="text-slate-400">{g.status}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </Field>
+            </div>
+            {/* Reembolso / Exportación toggles */}
+            <div className="mt-3 flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={invoiceKind === "REIMBURSEMENT"}
+                  onChange={(e) => setInvoiceKind(e.target.checked ? "REIMBURSEMENT" : "NORMAL")}
+                  className="size-4 rounded border-slate-300"
+                />
+                Factura Reembolso
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={invoiceKind === "EXPORT"}
+                  onChange={(e) => setInvoiceKind(e.target.checked ? "EXPORT" : "NORMAL")}
+                  className="size-4 rounded border-slate-300"
+                />
+                Factura de Exportación
+              </label>
             </div>
             {payments.length > 0 && (
               <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm">
                 <span className="text-slate-500">Pago: </span>
                 <span className="font-medium">{paymentSummary}</span>
+                {paymentMethod === "multiple" && payments.length > 0 && (
+                  <span className="ml-2 text-xs text-slate-400">
+                    Pag. SRI: Múltiple
+                  </span>
+                )}
               </div>
             )}
           </Card>
@@ -1030,68 +1156,6 @@ export function InvoiceEditor({
           </Card>
         )}
 
-        {/* Shipment guide */}
-        {shipmentGuides.length > 0 && (
-          <Card title="Guía de remisión">
-            <div className="relative" ref={guideSearchRef}>
-              <div className="flex items-end gap-2">
-                <div className="relative flex-1">
-                  <Label>Buscar guía</Label>
-                  <div className="relative mt-1">
-                    <Search className="absolute left-3 top-2 size-4 text-slate-400" />
-                    <Input
-                      className="pl-9 pr-8"
-                      value={shipmentGuideSearch}
-                      onChange={(e) => {
-                        setShipmentGuideSearch(e.target.value);
-                        setGuideDropdownOpen(true);
-                      }}
-                      onFocus={() => setGuideDropdownOpen(true)}
-                      placeholder="Número de guía o dirección"
-                    />
-                    {shipmentGuideId && (
-                      <button
-                        type="button"
-                        className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
-                        onClick={() => {
-                          setShipmentGuideId("");
-                          setShipmentGuideSearch("");
-                          setGuideDropdownOpen(false);
-                        }}
-                      >
-                        <X className="size-4" />
-                      </button>
-                    )}
-                  </div>
-                  {guideDropdownOpen && guideMatches.length > 0 ? (
-                    <div className="absolute z-20 mt-1 w-full rounded-lg border bg-white shadow-lg">
-                      {guideMatches.map((g) => (
-                        <button
-                          type="button"
-                          className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
-                          key={g.id}
-                          onClick={() => {
-                            setShipmentGuideId(g.id);
-                            setShipmentGuideSearch(g.number);
-                            setGuideDropdownOpen(false);
-                          }}
-                        >
-                          {g.number} · {g.destinationAddress}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-                {shipmentGuideId && (
-                  <p className="pb-1 text-sm text-slate-500">
-                    Guía: {shipmentGuides.find((g) => g.id === shipmentGuideId)?.number ?? "—"}
-                  </p>
-                )}
-              </div>
-            </div>
-          </Card>
-        )}
-
         {/* Detail + totals */}
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_310px]">
           <Card title="Detalle de factura">
@@ -1138,11 +1202,13 @@ export function InvoiceEditor({
                   <div className="absolute z-20 mt-1 w-full rounded-lg border bg-white shadow-lg">
                     {productMatches.map((item) => {
                       const stock = getStock(item.id);
+                      const stockLabel = item.trackInventory ? String(stock) : "Sin control";
+                      const isDisabled = item.trackInventory && stock <= 0;
                       return (
                         <button
                           type="button"
                           className="flex w-full justify-between px-3 py-2 text-left text-sm hover:bg-slate-50 disabled:opacity-50"
-                          disabled={stock <= 0 && item.stock !== 999999}
+                          disabled={isDisabled}
                           key={item.id}
                           onClick={() => addProduct(item)}
                         >
@@ -1150,7 +1216,7 @@ export function InvoiceEditor({
                             {item.name} · {item.primaryCode ?? item.auxiliaryCode ?? "—"}
                           </span>
                           <span>
-                            {money(priceFor(item, priceTier))} · Stock {stock}
+                            {money(priceFor(item, priceTier))} · Stock {stockLabel}
                           </span>
                         </button>
                       );
@@ -1185,7 +1251,10 @@ export function InvoiceEditor({
                 </thead>
                 <tbody className="divide-y">
                   {calculated.map((item, index) => {
+                    const product = productById.get(item.productId)!;
                     const stock = getStock(item.productId);
+                    const stockLabel = product.trackInventory ? String(stock) : "—";
+                    const maxQty = product.trackInventory ? stock : undefined;
                     const taxLabel = item.taxCategory === "NON_OBJECT"
                       ? "N/O"
                       : item.taxCategory === "EXEMPT"
@@ -1210,18 +1279,20 @@ export function InvoiceEditor({
                             }
                           />
                         </td>
-                        <td className="px-2">{stock}</td>
+                        <td className="px-2">{stockLabel}</td>
                         <td className="px-2">
                           <EditableNumberInput
                             className="h-7 w-16"
                             value={item.quantity}
                             onChange={(v) =>
                               updateLine(item.productId, {
-                                quantity: Math.max(1, Math.min(stock, Math.round(v))),
+                                quantity: maxQty !== undefined
+                                  ? Math.max(1, Math.min(maxQty, Math.round(v)))
+                                  : Math.max(1, Math.round(v)),
                               })
                             }
                             min={1}
-                            max={stock}
+                            max={maxQty}
                             fallback={1}
                           />
                         </td>
@@ -1311,32 +1382,23 @@ export function InvoiceEditor({
             </div>
           </Card>
 
-          {/* Totals sidebar */}
+          {/* Totals sidebar — fixed 11 rows, always visible */}
           <aside className="h-fit rounded-xl border bg-white p-4">
             <h2 className="mb-3 font-semibold">Totales</h2>
-            {Object.entries(taxBuckets)
-              .sort(([a], [b]) => a.localeCompare(b))
-              .map(([key, bucket]) => (
-                <Total key={key} label={bucket.label} value={bucket.base} />
-              ))}
-            {lineDiscount + appliedGlobal > 0 ? (
-              <Total label="Descuento" value={-(lineDiscount + appliedGlobal)} />
-            ) : null}
-            <Total label="Subtotal" value={subtotalAfterDiscount} />
-            {Object.entries(taxBuckets)
-              .filter(([, b]) => b.rate > 0)
-              .sort(([a], [b]) => a.localeCompare(b))
-              .map(([key, bucket]) => (
-                <Total
-                  key={`tax_${key}`}
-                  label={`IVA ${bucket.rate}%`}
-                  value={(bucket.rate * bucket.base) / 100}
-                />
-              ))}
+            <Total label="Subtotal" value={totalsData.subtotalBruto} />
+            <Total label={`Subtotal dif ${totalsData.ivaRate || 0}%`} value={totalsData.taxableBase} />
+            <Total label="Subtotal 0%" value={totalsData.zeroBase} />
+            <Total label="No Objeto de Impuesto" value={totalsData.nonObjectBase} />
+            <Total label="Exento de IVA" value={totalsData.exemptBase} />
+            <Total label="Descuento" value={totalsData.totalDiscount} />
+            <Total label="Subtotal - Descuento" value={totalsData.subtotalAfterDiscount} />
+            <Total label={`IVA${totalsData.ivaRate ? ` ${totalsData.ivaRate}%` : ""}`} value={totalsData.ivaTotal} />
+            <Total label="Total Factura" value={totalsData.totalFactura} />
+            <Total label="Total Retención" value={totalsData.totalRetencion} />
             <div className="my-3 border-t" />
             <div className="flex items-end justify-between">
-              <span className="font-semibold">TOTAL A PAGAR</span>
-              <strong className="text-2xl text-[#172033]">{money(total)}</strong>
+              <span className="font-semibold">Total Pagar</span>
+              <strong className="text-2xl text-[#172033]">{money(totalsData.totalPagar)}</strong>
             </div>
             <Button
               className="mt-4 w-full bg-[#1E52F1] text-white"
@@ -1360,10 +1422,7 @@ export function InvoiceEditor({
           customerName={selectedCustomer?.name ?? null}
           hasCustomer={Boolean(customerId)}
           onSave={handleSinglePaymentSave}
-          onClose={() => {
-            setShowPaymentModal(false);
-            setSinglePaymentMethod(null);
-          }}
+          onClose={handlePaymentModalCancel}
         />
       )}
       {showMultipleModal && (
@@ -1374,7 +1433,7 @@ export function InvoiceEditor({
           hasCustomer={Boolean(customerId)}
           initialPayments={payments}
           onSave={handleMultiplePaymentSave}
-          onClose={() => setShowMultipleModal(false)}
+          onClose={handleMultiplePaymentCancel}
         />
       )}
     </div>

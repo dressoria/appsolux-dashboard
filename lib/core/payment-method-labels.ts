@@ -19,3 +19,14 @@ export const COMMERCIAL_TO_SRI: Record<string, string> = {
   card: "19",
   credit: "20",
 };
+
+export const SRI_PAYMENT_LABELS: Record<string, string> = {
+  "01": "Sin utilización del sistema financiero",
+  "15": "Compensación de deudas",
+  "16": "Tarjeta de débito",
+  "17": "Dinero electrónico",
+  "18": "Tarjeta prepago",
+  "19": "Tarjeta de crédito",
+  "20": "Otros con utilización del sistema financiero",
+  "21": "Endoso de títulos",
+};
