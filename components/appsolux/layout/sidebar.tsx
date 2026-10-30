@@ -90,6 +90,8 @@ export function buildSidebarNavigation(
             link("Proformas", routes.facturacionSalesQuotations),
             link("Órdenes de venta", routes.facturacionSalesOrders),
             link("Recibos", routes.facturacionReceipts),
+            link("Notas de crédito", routes.facturacionCreditNotes),
+            link("Notas de débito", routes.facturacionDebitNotes),
             link("Importar ventas", routes.facturacionSalesImports),
           ],
         },

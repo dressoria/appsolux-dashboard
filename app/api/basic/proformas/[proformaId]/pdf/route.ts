@@ -65,9 +65,11 @@ export async function GET(_: Request, context: Context) {
   text(`Email: ${customer.email ?? "—"}   Teléfono: ${customer.phone ?? "—"}`);
   y -= 18;
   text(
-    `Fecha: ${proforma.issueDate.toLocaleDateString("es-EC")}   Válida hasta: ${proforma.validUntil?.toLocaleDateString("es-EC") ?? "—"}`,
+    `Fecha: ${proforma.issueDate.toLocaleDateString("es-EC")}   Válida hasta: ${proforma.validUntil?.toLocaleDateString("es-EC", { day: "2-digit", month: "2-digit", year: "numeric" }) ?? "—"}`,
   );
-  y -= 28;
+  y -= 14;
+  text("Válida por 8 días laborables.", 45, 8);
+  y -= 24;
   page.drawRectangle({
     x: 45,
     y: y - 4,

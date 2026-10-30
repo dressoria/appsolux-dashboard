@@ -9,9 +9,9 @@ import { loadCoreDocuments, loadErpDocuments } from "@/lib/core/billing/billing-
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 
-type FilterKey = "all" | "receipt" | "sri" | "authorized" | "pending" | "rejected" | "canceled";
+type FilterKey = "all" | "receipt" | "sri" | "credit_note" | "debit_note" | "authorized" | "pending" | "rejected" | "canceled";
 type Props = { searchParams: Promise<{ q?: string; type?: string; page?: string; perPage?: string; from?: string; to?: string; sort?: string }> };
-const FILTERS = new Set<FilterKey>(["all", "receipt", "sri", "authorized", "pending", "rejected", "canceled"]);
+const FILTERS = new Set<FilterKey>(["all", "receipt", "sri", "credit_note", "debit_note", "authorized", "pending", "rejected", "canceled"]);
 function integer(value: string | undefined, fallback: number) { const parsed = Number.parseInt(value ?? "", 10); return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback; }
 function dateValue(value: string | undefined, end = false) { if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined; const date = new Date(`${value}T${end ? "23:59:59.999" : "00:00:00.000"}-05:00`); return Number.isNaN(date.getTime()) ? undefined : date; }
 

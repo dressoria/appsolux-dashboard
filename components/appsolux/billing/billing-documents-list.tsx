@@ -5,17 +5,42 @@ import { useRouter } from "next/navigation";
 import { SriCancellationAction, SriCancellationModal } from "@/components/appsolux/sri/sri-cancellation-modal";
 import { canRequestSriCancellation, sriCancellationLabel } from "@/lib/sri-cancellation-status";
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Eye, FileSearch, MoreHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Eye, FileSearch, MoreHorizontal } from "lucide-react";
 
 import { SriDownloadButton } from "@/components/appsolux/sri/sri-download-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { BillingDocumentListItem } from "@/lib/core/billing/billing-documents";
 
-type FilterKey = "all" | "receipt" | "sri" | "authorized" | "pending" | "rejected" | "canceled";
+type FilterKey = "all" | "receipt" | "sri" | "credit_note" | "debit_note" | "authorized" | "pending" | "rejected" | "canceled";
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: "all", label: "Todos" }, { key: "receipt", label: "Recibos" }, { key: "sri", label: "Facturas SRI" },
+  { key: "credit_note", label: "Notas de crédito" }, { key: "debit_note", label: "Notas de débito" },
   { key: "authorized", label: "Autorizados" }, { key: "pending", label: "Pendientes" }, { key: "rejected", label: "Rechazados" }, { key: "canceled", label: "Cancelados" },
+];
+
+function getQuickDateRange(key: string): { from: string; to: string } {
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Guayaquil" }));
+  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const today = fmt(now);
+  if (key === "today") return { from: today, to: today };
+  if (key === "week") {
+    const day = now.getDay();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((day === 0 ? 7 : day) - 1));
+    return { from: fmt(monday), to: today };
+  }
+  if (key === "month") return { from: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`, to: today };
+  if (key === "year") return { from: `${now.getFullYear()}-01-01`, to: today };
+  return { from: "", to: "" };
+}
+
+const QUICK_DATES: Array<{ key: string; label: string }> = [
+  { key: "all", label: "Todas" },
+  { key: "today", label: "Hoy" },
+  { key: "week", label: "Esta semana" },
+  { key: "month", label: "Este mes" },
+  { key: "year", label: "Este año" },
 ];
 
 function money(value: string | null) { return value === null ? "—" : `$${Number(value).toFixed(2)}`; }
@@ -55,7 +80,48 @@ export function BillingDocumentsList({ items, page, totalPages, totalItems, curr
     router.refresh();
   }
   function hrefFor(updates: Record<string,string | number | undefined>) { const params = new URLSearchParams(); const values: Record<string,string | number | undefined> = { q: search || undefined, from: from || undefined, to: to || undefined, perPage, sort, type: currentFilter, page, ...updates }; Object.entries(values).forEach(([key,value]) => { if (value !== undefined && value !== "" && value !== "all" && value !== 1 && !(key === "perPage" && value === 10) && !(key === "sort" && value === "date")) params.set(key,String(value)); }); const query = params.toString(); return query ? `${basePath}?${query}` : basePath; }
-  return <div className="space-y-4"><form className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4"><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_150px_150px_100px_130px_auto]"><Input name="q" defaultValue={search} placeholder="Cliente, identificación, número, autorización o clave"/><Input name="from" type="date" defaultValue={from} aria-label="Desde"/><Input name="to" type="date" defaultValue={to} aria-label="Hasta"/><select name="perPage" defaultValue={String(perPage)} aria-label="Resultados por página" className="h-10 rounded-md border border-input bg-white px-3 text-sm"><option value="10">10 filas</option><option value="25">25 filas</option><option value="50">50 filas</option></select><select name="sort" defaultValue={sort} aria-label="Orden" className="h-10 rounded-md border border-input bg-white px-3 text-sm"><option value="date">Más recientes</option><option value="total">Mayor total</option></select><input type="hidden" name="type" value={currentFilter}/><Button className="bg-facturom-primary hover:bg-facturom-primary-soft">Buscar</Button></div><div className="mt-3 flex flex-wrap gap-1.5">{FILTERS.map((filter) => <Button key={filter.key} asChild variant={currentFilter === filter.key ? "default" : "outline"} size="sm" className={currentFilter === filter.key ? "rounded-full bg-facturom-primary hover:bg-facturom-primary-soft" : "rounded-full"}><Link href={hrefFor({ type: filter.key, page: undefined })}>{filter.label}</Link></Button>)}</div></form>
+  const [showExport, setShowExport] = useState(false);
+
+  function exportUrl(fmt: "pdf" | "excel") {
+    const params = new URLSearchParams();
+    params.set("format", fmt);
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    if (search) params.set("q", search);
+    if (currentFilter !== "all") params.set("type", currentFilter);
+    return `/api/facturacion/documents/export?${params}`;
+  }
+
+  return <div className="space-y-4">
+    {/* Quick date filters */}
+    <div className="flex flex-wrap items-center gap-2">
+      {QUICK_DATES.map((qd) => {
+        const range = qd.key === "all" ? { from: "", to: "" } : getQuickDateRange(qd.key);
+        const isActive = qd.key === "all" ? !from && !to : from === range.from && to === range.to;
+        return <Link key={qd.key} href={hrefFor({ from: range.from || undefined, to: range.to || undefined, page: undefined })} className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${isActive ? "bg-[#F97316] text-white" : "border border-slate-200 bg-white text-slate-500 hover:border-slate-300"}`}>{qd.label}</Link>;
+      })}
+      <button type="button" onClick={() => setShowExport(true)} className="ml-auto flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-300">
+        <Download className="h-3.5 w-3.5" /> Exportar
+      </button>
+    </div>
+
+    {/* Export modal */}
+    {showExport && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={(e) => { if (e.target === e.currentTarget) setShowExport(false); }}>
+        <div className="w-full max-w-sm rounded-xl border bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <h3 className="mb-4 text-lg font-semibold">Exportar documentos</h3>
+          <p className="mb-2 text-sm text-slate-500">Rango: {from || "inicio"} — {to || "actual"}</p>
+          <p className="mb-4 text-sm text-slate-500">Filtro: {FILTERS.find((f) => f.key === currentFilter)?.label ?? "Todos"}</p>
+          <div className="flex gap-3">
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowExport(false)}>Cancelar</Button>
+            <a href={exportUrl("pdf")} target="_blank" rel="noopener noreferrer" className="flex-1"><Button size="sm" className="w-full bg-red-600 text-white hover:bg-red-700">PDF</Button></a>
+            <a href={exportUrl("excel")} target="_blank" rel="noopener noreferrer" className="flex-1"><Button size="sm" className="w-full bg-emerald-600 text-white hover:bg-emerald-700">Excel</Button></a>
+          </div>
+        </div>
+      </div>
+    )}
+
+    <form className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4"><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_150px_150px_100px_130px_auto]"><Input name="q" defaultValue={search} placeholder="Cliente, identificación, número, autorización o clave"/><Input name="from" type="date" defaultValue={from} aria-label="Desde"/><Input name="to" type="date" defaultValue={to} aria-label="Hasta"/><select name="perPage" defaultValue={String(perPage)} aria-label="Resultados por página" className="h-10 rounded-md border border-input bg-white px-3 text-sm"><option value="10">10 filas</option><option value="25">25 filas</option><option value="50">50 filas</option></select><select name="sort" defaultValue={sort} aria-label="Orden" className="h-10 rounded-md border border-input bg-white px-3 text-sm"><option value="date">Más recientes</option><option value="total">Mayor total</option></select><input type="hidden" name="type" value={currentFilter}/><Button className="bg-facturom-primary hover:bg-facturom-primary-soft">Buscar</Button></div><div className="mt-3 flex flex-wrap gap-1.5">{FILTERS.map((filter) => <Button key={filter.key} asChild variant={currentFilter === filter.key ? "default" : "outline"} size="sm" className={currentFilter === filter.key ? "rounded-full bg-facturom-primary hover:bg-facturom-primary-soft" : "rounded-full"}><Link href={hrefFor({ type: filter.key, page: undefined })}>{filter.label}</Link></Button>)}</div></form>
     <div className="hidden overflow-hidden rounded-[22px] border border-slate-200 bg-white md:block"><table className="w-full text-left text-sm"><thead className="border-b bg-violet-50/60 text-[11px] uppercase tracking-[.14em] text-slate-500"><tr><th className="px-5 py-4">Emisión</th><th>Documento</th><th>Cliente</th><th>Total</th><th>Estado</th><th className="pr-5 text-right">Acciones</th></tr></thead><tbody className="divide-y divide-slate-100">{visibleItems.map((doc) => { const issued = dateParts(doc.issuedAt); return <tr key={doc.id} className="transition-colors hover:bg-violet-50/35"><td className="px-5 py-4"><p className="font-medium text-slate-800">{issued.date}</p><p className="text-xs text-slate-400">{issued.time}</p></td><td><p className="font-semibold text-slate-950">{doc.sriDocumentId ? "Factura SRI" : "Recibo interno"}</p><p className="font-mono text-xs text-slate-500">{doc.displayNumber ?? `REC-${doc.id.slice(-8).toUpperCase()}`}</p>{doc.environment ? <p className="text-[11px] text-slate-400">{doc.environment === "TEST" ? "Pruebas" : "Producción"}</p> : null}</td><td><p className="max-w-56 truncate font-medium">{doc.customerName ?? "Consumidor Final"}</p><p className="text-xs text-slate-400">{doc.customerIdentification ?? (doc.customerName ? "Sin identificación" : "9999999999999")}</p></td><td className="font-mono text-base font-bold text-slate-950">{money(doc.total)}</td><td><BillingDocumentStatus doc={doc}/></td><td className="pr-5"><Actions doc={doc} onRequested={onRequested}/></td></tr>; })}</tbody></table></div>
     <div className="space-y-3 md:hidden">{visibleItems.map((doc) => { const issued = dateParts(doc.issuedAt); return <article key={doc.id} className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-violet-700">{doc.sriDocumentId ? "Factura SRI" : "Recibo interno"}</p><p className="mt-1 font-mono text-sm font-semibold">{doc.displayNumber ?? `REC-${doc.id.slice(-8).toUpperCase()}`}</p></div><BillingDocumentStatus doc={doc}/></div><div className="my-3 border-t border-slate-100 pt-3"><p className="font-medium">{doc.customerName ?? "Consumidor Final"}</p><p className="text-xs text-slate-500">{issued.date} · {issued.time}</p></div><div className="flex items-center justify-between"><p className="font-mono text-xl font-black">{money(doc.total)}</p><Actions doc={doc} onRequested={onRequested}/></div></article>; })}</div>
     {items.length === 0 ? <div className="py-12 text-center text-sm text-slate-500"><FileSearch className="mx-auto mb-3 h-8 w-8 text-slate-300"/>No hay documentos que coincidan con los filtros.</div> : null}

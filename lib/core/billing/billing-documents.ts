@@ -96,7 +96,7 @@ export async function loadCoreDocuments(
   tenantId: string,
   options: {
     status?: string;
-    type?: "all" | "receipt" | "sri" | "authorized" | "pending" | "rejected" | "canceled";
+    type?: "all" | "receipt" | "sri" | "credit_note" | "debit_note" | "authorized" | "pending" | "rejected" | "canceled";
     search?: string;
     from?: Date;
     to?: Date;
@@ -293,7 +293,7 @@ export async function loadErpDocuments(
     page?: number;
     perPage?: number;
     includeBasicHistory?: boolean;
-    type?: "all" | "receipt" | "sri" | "authorized" | "pending" | "rejected" | "canceled";
+    type?: "all" | "receipt" | "sri" | "credit_note" | "debit_note" | "authorized" | "pending" | "rejected" | "canceled";
   } = {}
 ): Promise<{ items: BillingDocumentListItem[]; total: number; basicHistoryCount: number }> {
   const prisma = getPrismaClient();
@@ -312,6 +312,9 @@ export async function loadErpDocuments(
     ...(statusValue ? { status: statusValue as never } : {}),
     ...(typeStatuses ? { status: { in: [...typeStatuses] } } : {}),
     ...(type === "receipt" ? { id: { in: [] } } : {}),
+    ...(type === "sri" ? { documentType: "INVOICE" } : {}),
+    ...(type === "credit_note" ? { documentType: "CREDIT_NOTE" } : {}),
+    ...(type === "debit_note" ? { documentType: "DEBIT_NOTE" } : {}),
     ...(type === "canceled" ? { OR: [{ status: "CANCELLED" }, { cancellationRequests: { some: { tenantId, status: "CONFIRMED" } } }] } : {}),
   };
 

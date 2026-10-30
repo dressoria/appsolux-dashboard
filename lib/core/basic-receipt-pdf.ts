@@ -42,13 +42,14 @@ export type ReceiptPdfData = {
 // ── Colors ────────────────────────────────────────────────────────────────────
 
 const C = {
-  blue:   rgb(0.0, 0.25, 0.50),
+  blue:   rgb(0.12, 0.32, 0.95),
+  orange: rgb(0.976, 0.451, 0.086),
   white:  rgb(1, 1, 1),
   border: rgb(0.80, 0.82, 0.87),
   text:   rgb(0.07, 0.10, 0.14),
   muted:  rgb(0.38, 0.44, 0.52),
   rowOdd: rgb(0.97, 0.98, 0.99),
-  hdrBg:  rgb(0.0, 0.25, 0.50),
+  hdrBg:  rgb(0.12, 0.32, 0.95),
 };
 
 // ── Coordinate helpers ────────────────────────────────────────────────────────
@@ -119,9 +120,11 @@ function money(value: number): string {
 function paymentLabel(method: string): string {
   const labels: Record<string, string> = {
     cash: "Efectivo",
-    transfer: "Transferencia",
-    card: "Tarjeta",
+    transfer: "Transferencia bancaria",
+    card: "Tarjeta de crédito/débito",
     credit: "Crédito / Fiado",
+    check: "Cheque",
+    other: "Otro",
   };
   return labels[method] ?? method;
 }
@@ -131,7 +134,7 @@ function paymentLabel(method: string): string {
 export async function generateBasicReceiptPdf(data: ReceiptPdfData): Promise<Buffer> {
   const pdfDoc = await PDFDocument.create();
   pdfDoc.setTitle(`Recibo ${data.saleId}`);
-  pdfDoc.setCreator("Appsolux");
+  pdfDoc.setCreator("Facturom by Appsolux");
 
   const page = pdfDoc.addPage([595.28, 841.89]); // A4
   const W = page.getWidth();
@@ -277,11 +280,25 @@ export async function generateBasicReceiptPdf(data: ReceiptPdfData): Promise<Buf
     Y += 12;
   }
 
+  // ── Payments detail ──
+
+  if (data.payments.length > 1) {
+    Y += 8;
+    drawText(page, H, "Formas de pago", sumX, Y, 8, fontB, C.blue, 120);
+    Y += 12;
+    for (const p of data.payments) {
+      drawText(page, H, paymentLabel(p.method), sumX, Y, 8, fontR, C.text, 120);
+      drawTextRight(page, H, money(p.amount), valX, Y, 8, fontR, C.text);
+      Y += 11;
+    }
+  }
+
   // ── Footer note ──
 
-  drawLine(page, H, ML, ML + UW, H - 42, C.border);
+  drawLine(page, H, ML, ML + UW, H - 48, C.border);
+  drawText(page, H, "Facturom by Appsolux", ML, H - 42, 7, fontB, C.orange, UW);
   drawText(page, H, "Documento interno — no constituye comprobante electrónico autorizado por el SRI",
-    ML, H - 36, 7, fontR, C.muted, UW);
+    ML, H - 34, 7, fontR, C.muted, UW);
 
   const pdfBytes = await pdfDoc.save();
   return Buffer.from(pdfBytes);

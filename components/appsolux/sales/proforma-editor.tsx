@@ -78,10 +78,16 @@ export function ProformaEditor({
   const [issueDate, setIssueDate] = useState(
     initial?.issueDate.slice(0, 10) ?? dateInput(new Date()),
   );
-  const [validUntil, setValidUntil] = useState(
-    initial?.validUntil?.slice(0, 10) ??
-      dateInput(new Date(Date.now() + 15 * 86400000)),
-  );
+  const [validUntil, setValidUntil] = useState(() => {
+    if (initial?.validUntil) return initial.validUntil.slice(0, 10);
+    const d = new Date();
+    let added = 0;
+    while (added < 8) {
+      d.setDate(d.getDate() + 1);
+      if (d.getDay() !== 0 && d.getDay() !== 6) added++;
+    }
+    return dateInput(d);
+  });
   const [observation, setObservation] = useState(initial?.observation ?? "");
   const [priceTier, setPriceTier] = useState("PVP1");
   const [lines, setLines] = useState<Line[]>(initial?.items ?? []);

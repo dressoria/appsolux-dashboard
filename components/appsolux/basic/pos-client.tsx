@@ -196,6 +196,19 @@ export function BasicPosClient({
   const [selectedWarehouse, setSelectedWarehouse] =
     useState(initialWarehouseName);
 
+  // ── Server-side product pagination (CORE mode) ──
+  const [serverProducts, setServerProducts] = useState<Product[]>([]);
+  const [productPage, setProductPage] = useState(1);
+  const [productPerPage, setProductPerPage] = useState(12);
+  const [productTotal, setProductTotal] = useState(0);
+  const [productTotalPages, setProductTotalPages] = useState(1);
+  const [availability, setAvailability] = useState<"available" | "all" | "out_of_stock">("available");
+  const [productLoading, setProductLoading] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
+  const customerDropdownRef = useRef<HTMLDivElement>(null);
+  const useServerPagination = engine === "CORE";
+
   // Invoice editor customer fields (editable overrides)
   const [invoiceCustomerName, setInvoiceCustomerName] =
     useState("Consumidor Final");
@@ -219,7 +232,58 @@ export function BasicPosClient({
 
   const tipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const productById = new Map(products.map((p) => [p.id, p]));
+  const displayProducts = useServerPagination ? serverProducts : products;
+  const productById = new Map([
+    ...products.map((p) => [p.id, p] as const),
+    ...displayProducts.map((p) => [p.id, p] as const),
+  ]);
+
+  // ── Fetch products server-side ──
+  const fetchProducts = useRef(async (q: string, pg: number, pp: number, avail: string, wh: string) => {
+    if (!useServerPagination) return;
+    setProductLoading(true);
+    try {
+      const params = new URLSearchParams({ q, page: String(pg), perPage: String(pp), availability: avail });
+      if (wh) params.set("warehouseId", wh);
+      const res = await fetch(`/api/facturacion/pos/products?${params}`);
+      const data = await res.json();
+      if (data.ok) {
+        setServerProducts(data.products);
+        setProductTotal(data.total);
+        setProductTotalPages(data.totalPages);
+        setProductPage(data.page);
+      }
+    } finally {
+      setProductLoading(false);
+    }
+  }).current;
+
+  useEffect(() => {
+    fetchProducts(search, productPage, productPerPage, availability, "");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productPage, productPerPage, availability]);
+
+  useEffect(() => {
+    if (!useServerPagination) return;
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setProductPage(1);
+      fetchProducts(search, 1, productPerPage, availability, "");
+    }, 300);
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
+
+  // ── Customer dropdown click-outside ──
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (customerDropdownRef.current && !customerDropdownRef.current.contains(e.target as Node)) {
+        setCustomerDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   useEffect(() => {
     if (!warehouses.length) return;
@@ -294,17 +358,19 @@ export function BasicPosClient({
     {} as Record<number, number>,
   );
 
-  const filteredProducts = products.filter((product) => {
-    const term = search.trim().toLowerCase();
-    if (!term) return true;
-    return (
-      product.name.toLowerCase().includes(term) ||
-      (product.barcode ?? "").toLowerCase().includes(term) ||
-      (product.primaryCode ?? "").toLowerCase().includes(term) ||
-      (product.auxiliaryCode ?? "").toLowerCase().includes(term) ||
-      (product.description ?? "").toLowerCase().includes(term)
-    );
-  });
+  const filteredProducts = useServerPagination
+    ? serverProducts
+    : products.filter((product) => {
+        const term = search.trim().toLowerCase();
+        if (!term) return true;
+        return (
+          product.name.toLowerCase().includes(term) ||
+          (product.barcode ?? "").toLowerCase().includes(term) ||
+          (product.primaryCode ?? "").toLowerCase().includes(term) ||
+          (product.auxiliaryCode ?? "").toLowerCase().includes(term) ||
+          (product.description ?? "").toLowerCase().includes(term)
+        );
+      });
   const customerMatches = customerSearch.trim()
     ? customers
         .filter((customer) =>
@@ -1545,7 +1611,7 @@ export function BasicPosClient({
                 Productos
               </Label>
               <SaleStatusBadge
-                label={`${filteredProducts.length} disponibles`}
+                label={useServerPagination ? `${productTotal} productos` : `${filteredProducts.length} disponibles`}
                 variant="info"
               />
             </div>
@@ -1555,15 +1621,43 @@ export function BasicPosClient({
               placeholder="Buscar producto o codigo"
               className="rounded-2xl border-slate-200 bg-white"
             />
+            {useServerPagination && (
+              <div className="flex flex-wrap items-center gap-2">
+                {(["available", "all", "out_of_stock"] as const).map((av) => (
+                  <button
+                    key={av}
+                    type="button"
+                    onClick={() => { setAvailability(av); setProductPage(1); }}
+                    className={cn(
+                      "rounded-lg px-3 py-1.5 text-xs font-medium transition",
+                      availability === av
+                        ? "bg-[#F97316] text-white"
+                        : "border border-slate-200 text-slate-500 hover:border-slate-300",
+                    )}
+                  >
+                    {av === "available" ? "Disponibles" : av === "all" ? "Todos" : "Agotados"}
+                  </button>
+                ))}
+                <select
+                  className="ml-auto h-7 rounded-lg border px-2 text-xs"
+                  value={productPerPage}
+                  onChange={(e) => { setProductPerPage(Number(e.target.value)); setProductPage(1); }}
+                >
+                  <option value={12}>12</option>
+                  <option value={24}>24</option>
+                  <option value={48}>48</option>
+                </select>
+              </div>
+            )}
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {filteredProducts.map((product) => (
               <button
                 key={product.id}
                 type="button"
                 onClick={() => addProduct(product.id)}
-                className="rounded-[22px] border border-slate-200 bg-white p-4 text-left text-sm shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl border border-slate-200 bg-white p-3 text-left text-sm shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={isLoading || getAvailableStock(product) <= 0}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -1612,9 +1706,19 @@ export function BasicPosClient({
 
           {filteredProducts.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No hay productos disponibles.
+              {productLoading ? "Cargando productos..." : "No hay productos disponibles."}
             </p>
           ) : null}
+
+          {useServerPagination && productTotalPages > 1 && (
+            <div className="flex items-center justify-between text-sm text-slate-500">
+              <span>{productTotal} producto{productTotal !== 1 ? "s" : ""} · Página {productPage} de {productTotalPages}</span>
+              <div className="flex gap-1">
+                <Button variant="outline" size="sm" disabled={productPage <= 1} onClick={() => setProductPage((p) => p - 1)}>←</Button>
+                <Button variant="outline" size="sm" disabled={productPage >= productTotalPages} onClick={() => setProductPage((p) => p + 1)}>→</Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right: cart + checkout */}
@@ -1638,7 +1742,39 @@ export function BasicPosClient({
             {cart.length > 0 && (
               <button
                 type="button"
-                onClick={() => setShowInvoiceEditor(true)}
+                onClick={async () => {
+                  try {
+                    const draftPayload = {
+                      customerId: customerId || null,
+                      warehouseId: null,
+                      establishmentId: establishmentId || null,
+                      issuePointId: issuePointId || null,
+                      paymentMethod,
+                      items: cart.map((ci) => {
+                        const p = productById.get(ci.productId);
+                        return {
+                          productId: ci.productId,
+                          quantity: ci.quantity,
+                          price: p ? toNumber(p.price) : 0,
+                          discountAmount: ci.discountAmount,
+                          taxRate: p ? toNumber(p.taxRate) : 0,
+                          description: lineNotes[ci.productId] ?? "",
+                        };
+                      }),
+                    };
+                    const res = await fetch("/api/facturacion/drafts", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ payload: draftPayload }),
+                    });
+                    const data = await res.json();
+                    if (data.id) {
+                      router.push(`${routes.facturacionSalesNew}?draftId=${data.id}`);
+                    }
+                  } catch {
+                    setError("No se pudo crear el borrador.");
+                  }
+                }}
                 className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs text-slate-500 transition hover:border-[#004080] hover:text-[#004080]"
                 title="Editar detalle de venta"
               >
@@ -1714,14 +1850,16 @@ export function BasicPosClient({
                 Cliente seleccionado desde conversacion.
               </p>
             )}
-            <div className="relative">
+            <div className="relative" ref={customerDropdownRef}>
               <Input
                 id="customerId"
                 value={customerSearch}
-                onChange={(event) => setCustomerSearch(event.target.value)}
+                onChange={(event) => { setCustomerSearch(event.target.value); setCustomerDropdownOpen(true); }}
+                onKeyDown={(e) => { if (e.key === "Escape") { setCustomerDropdownOpen(false); setCustomerSearch(""); } }}
+                onFocus={() => setCustomerDropdownOpen(true)}
                 placeholder="RUC/cédula, nombre, nombre comercial o email"
               />
-              {customerMatches.length ? (
+              {customerDropdownOpen && customerMatches.length ? (
                 <div className="absolute z-20 mt-1 w-full rounded-xl border bg-white shadow-lg">
                   {customerMatches.map((customer) => (
                     <button
@@ -1731,6 +1869,7 @@ export function BasicPosClient({
                       onClick={() => {
                         setCustomerId(customer.id);
                         setCustomerSearch("");
+                        setCustomerDropdownOpen(false);
                       }}
                     >
                       {customer.name} ·{" "}

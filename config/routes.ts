@@ -124,6 +124,11 @@ export const routes = {
   facturacionHistoryBasic: "/facturacion/history/basic",
   facturacionReceipts: "/facturacion/receipts",
   facturacionSalesImports: "/facturacion/sales/imports",
+  facturacionSalesOrdersNew: "/facturacion/sales/orders/new",
+  facturacionCreditNotes: "/facturacion/sales/credit-notes",
+  facturacionCreditNotesNew: "/facturacion/sales/credit-notes/new",
+  facturacionDebitNotes: "/facturacion/sales/debit-notes",
+  facturacionDebitNotesNew: "/facturacion/sales/debit-notes/new",
   facturacionAi: "/facturacion/ai",
 
   facturacionSettingsWarehouses: "/facturacion/settings/warehouses",
