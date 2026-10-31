@@ -18,20 +18,22 @@ let purchaseJobs: typeof import("../../app/api/purchases/sri-sync/jobs/route");
 let status: typeof import("./purchase-sync-jobs");
 let createdTenant: string | undefined;
 const importedRows: Record<string, unknown>[] = [];
-const finishedJob = { ...job("FAILED", { errorCode: "SRI_QUERY_FAILED", errorMessage: "Consulta JSF rechazada por el portal" }), tenantId: "tenant-session", createdAt: new Date("2026-10-31T10:00:00Z") };
+const finishedJob = { ...job("FAILED", { errorCode: "SRI_QUERY_FAILED", errorMessage: "Consulta JSF rechazada por el portal" }), tenantId: "tenant-session", createdAt: new Date("2026-10-31T10:00:00Z"), dateFrom: new Date("2026-10-17T05:00:00Z"), dateTo: new Date("2026-10-19T05:00:00Z"), updatedAt: new Date(), checkpointDate: null };
 const credential = { tenantId: "tenant-session", username: "1791234567001", additionalUserId: null, status: "VERIFIED", encryptedPassword: "private-encrypted-fixture", encryptionIv: "private-iv", authTag: "private-tag", verifiedAt: new Date("2026-10-31T09:00:00Z"), lastVerificationAt: new Date("2026-10-31T09:00:00Z"), lastVerificationError: null };
 const config = { tenantId: "tenant-session", enabled: true, sriEnabled: true, syncFrequency: "DAILY", lastSuccessAt: null };
 const assertTenant = (args: { where: { tenantId: string } }) => assert.equal(args.where.tenantId, "tenant-session");
 const database = {
+  $transaction: async <T>(action: (tx: unknown) => Promise<T>) => action(database),
+  $executeRaw: async () => 0,
   externalSalesDocument: {
     findFirst: async ({ where }: { where: Record<string, unknown> }) => importedRows.find((row) => Object.entries(where).every(([key, value]) => row[key] === value)) ?? null,
     create: async ({ data }: { data: Record<string, unknown> }) => { const row = { ...data, id: `fixture-external-${importedRows.length}` }; importedRows.push(row); return { id: row.id }; },
   },
   sriDocument: { findFirst: async () => null },
   purchaseSriCredential: { findUnique: async (args: { where: { tenantId: string } }) => { assertTenant(args); return credential; } },
-  salesAutoSyncSettings: { findUnique: async () => config, update: async () => config },
+  salesAutoSyncSettings: { findUnique: async () => config, update: async () => config, upsert: async () => config, updateMany: async () => ({ count: 1 }) },
   salesSriSyncJob: {
-    findMany: async (args: { where: { tenantId: string } }) => { assertTenant(args); return [finishedJob]; },
+    findMany: async (args: { where: { tenantId: string; status?: unknown } }) => { assertTenant(args); return args.where.status ? [] : [finishedJob]; },
     count: async (args: { where: { tenantId: string } }) => { assertTenant(args); return 1; },
     findFirst: async (args: { where: { tenantId: string } }) => { assertTenant(args); return null; },
     create: async ({ data }: { data: { tenantId: string; dateFrom?: Date; dateTo?: Date; type: string } }) => { createdTenant = data.tenantId; return { ...job("QUEUED"), ...data, finishedAt: null }; },
@@ -47,7 +49,7 @@ const database = {
 test.before(async () => {
   mock.module(resolve("lib/security/server-only.ts"), { namedExports: {} });
   mock.module(resolve("lib/db/prisma.ts"), { namedExports: { getPrismaClient: () => database } });
-  mock.module(resolve("lib/core/require-dashboard-session.ts"), { namedExports: { requireDashboardSession: async () => ({ tenant: { id: "tenant-session" } }) } });
+  mock.module(resolve("lib/core/require-dashboard-session.ts"), { namedExports: { requireDashboardSession: async () => ({ user: { id: "session-user" }, tenant: { id: "tenant-session" } }) } });
   mock.module(resolve("lib/auth/current-user.ts"), { namedExports: { getCurrentUser: async () => ({ id: "session-user" }) } });
   mock.module(resolve("lib/tenant/current-tenant.ts"), { namedExports: { getCurrentTenant: async () => ({ id: "tenant-session" }) } });
   mock.module(resolve("lib/core/tenant-features.ts"), { namedExports: { resolveEffectiveTenantAccessForTenant: async () => ({ features: [] }), featureEnabled: () => true } });
@@ -138,7 +140,7 @@ test("auto-sync GET returns only public credential metadata, never encrypted mat
 
 test("both automatic screens consume the real jobs API and shared polling cleans up", () => {
   for (const [file, endpoint] of [["app/facturacion/sales/imports/sales-import-client.tsx", "/api/sales-import/sync-jobs"], ["app/facturacion/purchases/automatic-download/automatic-download-client.tsx", "/api/purchases/sri-sync/jobs"]]) {
-    const source = readFileSync(file!, "utf8"); assert.ok(source.includes(endpoint!)); assert.ok(source.includes("progress.trackJob")); assert.ok(source.includes("progress.job")); assert.ok(source.includes("SyncProgressCard"));
+    const source = readFileSync(file!, "utf8"); assert.ok(source.includes(endpoint!)); assert.ok(source.includes("progress.trackJob")); assert.ok(source.includes("progress.job")); assert.ok(source.includes("SalesAutomaticSyncView") || source.includes("SyncProgressCard"));
   }
   const hook = readFileSync("components/appsolux/sri-tax/use-sync-jobs.ts", "utf8");
   assert.match(hook, /clearTimeout/); assert.match(hook, /abort\(\)/); assert.match(hook, /cache: "no-store"/);

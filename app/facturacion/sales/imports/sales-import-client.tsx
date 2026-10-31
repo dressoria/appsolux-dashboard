@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { SyncProgressCard } from "@/components/appsolux/sri-tax/sync-progress-card";
+import { SalesAutomaticSyncView, type SalesCredentialView } from "@/components/appsolux/sri-tax/sales-automatic-sync-view";
 import { useSyncJobs } from "@/components/appsolux/sri-tax/use-sync-jobs";
-import { connectionLabel } from "@/lib/core/sri-sync-presentation";
+import { selectVisibleSyncJob } from "@/lib/core/sri-sync-presentation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Upload,
@@ -18,7 +18,6 @@ import {
   Key,
   ChevronDown,
   Copy,
-  RefreshCw,
   Shield,
 } from "lucide-react";
 
@@ -124,12 +123,12 @@ export function SalesImportClient({ activeTab = "consolidated" }: { activeTab?: 
 
   return (
     <div className="space-y-5">
-      <header>
+      {activeTab !== "automatic" && <header>
         <h1 className="text-3xl font-black tracking-tight text-slate-950">Consolidar ventas</h1>
         <p className="mt-1 text-sm text-slate-600">
           Reúne en un solo lugar tus ventas de Facturom, archivos externos y otras integraciones.
         </p>
-      </header>
+      </header>}
 
       <nav aria-label="Importación de ventas" className="flex gap-1 border-b overflow-x-auto">
         {([ ["consolidated", "Consolidado", "/facturacion/sales/imports"], ["import", "Importar archivo", "/facturacion/sales/imports/file"], ["automatic", "Importación automática", "/facturacion/sales/imports/automatic"] ] as const).map(([key, label, href]) => (
@@ -539,26 +538,9 @@ type SyncConfig = {
   lastError: string | null;
 };
 
-type SyncFrequency = "DAILY" | "EVERY_3_DAYS" | "WEEKLY" | "EVERY_15_DAYS" | "MONTHLY";
-
-const FREQUENCY_LABELS: Record<string, string> = {
-  DAILY: "Una vez al día",
-  EVERY_3_DAYS: "Cada 3 días",
-  WEEKLY: "Una vez por semana",
-  EVERY_15_DAYS: "Cada 15 días",
-  MONTHLY: "Una vez al mes",
-};
-
-const FREQUENCY_OPTIONS: SyncFrequency[] = ["DAILY", "EVERY_3_DAYS", "WEEKLY", "EVERY_15_DAYS", "MONTHLY"];
-
-function formatDate(v: string | null) {
-  if (!v) return "—";
-  return new Date(v).toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
 function AutomaticTab() {
   const progress = useSyncJobs("/api/sales-import/sync-jobs?page=1&pageSize=20");
-  const [credential, setCredential] = useState<{ status?: string; verifiedAt?: string | null } | null>(null);
+  const [credential, setCredential] = useState<SalesCredentialView | null>(null);
   const [config, setConfig] = useState<SyncConfig | null>(null);
   const [hasFeature, setHasFeature] = useState<boolean | null>(null);
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -569,7 +551,10 @@ function AutomaticTab() {
   const [copied, setCopied] = useState(false);
   const [showApiConfig, setShowApiConfig] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const actionPending = useRef(false);
+  const syncJobs = progress.jobs.filter((job) => job.type === "SYNC_ISSUED_DOCUMENTS");
+  const syncJob = syncJobs.find((job) => ["RUNNING", "QUEUED"].includes(job.status)) ?? progress.resumeJob ?? selectVisibleSyncJob(syncJobs);
 
   const fetchData = useCallback((background = false, signal?: AbortSignal) => {
     return Promise.all([
@@ -580,10 +565,10 @@ function AutomaticTab() {
       return Promise.all([syncRes.json(), tokenRes.json()]);
     }).then(([syncData, tokenData]) => {
       if (signal?.aborted) return;
-      if (syncData.ok) { setConfig(syncData.config); setHasFeature(syncData.hasFeature); setCredential(syncData.credential); }
+      if (syncData.ok) { setConfig(syncData.config); setHasFeature(syncData.hasFeature); setCredential(syncData.credential); setLoadError(null); }
       if (tokenData.ok) setTokens(tokenData.tokens);
     }).catch(() => {
-      if (!signal?.aborted) setError("No se pudo cargar la configuración de sincronización.");
+      if (!signal?.aborted) setLoadError("No se pudo cargar la configuración de sincronización.");
     }).finally(() => { if (!signal?.aborted && !background) setLoading(false); });
   }, []);
 
@@ -599,43 +584,28 @@ function AutomaticTab() {
   }, [fetchData, progress.job?.status, progress.job?.id]);
 
   async function updateConfig(patch: Record<string, unknown>) {
-    setError(""); setMessage("");
+    if (actionPending.current) return;
+    actionPending.current = true; setSyncing(true); setError("");
     try {
-      const res = await fetch("/api/sales-import/auto-sync", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
-      });
+      const res = await fetch("/api/sales-import/auto-sync", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
       const data = await res.json();
-      if (data.ok) { setConfig(data.config); setMessage("Configuración guardada."); }
-      else setError(data.error ?? "Error al guardar.");
-    } catch { setError("Error de conexión."); }
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "No se pudo guardar la programación.");
+      setConfig(data.config);
+    } catch (err) { setError(err instanceof Error ? err.message : "Error de conexión."); }
+    finally { actionPending.current = false; setSyncing(false); }
   }
 
   async function manualSync() {
-    setError(""); setMessage(""); setSyncing(true);
+    if (actionPending.current) return;
+    actionPending.current = true; setSyncing(true); setError("");
     try {
-      const res = await fetch("/api/sales-import/auto-sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "manual_sync" }),
-      });
+      const res = await fetch("/api/sales-import/auto-sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(syncJob?.resumable ? { action: "resume_sync" } : { action: "manual_sync" }) });
       const data = await res.json();
-      if (data.ok) { if (data.job) progress.trackJob(data.job); await progress.refresh(); setMessage("Sincronización manual iniciada."); }
-      else setError(data.error ?? "Error al sincronizar.");
-    } catch { setError("Error de conexión."); }
-    finally { setSyncing(false); }
-  }
-
-  async function verifyConnection() {
-    setError(""); setSyncing(true);
-    try {
-      const res = await fetch("/api/sales-import/auto-sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify_connection" }) });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error ?? "No se pudo iniciar la verificación.");
-      progress.trackJob(data.job);
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "No se pudo iniciar la sincronización.");
+      if (data.job) progress.trackJob(data.job);
+      await progress.refresh();
     } catch (err) { setError(err instanceof Error ? err.message : "Error de conexión."); }
-    finally { setSyncing(false); }
+    finally { actionPending.current = false; setSyncing(false); }
   }
 
   async function generateToken() {
@@ -669,8 +639,6 @@ function AutomaticTab() {
     }
   }
 
-  if (loading) return <p className="py-8 text-center text-slate-400">Cargando...</p>;
-
   if (hasFeature === false) {
     return (
       <div className="space-y-6">
@@ -700,110 +668,16 @@ function AutomaticTab() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            Importación automática
-            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">Premium</span>
-          </h2>
-          <p className="mt-1 text-sm text-slate-600">Consolida automáticamente ventas creadas fuera de Facturom.</p>
-        </div>
-      </div>
+      <SalesAutomaticSyncView
+        credential={credential} config={config} job={syncJob} latestJob={progress.job}
+        busy={syncing} loading={loading} error={error || loadError || progress.error}
+        onSync={manualSync} onToggle={(enabled) => updateConfig({ enabled, sriEnabled: true })}
+        onFrequency={(syncFrequency) => updateConfig({ syncFrequency })}
+      />
 
-      {error && <p className="rounded border border-red-300 p-3 text-sm text-red-800">{error}</p>}
-      {message && <p className="rounded border border-green-300 p-3 text-sm text-green-800">{message}</p>}
-
-      {progress.error && <p role="alert" className="text-sm text-red-700">{progress.error}</p>}
-      {progress.job && <SyncProgressCard job={progress.job} title="Último intento de sincronización de ventas" />}
-      <Link className="text-sm text-blue-700 underline" href="/facturacion/sales/imports/sync-history">Consultar historial</Link>
-
-      {/* SRI Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Shield className="h-5 w-5 text-amber-600" /> SRI / Facturador SRI
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-slate-600">Facturom revisa periódicamente los comprobantes emitidos en tu cuenta del SRI e importa únicamente los que aún no existen.</p>
-
-          <p className="text-sm"><Link href="/facturacion/configuration?tab=sri" className="text-blue-700 underline">Configurar credenciales en Empresa → Configuración → SRI</Link></p>
-          <Button variant="outline" onClick={verifyConnection} disabled={syncing || ["QUEUED", "RUNNING"].includes(progress.job?.status ?? "")}>Verificar conexión de ventas</Button>
-          {!config?.sriEnabled ? (
-            <Button onClick={() => updateConfig({ sriEnabled: true })} className="bg-[#1E52F1] hover:bg-[#1E52F1]/90">
-              <Shield className="mr-1 h-4 w-4" /> Habilitar consulta SRI
-            </Button>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-medium text-slate-700 flex items-center gap-1">
-                  {connectionLabel(credential?.status, progress.job, credential?.verifiedAt)}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <label className="text-sm font-medium">Importación automática</label>
-                <button
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${config.enabled ? "bg-[#1E52F1]" : "bg-slate-200"}`}
-                  onClick={() => updateConfig({ enabled: !config.enabled })}
-                >
-                  <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${config.enabled ? "translate-x-6" : "translate-x-1"}`} />
-                </button>
-              </div>
-
-              {config.enabled && (
-                <>
-                  <div>
-                    <label className="text-sm font-medium block mb-1">Frecuencia</label>
-                    <select
-                      className="h-9 rounded-md border bg-white px-3 text-sm"
-                      value={config.syncFrequency}
-                      onChange={(e) => updateConfig({ syncFrequency: e.target.value })}
-                    >
-                      {FREQUENCY_OPTIONS.map((f) => (
-                        <option key={f} value={f}>{FREQUENCY_LABELS[f]}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2 text-sm">
-                    <div>
-                      <p className="text-slate-500">Última sincronización</p>
-                      <p className="font-medium">{formatDate(config.lastSyncAt)}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500">Próxima sincronización</p>
-                      <p className="font-medium">{formatDate(config.nextSyncAt)}</p>
-                    </div>
-                  </div>
-
-                  {config.lastError && (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                      <div>
-                        {config.lastError === "HUMAN_VERIFICATION_REQUIRED" ? (
-                          <>
-                            <p className="font-medium">Se requiere verificación manual en el SRI.</p>
-                            <Button variant="outline" size="sm" className="mt-2" onClick={manualSync} disabled={syncing}>Verificar conexión</Button>
-                          </>
-                        ) : (
-                          <p>{config.lastError}</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <Button variant="outline" onClick={manualSync} disabled={syncing || ["QUEUED", "RUNNING"].includes(progress.job?.status ?? "")} >
-                    <RefreshCw className={`mr-1 h-4 w-4 ${syncing ? "animate-spin" : ""}`} /> Sincronizar ahora
-                  </Button>
-                </>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
+      <details className="rounded-xl border border-slate-200 px-4 py-3">
+        <summary className="cursor-pointer text-sm font-medium text-slate-600">Otras integraciones · API</summary>
+        <div className="pt-4">
       {/* API Integration Card */}
       <Card>
         <CardHeader>
@@ -904,6 +778,8 @@ Authorization: Bearer fsi_...
           )}
         </CardContent>
       </Card>
+        </div>
+      </details>
     </div>
   );
 }

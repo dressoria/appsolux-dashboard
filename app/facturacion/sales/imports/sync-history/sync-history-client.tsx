@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SyncProgressCard } from "@/components/appsolux/sri-tax/sync-progress-card";
+import Link from "next/link";
+import { SalesSyncProgressCard } from "@/components/appsolux/sri-tax/sync-progress-card";
 
 type SyncJob = {
   id: string;
@@ -23,10 +24,14 @@ type SyncJob = {
   documentsFound: number;
   documentsImported: number;
   documentsSkipped: number;
+  documentsRejected: number;
+  resumable?: boolean;
+  attemptHistory?: Array<{ event?: string; errorCode?: string | null; errorMessage?: string | null; finishedAt?: string; resumedAt?: string }>;
   documentsFailed: number;
   errorCode: string | null;
   errorMessage: string | null;
   createdAt: string;
+  updatedAt?: string;
 };
 
 const STATUS_BADGES: Record<string, { label: string; className: string }> = {
@@ -67,6 +72,7 @@ export function SyncHistoryClient() {
   const [triggeringSync, setTriggeringSync] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchJobs = useCallback((p: number, signal?: AbortSignal) => {
@@ -77,9 +83,9 @@ export function SyncHistoryClient() {
         return data;
       }).then((data) => {
         if (signal?.aborted) return;
-        setJobs(data.jobs); setTotalPages(data.totalPages); setTotal(data.total);
+        setJobs(data.jobs); setTotalPages(data.totalPages); setTotal(data.total); setLoadError(null);
       }).catch((err: unknown) => {
-        if (!signal?.aborted) setError(err instanceof Error ? err.message : "Error de conexión.");
+        if (!signal?.aborted) setLoadError(err instanceof Error ? err.message : "Error de conexión.");
       }).finally(() => { if (!signal?.aborted) setLoading(false); });
   }, []);
 
@@ -112,7 +118,7 @@ export function SyncHistoryClient() {
     };
   }, [activeJobId, page, fetchJobs]);
 
-  async function triggerHistoricalSync() {
+  async function triggerHistoricalSync(jobId?: string) {
     setTriggeringSync(true);
     setError(null);
     setMessage(null);
@@ -120,11 +126,11 @@ export function SyncHistoryClient() {
       const res = await fetch("/api/sales-import/auto-sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "historical_sync" }),
+        body: JSON.stringify(jobId ? { action: "resume_sync", jobId } : { action: "manual_sync" }),
       });
       const data = await res.json();
       if (data.ok) {
-        setMessage(`Sincronización histórica iniciada (desde ${data.dateFrom?.slice(0, 10) ?? "2026-01-01"}).`);
+        setMessage(data.resumed ? "Sincronización reanudada desde su checkpoint." : data.created ? "Sincronización en cola." : "Ya existe un trabajo activo.");
         setPage(1);
         await fetchJobs(1);
       } else {
@@ -147,11 +153,11 @@ export function SyncHistoryClient() {
           </p>
         </div>
         <Button
-          onClick={triggerHistoricalSync}
+          onClick={() => triggerHistoricalSync()}
           disabled={triggeringSync}
           className="shrink-0"
         >
-          {triggeringSync ? "Iniciando..." : "Sincronización histórica"}
+          {triggeringSync ? "Iniciando..." : "Sincronizar ahora"}
         </Button>
       </div>
 
@@ -160,13 +166,14 @@ export function SyncHistoryClient() {
           {message}
         </div>
       )}
-      {error && (
+      {(error || loadError) && (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
-          {error}
+          {error || loadError}
         </div>
       )}
 
-      {visibleJob && <SyncProgressCard job={visibleJob} title="Último intento de sincronización de ventas" />}
+      {visibleJob && <SalesSyncProgressCard job={visibleJob} compact /> }
+      <Link href="/facturacion/sales/imports/automatic" className="text-sm font-medium text-blue-700">Volver a importación automática</Link>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -222,10 +229,12 @@ export function SyncHistoryClient() {
                     <th className="px-3 py-2">Período</th>
                     <th className="px-3 py-2">Encontrados</th>
                     <th className="px-3 py-2">Importados</th>
-                    <th className="px-3 py-2">Omitidos</th>
+                    <th className="px-3 py-2">Duplicados</th>
+                    <th className="px-3 py-2">Rechazados / omitidos</th>
+                    <th className="px-3 py-2">Acciones</th>
                     <th className="px-3 py-2">Fallidos</th>
                     <th className="px-3 py-2">Duración</th>
-                    <th className="px-3 py-2">Fecha</th>
+                    <th className="px-3 py-2">Última actividad</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -254,9 +263,13 @@ export function SyncHistoryClient() {
                         <td className="px-3 py-2 text-center">{job.documentsFound}</td>
                         <td className="px-3 py-2 text-center text-emerald-600 font-medium">{job.documentsImported}</td>
                         <td className="px-3 py-2 text-center text-muted-foreground">{job.documentsSkipped}</td>
+                        <td className="px-3 py-2 text-center text-amber-700">{job.documentsRejected}</td>
+                        <td className="px-3 py-2 space-y-2">{job.resumable && !activeJob && <Button size="sm" variant="outline" disabled={triggeringSync} onClick={() => triggerHistoricalSync(job.id)}>Reanudar</Button>}
+                          {(job.errorMessage || job.attemptHistory?.length) ? <details className="max-w-xs text-xs"><summary className="cursor-pointer text-blue-700">Ver detalles</summary><p className="mt-2 break-words">{job.errorCode} {job.errorMessage}</p>{job.attemptHistory?.map((attempt, index) => <p key={index} className="mt-2 break-words">{attempt.resumedAt ?? attempt.finishedAt} · {attempt.event} · {attempt.errorCode} {attempt.errorMessage}</p>)}</details> : null}
+                        </td>
                         <td className="px-3 py-2 text-center text-red-600">{job.documentsFailed}</td>
                         <td className="px-3 py-2 text-xs">{formatDuration(job.durationMs)}</td>
-                        <td className="px-3 py-2 text-xs">{formatDate(job.createdAt)}</td>
+                        <td className="px-3 py-2 text-xs">{formatDate(job.updatedAt ?? job.createdAt)}</td>
                       </tr>
                     );
                   })}
@@ -282,31 +295,7 @@ export function SyncHistoryClient() {
         </CardContent>
       </Card>
 
-      {/* Error details for failed jobs */}
-      {jobs.some((j) => j.errorMessage) && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Detalles de errores recientes</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {jobs
-              .filter((j) => j.errorMessage)
-              .slice(0, 5)
-              .map((job) => (
-                <div key={job.id} className="rounded-md border p-3 text-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium">{TYPE_LABELS[job.type] ?? job.type}</span>
-                    <span className="text-xs text-muted-foreground">{formatDate(job.createdAt)}</span>
-                  </div>
-                  {job.errorCode && (
-                    <p className="mt-1 text-xs font-mono text-red-600">{job.errorCode}</p>
-                  )}
-                  <p className="mt-1 text-xs text-muted-foreground">{job.errorMessage}</p>
-                </div>
-              ))}
-          </CardContent>
-        </Card>
-      )}
+
     </div>
   );
 }

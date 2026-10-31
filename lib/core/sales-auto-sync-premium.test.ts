@@ -120,7 +120,7 @@ test("Scheduler does NOT do SRI work (only creates jobs)", async () => {
 test("Manual sync works regardless of nextSyncAt", async () => {
   const source = await readFile(routePath, "utf8");
   assert.match(source, /manual_sync/);
-  assert.match(source, /createScheduledSyncJob/);
+  assert.match(source, /requestSalesSync/);
 });
 
 test("Manual sync requires Enterprise feature", async () => {
@@ -131,8 +131,10 @@ test("Manual sync requires Enterprise feature", async () => {
 
 test("Manual sync prevents duplicate running jobs", async () => {
   const source = await readFile(routePath, "utf8");
-  assert.match(source, /hasRunningSyncJob/);
-  assert.match(source, /409/);
+  assert.match(source, /requestSalesSync/);
+  const adapter = await readFile(adapterPath, "utf8");
+  assert.match(adapter, /pg_advisory_xact_lock/);
+  assert.match(adapter, /return \{ job: active/);
 });
 
 // ── CAPTCHA ─────────────────────────────────────────────────────────────────
@@ -142,11 +144,12 @@ test("HUMAN_VERIFICATION_REQUIRED status exists in schema", async () => {
   assert.match(source, /HUMAN_VERIFICATION_REQUIRED/);
 });
 
-test("UI shows CAPTCHA verification message", async () => {
-  const source = await readFile(uiPath, "utf8");
-  assert.match(source, /HUMAN_VERIFICATION_REQUIRED/);
-  assert.match(source, /verificación manual/i);
-  assert.match(source, /Verificar conexión/);
+test("UI keeps human verification distinct and explicit connection verification optional", async () => {
+  const source = await readFile(new URL("./sri-sync-presentation.ts", import.meta.url), "utf8");
+  assert.match(source, /SRI_HUMAN_VERIFICATION_REQUIRED/);
+  assert.match(source, /verificación humana/i);
+  const configuration = await readFile(new URL("../../components/appsolux/sri-tax/sri-credentials-section.tsx", import.meta.url), "utf8");
+  assert.match(configuration, /Verificar conexión de ventas/);
 });
 
 // ── API Integration ─────────────────────────────────────────────────────────
@@ -180,11 +183,11 @@ test("UI shows blocked state with 'Disponible en el plan Empresarial'", async ()
   assert.match(source, /Ver planes/);
 });
 
-test("UI enables SRI configuration without claiming verified authentication", async () => {
-  const source = await readFile(uiPath, "utf8");
-  assert.match(source, /SRI \/ Facturador SRI/);
-  assert.match(source, /Habilitar consulta SRI/);
-  assert.match(source, /connectionLabel/);
+test("UI separates configured credentials from the current session", async () => {
+  const source = await readFile(new URL("../../components/appsolux/sri-tax/sales-automatic-sync-view.tsx", import.meta.url), "utf8");
+  assert.match(source, /salesCredentialLabel/);
+  assert.match(source, /salesSessionLabel/);
+  assert.match(source, /Configuración SRI/);
 });
 
 test("UI has Integración por API card", async () => {
@@ -204,12 +207,12 @@ test("AutomaticTab does NOT show Telegram or n8n labels", async () => {
 });
 
 test("SRI card has Sincronizar ahora button", async () => {
-  const source = await readFile(uiPath, "utf8");
+  const source = await readFile(new URL("../../components/appsolux/sri-tax/sales-automatic-sync-view.tsx", import.meta.url), "utf8");
   assert.match(source, /Sincronizar ahora/);
 });
 
 test("Frequency selector has all 5 options", async () => {
-  const source = await readFile(uiPath, "utf8");
+  const source = await readFile(new URL("../../components/appsolux/sri-tax/sales-automatic-sync-view.tsx", import.meta.url), "utf8");
   assert.match(source, /Una vez al día/);
   assert.match(source, /Cada 3 días/);
   assert.match(source, /Una vez por semana/);
@@ -226,14 +229,14 @@ test("No hourly frequency options exist", async () => {
 });
 
 test("UI shows enable/disable toggle", async () => {
-  const source = await readFile(uiPath, "utf8");
-  assert.match(source, /enabled.*!config\.enabled/);
+  const source = await readFile(new URL("../../components/appsolux/sri-tax/sales-automatic-sync-view.tsx", import.meta.url), "utf8");
+  assert.match(source, /onToggle\(event\.target\.checked\)/);
 });
 
 test("UI shows last sync and next sync dates", async () => {
-  const source = await readFile(uiPath, "utf8");
-  assert.match(source, /Última sincronización/);
-  assert.match(source, /Próxima sincronización/);
+  const source = await readFile(new URL("../../components/appsolux/sri-tax/sales-automatic-sync-view.tsx", import.meta.url), "utf8");
+  assert.match(source, /SalesSyncProgressCard/);
+  assert.match(source, /Próxima revisión/);
 });
 
 // ── Schema ──────────────────────────────────────────────────────────────────

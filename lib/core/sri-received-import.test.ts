@@ -377,6 +377,7 @@ test("H04 – SOAP client uses only fetch (no browser dependencies)", async () =
 // I. Historical Sync Route (Phase D)
 // ══════════════════════════════════════════════════════════════════════════════
 
+const salesAdapterPath = new URL("./sales-sync-adapter.ts", import.meta.url);
 const autoSyncRoutePath = new URL("../../app/api/sales-import/auto-sync/route.ts", import.meta.url);
 
 test("I01 – auto-sync route handles historical_sync action", async () => {
@@ -391,27 +392,25 @@ test("I02 – historical_sync requires dashboard session", async () => {
 });
 
 test("I03 – historical_sync checks SRI enabled before creating job", async () => {
-  const source = await readFile(autoSyncRoutePath, "utf8");
-  const historicalBlock = source.slice(source.indexOf("historical_sync"));
-  assert.match(historicalBlock, /sriEnabled/);
+  const source = await readFile(salesAdapterPath, "utf8");
+  assert.match(source, /purchaseSriCredential\.findUnique/);
 });
 
 test("I04 – historical_sync checks for running jobs to prevent concurrency", async () => {
-  const source = await readFile(autoSyncRoutePath, "utf8");
-  const historicalBlock = source.slice(source.indexOf("historical_sync"));
-  assert.match(historicalBlock, /hasRunningSyncJob/);
-  assert.match(historicalBlock, /409/);
+  const source = await readFile(salesAdapterPath, "utf8");
+  assert.match(source, /pg_advisory_xact_lock/);
+  assert.match(source, /return \{ job: active/);
 });
 
 test("I05 – historical_sync creates SYNC_ISSUED_DOCUMENTS job", async () => {
-  const source = await readFile(autoSyncRoutePath, "utf8");
+  const source = await readFile(salesAdapterPath, "utf8");
   assert.match(source, /SYNC_ISSUED_DOCUMENTS/);
   assert.match(source, /salesSriSyncJob\.create/);
 });
 
 test("I06 – historical_sync defaults to January 1 of Ecuador fiscal year", async () => {
-  const source = await readFile(autoSyncRoutePath, "utf8");
-  assert.match(source, /fiscalYear/);
+  const source = await readFile(salesAdapterPath, "utf8");
+  assert.match(source, /year: "numeric"/);
   assert.match(source, /America\/Guayaquil/);
   assert.match(source, /-01-01/);
 });
@@ -419,24 +418,24 @@ test("I06 – historical_sync defaults to January 1 of Ecuador fiscal year", asy
 test("I07 – historical_sync accepts optional body.dateFrom", async () => {
   const source = await readFile(autoSyncRoutePath, "utf8");
   assert.match(source, /body\.dateFrom/);
-  assert.match(source, /typeof body\.dateFrom === "string"/);
+  assert.match(source, /typeof body\.dateFrom !== "string"/);
 });
 
 test("I08 – historical_sync returns jobId, dateFrom, dateTo", async () => {
   const source = await readFile(autoSyncRoutePath, "utf8");
-  assert.match(source, /jobId: job\.id/);
+  assert.match(source, /jobId: result\.job\.id/);
   assert.match(source, /dateFrom:/);
   assert.match(source, /dateTo:/);
 });
 
 test("I09 – historical_sync sets maxAttempts for retry support", async () => {
-  const source = await readFile(autoSyncRoutePath, "utf8");
+  const source = await readFile(salesAdapterPath, "utf8");
   assert.match(source, /maxAttempts: 3/);
 });
 
 test("I10 – auto-sync route rejects unknown actions with 400", async () => {
   const source = await readFile(autoSyncRoutePath, "utf8");
-  assert.match(source, /Unknown action/);
+  assert.match(source, /Acción desconocida/);
   assert.match(source, /400/);
 });
 
@@ -528,7 +527,7 @@ test("K05 – sync history client shows document counts", async () => {
 
 test("K06 – sync history client supports historical sync trigger", async () => {
   const source = await readFile(syncHistoryClientPath, "utf8");
-  assert.match(source, /historical_sync/);
+  assert.match(source, /resume_sync/);
   assert.match(source, /\/api\/sales-import\/auto-sync/);
 });
 
@@ -664,9 +663,9 @@ test("N05 – XML API route returns 404 when XML not available", async () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 test("O01 – automatic sales screen preserves a separate history link", async () => {
-  const source = await readFile("app/facturacion/sales/imports/sales-import-client.tsx", "utf8");
+  const source = await readFile("components/appsolux/sri-tax/sales-automatic-sync-view.tsx", "utf8");
   assert.match(source, /sync-history/);
-  assert.match(source, /Consultar historial/);
+  assert.match(source, /Ver historial/);
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

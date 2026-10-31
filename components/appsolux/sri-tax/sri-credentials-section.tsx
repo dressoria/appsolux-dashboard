@@ -46,27 +46,34 @@ export function SriCredentialsSection() {
   const [showAdditional, setShowAdditional] = useState(false);
   const [saving, setSaving] = useState(false);
   const [credError, setCredError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [credSuccess, setCredSuccess] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [profileRes, credRes] = await Promise.all([
-        fetch("/api/sri/profile"),
-        fetch("/api/purchases/sri-credentials"),
-      ]);
-      const profileData = await profileRes.json();
-      const credData: CredentialInfo = await credRes.json();
-      setProfile(profileData.profile ?? null);
-      setCred(credData);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchAll = useCallback((signal?: AbortSignal) => Promise.all([
+    fetch("/api/sri/profile", { cache: "no-store", signal }),
+    fetch("/api/purchases/sri-credentials", { cache: "no-store", signal }),
+  ]).then(async ([profileRes, credRes]) => {
+    if (!profileRes.ok || !credRes.ok) throw new Error("No se pudo cargar la configuración SRI.");
+    return Promise.all([profileRes.json(), credRes.json()]);
+  }).then(([profileData, credData]) => {
+    if (!signal?.aborted) { setProfile(profileData.profile ?? null); setCred(credData); setLoadError(null); }
+  }).catch(() => { if (!signal?.aborted) setLoadError("No se pudo consultar la configuración SRI."); })
+    .finally(() => { if (!signal?.aborted) setLoading(false); }), []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchAll(controller.signal);
+    return () => controller.abort();
+  }, [fetchAll]);
+
+  useEffect(() => {
+    if (cred?.status !== "PENDING_VERIFICATION") return;
+    const controller = new AbortController();
+    const timer = setInterval(() => { void fetchAll(controller.signal); }, 5000);
+    return () => { clearInterval(timer); controller.abort(); };
+  }, [fetchAll, cred?.status]);
 
   async function handleSaveCredentials() {
     if (!username.trim() || !password.trim()) {
@@ -83,12 +90,13 @@ export function SriCredentialsSection() {
         body: JSON.stringify({
           username: username.trim(),
           password,
-          additionalUserId: additionalUser.trim() || null,
+          ...(showAdditional ? { additionalUserId: additionalUser.trim() || null } : {}),
+          verificationTarget: "sales",
         }),
       });
       const data = await res.json();
       if (data.ok) {
-        setCredSuccess("Credenciales guardadas. Verificación en proceso...");
+        setCredSuccess(data.unchanged ? "Las credenciales ya estaban guardadas. Se conserva su verificación." : "Credenciales guardadas. Verificación inicial en proceso...");
         setEditing(false);
         setPassword("");
         fetchAll();
@@ -100,6 +108,17 @@ export function SriCredentialsSection() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleVerifySales() {
+    setSaving(true); setCredError(null); setCredSuccess(null);
+    try {
+      const response = await fetch("/api/sales-import/auto-sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify_connection" }) });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error ?? "No se pudo iniciar la verificación.");
+      setCredSuccess(data.created ? "Verificación de ventas en cola. Puedes consultar el progreso en Importación automática." : "Ya hay un trabajo activo. Puedes consultar su progreso en Importación automática.");
+    } catch (err) { setCredError(err instanceof Error ? err.message : "Error de conexión."); }
+    finally { setSaving(false); }
   }
 
   async function handleDelete() {
@@ -126,7 +145,7 @@ export function SriCredentialsSection() {
     );
   }
 
-  const statusInfo = cred?.status ? STATUS_LABELS[cred.status] : null;
+  const statusInfo = cred?.status === "ERROR" && cred.verifiedAt ? { label: "Credenciales guardadas", color: "text-slate-700 bg-slate-50" } : cred?.status ? STATUS_LABELS[cred.status] : null;
 
   return (
     <div className="space-y-6">
@@ -193,9 +212,9 @@ export function SriCredentialsSection() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {credError && (
+          {(credError || loadError) && (
             <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300">
-              {credError}
+              {credError || loadError}
             </div>
           )}
           {credSuccess && (
@@ -234,12 +253,14 @@ export function SriCredentialsSection() {
                   </div>
                 )}
               </div>
-              {cred.lastVerificationErrorSafe && (
+              {cred.lastVerificationErrorSafe && !cred.verifiedAt && (
                 <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
                   Último error: {cred.lastVerificationErrorSafe}
                 </div>
               )}
-              <div className="flex gap-2">
+              {cred.lastVerificationErrorSafe && cred.verifiedAt && <details className="text-sm text-muted-foreground"><summary className="cursor-pointer">Último intento de verificación con dificultades</summary><p className="mt-2">La configuración guardada se conserva. {cred.lastVerificationErrorSafe}</p></details>}
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" disabled={saving} onClick={handleVerifySales}>Verificar conexión de ventas</Button>
                 <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
                   Actualizar credenciales
                 </Button>

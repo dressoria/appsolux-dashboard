@@ -1,6 +1,6 @@
 import "@/lib/security/server-only";
 import { getPrismaClient } from "@/lib/db/prisma";
-import { randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
+import { randomBytes, createCipheriv, createDecipheriv, timingSafeEqual, createHash } from "node:crypto";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
@@ -71,6 +71,9 @@ export async function upsertCredential(
   additionalUserId?: string | null,
 ) {
   const prisma = getPrismaClient();
+  const existing = await getCredential(tenantId);
+  const effectiveAdditional = additionalUserId === undefined ? existing?.additionalUserId ?? null : additionalUserId;
+  if (existing && credentialMatchesInput(existing, username, password, effectiveAdditional)) return existing;
   const { encryptedPassword, iv, authTag, keyVersion } =
     encryptSriPassword(password);
 
@@ -79,7 +82,7 @@ export async function upsertCredential(
     create: {
       tenantId,
       username,
-      additionalUserId: additionalUserId ?? null,
+      additionalUserId: effectiveAdditional ?? null,
       encryptedPassword,
       encryptionIv: iv,
       authTag,
@@ -88,16 +91,25 @@ export async function upsertCredential(
     },
     update: {
       username,
-      additionalUserId: additionalUserId ?? null,
+      additionalUserId: effectiveAdditional ?? null,
       encryptedPassword,
       encryptionIv: iv,
       authTag,
       keyVersion,
       status: "PENDING_VERIFICATION",
       verifiedAt: null,
+      lastVerificationAt: null,
       lastVerificationError: null,
     },
   });
+}
+
+// Equality is checked only on the server; no plaintext or comparison digest is persisted.
+export function credentialMatchesInput(credential: { username: string; additionalUserId: string | null; encryptedPassword: string; encryptionIv: string; authTag: string }, username: string, password: string, additionalUserId?: string | null): boolean {
+  if (credential.username !== username || (credential.additionalUserId ?? null) !== (additionalUserId || null)) return false;
+  const existing = decryptSriPassword(credential.encryptedPassword, credential.encryptionIv, credential.authTag);
+  const digest = (value: string) => createHash("sha256").update(value).digest();
+  return timingSafeEqual(digest(existing), digest(password));
 }
 
 export async function deleteCredential(tenantId: string) {

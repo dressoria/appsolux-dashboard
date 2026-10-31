@@ -6,7 +6,9 @@ import {
   upsertCredential,
   deleteCredential,
   credentialToPublicView,
+  credentialMatchesInput,
 } from "@/lib/core/purchase-sri-credentials";
+import { requestSalesSync } from "@/lib/core/sales-sync-adapter";
 import { createSyncJob } from "@/lib/core/purchase-sync-jobs";
 
 export async function GET() {
@@ -33,12 +35,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Contraseña SRI requerida." }, { status: 400 });
   }
 
-  await upsertCredential(
-    tenant.id,
-    username.trim(),
-    password,
-    additionalUserId?.trim() || null,
-  );
+  const existing = await getCredential(tenant.id);
+  const additional = additionalUserId === undefined ? existing?.additionalUserId ?? null : typeof additionalUserId === "string" ? additionalUserId.trim() || null : null;
+  if (existing && credentialMatchesInput(existing, username.trim(), password, additional)) {
+    return NextResponse.json({ ok: true, unchanged: true, status: existing.status });
+  }
+  await upsertCredential(tenant.id, username.trim(), password, additional);
+
+  // The existing purchases caller keeps its verification path. Central sales
+  // configuration opts into the already established sales connector explicitly.
+  if (body.verificationTarget === "sales") {
+    const { job } = await requestSalesSync(tenant.id, { action: "verify_connection", requestedByUserId: user.id });
+    return NextResponse.json({ ok: true, status: "PENDING_VERIFICATION", jobId: job.id });
+  }
 
   const { job } = await createSyncJob(tenant.id, "VERIFY_CONNECTION", {
     trigger: "ACTIVATION",

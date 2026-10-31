@@ -4,9 +4,8 @@ import { NextResponse } from "next/server";
 import type { SalesAutoSyncFrequency } from "../../../../node_modules/.prisma/client";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { resolveEffectiveTenantAccessForTenant, featureEnabled } from "@/lib/core/tenant-features";
-import { getSalesAutoSyncConfig, upsertSalesAutoSyncConfig, hasRunningSyncJob, createScheduledSyncJob } from "@/lib/core/sales-sync-adapter";
+import { getSalesAutoSyncConfig, upsertSalesAutoSyncConfig, requestSalesSync, SalesSyncRequestError } from "@/lib/core/sales-sync-adapter";
 import { SYNC_FREQUENCY_OPTIONS } from "@/lib/core/sales-auto-sync";
-import { getPrismaClient } from "@/lib/db/prisma";
 
 export async function GET() {
   const { tenant } = await requireDashboardSession();
@@ -56,7 +55,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { tenant } = await requireDashboardSession();
+  const { tenant, user } = await requireDashboardSession();
 
   const access = await resolveEffectiveTenantAccessForTenant({ tenantId: tenant.id });
   if (!featureEnabled(access.features, "sales_auto_sync")) {
@@ -73,60 +72,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Invalid body." }, { status: 400 });
   }
 
-  if (body.action === "verify_connection") {
-    const credential = await getCredential(tenant.id);
-    if (!credential) return NextResponse.json({ ok: false, error: "Configure las credenciales en Empresa → Configuración → SRI." }, { status: 400 });
-    const prisma = getPrismaClient();
-    const existing = await prisma.salesSriSyncJob.findFirst({ where: { tenantId: tenant.id, status: { in: ["QUEUED", "RUNNING"] } }, orderBy: { createdAt: "desc" } });
-    const job = existing ?? await prisma.salesSriSyncJob.create({ data: { tenantId: tenant.id, type: "VERIFY_CONNECTION", maxAttempts: 3 } });
-    return NextResponse.json({ ok: true, jobId: job.id, job });
+  if (!["manual_sync", "resume_sync", "historical_sync", "verify_connection"].includes(String(body.action))) {
+    return NextResponse.json({ ok: false, error: "Acción desconocida." }, { status: 400 });
   }
-
-  if (body.action === "manual_sync") {
-    const config = await getSalesAutoSyncConfig(tenant.id);
-    if (!config?.sriEnabled) {
-      return NextResponse.json({ ok: false, error: "SRI no está configurado." }, { status: 400 });
-    }
-
-    if (await hasRunningSyncJob(tenant.id)) {
-      return NextResponse.json({ ok: false, error: "Ya existe una sincronización en curso." }, { status: 409 });
-    }
-
-    const job = await createScheduledSyncJob(tenant.id, config.syncFrequency);
-    return NextResponse.json({ ok: true, jobId: job.id, job });
+  let dateFrom: Date | undefined;
+  if (body.action === "historical_sync" && body.dateFrom !== undefined) {
+    if (typeof body.dateFrom !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.dateFrom)) return NextResponse.json({ ok: false, error: "Período inválido." }, { status: 400 });
+    dateFrom = new Date(`${body.dateFrom}T00:00:00-05:00`);
+    if (!Number.isFinite(dateFrom.getTime()) || dateFrom > new Date()) return NextResponse.json({ ok: false, error: "Período inválido." }, { status: 400 });
   }
-
-  if (body.action === "historical_sync") {
-    const config = await getSalesAutoSyncConfig(tenant.id);
-    if (!config?.sriEnabled) {
-      return NextResponse.json({ ok: false, error: "SRI no está configurado." }, { status: 400 });
-    }
-
-    if (await hasRunningSyncJob(tenant.id)) {
-      return NextResponse.json({ ok: false, error: "Ya existe una sincronización en curso." }, { status: 409 });
-    }
-
-    const fiscalYear = new Intl.DateTimeFormat("en", { timeZone: "America/Guayaquil", year: "numeric" }).format(new Date());
-    const dateFromStr = typeof body.dateFrom === "string" ? body.dateFrom : `${fiscalYear}-01-01`;
-    const dateFrom = new Date(`${dateFromStr}T00:00:00-05:00`);
-    const dateTo = new Date();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateFromStr) || !Number.isFinite(dateFrom.getTime()) || dateFrom > dateTo) {
-      return NextResponse.json({ ok: false, error: "Período de sincronización inválido." }, { status: 400 });
-    }
-
-    const prisma = getPrismaClient();
-    const job = await prisma.salesSriSyncJob.create({
-      data: {
-        tenantId: tenant.id,
-        type: "SYNC_ISSUED_DOCUMENTS",
-        dateFrom,
-        dateTo,
-        maxAttempts: 3,
-      },
+  try {
+    const result = await requestSalesSync(tenant.id, {
+      action: body.action as "manual_sync" | "resume_sync" | "historical_sync" | "verify_connection",
+      requestedByUserId: user.id,
+      jobId: typeof body.jobId === "string" ? body.jobId : undefined,
+      dateFrom,
     });
-
-    return NextResponse.json({ ok: true, jobId: job.id, job, dateFrom: dateFrom.toISOString(), dateTo: dateTo.toISOString() });
+    return NextResponse.json({ ok: true, ...result, jobId: result.job.id, dateFrom: result.job.dateFrom, dateTo: result.job.dateTo });
+  } catch (error) {
+    if (error instanceof SalesSyncRequestError) return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
+    throw error;
   }
-
-  return NextResponse.json({ ok: false, error: "Unknown action." }, { status: 400 });
 }

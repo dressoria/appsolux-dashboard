@@ -5,6 +5,7 @@ import { selectVisibleSyncJob, type SyncJobView } from "@/lib/core/sri-sync-pres
 
 export function useSyncJobs(endpoint: string) {
   const [jobs, setJobs] = useState<SyncJobView[]>([]);
+  const [resumeJob, setResumeJob] = useState<SyncJobView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const requestRef = useRef<AbortController | null>(null);
@@ -16,7 +17,12 @@ export function useSyncJobs(endpoint: string) {
       const response = await fetch(endpoint, { cache: "no-store", signal: controller.signal });
       const data = await response.json();
       if (!response.ok || data.ok === false) throw new Error(data.error ?? "No se pudo consultar el estado de los trabajos.");
-      if (!controller.signal.aborted) { setJobs(data.jobs ?? data.items ?? []); setError(null); }
+      if (!controller.signal.aborted) {
+        const items: SyncJobView[] = data.jobs ?? data.items ?? [];
+        setJobs(data.activeJob ? [data.activeJob, ...items.filter((item) => item.id !== data.activeJob.id)] : items);
+        setResumeJob(data.resumeJob ?? null);
+        setError(null);
+      }
     } catch (err) {
       if (!controller.signal.aborted) setError(err instanceof Error ? err.message : "Error de conexión.");
     } finally {
@@ -38,5 +44,5 @@ export function useSyncJobs(endpoint: string) {
     setJobs((previous) => [job, ...previous.filter((item) => item.id !== job.id)]);
     setLoading(false);
   }, []);
-  return { jobs, job: selectVisibleSyncJob(jobs), loading, error, refresh, trackJob };
+  return { jobs, resumeJob, job: selectVisibleSyncJob(jobs), loading, error, refresh, trackJob };
 }

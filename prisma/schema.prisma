@@ -759,6 +759,8 @@ model Tenant {
   salesOrders                   SalesOrder[]
   salesCreditNotes              SalesCreditNote[]
   salesDebitNotes               SalesDebitNote[]
+  salesSriSyncDocumentResults SalesSriSyncDocument[]
+
 }
 
 model Plan {
@@ -3807,6 +3809,9 @@ model SalesSriSyncJob {
   documentsFound      Int                   @default(0)
   documentsImported   Int                   @default(0)
   documentsSkipped    Int                   @default(0)
+  documentsRejected   Int                   @default(0)
+  counterBaseline     Json?
+  attemptHistory      Json                  @default("[]")
   documentsFailed     Int                   @default(0)
   errorCode           String?
   errorMessage        String?
@@ -3815,7 +3820,32 @@ model SalesSriSyncJob {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([status])
   @@index([tenantId, status])
+  documentResults SalesSriSyncDocument[]
+
+}
+
+
+model SalesSriSyncDocument {
+  id          String   @id @default(cuid())
+  tenantId    String
+  jobId       String
+  accessKey   String
+  queryDate   DateTime
+  outcome     String
+  sriStatus   String?
+  reasonCode  String?
+  reason      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  job SalesSriSyncJob @relation(fields: [jobId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@unique([jobId, accessKey])
+  @@index([tenantId, accessKey, outcome])
+  @@index([jobId, queryDate])
 }
