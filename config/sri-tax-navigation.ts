@@ -43,4 +43,14 @@ export const SRI_CONFIGURATION_NAVIGATION = [
     href: "/facturacion/purchases/automatic-download",
     description: "Automatización, conexión y estado del módulo de Compras.",
   },
+  {
+    title: "Importar comprobantes recibidos (TXT)",
+    href: "/facturacion/purchases/txt-import",
+    description: "Importación manual de comprobantes recibidos desde archivo TXT del SRI.",
+  },
+  {
+    title: "Historial de sincronización de ventas",
+    href: "/facturacion/sales/imports/sync-history",
+    description: "Registro de trabajos de sincronización de comprobantes emitidos desde el SRI.",
+  },
 ] as const;

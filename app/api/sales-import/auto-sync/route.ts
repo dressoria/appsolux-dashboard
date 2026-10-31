@@ -85,5 +85,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, jobId: job.id });
   }
 
+  if (body.action === "historical_sync") {
+    const config = await getSalesAutoSyncConfig(tenant.id);
+    if (!config?.sriEnabled) {
+      return NextResponse.json({ ok: false, error: "SRI no está configurado." }, { status: 400 });
+    }
+
+    if (await hasRunningSyncJob(tenant.id)) {
+      return NextResponse.json({ ok: false, error: "Ya existe una sincronización en curso." }, { status: 409 });
+    }
+
+    const dateFromStr = typeof body.dateFrom === "string" ? body.dateFrom : "2026-01-01";
+    const dateFrom = new Date(`${dateFromStr}T00:00:00-05:00`);
+    const dateTo = new Date();
+
+    const prisma = getPrismaClient();
+    const job = await prisma.salesSriSyncJob.create({
+      data: {
+        tenantId: tenant.id,
+        type: "SYNC_ISSUED_DOCUMENTS",
+        dateFrom,
+        dateTo,
+        maxAttempts: 3,
+      },
+    });
+
+    return NextResponse.json({ ok: true, jobId: job.id, dateFrom: dateFrom.toISOString(), dateTo: dateTo.toISOString() });
+  }
+
   return NextResponse.json({ ok: false, error: "Unknown action." }, { status: 400 });
 }

@@ -3788,6 +3788,7 @@ model SalesSriSyncJob {
   requestedByUserId   String?
   dateFrom            DateTime?
   dateTo              DateTime?
+  checkpointDate      DateTime?
   attemptCount        Int                   @default(0)
   maxAttempts         Int                   @default(3)
   lockedAt            DateTime?
