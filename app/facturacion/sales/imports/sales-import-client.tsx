@@ -1,5 +1,9 @@
 "use client";
 
+import Link from "next/link";
+import { SyncProgressCard } from "@/components/appsolux/sri-tax/sync-progress-card";
+import { useSyncJobs } from "@/components/appsolux/sri-tax/use-sync-jobs";
+import { connectionLabel } from "@/lib/core/sri-sync-presentation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Upload,
@@ -11,10 +15,9 @@ import {
   FileSpreadsheet,
   Clock,
   Search,
-  ChevronDown,
   Key,
+  ChevronDown,
   Copy,
-  Zap,
   RefreshCw,
   Shield,
 } from "lucide-react";
@@ -117,8 +120,7 @@ const PREVIEW_STATUS: Record<string, { label: string; className: string; icon: t
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function SalesImportClient() {
-  const [activeTab, setActiveTab] = useState<Tab>("consolidated");
+export function SalesImportClient({ activeTab = "consolidated" }: { activeTab?: Tab }) {
 
   return (
     <div className="space-y-5">
@@ -129,28 +131,11 @@ export function SalesImportClient() {
         </p>
       </header>
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b">
-        {(
-          [
-            ["consolidated", "Consolidado"],
-            ["import", "Importar archivo"],
-            ["automatic", "Importación automática"],
-          ] as [Tab, string][]
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              activeTab === key
-                ? "border-b-2 border-[#1E52F1] text-[#1E52F1]"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-            onClick={() => setActiveTab(key)}
-          >
-            {label}
-          </button>
+      <nav aria-label="Importación de ventas" className="flex gap-1 border-b overflow-x-auto">
+        {([ ["consolidated", "Consolidado", "/facturacion/sales/imports"], ["import", "Importar archivo", "/facturacion/sales/imports/file"], ["automatic", "Importación automática", "/facturacion/sales/imports/automatic"] ] as const).map(([key, label, href]) => (
+          <Link key={key} href={href} aria-current={activeTab === key ? "page" : undefined} className={`whitespace-nowrap px-4 py-2 text-sm font-medium ${activeTab === key ? "border-b-2 border-[#1E52F1] text-[#1E52F1]" : "text-slate-500 hover:text-slate-700"}`}>{label}</Link>
         ))}
-      </div>
+      </nav>
 
       {activeTab === "consolidated" && <ConsolidatedTab />}
       {activeTab === "import" && <ImportTab />}
@@ -175,7 +160,6 @@ function ConsolidatedTab() {
   const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const fetchData = useCallback(async (p: number, q: string, src: string, f: string, t: string, pp: number) => {
-    setLoading(true);
     try {
       const params = new URLSearchParams();
       params.set("page", String(p));
@@ -573,6 +557,8 @@ function formatDate(v: string | null) {
 }
 
 function AutomaticTab() {
+  const progress = useSyncJobs("/api/sales-import/sync-jobs?page=1&pageSize=20");
+  const [credential, setCredential] = useState<{ status?: string; verifiedAt?: string | null } | null>(null);
   const [config, setConfig] = useState<SyncConfig | null>(null);
   const [hasFeature, setHasFeature] = useState<boolean | null>(null);
   const [tokens, setTokens] = useState<Token[]>([]);
@@ -585,26 +571,32 @@ function AutomaticTab() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [syncRes, tokenRes] = await Promise.all([
-        fetch("/api/sales-import/auto-sync"),
-        fetch("/api/sales-import/tokens"),
-      ]);
-      const syncData = await syncRes.json();
-      const tokenData = await tokenRes.json();
-      if (syncData.ok) {
-        setConfig(syncData.config);
-        setHasFeature(syncData.hasFeature);
-      }
+  const fetchData = useCallback((background = false, signal?: AbortSignal) => {
+    return Promise.all([
+      fetch("/api/sales-import/auto-sync", { cache: "no-store", signal }),
+      fetch("/api/sales-import/tokens", { cache: "no-store", signal }),
+    ]).then(async ([syncRes, tokenRes]) => {
+      if (!syncRes.ok || !tokenRes.ok) throw new Error("No se pudo cargar la configuración.");
+      return Promise.all([syncRes.json(), tokenRes.json()]);
+    }).then(([syncData, tokenData]) => {
+      if (signal?.aborted) return;
+      if (syncData.ok) { setConfig(syncData.config); setHasFeature(syncData.hasFeature); setCredential(syncData.credential); }
       if (tokenData.ok) setTokens(tokenData.tokens);
-    } finally {
-      setLoading(false);
-    }
+    }).catch(() => {
+      if (!signal?.aborted) setError("No se pudo cargar la configuración de sincronización.");
+    }).finally(() => { if (!signal?.aborted && !background) setLoading(false); });
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchData(false, controller.signal);
+    return () => controller.abort();
+  }, [fetchData]);
+  useEffect(() => {
+    const controller = new AbortController();
+    if (progress.job?.status) void fetchData(true, controller.signal);
+    return () => controller.abort();
+  }, [fetchData, progress.job?.status, progress.job?.id]);
 
   async function updateConfig(patch: Record<string, unknown>) {
     setError(""); setMessage("");
@@ -629,9 +621,20 @@ function AutomaticTab() {
         body: JSON.stringify({ action: "manual_sync" }),
       });
       const data = await res.json();
-      if (data.ok) setMessage("Sincronización manual iniciada.");
+      if (data.ok) { if (data.job) progress.trackJob(data.job); await progress.refresh(); setMessage("Sincronización manual iniciada."); }
       else setError(data.error ?? "Error al sincronizar.");
     } catch { setError("Error de conexión."); }
+    finally { setSyncing(false); }
+  }
+
+  async function verifyConnection() {
+    setError(""); setSyncing(true);
+    try {
+      const res = await fetch("/api/sales-import/auto-sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify_connection" }) });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "No se pudo iniciar la verificación.");
+      progress.trackJob(data.job);
+    } catch (err) { setError(err instanceof Error ? err.message : "Error de conexión."); }
     finally { setSyncing(false); }
   }
 
@@ -711,6 +714,10 @@ function AutomaticTab() {
       {error && <p className="rounded border border-red-300 p-3 text-sm text-red-800">{error}</p>}
       {message && <p className="rounded border border-green-300 p-3 text-sm text-green-800">{message}</p>}
 
+      {progress.error && <p role="alert" className="text-sm text-red-700">{progress.error}</p>}
+      {progress.job && <SyncProgressCard job={progress.job} title="Último intento de sincronización de ventas" />}
+      <Link className="text-sm text-blue-700 underline" href="/facturacion/sales/imports/sync-history">Consultar historial</Link>
+
       {/* SRI Card */}
       <Card>
         <CardHeader>
@@ -721,15 +728,17 @@ function AutomaticTab() {
         <CardContent className="space-y-4">
           <p className="text-sm text-slate-600">Facturom revisa periódicamente los comprobantes emitidos en tu cuenta del SRI e importa únicamente los que aún no existen.</p>
 
+          <p className="text-sm"><Link href="/facturacion/configuration?tab=sri" className="text-blue-700 underline">Configurar credenciales en Empresa → Configuración → SRI</Link></p>
+          <Button variant="outline" onClick={verifyConnection} disabled={syncing || ["QUEUED", "RUNNING"].includes(progress.job?.status ?? "")}>Verificar conexión de ventas</Button>
           {!config?.sriEnabled ? (
             <Button onClick={() => updateConfig({ sriEnabled: true })} className="bg-[#1E52F1] hover:bg-[#1E52F1]/90">
-              <Shield className="mr-1 h-4 w-4" /> Conectar SRI
+              <Shield className="mr-1 h-4 w-4" /> Habilitar consulta SRI
             </Button>
           ) : (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <span className="text-xs font-medium text-emerald-600 flex items-center gap-1">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Conectado
+                <span className="text-xs font-medium text-slate-700 flex items-center gap-1">
+                  {connectionLabel(credential?.status, progress.job, credential?.verifiedAt)}
                 </span>
               </div>
 
@@ -785,7 +794,7 @@ function AutomaticTab() {
                     </div>
                   )}
 
-                  <Button variant="outline" onClick={manualSync} disabled={syncing}>
+                  <Button variant="outline" onClick={manualSync} disabled={syncing || ["QUEUED", "RUNNING"].includes(progress.job?.status ?? "")} >
                     <RefreshCw className={`mr-1 h-4 w-4 ${syncing ? "animate-spin" : ""}`} /> Sincronizar ahora
                   </Button>
                 </>

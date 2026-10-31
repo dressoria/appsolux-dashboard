@@ -260,13 +260,13 @@ test("D07 – TXT import client shows instructions for obtaining TXT", async () 
 test("E01 – SRI navigation includes TXT import link", async () => {
   const source = await readFile(sriNavPath, "utf8");
   assert.match(source, /txt-import/);
-  assert.match(source, /Importar comprobantes recibidos/);
+  assert.match(source, /Importar archivo/);
 });
 
 test("E02 – SRI navigation includes automatic download link", async () => {
   const source = await readFile(sriNavPath, "utf8");
   assert.match(source, /automatic-download/);
-  assert.match(source, /Descarga automática/);
+  assert.match(source, /Importación automática/);
 });
 
 test("E03 – SRI navigation includes comprobantes recibidos", async () => {
@@ -409,9 +409,11 @@ test("I05 – historical_sync creates SYNC_ISSUED_DOCUMENTS job", async () => {
   assert.match(source, /salesSriSyncJob\.create/);
 });
 
-test("I06 – historical_sync defaults dateFrom to 2026-01-01", async () => {
+test("I06 – historical_sync defaults to January 1 of Ecuador fiscal year", async () => {
   const source = await readFile(autoSyncRoutePath, "utf8");
-  assert.match(source, /2026-01-01/);
+  assert.match(source, /fiscalYear/);
+  assert.match(source, /America\/Guayaquil/);
+  assert.match(source, /-01-01/);
 });
 
 test("I07 – historical_sync accepts optional body.dateFrom", async () => {
@@ -661,10 +663,10 @@ test("N05 – XML API route returns 404 when XML not available", async () => {
 // O. Phase E — Navigation Updates
 // ══════════════════════════════════════════════════════════════════════════════
 
-test("O01 – SRI navigation includes sync history link", async () => {
-  const source = await readFile(sriNavPath, "utf8");
+test("O01 – automatic sales screen preserves a separate history link", async () => {
+  const source = await readFile("app/facturacion/sales/imports/sales-import-client.tsx", "utf8");
   assert.match(source, /sync-history/);
-  assert.match(source, /Historial de sincronización/);
+  assert.match(source, /Consultar historial/);
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

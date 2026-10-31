@@ -82,8 +82,8 @@ export async function listJobs(
   options: { page?: number; pageSize?: number } = {},
 ) {
   const prisma = getPrismaClient();
-  const page = options.page ?? 1;
-  const pageSize = options.pageSize ?? 20;
+  const page = Math.max(1, Math.trunc(options.page ?? 1) || 1);
+  const pageSize = Math.min(50, Math.max(1, Math.trunc(options.pageSize ?? 20) || 20));
 
   const [items, total] = await Promise.all([
     prisma.purchaseSriSyncJob.findMany({
@@ -116,13 +116,19 @@ export async function listJobs(
 
 export async function getSyncStatus(tenantId: string) {
   const prisma = getPrismaClient();
-  const [credential, config, activeJob] = await Promise.all([
+  const [credential, config, activeJob, latestJob] = await Promise.all([
     prisma.purchaseSriCredential.findUnique({
       where: { tenantId },
       select: { status: true, verifiedAt: true },
     }),
     prisma.purchaseSriSyncConfig.findUnique({ where: { tenantId } }),
     getActiveJob(tenantId),
+    prisma.purchaseSriSyncJob.findFirst({ where: { tenantId }, orderBy: { createdAt: "desc" }, select: {
+      id: true, type: true, status: true, dateFrom: true, dateTo: true, checkpointDate: true,
+      totalDays: true, completedDays: true, currentDateLabel: true,
+      documentsFound: true, documentsImported: true, documentsSkipped: true, documentsFailed: true,
+      startedAt: true, finishedAt: true, errorCode: true, errorMessage: true,
+    } }),
   ]);
 
   const lastSuccessJob = await prisma.purchaseSriSyncJob.findFirst({
@@ -138,6 +144,7 @@ export async function getSyncStatus(tenantId: string) {
 
   return {
     configured: !!credential,
+    latestJob,
     credentialStatus: credential?.status ?? null,
     syncStatus: config?.status ?? "DISABLED",
     activeJob: activeJob

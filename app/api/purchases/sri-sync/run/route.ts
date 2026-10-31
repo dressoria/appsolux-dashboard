@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { getCredential } from "@/lib/core/purchase-sri-credentials";
-import { createSyncJob } from "@/lib/core/purchase-sync-jobs";
+import { createSyncJob, getJobById } from "@/lib/core/purchase-sync-jobs";
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
@@ -18,9 +18,12 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const dateFrom = body.dateFrom ? new Date(body.dateFrom) : null;
+  const dateFrom = typeof body.dateFrom === "string" ? new Date(`${body.dateFrom}T00:00:00-05:00`) : null;
   const dateTo = body.dateTo ? new Date(body.dateTo) : null;
 
+  if ((dateFrom && !Number.isFinite(dateFrom.getTime())) || (dateTo && !Number.isFinite(dateTo.getTime())) || (dateFrom && dateFrom > (dateTo ?? new Date()))) {
+    return NextResponse.json({ error: "Período de sincronización inválido." }, { status: 400 });
+  }
   const { job, created } = await createSyncJob(tenant.id, "SYNC_RECEIVED_DOCUMENTS", {
     trigger: "MANUAL",
     requestedByUserId: user.id,
@@ -31,6 +34,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     jobId: job.id,
+    job: await getJobById(tenant.id, job.id),
     status: job.status,
     created,
   });

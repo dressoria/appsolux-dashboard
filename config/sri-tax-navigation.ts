@@ -9,8 +9,8 @@ export const SRI_TAX_NAVIGATION = [
 
 export const SRI_SALES_NAVIGATION = [
   { title: "Consolidado", href: "/facturacion/sales/imports" },
-  { title: "Importar archivo", href: "/facturacion/sales/imports/sync-history" },
-  { title: "Importación automática", href: "/facturacion/sales/imports/sync-history" },
+  { title: "Importar archivo", href: "/facturacion/sales/imports/file" },
+  { title: "Importación automática", href: "/facturacion/sales/imports/automatic" },
 ] as const;
 
 export const SRI_PURCHASES_NAVIGATION = [

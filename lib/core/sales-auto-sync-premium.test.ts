@@ -180,10 +180,11 @@ test("UI shows blocked state with 'Disponible en el plan Empresarial'", async ()
   assert.match(source, /Ver planes/);
 });
 
-test("UI has SRI card with Conectar SRI button", async () => {
+test("UI enables SRI configuration without claiming verified authentication", async () => {
   const source = await readFile(uiPath, "utf8");
   assert.match(source, /SRI \/ Facturador SRI/);
-  assert.match(source, /Conectar SRI/);
+  assert.match(source, /Habilitar consulta SRI/);
+  assert.match(source, /connectionLabel/);
 });
 
 test("UI has Integración por API card", async () => {

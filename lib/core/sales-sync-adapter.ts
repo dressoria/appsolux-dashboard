@@ -142,7 +142,7 @@ export async function createScheduledSyncJob(tenantId: string, frequency: SalesA
   const now = new Date();
   const from = lastSuccess?.lastSuccessAt
     ? new Date(lastSuccess.lastSuccessAt.getTime() - 24 * 60 * 60 * 1000)
-    : new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    : new Date(`${new Intl.DateTimeFormat("en", { timeZone: "America/Guayaquil", year: "numeric" }).format(now)}-01-01T00:00:00-05:00`);
 
   const job = await prisma.salesSriSyncJob.create({
     data: {

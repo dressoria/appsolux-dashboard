@@ -40,7 +40,9 @@ test("NAV03 – Purchases navigation points to correct routes", () => {
 test("NAV04 – Sales navigation points to correct routes", () => {
   const hrefs = SRI_SALES_NAVIGATION.map((i) => i.href);
   assert.ok(hrefs.includes("/facturacion/sales/imports"));
-  assert.ok(hrefs.includes("/facturacion/sales/imports/sync-history"));
+  assert.ok(hrefs.includes("/facturacion/sales/imports/file"));
+  assert.ok(hrefs.includes("/facturacion/sales/imports/automatic"));
+  assert.equal(new Set(hrefs).size, 3);
 });
 
 test("NAV05 – sidebar builds with sri group containing Ventas and Compras submenus", () => {
@@ -259,8 +261,9 @@ test("PRG08 – Purchases automatic download has polling for sync progress", () 
     "app/facturacion/purchases/automatic-download/automatic-download-client.tsx",
     "utf8",
   );
-  assert.match(src, /startSyncPolling/);
-  assert.match(src, /setInterval/);
+  assert.match(src, /useSyncJobs/);
+  const polling = readFileSync("components/appsolux/sri-tax/use-sync-jobs.ts", "utf8");
+  assert.match(polling, /setTimeout/);
 });
 
 test("PRG09 – Sales sync history client has polling for active jobs", () => {

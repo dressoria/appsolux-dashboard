@@ -3,7 +3,8 @@ import { ConfigurationPageClient } from "@/components/appsolux/settings/configur
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
-export default async function ConfigurationPage() {
+export default async function ConfigurationPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const { tab } = await searchParams;
   const user = await getCurrentUser();
   if (!user) {
     return (
@@ -37,7 +38,7 @@ export default async function ConfigurationPage() {
             Empresa: {tenant.name}
           </p>
         </div>
-        <ConfigurationPageClient />
+        <ConfigurationPageClient initialTab={tab === "sri" ? "sri" : "sistema"} />
       </div>
     </DashboardShell>
   );

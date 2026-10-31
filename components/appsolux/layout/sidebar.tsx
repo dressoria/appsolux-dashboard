@@ -117,7 +117,7 @@ export function buildSidebarNavigation(
         {
           kind: "submenu",
           title: "Ventas",
-          items: SRI_SALES_NAVIGATION.map((item) => link(item.title, item.href)),
+          items: SRI_SALES_NAVIGATION.map((item) => link(item.title, item.href, undefined, true)),
         },
         {
           kind: "submenu",

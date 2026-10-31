@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SyncProgressCard, type SyncJobProgress } from "@/components/appsolux/sri-tax/sync-progress-card";
+import { SyncProgressCard } from "@/components/appsolux/sri-tax/sync-progress-card";
 
 type SyncJob = {
   id: string;
@@ -69,35 +69,38 @@ export function SyncHistoryClient() {
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchJobs = useCallback(async (p: number) => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/sales-import/sync-jobs?page=${p}&pageSize=20`);
-      const data = await res.json();
-      if (data.ok) {
-        setJobs(data.jobs);
-        setTotalPages(data.totalPages);
-        setTotal(data.total);
-      }
-    } finally {
-      setLoading(false);
-    }
+  const fetchJobs = useCallback((p: number, signal?: AbortSignal) => {
+    return fetch(`/api/sales-import/sync-jobs?page=${p}&pageSize=20`, { cache: "no-store", signal })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error ?? "No se pudo consultar el historial.");
+        return data;
+      }).then((data) => {
+        if (signal?.aborted) return;
+        setJobs(data.jobs); setTotalPages(data.totalPages); setTotal(data.total);
+      }).catch((err: unknown) => {
+        if (!signal?.aborted) setError(err instanceof Error ? err.message : "Error de conexión.");
+      }).finally(() => { if (!signal?.aborted) setLoading(false); });
   }, []);
 
   useEffect(() => {
-    fetchJobs(page);
+    const controller = new AbortController();
+    void fetchJobs(page, controller.signal);
+    return () => controller.abort();
   }, [page, fetchJobs]);
 
   const activeJob = jobs.find(
     (j) => j.status === "RUNNING" || j.status === "QUEUED",
   );
+  const visibleJob = activeJob ?? jobs[0];
+  const activeJobId = activeJob?.id;
 
   useEffect(() => {
-    if (activeJob && !pollRef.current) {
+    if (activeJobId && !pollRef.current) {
       pollRef.current = setInterval(() => {
         fetchJobs(page);
       }, 5000);
-    } else if (!activeJob && pollRef.current) {
+    } else if (!activeJobId && pollRef.current) {
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
@@ -107,7 +110,7 @@ export function SyncHistoryClient() {
         pollRef.current = null;
       }
     };
-  }, [activeJob?.id, page, fetchJobs]);
+  }, [activeJobId, page, fetchJobs]);
 
   async function triggerHistoricalSync() {
     setTriggeringSync(true);
@@ -163,28 +166,7 @@ export function SyncHistoryClient() {
         </div>
       )}
 
-      {/* Active job progress */}
-      {activeJob && (
-        <SyncProgressCard
-          job={{
-            id: activeJob.id,
-            type: activeJob.type,
-            status: activeJob.status,
-            dateFrom: activeJob.dateFrom,
-            dateTo: activeJob.dateTo,
-            checkpointDate: activeJob.checkpointDate,
-            totalDays: activeJob.totalDays,
-            completedDays: activeJob.completedDays,
-            currentDateLabel: activeJob.currentDateLabel,
-            documentsFound: activeJob.documentsFound,
-            documentsImported: activeJob.documentsImported,
-            documentsSkipped: activeJob.documentsSkipped,
-            documentsFailed: activeJob.documentsFailed,
-            startedAt: activeJob.startedAt,
-          }}
-          title="Sincronización de ventas en curso"
-        />
-      )}
+      {visibleJob && <SyncProgressCard job={visibleJob} title="Último intento de sincronización de ventas" />}
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

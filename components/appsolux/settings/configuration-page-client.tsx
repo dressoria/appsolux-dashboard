@@ -634,8 +634,8 @@ function AccesosTab() {
   );
 }
 
-export function ConfigurationPageClient() {
-  const [activeTab, setActiveTab] = useState<ConfigTabId>("sistema");
+export function ConfigurationPageClient({ initialTab = "sistema" }: { initialTab?: ConfigTabId }) {
+  const [activeTab, setActiveTab] = useState<ConfigTabId>(initialTab);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

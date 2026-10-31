@@ -855,7 +855,8 @@ export function InvoiceEditor({
               {establishments.length > 1 ? (
                 <Field label="Establecimiento">
                   <select
-                    className="h-8 rounded-lg border px-2 text-sm"
+                    className="min-w-0 w-full truncate h-8 rounded-lg border px-2 text-sm"
+                    title={selectedEstablishment ? `${selectedEstablishment.code} · ${selectedEstablishment.name}` : undefined}
                     value={establishmentId}
                     onChange={(e) => {
                       setEstablishmentId(e.target.value);
@@ -883,7 +884,8 @@ export function InvoiceEditor({
               {filteredIssuePoints.length > 1 ? (
                 <Field label="Punto de emisión">
                   <select
-                    className="h-8 rounded-lg border px-2 text-sm"
+                    className="min-w-0 w-full truncate h-8 rounded-lg border px-2 text-sm"
+                    title={selectedIssuePoint ? `${selectedIssuePoint.code} · ${selectedIssuePoint.name}` : undefined}
                     value={issuePointId}
                     onChange={(e) => setIssuePointId(e.target.value)}
                   >

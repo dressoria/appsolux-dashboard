@@ -2,22 +2,8 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export type SyncJobProgress = {
-  id: string;
-  type: string;
-  status: string;
-  dateFrom: string | null;
-  dateTo: string | null;
-  checkpointDate: string | null;
-  totalDays: number | null;
-  completedDays: number;
-  currentDateLabel: string | null;
-  documentsFound: number;
-  documentsImported: number;
-  documentsSkipped: number;
-  documentsFailed: number;
-  startedAt: string | null;
-};
+import { syncPercentage, type SyncJobView } from "@/lib/core/sri-sync-presentation";
+export type SyncJobProgress = SyncJobView;
 
 const STATUS_LABELS: Record<string, string> = {
   QUEUED: "Pendiente",
@@ -45,15 +31,12 @@ export function SyncProgressCard({
   job: SyncJobProgress;
   title: string;
 }) {
-  const percentage =
-    job.totalDays && job.totalDays > 0
-      ? Math.min(100, Math.round((job.completedDays / job.totalDays) * 100))
-      : null;
+  const percentage = syncPercentage(job);
 
   const isActive = job.status === "RUNNING" || job.status === "QUEUED";
 
   return (
-    <Card className="border-blue-200 dark:border-blue-800">
+    <Card aria-live="polite" className="border-blue-200 dark:border-blue-800">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">{title}</CardTitle>
@@ -70,10 +53,10 @@ export function SyncProgressCard({
               <span className="text-muted-foreground">Progreso</span>
               <span className="font-medium">{percentage}%</span>
             </div>
-            <div className="h-3 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+            <div role="progressbar" aria-label="Progreso de sincronización" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage ?? undefined} className="h-3 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
-                  isActive ? "bg-blue-500 animate-pulse" : "bg-emerald-500"
+                  isActive ? "bg-blue-500 animate-pulse" : job.status === "SUCCEEDED" ? "bg-emerald-500" : "bg-amber-500"
                 }`}
                 style={{ width: `${percentage}%` }}
               />
@@ -84,7 +67,7 @@ export function SyncProgressCard({
           </div>
         ) : isActive ? (
           <div>
-            <div className="h-3 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+            <div role="progressbar" aria-label="Progreso de sincronización" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage ?? undefined} className="h-3 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
               <div className="h-full w-1/3 rounded-full bg-blue-500 animate-pulse" />
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -92,6 +75,9 @@ export function SyncProgressCard({
             </p>
           </div>
         ) : null}
+
+        {job.finishedAt && <p className="text-sm text-muted-foreground">Finalizado: {new Date(job.finishedAt).toLocaleString("es-EC", { timeZone: "America/Guayaquil" })}</p>}
+        {job.errorMessage && <p role="alert" className="text-sm text-red-700">{job.errorCode ? `${job.errorCode}: ` : ""}{job.errorMessage}</p>}
 
         {/* Stats grid */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -119,13 +105,13 @@ export function SyncProgressCard({
             <div>
               <span className="text-muted-foreground">Período: </span>
               <span>
-                {new Date(job.dateFrom).toLocaleDateString("es-EC")}
+                {new Date(job.dateFrom).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" })}
                 {" – "}
-                {new Date(job.dateTo).toLocaleDateString("es-EC")}
+                {new Date(job.dateTo).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" })}
               </span>
             </div>
           )}
-          {job.currentDateLabel && isActive && (
+          {job.currentDateLabel && (
             <div>
               <span className="text-muted-foreground">Procesando: </span>
               <span className="font-medium">{job.currentDateLabel}</span>
@@ -134,7 +120,7 @@ export function SyncProgressCard({
           {job.checkpointDate && (
             <div>
               <span className="text-muted-foreground">Último día completado: </span>
-              <span>{new Date(job.checkpointDate).toLocaleDateString("es-EC")}</span>
+              <span>{new Date(job.checkpointDate).toLocaleDateString("es-EC", { timeZone: "America/Guayaquil" })}</span>
             </div>
           )}
           {job.startedAt && (
