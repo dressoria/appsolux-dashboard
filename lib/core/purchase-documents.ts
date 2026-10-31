@@ -267,6 +267,48 @@ export async function listAccountingCategories(tenantId: string) {
   });
 }
 
+export async function getPurchaseConsolidatedTotals(
+  tenantId: string,
+  options: { from?: string; to?: string } = {},
+) {
+  const prisma = getPrismaClient();
+  const where: Record<string, unknown> = { tenantId, status: { not: "CANCELLED" } };
+  if (options.from || options.to) {
+    where.issueDate = {
+      ...(options.from ? { gte: new Date(options.from) } : {}),
+      ...(options.to ? { lte: new Date(options.to + "T23:59:59.999Z") } : {}),
+    };
+  }
+  const agg = await prisma.purchaseDocument.aggregate({
+    where: where as never,
+    _count: true,
+    _sum: {
+      subtotal0: true,
+      subtotal15: true,
+      ivaTotal: true,
+      total: true,
+    },
+  });
+  const byOrigin = await prisma.purchaseDocument.groupBy({
+    by: ["origin"],
+    where: where as never,
+    _count: true,
+    _sum: { total: true },
+  });
+  return {
+    count: agg._count,
+    subtotal0: Number(agg._sum.subtotal0 ?? 0),
+    subtotal15: Number(agg._sum.subtotal15 ?? 0),
+    ivaTotal: Number(agg._sum.ivaTotal ?? 0),
+    total: Number(agg._sum.total ?? 0),
+    byOrigin: byOrigin.map((g) => ({
+      origin: g.origin,
+      count: g._count,
+      total: Number(g._sum.total ?? 0),
+    })),
+  };
+}
+
 export async function createAccountingCategory(tenantId: string, name: string) {
   const prisma = getPrismaClient();
   return prisma.purchaseAccountingCategory.create({

@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SyncProgressCard, type SyncJobProgress } from "@/components/appsolux/sri-tax/sync-progress-card";
 
 type SyncJob = {
   id: string;
@@ -11,6 +12,9 @@ type SyncJob = {
   dateFrom: string | null;
   dateTo: string | null;
   checkpointDate: string | null;
+  totalDays: number | null;
+  completedDays: number;
+  currentDateLabel: string | null;
   attemptCount: number;
   maxAttempts: number;
   startedAt: string | null;
@@ -63,6 +67,7 @@ export function SyncHistoryClient() {
   const [triggeringSync, setTriggeringSync] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchJobs = useCallback(async (p: number) => {
     setLoading(true);
@@ -83,6 +88,27 @@ export function SyncHistoryClient() {
     fetchJobs(page);
   }, [page, fetchJobs]);
 
+  const activeJob = jobs.find(
+    (j) => j.status === "RUNNING" || j.status === "QUEUED",
+  );
+
+  useEffect(() => {
+    if (activeJob && !pollRef.current) {
+      pollRef.current = setInterval(() => {
+        fetchJobs(page);
+      }, 5000);
+    } else if (!activeJob && pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [activeJob?.id, page, fetchJobs]);
+
   async function triggerHistoricalSync() {
     setTriggeringSync(true);
     setError(null);
@@ -96,8 +122,8 @@ export function SyncHistoryClient() {
       const data = await res.json();
       if (data.ok) {
         setMessage(`Sincronización histórica iniciada (desde ${data.dateFrom?.slice(0, 10) ?? "2026-01-01"}).`);
-        fetchJobs(1);
         setPage(1);
+        await fetchJobs(1);
       } else {
         setError(data.error ?? "Error al iniciar sincronización histórica.");
       }
@@ -135,6 +161,29 @@ export function SyncHistoryClient() {
         <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
           {error}
         </div>
+      )}
+
+      {/* Active job progress */}
+      {activeJob && (
+        <SyncProgressCard
+          job={{
+            id: activeJob.id,
+            type: activeJob.type,
+            status: activeJob.status,
+            dateFrom: activeJob.dateFrom,
+            dateTo: activeJob.dateTo,
+            checkpointDate: activeJob.checkpointDate,
+            totalDays: activeJob.totalDays,
+            completedDays: activeJob.completedDays,
+            currentDateLabel: activeJob.currentDateLabel,
+            documentsFound: activeJob.documentsFound,
+            documentsImported: activeJob.documentsImported,
+            documentsSkipped: activeJob.documentsSkipped,
+            documentsFailed: activeJob.documentsFailed,
+            startedAt: activeJob.startedAt,
+          }}
+          title="Sincronización de ventas en curso"
+        />
       )}
 
       {/* Stats */}

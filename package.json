@@ -22,6 +22,7 @@
     "test:customer-import": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/customer-import.test.ts",
     "test:receipts-imports": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/receipts-and-imports.test.ts",
     "test:purchases": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/purchases-module.test.ts",
+    "test:sri-final": "node --import tsx --test lib/core/sri-final-implementation.test.ts",
     "sri:import-taxpayers": "tsx scripts/sri-import-taxpayers.ts",
     "sri:update-taxpayers": "tsx scripts/sri-import-taxpayers.ts --update",
     "sri:backfill-taxpayer-profiles": "tsx scripts/sri-backfill-taxpayer-profiles.ts",

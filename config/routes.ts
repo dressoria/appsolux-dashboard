@@ -146,6 +146,10 @@ export const routes = {
   facturacionPurchasesSettlementsNew: "/facturacion/purchases/settlements/new",
   facturacionPurchasesInbox: "/facturacion/purchases/inbox",
   facturacionPurchasesAutoDownload: "/facturacion/purchases/automatic-download",
+  facturacionPurchasesTxtImport: "/facturacion/purchases/txt-import",
+  facturacionPurchasesConsolidated: "/facturacion/purchases/consolidated",
+  facturacionSalesSyncHistory: "/facturacion/sales/imports/sync-history",
+  facturacionSalesConsolidated: "/facturacion/sales/imports",
 
   facturacionInventoryWarehouses: "/facturacion/inventory/warehouses",
   facturacionInventoryCatalog: "/facturacion/inventory/catalog",

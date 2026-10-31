@@ -51,6 +51,22 @@ export async function getActiveJob(tenantId: string) {
       status: { in: ["QUEUED", "RUNNING"] },
     },
     orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      type: true,
+      status: true,
+      dateFrom: true,
+      dateTo: true,
+      checkpointDate: true,
+      totalDays: true,
+      completedDays: true,
+      currentDateLabel: true,
+      documentsFound: true,
+      documentsImported: true,
+      documentsSkipped: true,
+      documentsFailed: true,
+      startedAt: true,
+    },
   });
 }
 
@@ -125,7 +141,22 @@ export async function getSyncStatus(tenantId: string) {
     credentialStatus: credential?.status ?? null,
     syncStatus: config?.status ?? "DISABLED",
     activeJob: activeJob
-      ? { id: activeJob.id, type: activeJob.type, status: activeJob.status }
+      ? {
+          id: activeJob.id,
+          type: activeJob.type,
+          status: activeJob.status,
+          dateFrom: activeJob.dateFrom?.toISOString() ?? null,
+          dateTo: activeJob.dateTo?.toISOString() ?? null,
+          checkpointDate: activeJob.checkpointDate?.toISOString() ?? null,
+          totalDays: activeJob.totalDays ?? null,
+          completedDays: activeJob.completedDays,
+          currentDateLabel: activeJob.currentDateLabel ?? null,
+          documentsFound: activeJob.documentsFound,
+          documentsImported: activeJob.documentsImported,
+          documentsSkipped: activeJob.documentsSkipped,
+          documentsFailed: activeJob.documentsFailed,
+          startedAt: activeJob.startedAt?.toISOString() ?? null,
+        }
       : null,
     lastSyncAt: config?.lastSyncAt?.toISOString() ?? null,
     lastSuccessfulSyncAt: config?.lastSuccessfulSyncAt?.toISOString() ?? null,

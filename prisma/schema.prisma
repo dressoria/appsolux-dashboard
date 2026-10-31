@@ -2365,12 +2365,17 @@ model PurchaseSriSyncJob {
   trigger             PurchaseSriSyncTrigger   @default(MANUAL)
   dateFrom            DateTime?
   dateTo              DateTime?
+  checkpointDate      DateTime?
+  totalDays           Int?
+  completedDays       Int                      @default(0)
+  currentDateLabel    String?
   attemptCount        Int                      @default(0)
   maxAttempts         Int                      @default(3)
   lockedAt            DateTime?
   lockedBy            String?
   startedAt           DateTime?
   finishedAt          DateTime?
+  durationMs          Int?
   documentsFound      Int                      @default(0)
   documentsDownloaded Int                      @default(0)
   documentsImported   Int                      @default(0)
@@ -3789,6 +3794,9 @@ model SalesSriSyncJob {
   dateFrom            DateTime?
   dateTo              DateTime?
   checkpointDate      DateTime?
+  totalDays           Int?
+  completedDays       Int                   @default(0)
+  currentDateLabel    String?
   attemptCount        Int                   @default(0)
   maxAttempts         Int                   @default(3)
   lockedAt            DateTime?

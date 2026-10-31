@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { SyncProgressCard, type SyncJobProgress } from "@/components/appsolux/sri-tax/sync-progress-card";
 
 type CredentialInfo = {
   configured: boolean;
@@ -19,7 +20,7 @@ type SyncStatus = {
   configured: boolean;
   credentialStatus: string | null;
   syncStatus: string;
-  activeJob: { id: string; type: string; status: string } | null;
+  activeJob: SyncJobProgress | null;
   lastSyncAt: string | null;
   lastSuccessfulSyncAt: string | null;
   nextSyncAt: string | null;
@@ -83,7 +84,22 @@ export function AutomaticDownloadClient() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    fetchAll().then(() => {
+      // Will be checked after state is set via the effect below
+    });
+  }, [fetchAll]);
+
+  useEffect(() => {
+    if (
+      sync?.activeJob &&
+      ["QUEUED", "RUNNING"].includes(sync.activeJob.status) &&
+      step === "active" &&
+      !pollRef.current
+    ) {
+      startSyncPolling();
+    }
+  }, [sync?.activeJob?.status, step]);
 
   useEffect(() => {
     return () => {
@@ -150,7 +166,27 @@ export function AutomaticDownloadClient() {
       body: JSON.stringify({ dateFrom: importFrom }),
     });
     setSyncing(false);
-    fetchAll();
+    await fetchAll();
+    startSyncPolling();
+  }
+
+  function startSyncPolling() {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollCountRef.current = 0;
+    pollRef.current = setInterval(async () => {
+      pollCountRef.current += 1;
+      if (pollCountRef.current > 180) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        return;
+      }
+      const res = await fetch("/api/purchases/sri-sync/status");
+      const data: SyncStatus = await res.json();
+      setSync(data);
+      if (!data.activeJob || !["QUEUED", "RUNNING"].includes(data.activeJob.status)) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        fetchAll();
+      }
+    }, 5000);
   }
 
   async function handleDeactivate() {
@@ -281,20 +317,24 @@ export function AutomaticDownloadClient() {
             Estamos verificando tu conexión con el SRI.
           </p>
         </div>
-        <Card>
-          <CardContent className="p-6 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <span className="text-sm">Verificación en progreso...</span>
-            </div>
-            {verifyJobId && (
-              <p className="text-xs text-muted-foreground">Job: {verifyJobId}</p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Esto puede tomar unos momentos. La página se actualizará automáticamente.
-            </p>
-          </CardContent>
-        </Card>
+        {sync?.activeJob ? (
+          <SyncProgressCard job={sync.activeJob} title="Verificación de conexión" />
+        ) : (
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <span className="text-sm">Verificación en progreso...</span>
+              </div>
+              {verifyJobId && (
+                <p className="text-xs text-muted-foreground">Job: {verifyJobId}</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Esto puede tomar unos momentos. La página se actualizará automáticamente.
+        </p>
       </div>
     );
   }
@@ -331,9 +371,8 @@ export function AutomaticDownloadClient() {
             </p>
           )}
           {sync?.activeJob && ["QUEUED", "RUNNING"].includes(sync.activeJob.status) && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              Sincronización en curso...
+            <div className="pt-1">
+              <SyncProgressCard job={sync.activeJob} title="Sincronización en curso" />
             </div>
           )}
           {sync?.lastSuccessfulSyncAt && (

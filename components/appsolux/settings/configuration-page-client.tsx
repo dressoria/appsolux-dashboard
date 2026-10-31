@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SriConfigurationSection } from "@/components/appsolux/sri-tax/configuration-section";
+import { SriCredentialsSection } from "@/components/appsolux/sri-tax/sri-credentials-section";
 import { Label } from "@/components/ui/label";
 
 type ConfigTabId = "sistema" | "comprobantes" | "sri" | "accesos";
@@ -730,7 +730,7 @@ export function ConfigurationPageClient() {
         <ComprobantesTab settings={settings} onUpdate={handleUpdate} saving={saving} />
       )}
 
-      {activeTab === "sri" && <SriConfigurationSection />}
+      {activeTab === "sri" && <SriCredentialsSection />}
 
       {activeTab === "accesos" && <AccesosTab />}
     </div>

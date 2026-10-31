@@ -128,14 +128,19 @@ function mockDb(t: TestContext, value: object) {
   });
 }
 
-test("A–F: sidebar exposes exactly the six Tax Center entries", () => {
+test("A–F: sidebar exposes all Tax Center entries plus Ventas/Compras submenus", () => {
   const sri = buildSidebarNavigation({} as TenantModeState).find(
     (g) => g.key === "sri",
   );
   assert.ok(sri);
+  const expectedTitles = [
+    ...SRI_TAX_NAVIGATION.map((i) => i.title),
+    "Ventas",
+    "Compras",
+  ];
   assert.deepEqual(
     sri.items.map((i) => i.title),
-    SRI_TAX_NAVIGATION.map((i) => i.title),
+    expectedTitles,
   );
   for (const title of [
     "Configuración SRI",
@@ -161,7 +166,7 @@ test("G: configuration preserves fiscal setup, signature and automation URLs", (
     );
   assert.ok(
     SRI_CONFIGURATION_NAVIGATION.some(
-      (i) => i.href === "/facturacion/purchases/automatic-download",
+      (i) => i.href === "/facturacion/configuration",
     ),
   );
   const client = readFileSync(
@@ -169,7 +174,7 @@ test("G: configuration preserves fiscal setup, signature and automation URLs", (
     "utf8",
   );
   assert.match(client, /activeTab === "sri"/);
-  assert.match(client, /SriConfigurationSection/);
+  assert.match(client, /SriCredentialsSection/);
   for (const suffix of [
     "company",
     "signature",

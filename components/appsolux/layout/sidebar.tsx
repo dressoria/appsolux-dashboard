@@ -1,5 +1,5 @@
 import { TREASURY_NAVIGATION } from "@/config/treasury-navigation";
-import { SRI_TAX_NAVIGATION } from "@/config/sri-tax-navigation";
+import { SRI_TAX_NAVIGATION, SRI_SALES_NAVIGATION, SRI_PURCHASES_NAVIGATION } from "@/config/sri-tax-navigation";
 import { routes } from "@/config/routes";
 import { getFacturomAccess } from "@/lib/core/facturom-access";
 import type { TenantModeState } from "@/lib/core/tenant-mode";
@@ -112,7 +112,19 @@ export function buildSidebarNavigation(
       key: "sri",
       title: "SRI",
       icon: "receipt",
-      items: SRI_TAX_NAVIGATION.map((item) => link(item.title, item.href, "file-check", true)),
+      items: [
+        ...SRI_TAX_NAVIGATION.map((item) => link(item.title, item.href, "file-check", true)),
+        {
+          kind: "submenu",
+          title: "Ventas",
+          items: SRI_SALES_NAVIGATION.map((item) => link(item.title, item.href)),
+        },
+        {
+          kind: "submenu",
+          title: "Compras",
+          items: SRI_PURCHASES_NAVIGATION.map((item) => link(item.title, item.href)),
+        },
+      ],
     },
     {
       key: "treasury",

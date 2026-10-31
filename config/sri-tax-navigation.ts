@@ -7,6 +7,18 @@ export const SRI_TAX_NAVIGATION = [
   { title: "Validaciones tributarias", href: "/facturacion/sri/validations" },
 ] as const;
 
+export const SRI_SALES_NAVIGATION = [
+  { title: "Consolidado", href: "/facturacion/sales/imports" },
+  { title: "Importar archivo", href: "/facturacion/sales/imports/sync-history" },
+  { title: "Importación automática", href: "/facturacion/sales/imports/sync-history" },
+] as const;
+
+export const SRI_PURCHASES_NAVIGATION = [
+  { title: "Consolidado", href: "/facturacion/purchases/consolidated" },
+  { title: "Importar archivo", href: "/facturacion/purchases/txt-import" },
+  { title: "Importación automática", href: "/facturacion/purchases/automatic-download" },
+] as const;
+
 export const SRI_CONFIGURATION_NAVIGATION = [
   {
     title: "Datos fiscales",
@@ -39,18 +51,8 @@ export const SRI_CONFIGURATION_NAVIGATION = [
     description: "Consulta y gestiona el ambiente fiscal existente.",
   },
   {
-    title: "Descarga automática de comprobantes recibidos",
-    href: "/facturacion/purchases/automatic-download",
-    description: "Automatización, conexión y estado del módulo de Compras.",
-  },
-  {
-    title: "Importar comprobantes recibidos (TXT)",
-    href: "/facturacion/purchases/txt-import",
-    description: "Importación manual de comprobantes recibidos desde archivo TXT del SRI.",
-  },
-  {
-    title: "Historial de sincronización de ventas",
-    href: "/facturacion/sales/imports/sync-history",
-    description: "Registro de trabajos de sincronización de comprobantes emitidos desde el SRI.",
+    title: "Credenciales SRI",
+    href: "/facturacion/configuration",
+    description: "Usuario y contraseña para acceso al portal del SRI.",
   },
 ] as const;
