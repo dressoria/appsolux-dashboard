@@ -11,7 +11,7 @@ export function shouldActivateFromPaidInvoice(priceRecognized: boolean) {
   return priceRecognized;
 }
 
-export function isWebhookAlreadyHandled(status: "processing" | "processed" | "failed") {
+export function isWebhookAlreadyHandled(status: "received" | "processing" | "processed" | "failed") {
   return status === "processing" || status === "processed";
 }
 

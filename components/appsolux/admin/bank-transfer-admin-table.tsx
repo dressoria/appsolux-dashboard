@@ -35,11 +35,12 @@ type TransferRequest = {
   reviewedBy: { id: string; email: string; name: string | null } | null;
 };
 
-type StatusTab = "ALL" | "PENDING_REVIEW" | "APPROVED" | "REJECTED";
+type StatusTab = "ALL" | "PENDING_REVIEW" | "ACTIVATION_FAILED" | "APPROVED" | "REJECTED";
 
 const TABS: { key: StatusTab; label: string }[] = [
   { key: "ALL", label: "Todas" },
   { key: "PENDING_REVIEW", label: "Pendientes" },
+  { key: "ACTIVATION_FAILED", label: "Incidencias" },
   { key: "APPROVED", label: "Aprobadas" },
   { key: "REJECTED", label: "Rechazadas" },
 ];
@@ -281,7 +282,7 @@ export function BankTransferAdminTable() {
                             <Download className="size-4" />
                           </a>
                         </Button>
-                        {req.status === "PENDING_REVIEW" ? (
+                        {["PENDING_REVIEW", "ACTIVATION_FAILED"].includes(req.status) ? (
                           <>
                             <Button
                               onClick={() => openAction("approve", req)}

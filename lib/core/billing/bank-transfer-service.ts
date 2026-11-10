@@ -1,11 +1,17 @@
 import "@/lib/security/server-only";
 
+import { randomUUID } from "node:crypto";
+import { assertContractOwner, recordLegalAcceptance } from "@/lib/legal/service";
 import { Prisma, type BankTransferRequestStatus } from "@prisma/client";
 
 import { getPrismaClient } from "@/lib/db/prisma";
 import { commercialPlans, type CommercialPlanCode } from "./commercial-plans";
 import { calculateRenewalPeriod } from "./subscription-periods";
 import { registerPendingInvoice } from "./commercial-invoicing";
+
+class TransferActivationError extends Error {
+  constructor(public code: string, message: string, public pendingReview = false) { super(message); }
+}
 
 function getCommercialPlanPrice(
   planCode: CommercialPlanCode,
@@ -51,15 +57,21 @@ export async function createBankTransferRequest(input: {
   receiptFileName: string;
   receiptFileType: string;
   receiptFileSizeBytes: number;
+  legalProof?: unknown;
+  technicalEvidence?: { ip?: string; userAgent?: string };
 }) {
   const prisma = getPrismaClient();
   const amount = getCommercialPlanPrice(input.planCode, input.billingInterval);
 
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Tenant" WHERE id = ${input.tenantId} FOR UPDATE`;
+    await assertContractOwner(tx, input.requestedById, input.tenantId);
+    const id = randomUUID();
+    const acceptance = await recordLegalAcceptance(tx, { proof: input.legalProof, userId: input.requestedById, tenantId: input.tenantId, context: "BANK_TRANSFER", technical: input.technicalEvidence, planCode: input.planCode, billingInterval: input.billingInterval, operationReference: `transfer:${id}` });
     const existing = await tx.bankTransferRequest.findFirst({
       where: {
         tenantId: input.tenantId,
-        status: "PENDING_REVIEW",
+        status: { in: ["PENDING_REVIEW", "ACTIVATION_FAILED"] },
       },
     });
 
@@ -77,6 +89,8 @@ export async function createBankTransferRequest(input: {
 
     const request = await tx.bankTransferRequest.create({
       data: {
+        id,
+        legalAcceptanceId: acceptance.id,
         tenantId: input.tenantId,
         requestedById: input.requestedById,
         planCode: input.planCode,
@@ -176,14 +190,25 @@ export async function approveBankTransfer(input: {
 }) {
   const prisma = getPrismaClient();
 
-  return prisma.$transaction(async (tx) => {
+  let activationAttempted = false;
+  try {
+  return await prisma.$transaction(async (tx) => {
+    const initial = await tx.bankTransferRequest.findUniqueOrThrow({ where: { id: input.requestId } });
+    await tx.$queryRaw`SELECT id FROM "Tenant" WHERE id = ${initial.tenantId} FOR UPDATE`;
+    await assertTransferReviewer(tx, input.adminUserId, initial.tenantId);
+    const locked = await tx.bankTransferRequest.findUniqueOrThrow({ where: { id: input.requestId } });
+    if (locked.status === "APPROVED" && locked.activatedSubscriptionId && locked.subscriptionStartsAt && locked.subscriptionEndsAt) {
+      const subscription = await tx.tenantSubscription.findUniqueOrThrow({ where: { id: locked.activatedSubscriptionId } });
+      return { subscription, period: { startsAt: locked.subscriptionStartsAt, endsAt: locked.subscriptionEndsAt } };
+    }
     const updated = await tx.bankTransferRequest.updateMany({
-      where: { id: input.requestId, status: "PENDING_REVIEW" },
+      where: { id: input.requestId, status: { in: ["PENDING_REVIEW", "ACTIVATION_FAILED"] } },
       data: {
         status: "APPROVED",
         reviewedById: input.adminUserId,
         reviewedAt: new Date(),
         adminNote: input.adminNote?.trim() || null,
+        activationErrorCode: null,
       },
     });
 
@@ -191,6 +216,7 @@ export async function approveBankTransfer(input: {
       throw new Error("Esta solicitud ya fue procesada o no existe.");
     }
 
+    activationAttempted = true;
     const request = await tx.bankTransferRequest.findUniqueOrThrow({
       where: { id: input.requestId },
     });
@@ -206,11 +232,7 @@ export async function approveBankTransfer(input: {
     });
 
     if (!plan) {
-      await tx.bankTransferRequest.update({
-        where: { id: input.requestId },
-        data: { status: "ACTIVATION_FAILED", adminNote: "Plan local no encontrado." },
-      });
-      throw new Error("Plan local no configurado. La activación falló.");
+      throw new TransferActivationError("LOCAL_PLAN_MISSING", "Plan local no configurado. La activación falló.");
     }
 
     const currentSubscription = await tx.tenantSubscription.findFirst({
@@ -221,22 +243,19 @@ export async function approveBankTransfer(input: {
     if (
       currentSubscription &&
       currentSubscription.billingMode === "paddle" &&
-      currentSubscription.status === "active"
+      currentSubscription.status !== "canceled"
     ) {
-      await tx.bankTransferRequest.update({
-        where: { id: input.requestId },
-        data: { status: "PENDING_REVIEW" },
-      });
-      throw new Error(
+      throw new TransferActivationError("PADDLE_STILL_BILLABLE",
         "Este tenant tiene una suscripción Paddle activa. "
         + "Para aprobar esta transferencia, la suscripción Paddle debe estar efectivamente "
         + "cancelada (status: canceled) — una cancelación programada (cancelAtPeriodEnd) no "
-        + "es suficiente porque Paddle sigue cobrando hasta el fin del período.",
+        + "es suficiente porque Paddle sigue cobrando hasta el fin del período.", true,
       );
     }
 
+    if (currentSubscription?.billingMode === "manual" && currentSubscription.status === "active" && currentSubscription.currentPeriodEndsAt && currentSubscription.currentPeriodEndsAt > new Date() && currentSubscription.planId !== plan.id) throw new TransferActivationError("PLAN_TRANSITION_REVIEW", "Cambio de plan durante un período manual vigente: requiere acordar una transición antes de aprobar.", true);
     const period = calculateRenewalPeriod(
-      currentSubscription?.currentPeriodEndsAt,
+      currentSubscription?.billingMode === "manual" && currentSubscription.status === "active" ? currentSubscription.currentPeriodEndsAt : null,
       request.billingInterval,
     );
 
@@ -264,6 +283,9 @@ export async function approveBankTransfer(input: {
             suspendedAt: null,
             providerSubscriptionId: null,
             providerPriceId: null,
+            providerCustomerId: null,
+            providerLastEventAt: null,
+            cancelAtPeriodEnd: false,
             providerMetadata: providerMetadataForTransition ?? undefined,
           },
         })
@@ -334,10 +356,18 @@ export async function approveBankTransfer(input: {
       amountUsd: Number(request.amountUsd),
       currency: request.currency,
       billingInterval: request.billingInterval,
-    });
+    }, tx);
 
     return { subscription, period };
   });
+  } catch (error) {
+    // This write is deliberately outside the failed approval transaction.
+    if (activationAttempted) {
+      await prisma.bankTransferRequest.updateMany({ where: { id: input.requestId, status: { in: ["PENDING_REVIEW", "ACTIVATION_FAILED"] } }, data: { status: error instanceof TransferActivationError && error.pendingReview ? "PENDING_REVIEW" : "ACTIVATION_FAILED", activationErrorCode: error instanceof TransferActivationError ? error.code : "APPROVAL_TRANSACTION_FAILED" } });
+      if (!(error instanceof TransferActivationError)) throw new Error("No se pudo completar la aprobación. No se activó el plan; la solicitud requiere revisión y permite un reintento seguro.");
+    }
+    throw error;
+  }
 }
 
 export async function rejectBankTransfer(input: {
@@ -352,8 +382,11 @@ export async function rejectBankTransfer(input: {
   const prisma = getPrismaClient();
 
   return prisma.$transaction(async (tx) => {
+    const initial = await tx.bankTransferRequest.findUniqueOrThrow({ where: { id: input.requestId } });
+    await tx.$queryRaw`SELECT id FROM "Tenant" WHERE id = ${initial.tenantId} FOR UPDATE`;
+    await assertTransferReviewer(tx, input.adminUserId, initial.tenantId);
     const updated = await tx.bankTransferRequest.updateMany({
-      where: { id: input.requestId, status: "PENDING_REVIEW" },
+      where: { id: input.requestId, status: { in: ["PENDING_REVIEW", "ACTIVATION_FAILED"] } },
       data: {
         status: "REJECTED",
         reviewedById: input.adminUserId,
@@ -387,4 +420,12 @@ export async function rejectBankTransfer(input: {
 
     return request;
   });
+}
+
+async function assertTransferReviewer(tx: Prisma.TransactionClient, userId: string, tenantId: string) {
+  const admin = await tx.user.findUnique({ where: { id: userId }, select: { email: true, status: true } });
+  const allowed = (process.env.BILLING_REVIEW_ADMIN_EMAILS ?? "").split(",").map((email) => email.trim().toLowerCase());
+  if (!admin || admin.status !== "active" || !allowed.includes(admin.email.toLowerCase())) throw new Error("Administrador de pagos requerido.");
+  const member = await tx.membership.findFirst({ where: { userId, tenantId } });
+  if (member) throw new Error("No puedes aprobar ni rechazar solicitudes de tu propia empresa.");
 }

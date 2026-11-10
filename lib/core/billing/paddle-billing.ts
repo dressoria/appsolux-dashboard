@@ -1,29 +1,30 @@
 import "@/lib/security/server-only";
 
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
 import { Prisma } from "@prisma/client";
 
 import { getPrismaClient } from "@/lib/db/prisma";
 import { calculateGraceEndsAt } from "@/lib/core/billing-access-policy";
-import { getBillingAppUrl, getPaddleClient } from "@/lib/core/billing/paddle-config";
+import { getBillingAppUrl, getPaddleClient, getPaddleEnvironment } from "@/lib/core/billing/paddle-config";
 import {
   resolvePaddlePrice,
   resolvePaddlePriceId,
   type PaddleBillingInterval,
   type PaddlePlanCode,
 } from "@/lib/core/billing/paddle-price-map";
-import {
-  isWebhookAlreadyHandled,
-  resolvePaymentFailureGrace,
-} from "@/lib/core/billing/stripe-event-policy";
+import { assertContractOwner, recordLegalAcceptance } from "@/lib/legal/service";
 
-type PaddleSubscriptionSnapshot = {
+export type PaddleSubscriptionSnapshot = {
+  subscriptionCreatedAt?: Date;
+  checkoutIntentId?: string;
+  environment?: string;
+  providerInterval?: string;
   id: string;
   customerId: string;
   priceId: string;
-  currentPeriodStartsAt: Date;
-  currentPeriodEndsAt: Date;
+  currentPeriodStartsAt: Date | null;
+  currentPeriodEndsAt: Date | null;
   cancelAtPeriodEnd: boolean;
   status: string;
   occurredAt: Date;
@@ -37,21 +38,27 @@ export async function createCheckoutIntent(input: {
   userId: string;
   planCode: PaddlePlanCode;
   billingInterval: PaddleBillingInterval;
+  legalProof?: unknown;
+  technicalEvidence?: { ip?: string; userAgent?: string };
+  operation?: "new" | "change";
 }) {
   const prisma = getPrismaClient();
   const selection = resolvePaddlePrice(input.planCode, input.billingInterval);
   const token = randomBytes(32).toString("hex");
 
-  const intent = await prisma.paddleCheckoutIntent.create({
-    data: {
-      token,
-      tenantId: input.tenantId,
-      userId: input.userId,
-      planCode: input.planCode,
-      billingInterval: input.billingInterval,
-      expectedPriceId: selection.priceId,
-      expiresAt: new Date(Date.now() + CHECKOUT_INTENT_TTL_MS),
-    },
+  const intent = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Tenant" WHERE id = ${input.tenantId} FOR UPDATE`;
+    await assertContractOwner(tx, input.userId, input.tenantId);
+    const current = await tx.tenantSubscription.findFirst({ where: { tenantId: input.tenantId }, orderBy: { startedAt: "desc" } });
+    if (current?.billingMode === "paddle" && current.providerSubscriptionId && !["canceled", "expired"].includes(current.status)) {
+      if (input.operation !== "change" || current.status !== "active") throw new Error("Administra tu suscripción existente desde el portal para evitar una segunda compra.");
+      if (current.providerPriceId === selection.priceId) throw new Error("Este ya es tu plan y ciclo actual.");
+    }
+    if (input.operation === "change" && !(current?.billingMode === "paddle" && current.providerSubscriptionId && current.status === "active")) throw new Error("No existe una suscripción Paddle activa para cambiar.");
+    if (current?.billingMode === "manual" && current.status === "active" && current.currentPeriodEndsAt && current.currentPeriodEndsAt > new Date()) throw new Error("Existe un período manual vigente. Coordina su transición con soporte antes de iniciar otro pago.");
+    const id = randomUUID();
+    const acceptance = await recordLegalAcceptance(tx, { proof: input.legalProof, userId: input.userId, tenantId: input.tenantId, context: "PADDLE", technical: input.technicalEvidence, planCode: input.planCode, billingInterval: input.billingInterval, operationReference: `paddle:${id}` });
+    return tx.paddleCheckoutIntent.create({ data: { id, token, status: input.operation === "change" ? "change_authorized" : "pending", paddleSubscriptionId: input.operation === "change" ? current?.providerSubscriptionId : undefined, tenantId: input.tenantId, userId: input.userId, planCode: input.planCode, billingInterval: input.billingInterval, expectedPriceId: selection.priceId, environment: getPaddleEnvironment(), legalAcceptanceId: acceptance.id, expiresAt: new Date(Date.now() + CHECKOUT_INTENT_TTL_MS) } });
   });
 
   return { intentId: intent.id, token: intent.token, expectedPriceId: selection.priceId };
@@ -168,281 +175,125 @@ export function extractPreviousPaddleSubscriptionId(metadata: unknown): string |
   return null;
 }
 
-async function findLocalSubscriptionByProvider(
-  snapshot: PaddleSubscriptionSnapshot,
-  resolvedIntent?: { tenantId: string } | null,
-) {
-  const prisma = getPrismaClient();
-  if (snapshot.id) {
-    const bySubId = await prisma.tenantSubscription.findFirst({
-      where: { providerSubscriptionId: snapshot.id, billingMode: "paddle" },
-      include: { plan: true },
-      orderBy: { startedAt: "desc" },
-    });
-    if (bySubId) return bySubId;
-  }
-  if (resolvedIntent) {
-    return prisma.tenantSubscription.findFirst({
-      where: { tenantId: resolvedIntent.tenantId },
-      include: { plan: true },
-      orderBy: { startedAt: "desc" },
-    });
-  }
-  return null;
+export class PaddleSyncError extends Error {
+  constructor(public code: string) { super(code); }
+}
+const fail = (code: string): never => { throw new PaddleSyncError(code); };
+
+export async function syncPaddleSubscription(input: { snapshot: PaddleSubscriptionSnapshot; isFirstCreation?: boolean }) {
+  return getPrismaClient().$transaction((tx) => syncPaddleSubscriptionTx(tx, input.snapshot));
 }
 
-export async function syncPaddleSubscription(input: {
-  snapshot: PaddleSubscriptionSnapshot;
-  isFirstCreation?: boolean;
-}) {
-  const prisma = getPrismaClient();
-
-  let resolvedIntent: { tenantId: string; id: string; expectedPriceId: string } | null = null;
-  if (input.isFirstCreation && input.snapshot.checkoutIntentToken) {
-    const intent = await resolveCheckoutIntent(input.snapshot.checkoutIntentToken);
-    if (intent) {
-      if (intent.expectedPriceId !== input.snapshot.priceId) {
-        await prisma.auditLog.create({
-          data: {
-            tenantId: intent.tenantId,
-            action: "paddle_checkout_price_mismatch",
-            entityType: "PaddleCheckoutIntent",
-            entityId: intent.id,
-            metadata: {
-              expectedPriceId: intent.expectedPriceId,
-              receivedPriceId: input.snapshot.priceId,
-              paddleSubscriptionId: input.snapshot.id,
-            },
-          },
-        });
-        throw new Error(
-          `El precio recibido de Paddle (${input.snapshot.priceId}) no coincide con la intención `
-          + `de checkout (${intent.expectedPriceId}). Posible manipulación.`,
-        );
-      }
-      resolvedIntent = { tenantId: intent.tenantId, id: intent.id, expectedPriceId: intent.expectedPriceId };
-    }
+export async function syncPaddleSubscriptionTx(tx: Prisma.TransactionClient, snapshot: PaddleSubscriptionSnapshot) {
+  const environment = snapshot.environment ?? getPaddleEnvironment();
+  if (environment !== getPaddleEnvironment()) fail("PADDLE_ENVIRONMENT_MISMATCH");
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${environment + ":" + snapshot.id}))::text`;
+  let intent = snapshot.checkoutIntentId
+    ? await tx.paddleCheckoutIntent.findUnique({ where: { id: snapshot.checkoutIntentId } })
+    : snapshot.checkoutIntentToken ? await tx.paddleCheckoutIntent.findUnique({ where: { token: snapshot.checkoutIntentToken } }) : null;
+  let link = await tx.paddleSubscriptionLink.findUnique({ where: { environment_providerSubscriptionId: { environment, providerSubscriptionId: snapshot.id } } });
+  if (!intent && link?.checkoutIntentId) intent = await tx.paddleCheckoutIntent.findUnique({ where: { id: link.checkoutIntentId } });
+  const existingMatches = await tx.tenantSubscription.findMany({ where: { providerSubscriptionId: snapshot.id, billingMode: "paddle" }, distinct: ["tenantId"], orderBy: { startedAt: "desc" }, take: 2 });
+  if (existingMatches.length > 1) fail("PADDLE_HISTORICAL_MAPPING_AMBIGUOUS");
+  const existing = existingMatches[0] ?? null;
+  const tenantId = link?.tenantId ?? intent?.tenantId ?? existing?.tenantId;
+  if (!tenantId) fail("PADDLE_MAPPING_MISSING");
+  if (existing && intent && existing.tenantId !== intent.tenantId) fail("PADDLE_TENANT_MISMATCH");
+  if (existing?.providerCustomerId && existing.providerCustomerId !== snapshot.customerId) fail("PADDLE_CUSTOMER_MISMATCH");
+  if (intent && intent.tenantId !== tenantId) fail("PADDLE_TENANT_MISMATCH");
+  await tx.$queryRaw`SELECT id FROM "Tenant" WHERE id = ${tenantId} FOR UPDATE`;
+  const local = await tx.tenantSubscription.findFirst({ where: { tenantId }, include: { plan: true }, orderBy: { startedAt: "desc" } });
+  if (!local) return fail("PADDLE_LOCAL_SUBSCRIPTION_MISSING");
+  if (intent) {
+    // The provider's signed creation time, not delivery time, determines purchase eligibility.
+    const purchaseAt = snapshot.subscriptionCreatedAt ?? snapshot.occurredAt;
+    if (intent.environment && intent.environment !== environment) fail("PADDLE_ENVIRONMENT_MISMATCH");
+    if (intent.status !== "pending" && !(intent.status === "completed" && intent.paddleSubscriptionId === snapshot.id)) fail("PADDLE_INTENT_ALREADY_BOUND");
+    if (intent.paddleSubscriptionId && intent.paddleSubscriptionId !== snapshot.id) fail("PADDLE_INTENT_ALREADY_BOUND");
+    if (!link && intent.status === "pending" && (purchaseAt < intent.createdAt || purchaseAt > intent.expiresAt)) fail("PADDLE_INTENT_OUTSIDE_PURCHASE_WINDOW");
+    if (!link && !existing && intent.expectedPriceId !== snapshot.priceId) fail("PADDLE_PRICE_MISMATCH");
+  } else if (!link && !existing) return fail("PADDLE_INTENT_REQUIRED");
+  if (local.providerSubscriptionId && local.providerSubscriptionId !== snapshot.id && local.billingMode === "paddle" && local.status !== "canceled") fail("PADDLE_OTHER_SUBSCRIPTION_ACTIVE");
+  if (!link) {
+    link = await tx.paddleSubscriptionLink.create({ data: { environment, providerSubscriptionId: snapshot.id, tenantId: local.tenantId, localSubscriptionId: existing?.id ?? local.id, checkoutIntentId: intent?.id, lastEventAt: existing?.providerLastEventAt } });
   }
-
-  const local = await findLocalSubscriptionByProvider(input.snapshot, resolvedIntent);
-  if (!local) throw new Error("No existe mapping local para la suscripción Paddle.");
-
-  if (
-    local.providerLastEventAt &&
-    input.snapshot.occurredAt.getTime() <= local.providerLastEventAt.getTime()
-  ) {
-    return "stale" as const;
+  // A historical provider subscription must not overwrite a subsequent manual contract.
+  if (link.localSubscriptionId !== local.id) return "skipped_historical_subscription" as const;
+  if (local.billingMode === "manual" && extractPreviousPaddleSubscriptionId(local.providerMetadata) === snapshot.id) return "skipped_manual_mode" as const;
+  if (link.lastEventAt && (snapshot.occurredAt < link.lastEventAt || (snapshot.occurredAt.getTime() === link.lastEventAt.getTime() && (snapshot.status !== "canceled" || local.status === "canceled")))) return "stale" as const;
+  const revoking = ["canceled", "paused", "past_due"].includes(snapshot.status);
+  const priceChanged = local.billingMode === "paddle" && local.providerSubscriptionId === snapshot.id && local.providerPriceId !== snapshot.priceId;
+  if (priceChanged && !revoking) {
+    const change = await tx.paddleCheckoutIntent.findFirst({ where: { tenantId: local.tenantId, paddleSubscriptionId: snapshot.id, expectedPriceId: snapshot.priceId, environment, status: "change_authorized", legalAcceptanceId: { not: null }, createdAt: { lte: snapshot.occurredAt }, expiresAt: { gte: snapshot.occurredAt } }, orderBy: { createdAt: "desc" } });
+    if (!change) fail("PADDLE_PLAN_CHANGE_ACCEPTANCE_REQUIRED");
+    intent = change;
+    await tx.paddleSubscriptionLink.update({ where: { id: link.id }, data: { checkoutIntentId: change!.id } });
   }
-
-  const paddleStatus = input.snapshot.status;
-
-  if (local.billingMode === "manual") {
-    const previousPaddleSubId = extractPreviousPaddleSubscriptionId(local.providerMetadata);
-    const isNewCheckout =
-      input.isFirstCreation === true &&
-      input.snapshot.id !== previousPaddleSubId;
-
-    if (!isNewCheckout) {
-      await prisma.$transaction([
-        prisma.tenantSubscription.update({
-          where: { id: local.id },
-          data: { providerLastEventAt: input.snapshot.occurredAt },
-        }),
-        prisma.auditLog.create({
-          data: {
-            tenantId: local.tenantId,
-            action: "paddle_event_skipped_manual_mode",
-            entityType: "TenantSubscription",
-            entityId: local.id,
-            metadata: {
-              paddleEventStatus: paddleStatus,
-              paddleSubscriptionId: input.snapshot.id,
-              isFirstCreation: input.isFirstCreation ?? false,
-              previousPaddleSubId: previousPaddleSubId ?? null,
-              reason: "Suscripción en modo manual — evento Paddle registrado sin aplicar.",
-            },
-          },
-        }),
-      ]);
-      return "skipped_manual_mode" as const;
-    }
-  }
-
-  const selection = resolvePaddlePriceId(input.snapshot.priceId);
-  if (!selection) {
-    await prisma.$transaction([
-      ...(paddleStatus === "canceled"
-        ? [prisma.tenantSubscription.update({
-            where: { id: local.id },
-            data: {
-              status: "canceled",
-              cancelAtPeriodEnd: false,
-              providerLastEventAt: input.snapshot.occurredAt,
-            },
-          })]
-        : []),
-      prisma.auditLog.create({
-        data: {
-          tenantId: local.tenantId,
-          action: "paddle_price_unrecognized",
-          entityType: "TenantSubscription",
-          entityId: local.id,
-          metadata: { paddlePriceId: input.snapshot.priceId },
-        },
-      }),
-    ]);
-    return "unknown_price" as const;
-  }
-
-  const shouldActivate = paddleStatus === "active" && (
-    local.status !== "active" || input.isFirstCreation
-  );
-  const plan = shouldActivate
-    ? await prisma.plan.findUnique({ where: { key: selection.planKey } })
-    : null;
-  if (shouldActivate && !plan) throw new Error(`Plan local no configurado: ${selection.planKey}.`);
-
-  const nextStatus = paddleStatus === "canceled"
-    ? "canceled"
-    : paddleStatus === "active" || paddleStatus === "trialing"
-      ? paddleStatus === "trialing" ? "trialing" : "active"
-      : paddleStatus === "past_due"
-        ? "past_due"
-        : paddleStatus === "paused"
-          ? "suspended"
-          : local.status;
-
-  const graceEndsAt = nextStatus === "past_due"
-    ? local.graceEndsAt ?? calculateGraceEndsAt(new Date())
-    : nextStatus === "active"
-      ? null
-      : local.graceEndsAt;
-  const wasRecovering = local.status === "past_due" || local.status === "suspended";
-
-  await prisma.$transaction(async (tx) => {
-    await tx.tenantSubscription.update({
-      where: { id: local.id },
-      data: {
-        planId: plan?.id ?? local.planId,
-        status: nextStatus,
-        billingMode: "paddle",
-        providerCustomerId: input.snapshot.customerId,
-        providerSubscriptionId: input.snapshot.id,
-        providerPriceId: input.snapshot.priceId,
-        billingInterval: selection.billingInterval as "MONTHLY" | "YEARLY",
-        currentPeriodStartsAt: input.snapshot.currentPeriodStartsAt,
-        currentPeriodEndsAt: input.snapshot.currentPeriodEndsAt,
-        cancelAtPeriodEnd: input.snapshot.cancelAtPeriodEnd,
-        graceEndsAt,
-        suspendedAt: nextStatus === "active" ? null : nextStatus === "suspended" ? local.suspendedAt ?? new Date() : local.suspendedAt,
-        providerLastEventAt: input.snapshot.occurredAt,
-      },
-    });
-    if (shouldActivate && plan) {
-      await tx.tenant.update({ where: { id: local.tenantId }, data: { planKey: selection.planKey } });
-    }
-
-    const actions = [
-      ...(shouldActivate && local.plan.key !== selection.planKey ? ["plan_changed"] : []),
-      ...(shouldActivate && local.status !== "active"
-        ? [wasRecovering ? "subscription_reactivated" : "subscription_activated"]
-        : []),
-      ...(nextStatus === "canceled" && local.status !== "canceled" ? ["subscription_canceled"] : []),
-      ...(nextStatus === "past_due" && local.status !== "past_due" ? ["payment_failed"] : []),
-      ...(nextStatus === "suspended" && local.status !== "suspended" ? ["subscription_suspended"] : []),
-    ];
-    if (actions.length) {
-      await tx.auditLog.createMany({
-        data: actions.map((action) => ({
-          tenantId: local.tenantId,
-          action,
-          entityType: "TenantSubscription",
-          entityId: local.id,
-          metadata: { source: "paddle", billingInterval: selection.billingInterval },
-        })),
-      });
-    }
-
-    if (resolvedIntent) {
-      await tx.paddleCheckoutIntent.update({
-        where: { id: resolvedIntent.id },
-        data: { status: "completed", paddleSubscriptionId: input.snapshot.id },
-      });
-    }
-  });
+  const selection = (revoking && priceChanged ? resolvePaddlePriceId(local.providerPriceId ?? "") : resolvePaddlePriceId(snapshot.priceId))
+    ?? (revoking ? { planCode: intent?.planCode ?? "UNKNOWN", planKey: local.plan.key, billingInterval: local.billingInterval ?? intent?.billingInterval ?? "MONTHLY" } : null);
+  if (!selection) return fail("PADDLE_PRICE_UNRECOGNIZED");
+  if (!revoking && snapshot.providerInterval && snapshot.providerInterval !== selection.billingInterval) fail("PADDLE_INTERVAL_MISMATCH");
+  if (intent && !intent.paddleSubscriptionId && (selection.planCode !== intent.planCode || selection.billingInterval !== intent.billingInterval)) fail("PADDLE_INTERVAL_MISMATCH");
+  const plan = await tx.plan.findUnique({ where: { key: selection.planKey } });
+  if (!plan) return fail("PADDLE_LOCAL_PLAN_MISSING");
+  if (!["active", "trialing", "past_due", "paused", "canceled"].includes(snapshot.status)) return fail("PADDLE_STATUS_UNSUPPORTED");
+  if (["active", "trialing", "past_due"].includes(snapshot.status) && (!snapshot.currentPeriodStartsAt || !snapshot.currentPeriodEndsAt || snapshot.currentPeriodEndsAt <= snapshot.currentPeriodStartsAt)) fail("PADDLE_PERIOD_INVALID");
+  const nextStatus = snapshot.status === "paused" ? "suspended" : snapshot.status as "active" | "trialing" | "past_due" | "canceled";
+  const shouldActivate = nextStatus === "active" && (local.status !== "active" || local.billingMode !== "paddle" || local.planId !== plan.id || local.providerSubscriptionId !== snapshot.id || local.providerPriceId !== snapshot.priceId);
+  await tx.tenantSubscription.update({ where: { id: local.id }, data: {
+    planId: nextStatus === "active" || nextStatus === "trialing" ? plan.id : local.planId,
+    status: nextStatus, billingMode: "paddle", billingInterval: selection.billingInterval,
+    providerSubscriptionId: snapshot.id, providerCustomerId: snapshot.customerId, providerPriceId: revoking && priceChanged ? local.providerPriceId : snapshot.priceId,
+    currentPeriodStartsAt: snapshot.currentPeriodStartsAt ?? local.currentPeriodStartsAt,
+    currentPeriodEndsAt: snapshot.currentPeriodEndsAt ?? local.currentPeriodEndsAt,
+    cancelAtPeriodEnd: snapshot.status === "canceled" ? false : snapshot.cancelAtPeriodEnd,
+    graceEndsAt: nextStatus === "past_due" ? local.graceEndsAt ?? calculateGraceEndsAt(snapshot.occurredAt) : nextStatus === "active" ? null : local.graceEndsAt,
+    suspendedAt: nextStatus === "active" ? null : nextStatus === "suspended" ? local.suspendedAt ?? snapshot.occurredAt : local.suspendedAt,
+    providerLastEventAt: snapshot.occurredAt,
+  } });
+  if (nextStatus === "active" || nextStatus === "trialing") await tx.tenant.update({ where: { id: local.tenantId }, data: { planKey: selection.planKey } });
+  await tx.paddleSubscriptionLink.update({ where: { id: link.id }, data: { lastEventAt: snapshot.occurredAt } });
+  if (intent) await tx.paddleCheckoutIntent.update({ where: { id: intent.id }, data: { status: "completed", paddleSubscriptionId: snapshot.id, completedAt: intent.completedAt ?? new Date(), environment } });
+  await tx.auditLog.create({ data: {
+    tenantId: local.tenantId, action: shouldActivate ? "subscription_activated" : "paddle_subscription_synced", entityType: "TenantSubscription", entityId: local.id,
+    metadata: { source: "paddle", providerSubscriptionId: snapshot.id, occurredAt: snapshot.occurredAt.toISOString(), previousStatus: local.status, nextStatus, previousMode: local.billingMode, planCode: selection.planCode, billingInterval: selection.billingInterval, cancelAtPeriodEnd: snapshot.cancelAtPeriodEnd },
+  } });
   return "processed" as const;
 }
 
 export function buildPaddleSubscriptionSnapshot(subscription: {
-  id: string;
-  customerId: string;
-  status: string;
-  items: Array<{ price: { id: string } }>;
+  id: string; customerId: string; status: string; createdAt?: string;
+  items: Array<{ price: { id: string }; quantity?: number }>;
   currentBillingPeriod?: { startsAt: string; endsAt: string } | null;
-  scheduledChange?: { action: string } | null;
-  customData?: Record<string, unknown> | null;
+  billingCycle?: { interval: string; frequency: number };
+  scheduledChange?: { action: string } | null; customData?: Record<string, unknown> | null;
 }, occurredAt: string): PaddleSubscriptionSnapshot {
   const item = subscription.items[0];
-  if (!item?.price.id) throw new Error("Suscripción Paddle incompleta: falta price ID.");
-
+  if (subscription.items.length !== 1 || !item?.price?.id || (item.quantity !== undefined && item.quantity !== 1)) fail("PADDLE_ITEMS_INVALID");
+  const date = (value: string) => { const result = new Date(value); if (!Number.isFinite(result.getTime())) fail("PADDLE_DATE_INVALID"); return result; };
   return {
-    id: subscription.id,
-    customerId: subscription.customerId,
-    priceId: item.price.id,
-    currentPeriodStartsAt: subscription.currentBillingPeriod
-      ? new Date(subscription.currentBillingPeriod.startsAt)
-      : new Date(),
-    currentPeriodEndsAt: subscription.currentBillingPeriod
-      ? new Date(subscription.currentBillingPeriod.endsAt)
-      : new Date(),
+    providerInterval: subscription.billingCycle ? subscription.billingCycle.frequency === 1 && subscription.billingCycle.interval === "month" ? "MONTHLY" : subscription.billingCycle.frequency === 1 && subscription.billingCycle.interval === "year" ? "YEARLY" : "UNSUPPORTED" : undefined,
+    id: subscription.id, customerId: subscription.customerId, priceId: item.price.id, status: subscription.status,
+    occurredAt: date(occurredAt), subscriptionCreatedAt: subscription.createdAt ? date(subscription.createdAt) : undefined,
+    currentPeriodStartsAt: subscription.currentBillingPeriod ? date(subscription.currentBillingPeriod.startsAt) : null,
+    currentPeriodEndsAt: subscription.currentBillingPeriod ? date(subscription.currentBillingPeriod.endsAt) : null,
     cancelAtPeriodEnd: subscription.scheduledChange?.action === "cancel",
-    status: subscription.status,
-    occurredAt: new Date(occurredAt),
-    checkoutIntentToken:
-      subscription.customData && typeof subscription.customData.cid === "string"
-        ? subscription.customData.cid
-        : undefined,
+    checkoutIntentToken: typeof subscription.customData?.cid === "string" ? subscription.customData.cid : undefined,
   };
 }
 
-export async function processPaddleEventIdempotently(
-  eventId: string,
-  eventType: string,
-  handler: () => Promise<string>,
-) {
+// Compatibility for internal callers: preserve failed records and claim retries atomically.
+export async function processPaddleEventIdempotently(eventId: string, eventType: string, handler: () => Promise<string>) {
   const prisma = getPrismaClient();
+  await prisma.billingWebhookEvent.createMany({ data: [{ provider: "PADDLE", externalEventId: eventId, eventType, status: "failed" }], skipDuplicates: true });
+  const claimed = await prisma.billingWebhookEvent.updateMany({ where: { provider: "PADDLE", externalEventId: eventId, status: "failed" }, data: { status: "processing", attempts: { increment: 1 } } });
+  if (!claimed.count) return { duplicate: true, result: "handled_or_processing" };
   try {
-    const record = await prisma.billingWebhookEvent.create({
-      data: { provider: "PADDLE", externalEventId: eventId, eventType },
-    });
-    try {
-      const result = await handler();
-      await prisma.billingWebhookEvent.update({
-        where: { id: record.id },
-        data: { status: "processed", processedAt: new Date(), errorMessage: null },
-      });
-      return { duplicate: false, result };
-    } catch (error) {
-      await prisma.billingWebhookEvent.update({
-        where: { id: record.id },
-        data: { status: "failed", errorMessage: error instanceof Error ? error.message.slice(0, 500) : "Error Paddle" },
-      });
-      throw error;
-    }
+    const result = await handler();
+    await prisma.billingWebhookEvent.update({ where: { provider_externalEventId: { provider: "PADDLE", externalEventId: eventId } }, data: { status: "processed", processedAt: new Date(), errorMessage: null } });
+    return { duplicate: false, result };
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      const existing = await prisma.billingWebhookEvent.findUnique({
-        where: { provider_externalEventId: { provider: "PADDLE", externalEventId: eventId } },
-      });
-      if (existing?.status === "failed") {
-        await prisma.billingWebhookEvent.delete({ where: { id: existing.id } });
-        return processPaddleEventIdempotently(eventId, eventType, handler);
-      }
-      if (existing && isWebhookAlreadyHandled(existing.status)) {
-        return { duplicate: true, result: existing.status };
-      }
-      return { duplicate: true, result: "processing" };
-    }
+    await prisma.billingWebhookEvent.update({ where: { provider_externalEventId: { provider: "PADDLE", externalEventId: eventId } }, data: { status: "failed", errorMessage: error instanceof PaddleSyncError ? error.code : "PADDLE_PROCESSING_FAILED" } });
     throw error;
   }
 }

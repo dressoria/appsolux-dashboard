@@ -125,6 +125,7 @@ enum BillingInterval {
 }
 
 enum BillingWebhookStatus {
+  received
   processing
   processed
   failed
@@ -674,9 +675,12 @@ model User {
   requestedBankTransfers               BankTransferRequest[]        @relation("RequestedBankTransfers")
   reviewedBankTransfers                BankTransferRequest[]        @relation("ReviewedBankTransfers")
   paddleCheckoutIntents                PaddleCheckoutIntent[]       @relation("PaddleCheckoutIntents")
+  legalAcceptances                     LegalAcceptance[]
 }
 
 model Tenant {
+  legalAcceptances            LegalAcceptance[]
+  paddleLinks                 PaddleSubscriptionLink[]
   id                          String       @id @default(cuid())
   name                        String
   slug                        String       @unique
@@ -829,6 +833,14 @@ model TenantSubscription {
 }
 
 model BillingWebhookEvent {
+  environment     String?
+  payload         Json?
+  occurredAt      DateTime?
+  attempts        Int                     @default(0)
+  nextAttemptAt   DateTime                @default(now())
+  lockedAt        DateTime?
+  lockToken       String?
+  attemptsHistory BillingWebhookAttempt[]
   id              String               @id @default(cuid())
   provider        String
   externalEventId String
@@ -845,6 +857,10 @@ model BillingWebhookEvent {
 }
 
 model BankTransferRequest {
+  activationErrorCode String?
+  legalAcceptanceId       String?                   @unique
+  legalAcceptance         LegalAcceptance?          @relation(fields: [legalAcceptanceId], references: [id], onDelete: Restrict)
+  pendingInvoice          CommercialInvoicePending?
   id                      String                    @id @default(cuid())
   tenantId                String
   requestedById           String
@@ -882,6 +898,13 @@ model BankTransferRequest {
 }
 
 model PaddleCheckoutIntent {
+  environment          String?
+  completedAt          DateTime?
+  paymentConfirmedAt   DateTime?
+  transactionId        String?
+  legalAcceptanceId    String?                  @unique
+  legalAcceptance      LegalAcceptance?         @relation(fields: [legalAcceptanceId], references: [id], onDelete: Restrict)
+  links                PaddleSubscriptionLink[]
   id                   String          @id @default(cuid())
   token                String          @unique
   tenantId             String
@@ -3996,4 +4019,117 @@ model ApiRequestLog {
   apiKey UserApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
   @@index([tenantId, createdAt])
   @@index([apiKeyId, createdAt])
+}
+
+// Durable provider identity survives transitions away from Paddle.
+model PaddleSubscriptionLink {
+  id                     String                @id @default(cuid())
+  environment            String
+  providerSubscriptionId String
+  tenantId               String
+  localSubscriptionId    String
+  checkoutIntentId       String?
+  lastEventAt            DateTime?
+  createdAt              DateTime              @default(now())
+  tenant                 Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  checkoutIntent         PaddleCheckoutIntent? @relation(fields: [checkoutIntentId], references: [id], onDelete: Restrict)
+
+  @@unique([environment, providerSubscriptionId])
+  @@index([tenantId])
+}
+
+model BillingWebhookAttempt {
+  id        String              @id @default(cuid())
+  eventId   String
+  attempt   Int
+  result    String
+  errorCode String?
+  createdAt DateTime            @default(now())
+  event     BillingWebhookEvent @relation(fields: [eventId], references: [id], onDelete: Restrict)
+
+  @@index([eventId, createdAt])
+}
+
+// Administrative record only; this is not a tax invoice.
+model CommercialInvoicePending {
+  id                    String              @id @default(cuid())
+  bankTransferRequestId String              @unique
+  createdAt             DateTime            @default(now())
+  request               BankTransferRequest @relation(fields: [bankTransferRequestId], references: [id], onDelete: Restrict)
+}
+
+enum LegalPublicationStatus {
+  DRAFT
+  APPROVED
+  PUBLISHED
+  REPLACED
+}
+
+model LegalRelease {
+  id              String                 @id @default(cuid())
+  version         String                 @unique
+  hash            String
+  status          LegalPublicationStatus @default(DRAFT)
+  operator        Json
+  reviewReference String?
+  publishedAt     DateTime?
+  effectiveAt     DateTime
+  createdAt       DateTime               @default(now())
+  documents       LegalDocumentVersion[]
+  acceptances     LegalAcceptance[]
+
+  @@index([status, effectiveAt])
+}
+
+model LegalDocumentVersion {
+  id          String                 @id @default(cuid())
+  releaseId   String
+  type        String
+  version     String
+  title       String
+  content     String                 @db.Text
+  hash        String
+  status      LegalPublicationStatus @default(DRAFT)
+  publishedAt DateTime?
+  effectiveAt DateTime
+  createdAt   DateTime               @default(now())
+  release     LegalRelease           @relation(fields: [releaseId], references: [id], onDelete: Restrict)
+
+  @@unique([type, version])
+  @@unique([releaseId, type])
+}
+
+model LegalAcceptance {
+  id                 String                            @id @default(cuid())
+  userId             String
+  tenantId           String
+  releaseId          String
+  releaseHash        String
+  documents          Json
+  context            String
+  planCode           String
+  billingInterval    String?
+  operationReference String                            @unique
+  acceptedAt         DateTime                          @default(now())
+  createdAt          DateTime                          @default(now())
+  user               User                              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  tenant             Tenant                            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  release            LegalRelease                      @relation(fields: [releaseId], references: [id], onDelete: Restrict)
+  technicalEvidence  LegalAcceptanceTechnicalEvidence?
+  paddleIntent       PaddleCheckoutIntent?
+  bankTransfer       BankTransferRequest?
+
+  @@index([tenantId, acceptedAt])
+}
+
+// Expirable technical metadata is kept separate from immutable contractual evidence.
+model LegalAcceptanceTechnicalEvidence {
+  id           String          @id @default(cuid())
+  acceptanceId String          @unique
+  ipDigest     String?
+  userAgent    String?
+  expiresAt    DateTime
+  acceptance   LegalAcceptance @relation(fields: [acceptanceId], references: [id], onDelete: Restrict)
+
+  @@index([expiresAt])
 }

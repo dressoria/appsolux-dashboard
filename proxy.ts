@@ -1,3 +1,4 @@
+import { isClerkIndependentRoute } from "@/lib/security/clerk-independent-routes";
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse, type NextRequest, type NextFetchEvent } from "next/server";
 
@@ -50,7 +51,7 @@ const clerkProxy = clerkMiddleware(
 // Integration requests must never invoke Clerk (including handshake/redirect
 // behavior before its callback). Their route handlers validate API keys.
 export default function proxy(request: NextRequest, event: NextFetchEvent) {
-  if (request.nextUrl.pathname.startsWith("/api/v1/") || process.env.APPSOLUX_AUTH_PROVIDER?.trim().toLowerCase() !== "clerk") {
+  if (isClerkIndependentRoute(request.nextUrl.pathname) || process.env.APPSOLUX_AUTH_PROVIDER?.trim().toLowerCase() !== "clerk") {
     return NextResponse.next();
   }
   return clerkProxy(request, event);

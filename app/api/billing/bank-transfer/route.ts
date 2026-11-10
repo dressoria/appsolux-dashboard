@@ -1,3 +1,7 @@
+import { legalTechnicalEvidence } from "@/lib/legal/request-evidence";
+import { proofFromForm } from "@/lib/legal/catalog";
+import { assertContractOwner, validateLegalProof, legalErrorResponse } from "@/lib/legal/service";
+import { getPrismaClient } from "@/lib/db/prisma";
 import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -57,6 +61,10 @@ export async function POST(request: Request) {
       );
     }
 
+    const legalProof = proofFromForm(formData);
+    await assertContractOwner(getPrismaClient(), user.id, tenant.id);
+    await validateLegalProof(getPrismaClient(), legalProof);
+
     const buffer = Buffer.from(await receipt.arrayBuffer());
     const validation = validateReceiptFile(buffer, receipt.name, receipt.size);
     if (!validation.ok) {
@@ -67,6 +75,8 @@ export async function POST(request: Request) {
     const fileId = await saveReceipt(tenant.id, ext, buffer);
 
     const transferRequest = await createBankTransferRequest({
+      technicalEvidence: legalTechnicalEvidence(request.headers),
+      legalProof,
       tenantId: tenant.id,
       requestedById: user.id,
       planCode: planCode as CommercialPlanCode,
@@ -80,6 +90,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, requestId: transferRequest.id });
   } catch (error) {
+    const legal = legalErrorResponse(error);
+    if (legal) return NextResponse.json({ ok: false, code: legal.code, message: legal.message }, { status: legal.status });
     return NextResponse.json(
       { ok: false, message: error instanceof Error ? error.message : "Error al enviar la solicitud." },
       { status: 400 },

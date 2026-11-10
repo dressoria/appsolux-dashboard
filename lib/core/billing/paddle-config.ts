@@ -29,7 +29,10 @@ export function getPaddleClient() {
 }
 
 export function getPaddleWebhookSecret() {
-  return requireServerEnv("PADDLE_WEBHOOK_SECRET");
+  const specific = getPaddleEnvironment() === Environment.sandbox ? "PADDLE_SANDBOX_WEBHOOK_SECRET" : "PADDLE_PRODUCTION_WEBHOOK_SECRET";
+  const value = process.env[specific]?.trim() || process.env.PADDLE_WEBHOOK_SECRET?.trim();
+  if (!value) throw new Error(`Falta configurar ${specific}.`);
+  return value;
 }
 
 export function getPaddleClientToken() {

@@ -1,97 +1,29 @@
-import { NextResponse } from "next/server";
-
-import {
-  getPaddleBillingAvailability,
-  getPaddleClient,
-  getPaddleWebhookSecret,
-} from "@/lib/core/billing/paddle-config";
-import {
-  buildPaddleSubscriptionSnapshot,
-  processPaddleEventIdempotently,
-  syncPaddleSubscription,
-} from "@/lib/core/billing/paddle-billing";
-import { BILLING_PROVIDER_UNAVAILABLE } from "@/lib/core/billing/providers/types";
+import { Webhooks, NodeRuntime } from "@paddle/paddle-node-sdk";
+import { after, NextResponse } from "next/server";
+import { getPaddleWebhookSecret } from "@/lib/core/billing/paddle-config";
+import { processPaddleInbox, receivePaddleEvent, type VerifiedPaddleEvent } from "@/lib/core/billing/paddle-inbox";
 
 export const runtime = "nodejs";
-
 export async function POST(request: Request) {
-  if (!getPaddleBillingAvailability().configured) {
-    return NextResponse.json(BILLING_PROVIDER_UNAVAILABLE, { status: 503 });
-  }
-
   const signature = request.headers.get("paddle-signature");
-  if (!signature) {
-    return NextResponse.json({ ok: false, message: "Firma Paddle requerida." }, { status: 400 });
-  }
-
+  if (!signature) return NextResponse.json({ ok: false, message: "Firma Paddle requerida." }, { status: 400 });
+  let secret: string;
+  try { secret = getPaddleWebhookSecret(); }
+  catch { return NextResponse.json({ ok: false, message: "Destino Paddle no configurado." }, { status: 503 }); }
   const rawBody = await request.text();
-  const paddle = getPaddleClient();
-  const webhookSecret = getPaddleWebhookSecret();
-
-  let event: {
-    eventId: string;
-    eventType: string;
-    occurredAt: string;
-    data: Record<string, unknown>;
-  };
-
+  let event: VerifiedPaddleEvent;
   try {
-    const parsed = await paddle.webhooks.unmarshal(rawBody, webhookSecret, signature);
-    event = parsed as unknown as typeof event;
+    NodeRuntime.initialize();
+    event = await new Webhooks().unmarshal(rawBody, secret, signature) as unknown as VerifiedPaddleEvent;
+    if (!event?.eventId || !event.data || !Number.isFinite(Date.parse(event.occurredAt))) throw new Error("invalid");
+  } catch { return NextResponse.json({ ok: false, message: "Firma o evento Paddle inválido." }, { status: 400 }); }
+  try {
+    const result = await receivePaddleEvent(event);
+    // Best effort wake-up. PostgreSQL and the protected scheduled processor provide recovery.
+    after(async () => { try { await processPaddleInbox(5); } catch { console.error("[billing][paddle] inbox wake-up failed"); } });
+    return NextResponse.json({ ok: true, received: true, ...result });
   } catch {
-    return NextResponse.json({ ok: false, message: "Firma Paddle inválida." }, { status: 400 });
-  }
-
-  if (!event?.eventId) {
-    return NextResponse.json({ ok: false, message: "Evento Paddle inválido." }, { status: 400 });
-  }
-
-  const subscriptionEvents = new Set([
-    "subscription.created",
-    "subscription.updated",
-    "subscription.activated",
-    "subscription.past_due",
-    "subscription.paused",
-    "subscription.canceled",
-  ]);
-
-  try {
-    if (subscriptionEvents.has(event.eventType)) {
-      const result = await processPaddleEventIdempotently(
-        event.eventId,
-        event.eventType,
-        async () => {
-          const subscription = event.data as {
-            id: string;
-            customerId: string;
-            status: string;
-            items: Array<{ price: { id: string } }>;
-            currentBillingPeriod?: { startsAt: string; endsAt: string } | null;
-            scheduledChange?: { action: string } | null;
-            customData?: Record<string, unknown> | null;
-          };
-          const snapshot = buildPaddleSubscriptionSnapshot(subscription, event.occurredAt);
-          return syncPaddleSubscription({
-            snapshot,
-            isFirstCreation: event.eventType === "subscription.created" || event.eventType === "subscription.activated",
-          });
-        },
-      );
-      return NextResponse.json({ ok: true, received: true, duplicate: result.duplicate });
-    }
-
-    if (event.eventType === "transaction.completed") {
-      await processPaddleEventIdempotently(event.eventId, event.eventType, async () => "audited");
-      return NextResponse.json({ ok: true, received: true, audited: true });
-    }
-
-    return NextResponse.json({ ok: true, received: true, ignored: true });
-  } catch (error) {
-    console.error("[billing][paddle] webhook processing failed", {
-      eventId: event.eventId,
-      eventType: event.eventType,
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
-    return NextResponse.json({ ok: false, message: "No se pudo procesar el evento." }, { status: 500 });
+    console.error("[billing][paddle] durable receipt failed", { eventId: event.eventId });
+    return NextResponse.json({ ok: false, message: "No se pudo guardar el evento." }, { status: 500 });
   }
 }

@@ -1,5 +1,9 @@
 "use server";
 
+import { headers } from "next/headers";
+import { legalTechnicalEvidence } from "@/lib/legal/request-evidence";
+import { proofFromForm } from "@/lib/legal/catalog";
+import { legalErrorResponse } from "@/lib/legal/service";
 import { redirect } from "next/navigation";
 
 import { routes } from "@/config/routes";
@@ -89,6 +93,8 @@ export async function createTenantAction(
 
   try {
     await bootstrapAuthenticatedUserTenant({
+      legalProof: proofFromForm(formData),
+      technicalEvidence: legalTechnicalEvidence(await headers()),
       userId: user.id,
       email: user.email,
       name: user.name,
@@ -103,6 +109,8 @@ export async function createTenantAction(
       address: address || undefined,
     });
   } catch (error) {
+    const legal = legalErrorResponse(error);
+    if (legal) return { message: legal.message };
     if (error instanceof OnboardingCompanyAlreadyRegisteredError) {
       return {
         message: "Esta empresa ya está registrada en Facturom. Solicita acceso al equipo de soporte.",

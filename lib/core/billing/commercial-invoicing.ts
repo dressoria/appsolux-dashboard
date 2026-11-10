@@ -1,5 +1,6 @@
 import "@/lib/security/server-only";
 
+import type { Prisma } from "@prisma/client";
 import { getPrismaClient } from "@/lib/db/prisma";
 
 export type InvoiceRegistration = {
@@ -11,15 +12,19 @@ export type InvoiceRegistration = {
   billingInterval: "MONTHLY" | "YEARLY";
 };
 
-export async function registerPendingInvoice(input: InvoiceRegistration) {
-  const prisma = getPrismaClient();
+export async function registerPendingInvoice(input: InvoiceRegistration, prisma: Prisma.TransactionClient) {
+  // Caller holds the request lock. All effects use its transaction.
+  const existing = await prisma.commercialInvoicePending.findUnique({ where: { bankTransferRequestId: input.bankTransferRequestId } });
+  if (existing) return existing;
+  const pending = await prisma.commercialInvoicePending.create({ data: { bankTransferRequestId: input.bankTransferRequestId } });
 
   await prisma.bankTransferRequest.update({
     where: { id: input.bankTransferRequestId },
     data: { invoiceStatus: "pending" },
   });
 
-  await prisma.auditLog.create({
+  const historical = await prisma.auditLog.findFirst({ where: { tenantId: input.tenantId, entityId: input.bankTransferRequestId, action: "commercial_invoice.pending" }, select: { id: true } });
+  if (!historical) await prisma.auditLog.create({
     data: {
       tenantId: input.tenantId,
       action: "commercial_invoice.pending",
@@ -30,10 +35,11 @@ export async function registerPendingInvoice(input: InvoiceRegistration) {
         amountUsd: input.amountUsd,
         currency: input.currency,
         billingInterval: input.billingInterval,
-        note: "Factura comercial pendiente de emisión. Requiere configuración del emisor autorizado.",
+        note: "Registro administrativo pendiente. No acredita la emisión de un comprobante tributario.",
       },
     },
   });
+  return pending;
 }
 
 export async function getInvoicingStatus(bankTransferRequestId: string) {

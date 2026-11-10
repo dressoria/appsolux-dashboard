@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { ArrowRight, Building2, IdCard, MapPin, ReceiptText, Store } from "lucide-react";
 
 import { createTenantAction, type OnboardingActionState } from "@/app/onboarding/actions";
+import { ContractAcceptance } from "@/components/appsolux/legal/contract-acceptance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,10 +37,10 @@ const ecuadorProvinces = [
   "Tungurahua", "Zamora Chinchipe",
 ];
 
-function SubmitButton() {
+function SubmitButton({ accepted }: { accepted: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending} className="h-11 rounded-xl bg-facturom-primary px-6 text-white shadow-md shadow-facturom-primary/20 hover:bg-facturom-primary-soft">
+    <Button type="submit" disabled={pending || !accepted} className="h-11 rounded-xl bg-facturom-primary px-6 text-white shadow-md shadow-facturom-primary/20 hover:bg-facturom-primary-soft">
       {pending ? "Creando tu negocio…" : "Crear mi negocio"}
       {pending ? null : <ArrowRight className="ml-2 h-4 w-4" />}
     </Button>
@@ -51,6 +52,7 @@ function FieldError({ message }: { message?: string }) {
 }
 
 export function OnboardingBusinessForm({ defaultEmail }: { defaultEmail: string }) {
+  const [legalAccepted, setLegalAccepted] = useState(false);
   const [state, formAction] = useActionState(createTenantAction, initialState);
   const [identificationType, setIdentificationType] = useState<TaxIdentificationType>("ruc");
   const [identification, setIdentification] = useState("");
@@ -198,12 +200,13 @@ export function OnboardingBusinessForm({ defaultEmail }: { defaultEmail: string 
         </div>
       </section>
 
+      <ContractAcceptance onChange={(proof) => setLegalAccepted(!!proof)} />
       <div className="flex flex-col items-start justify-between gap-3 border-t border-facturom-primary/10 pt-5 sm:flex-row sm:items-center">
         <div>
           <p className="text-sm font-bold text-slate-900">Comenzarás con Plan Básico</p>
           <p className="text-xs text-slate-500">Podrás configurar SRI después, cuando lo necesites.</p>
         </div>
-        <SubmitButton />
+        <SubmitButton accepted={legalAccepted} />
       </div>
       {state.message ? <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{state.message}</p> : null}
     </form>

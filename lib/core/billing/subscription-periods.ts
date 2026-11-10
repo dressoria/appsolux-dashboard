@@ -7,20 +7,20 @@ export type SubscriptionPeriod = {
 
 function addMonths(date: Date, months: number): Date {
   const result = new Date(date);
-  const day = result.getDate();
-  result.setMonth(result.getMonth() + months);
-  if (result.getDate() !== day) {
-    result.setDate(0);
+  const day = result.getUTCDate();
+  result.setUTCMonth(result.getUTCMonth() + months);
+  if (result.getUTCDate() !== day) {
+    result.setUTCDate(0);
   }
   return result;
 }
 
 function addYears(date: Date, years: number): Date {
   const result = new Date(date);
-  const day = result.getDate();
-  result.setFullYear(result.getFullYear() + years);
-  if (result.getDate() !== day) {
-    result.setDate(0);
+  const day = result.getUTCDate();
+  result.setUTCFullYear(result.getUTCFullYear() + years);
+  if (result.getUTCDate() !== day) {
+    result.setUTCDate(0);
   }
   return result;
 }
@@ -30,7 +30,6 @@ export function calculateSubscriptionPeriod(
   interval: "MONTHLY" | "YEARLY",
 ): SubscriptionPeriod {
   const startsAt = new Date(startDate);
-  startsAt.setHours(0, 0, 0, 0);
 
   const endsAt = interval === "MONTHLY"
     ? addMonths(startsAt, 1)

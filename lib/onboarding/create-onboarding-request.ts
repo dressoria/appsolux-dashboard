@@ -64,6 +64,7 @@ export function createOnboardingRequest(
   }
 
   return {
+    legalProof: record.legalProof,
     user_name: input.user_name,
     email: input.email,
     password: input.password,

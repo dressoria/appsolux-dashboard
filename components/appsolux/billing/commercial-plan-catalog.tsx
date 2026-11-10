@@ -141,8 +141,8 @@ export function CommercialPlanCatalog({
                 <div className="space-y-2">
                   <Button
                     className="w-full rounded-xl"
-                    disabled={!onlinePaymentsAvailable || !canManagePlan || hasActiveSubscription || loading !== null}
-                    onClick={() => redirectFrom("/api/billing/checkout", { planCode: plan.code, billingInterval: interval })}
+                    disabled={!onlinePaymentsAvailable || !canManagePlan || (hasActiveSubscription && isCurrent && currentInterval === interval) || loading !== null}
+                    onClick={() => router.push(`/billing/paddle/checkout?planCode=${plan.code}&billingInterval=${interval}`)}
                     variant={plan.highlighted ? "default" : "outline"}
                   >
                     {!onlinePaymentsAvailable
@@ -152,7 +152,7 @@ export function CommercialPlanCatalog({
                         : isCurrent && hasActiveSubscription && currentInterval === interval
                           ? "Plan actual"
                           : hasActiveSubscription
-                            ? "Cambiar desde el portal"
+                            ? "Revisar cambio de plan"
                             : loading === requestKey
                               ? "Abriendo…"
                               : "Elegir plan"}

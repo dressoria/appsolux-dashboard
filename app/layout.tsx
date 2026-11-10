@@ -1,3 +1,4 @@
+import { CookiePreferences } from "@/components/public/cookie-preferences";
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
@@ -38,7 +39,7 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="es" className="h-full antialiased">
-        <body className="min-h-full flex flex-col">{children}</body>
+        <body className="min-h-full flex flex-col">{children}<CookiePreferences /></body>
       </html>
     </ClerkProvider>
   );

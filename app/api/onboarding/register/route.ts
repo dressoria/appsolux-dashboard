@@ -1,3 +1,5 @@
+import { getAppsoluxAuthProvider } from "@/lib/auth/provider";
+import { LegalContractError, legalErrorResponse } from "@/lib/legal/service";
 import { NextResponse } from "next/server";
 import {
   getCoreDbUnavailableMessage,
@@ -32,21 +34,13 @@ async function tryRegisterAccount(
 
     return account;
   } catch (error) {
+    if (error instanceof LegalContractError) throw error;
     if (error instanceof RegisterAccountError) {
       throw error;
     }
 
-    if (isCoreDbRequired()) {
-      console.error("[CoreDB] Required database unavailable", error);
-      throw new Error(getCoreDbUnavailableMessage());
-    }
-
-    logCoreDbWarning(
-      "Skipped in development because database is unavailable",
-      error
-    );
-
-    return null;
+    // Never provision a company when its contractual evidence could not be persisted.
+    throw new RegisterAccountError("No se pudo guardar la contratación. Reintenta cuando la base esté disponible.", "CONTRACT_DATABASE_UNAVAILABLE", 503);
   }
 }
 
@@ -78,6 +72,7 @@ async function tryUpdateOnboardingRequest(
 
 export async function POST(request: Request) {
   try {
+    if (getAppsoluxAuthProvider() === "clerk") throw new RegisterAccountError("Crea tu cuenta con Clerk e inicia sesión; completa después el formulario de empresa para registrar tu aceptación.", "AUTHENTICATED_ONBOARDING_REQUIRED", 409);
     const body = await request.json();
     const onboardingRequest = createOnboardingRequest(body);
     const account = await tryRegisterAccount(onboardingRequest);
@@ -129,6 +124,8 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
+    const legal = legalErrorResponse(error);
+    if (legal) return NextResponse.json({ success: false, error: { code: legal.code, message: legal.message } }, { status: legal.status });
     const message =
       error instanceof Error
         ? error.message

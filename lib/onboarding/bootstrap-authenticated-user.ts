@@ -1,5 +1,6 @@
 import "@/lib/security/server-only";
 
+import { recordLegalAcceptance, validateLegalProof } from "@/lib/legal/service";
 import type { Prisma } from "@prisma/client";
 
 import { getPrismaClient } from "@/lib/db/prisma";
@@ -26,6 +27,8 @@ export class OnboardingTrialAlreadyConsumedError extends Error {
 const TRIAL_DURATION_DAYS = 7;
 
 type BootstrapAuthenticatedUserInput = {
+  legalProof?: unknown;
+  technicalEvidence?: { ip?: string; userAgent?: string };
   userId: string;
   email: string;
   name: string;
@@ -96,6 +99,8 @@ export async function bootstrapAuthenticatedUserTenant(
   const prisma = getPrismaClient();
 
   return prisma.$transaction(async (tx) => {
+    // A double submission must create one company, trial and contractual record.
+    await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${input.userId} FOR UPDATE`;
     const normalizedTaxIdentification = input.taxIdentificationValue
       ? normalizeEcuadorIdentification(input.taxIdentificationValue)
       : undefined;
@@ -122,6 +127,7 @@ export async function bootstrapAuthenticatedUserTenant(
       };
     }
 
+    await validateLegalProof(tx, input.legalProof);
     const identity = await tx.user.findUnique({
       where: { id: input.userId },
       select: { trialConsumedAt: true, memberships: { where: { status: "active" }, select: { id: true } } },
@@ -191,6 +197,7 @@ export async function bootstrapAuthenticatedUserTenant(
     const trialEndsAt = new Date(
       Date.now() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
     );
+    await recordLegalAcceptance(tx, { proof: input.legalProof, userId: input.userId, tenantId: tenant.id, context: "ONBOARDING", technical: input.technicalEvidence, planCode: "TRIAL", operationReference: `onboarding:${tenant.id}` });
     const subscription = await tx.tenantSubscription.create({
       data: {
         tenantId: tenant.id,

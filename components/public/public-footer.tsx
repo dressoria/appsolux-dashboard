@@ -86,6 +86,7 @@ export function PublicFooter() {
           </div>
         </div>
 
+        <nav aria-label="Legal" className="mb-6 flex flex-wrap gap-4 text-sm underline">{[ ["/terminos-y-condiciones", "Términos"], ["/politica-de-privacidad", "Privacidad"], ["/pagos-y-suscripciones", "Pagos"], ["/acuerdo-tratamiento-datos", "Tratamiento de datos"], ["/politica-de-cookies", "Cookies"] ].map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}</nav>
         <div className="flex flex-col items-center justify-between gap-4 border-t border-gray-800/60 pt-8 sm:flex-row">
           <p className="text-xs text-gray-200">© {new Date().getFullYear()} Facturom. Todos los derechos reservados.</p>
           <p className="text-xs text-gray-200">Ecuador · Cumplimiento SRI</p>

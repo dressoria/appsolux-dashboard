@@ -1,0 +1,9 @@
+"use client";
+import { useRef, useState } from "react";
+import { functionalStorageAllowed, setFunctionalStorageAllowed } from "@/lib/legal/browser-storage";
+export function CookiePreferences() {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [functional, setFunctional] = useState(false);
+  function save(value: boolean) { setFunctionalStorageAllowed(value); dialog.current?.close(); }
+  return <><button type="button" className="fixed bottom-2 left-2 z-30 rounded border bg-background px-3 py-1 text-xs shadow-sm" onClick={() => { setFunctional(functionalStorageAllowed()); dialog.current?.showModal(); }}>Preferencias de cookies</button><dialog ref={dialog} className="m-auto max-w-lg rounded-xl border bg-background p-6 text-foreground shadow-xl backdrop:bg-black/40"><div className="space-y-4"><h2 className="text-xl font-bold">Cookies y almacenamiento</h2><p className="text-sm">La sesión, seguridad y el checkout solicitado utilizan tecnologías necesarias. Las preferencias del menú son opcionales y están desactivadas hasta que las habilites. No incorporamos analítica ni publicidad en esta versión.</p><label className="flex gap-3"><input type="checkbox" checked={functional} onChange={(event) => setFunctional(event.target.checked)} />Recordar preferencias del menú en este navegador</label><p><a href="/politica-de-cookies" className="underline">Consultar política de cookies</a></p><div className="flex flex-wrap gap-3"><button type="button" className="rounded border px-3 py-2" onClick={() => save(false)}>Rechazar opcionales</button><button type="button" className="rounded bg-facturom-primary px-3 py-2 text-white" onClick={() => save(functional)}>Guardar preferencias</button><button type="button" className="rounded border px-3 py-2" onClick={() => dialog.current?.close()}>Cerrar</button></div></div></dialog></>;
+}

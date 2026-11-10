@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CheckCircle2, Clock3, ShieldCheck } from "lucide-react";
 
+import { BillingActivationStatus } from "@/components/appsolux/billing/billing-activation-status";
 import { BankTransferStatus } from "@/components/appsolux/billing/bank-transfer-status";
 import { CommercialPlanCatalog } from "@/components/appsolux/billing/commercial-plan-catalog";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
@@ -20,7 +21,7 @@ function formatDate(value?: Date | null) {
   return new Intl.DateTimeFormat("es-EC", { dateStyle: "long" }).format(value);
 }
 
-export default async function BillingPage({ searchParams }: { searchParams: Promise<{ checkout?: string }> }) {
+export default async function BillingPage({ searchParams }: { searchParams: Promise<{ checkout?: string; intentId?: string }> }) {
   const user = await getCurrentUser();
   if (!user) {
     return <DashboardShell><div className="space-y-3"><h1 className="text-3xl font-black tracking-tight">Inicia sesión para ver tu plan</h1><Button asChild><Link href="/sign-in">Iniciar sesión</Link></Button></div></DashboardShell>;
@@ -42,7 +43,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   return (
     <DashboardShell contentClassName="mx-auto max-w-7xl">
       <div className="space-y-10 pb-10">
-        {query.checkout === "success" ? <p className="rounded-xl border border-facturom-primary/25 bg-facturom-primary/5 p-4 text-sm">Recibimos tu solicitud. Activaremos el plan cuando el pago quede confirmado.</p> : query.checkout === "cancelled" ? <p className="rounded-xl border bg-muted/40 p-4 text-sm">El proceso fue cancelado y no se realizó ningún cambio.</p> : null}
+        {isTenantOwner(user) ? <BillingActivationStatus intentId={query.intentId} /> : null}
 
         <header className="space-y-3">
           <p className="text-sm font-bold uppercase tracking-[0.18em] text-facturom-primary">Mi plan</p>
@@ -77,6 +78,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
         </Card>
 
         <BankTransferStatus />
+        {isTenantOwner(user) ? <Link href="/billing/contracts" className="text-sm underline">Consultar historial contractual</Link> : null}
 
         <section className="space-y-3 text-center">
           <h2 className="text-3xl font-black tracking-tight">Elige el plan para tu negocio</h2>

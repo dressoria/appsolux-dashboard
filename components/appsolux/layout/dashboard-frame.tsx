@@ -1,4 +1,5 @@
 "use client";
+import { readFunctionalPreference, saveFunctionalPreference } from "@/lib/legal/browser-storage";
 
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
@@ -127,18 +128,18 @@ export function DashboardFrame({
   const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    const storedValue = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
+    const storedValue = readFunctionalPreference(SIDEBAR_STORAGE_KEY);
     if (storedValue === "1") {
       setCollapsed(true);
     }
     try {
-      const storedGroups = window.localStorage.getItem(SIDEBAR_OPEN_STORAGE_KEY);
+      const storedGroups = readFunctionalPreference(SIDEBAR_OPEN_STORAGE_KEY);
       if (storedGroups) setOpenGroups(JSON.parse(storedGroups) as Record<string, boolean>);
     } catch {
       setOpenGroups({});
     }
     try {
-      const storedSubmenus = window.localStorage.getItem(SIDEBAR_SUBMENU_STORAGE_KEY);
+      const storedSubmenus = readFunctionalPreference(SIDEBAR_SUBMENU_STORAGE_KEY);
       if (storedSubmenus) setOpenSubmenus(JSON.parse(storedSubmenus) as Record<string, boolean>);
     } catch {
       setOpenSubmenus({});
@@ -146,7 +147,7 @@ export function DashboardFrame({
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, collapsed ? "1" : "0");
+    saveFunctionalPreference(SIDEBAR_STORAGE_KEY, collapsed ? "1" : "0");
   }, [collapsed]);
 
   useEffect(() => {
@@ -169,7 +170,7 @@ export function DashboardFrame({
   function toggleGroup(key: string) {
     setOpenGroups((current) => {
       const next = { ...current, [key]: !current[key] };
-      window.localStorage.setItem(SIDEBAR_OPEN_STORAGE_KEY, JSON.stringify(next));
+      saveFunctionalPreference(SIDEBAR_OPEN_STORAGE_KEY, JSON.stringify(next));
       return next;
     });
   }
@@ -177,7 +178,7 @@ export function DashboardFrame({
   function toggleSubmenu(key: string) {
     setOpenSubmenus((current) => {
       const next = { ...current, [key]: !current[key] };
-      window.localStorage.setItem(SIDEBAR_SUBMENU_STORAGE_KEY, JSON.stringify(next));
+      saveFunctionalPreference(SIDEBAR_SUBMENU_STORAGE_KEY, JSON.stringify(next));
       return next;
     });
   }

@@ -1,4 +1,5 @@
 import "@/lib/security/server-only";
+import { recordLegalAcceptance, validateLegalProof } from "@/lib/legal/service";
 import type { Prisma, TenantStatus } from "@prisma/client";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { hashPassword } from "@/lib/auth/password";
@@ -85,6 +86,7 @@ export async function registerAccountFromOnboardingRequest(
   const tenantStatus: TenantStatus = "provisioning";
 
   return prisma.$transaction(async (tx) => {
+    await validateLegalProof(tx, request.legalProof);
     const existingUser = await tx.user.findUnique({
       where: { email: request.email },
       select: { id: true },
@@ -136,6 +138,8 @@ export async function registerAccountFromOnboardingRequest(
         status: "active",
       },
     });
+
+    await recordLegalAcceptance(tx, { proof: request.legalProof, userId: user.id, tenantId: tenant.id, context: "ONBOARDING", planCode: "TRIAL", operationReference: `onboarding:${tenant.id}` });
 
     await tx.tenantSubscription.create({
       data: {

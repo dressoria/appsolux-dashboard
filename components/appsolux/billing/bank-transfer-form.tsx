@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import { Upload, FileText, ImageIcon, AlertCircle } from "lucide-react";
 
+import { ContractAcceptance } from "@/components/appsolux/legal/contract-acceptance";
+import type { LegalProof } from "@/lib/legal/catalog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +33,7 @@ export function BankTransferForm({
   amount,
   accountNumber,
 }: Props) {
+  const [proof, setProof] = useState<LegalProof | null>(null);
   const [reference, setReference] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [formStatus, setFormStatus] = useState<FormStatus>("idle");
@@ -39,12 +42,16 @@ export function BankTransferForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!reference.trim() || !file) return;
+    if (!reference.trim() || !file || !proof) return;
 
     setFormStatus("submitting");
     setErrorMessage(null);
 
     const formData = new FormData();
+    formData.set("legalAccepted", "on");
+    formData.set("legalAuthorized", "on");
+    formData.set("legalReleaseId", proof.releaseId);
+    formData.set("legalReleaseHash", proof.releaseHash);
     formData.set("planCode", planCode);
     formData.set("billingInterval", billingInterval);
     formData.set("bankReference", reference.trim());
@@ -182,6 +189,7 @@ export function BankTransferForm({
         </div>
       </div>
 
+      <ContractAcceptance onChange={setProof} />
       {errorMessage ? (
         <div className="flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/5 p-4">
           <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
@@ -191,7 +199,7 @@ export function BankTransferForm({
 
       <Button
         className="w-full rounded-xl"
-        disabled={!reference.trim() || !file || formStatus === "submitting"}
+        disabled={!reference.trim() || !file || !proof || formStatus === "submitting"}
         type="submit"
       >
         {formStatus === "submitting" ? "Enviando…" : "Enviar comprobante"}

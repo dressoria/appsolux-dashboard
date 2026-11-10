@@ -31,13 +31,6 @@ export async function POST(
       return NextResponse.json({ ok: false, message: "Solicitud no encontrada." }, { status: 404 });
     }
 
-    if (transferRequest.status !== "PENDING_REVIEW") {
-      return NextResponse.json(
-        { ok: false, message: "Esta solicitud ya fue procesada." },
-        { status: 409 },
-      );
-    }
-
     const adminMembership = await prisma.membership.findFirst({
       where: { userId: user.id, tenantId: transferRequest.tenantId },
     });

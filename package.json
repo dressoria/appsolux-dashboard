@@ -42,7 +42,15 @@
     "test:api": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/integration-api/security.test.ts lib/integration-api/postgres.test.ts",
     "test:inventory-ui": "node --experimental-test-module-mocks --import tsx --test lib/core/inventory-actions-ui.test.ts",
     "test:sri-regressions": "node --experimental-test-module-mocks --import tsx --test lib/core/sri-sync-regressions.test.ts",
-    "test:sri-sales-stability": "node --experimental-test-module-mocks --import tsx --test lib/core/sales-sri-stability.test.ts"
+    "test:sri-sales-stability": "node --experimental-test-module-mocks --import tsx --test lib/core/sales-sri-stability.test.ts",
+    "test:billing-contracts": "NODE_OPTIONS='--conditions=react-server' tsx --test lib/core/billing/contracts-postgres.test.ts",
+    "legal:contracts": "NODE_OPTIONS='--conditions=react-server' tsx scripts/legal-contracts.ts",
+    "billing:paddle-inbox": "NODE_OPTIONS='--conditions=react-server' tsx scripts/billing/process-paddle-inbox.ts",
+    "billing:paddle-sandbox-reconcile": "NODE_OPTIONS='--conditions=react-server' tsx scripts/billing/reconcile-paddle-sandbox.ts",
+    "billing:inspect-transfer": "NODE_OPTIONS='--conditions=react-server' tsx scripts/billing/inspect-bank-transfer.ts",
+    "test:billing-http": "tsx --test lib/core/billing/contracts-http.test.ts",
+    "test:billing-migration": "tsx --test lib/core/billing/contracts-migration.test.ts",
+    "test:billing-browser": "node scripts/billing/verify-contracts-browser.cjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.5.6",

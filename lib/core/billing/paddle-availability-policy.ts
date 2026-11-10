@@ -14,6 +14,6 @@ type BillingEnvironment = Readonly<Record<string, string | undefined>>;
 
 export function resolvePaddleBillingAvailability(env: BillingEnvironment) {
   return {
-    configured: paddleBillingEnvironmentKeys.every((key) => Boolean(env[key]?.trim())),
+    configured: paddleBillingEnvironmentKeys.every((key) => Boolean(key === "PADDLE_WEBHOOK_SECRET" ? env[env.PADDLE_ENV?.trim() === "production" ? "PADDLE_PRODUCTION_WEBHOOK_SECRET" : "PADDLE_SANDBOX_WEBHOOK_SECRET"]?.trim() || env[key]?.trim() : env[key]?.trim())),
   } as const;
 }

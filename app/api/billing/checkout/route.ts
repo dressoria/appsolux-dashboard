@@ -1,3 +1,8 @@
+import { legalTechnicalEvidence } from "@/lib/legal/request-evidence";
+import { createCheckoutIntent, createPaddlePortal } from "@/lib/core/billing/paddle-billing";
+import { getBillingAppUrl } from "@/lib/core/billing/paddle-config";
+import { legalErrorResponse } from "@/lib/legal/service";
+import type { PaddlePlanCode, PaddleBillingInterval } from "@/lib/core/billing/paddle-price-map";
 import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -14,7 +19,7 @@ function parseCheckoutBody(value: unknown) {
     throw new Error("Solicitud de Checkout inválida.");
   }
   const body = value as Record<string, unknown>;
-  const allowedKeys = new Set(["planCode", "billingInterval"]);
+  const allowedKeys = new Set(["planCode", "billingInterval", "legalProof", "operation"]);
   if (Object.keys(body).some((key) => !allowedKeys.has(key))) {
     throw new Error("La solicitud contiene campos no permitidos.");
   }
@@ -26,7 +31,8 @@ function parseCheckoutBody(value: unknown) {
   if (typeof body.billingInterval !== "string" || !validIntervals.has(body.billingInterval)) {
     throw new Error("Intervalo inválido.");
   }
-  return { planCode: body.planCode, billingInterval: body.billingInterval };
+  if (body.operation !== undefined && body.operation !== "new" && body.operation !== "change") throw new Error("Operación inválida.");
+  return { operation: body.operation as "new" | "change" | undefined, planCode: body.planCode, billingInterval: body.billingInterval, legalProof: body.legalProof };
 }
 
 export async function POST(request: Request) {
@@ -45,16 +51,14 @@ export async function POST(request: Request) {
 
     const tenant = await getCurrentTenant(user);
     const body = parseCheckoutBody(await request.json());
-    const result = await provider.createCheckout({
-      tenantId: tenant.id,
-      tenantName: tenant.name,
-      ownerEmail: user.email,
-      actorUserId: user.id,
-      planCode: body.planCode,
-      billingInterval: body.billingInterval,
-    });
+    if (provider.id !== "paddle") return NextResponse.json({ ok: false, message: "Este método de contratación no está habilitado." }, { status: 503 });
+    const appUrl = getBillingAppUrl();
+    const intent = await createCheckoutIntent({ tenantId: tenant.id, userId: user.id, planCode: body.planCode as PaddlePlanCode, billingInterval: body.billingInterval as PaddleBillingInterval, technicalEvidence: legalTechnicalEvidence(request.headers), legalProof: body.legalProof, operation: body.operation });
+    const result = body.operation === "change" ? await createPaddlePortal({ tenantId: tenant.id }) : { url: `${appUrl}/billing/paddle/checkout?intentId=${encodeURIComponent(intent.intentId)}` };
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
+    const legal = legalErrorResponse(error);
+    if (legal) return NextResponse.json({ ok: false, code: legal.code, message: legal.message }, { status: legal.status });
     return NextResponse.json(
       { ok: false, message: error instanceof Error ? error.message : "No se pudo iniciar Checkout." },
       { status: 400 },

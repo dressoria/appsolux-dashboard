@@ -1,4 +1,5 @@
 "use client";
+import { readFunctionalPreference, saveFunctionalPreference } from "@/lib/legal/browser-storage";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -181,14 +182,14 @@ export function BillingModuleSidebar() {
     const derived = getDerivedOpenState(pathname);
 
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = readFunctionalPreference(STORAGE_KEY);
       if (raw) {
         setOpen({ ...derived, ...JSON.parse(raw) });
       } else {
         setOpen(derived);
       }
 
-      const wasCollapsed = localStorage.getItem("billing-sidebar-collapsed") === "true";
+      const wasCollapsed = readFunctionalPreference("billing-sidebar-collapsed") === "true";
       setCollapsed(wasCollapsed);
     } catch {
       setOpen(derived);
@@ -198,13 +199,13 @@ export function BillingModuleSidebar() {
   function toggleCollapsed() {
     const next = !collapsed;
     setCollapsed(next);
-    try { localStorage.setItem("billing-sidebar-collapsed", String(next)); } catch {}
+    try { saveFunctionalPreference("billing-sidebar-collapsed", String(next)); } catch {}
   }
 
   function toggleSection(key: string) {
     setOpen((prev) => {
       const next = { ...prev, [key]: !prev[key] };
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+      try { saveFunctionalPreference(STORAGE_KEY, JSON.stringify(next)); } catch {}
       return next;
     });
   }

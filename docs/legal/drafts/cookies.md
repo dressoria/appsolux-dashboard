@@ -1,0 +1,21 @@
+POLÍTICA DE COOKIES Y ALMACENAMIENTO LOCAL
+Operador: {{legalName}}, RUC {{ruc}}, Facturom, domicilio {{domicile}}, {{country}}. Contacto: {{privacyEmail}}. Vigencia: {{effectiveDate}}.
+
+1. Alcance
+Las cookies y tecnologías equivalentes conservan información del navegador para sesión, seguridad, checkout y preferencias. Su clasificación depende de finalidad y necesidad, no solo de su denominación. Esta versión no incluye integraciones propias de Google Analytics, píxeles publicitarios ni herramientas equivalentes de marketing identificadas en el código revisado. Las tecnologías de los proveedores y de la instalación real deben verificarse en navegador; no se afirma que este inventario de código sustituye esa verificación.
+
+2. Sesión y seguridad necesarias
+Cuando se usa Clerk, su documentación identifica __session, __client_uat y __client para mantener y verificar sesiones; pueden existir mecanismos transitorios de handshake. __clerk_db_jwt es específico de desarrollo. Su presencia, dominio y duración concretos dependen de la instancia y configuración; no se presupone que todos estén presentes en cada navegador. Consulta técnica del proveedor: https://clerk.com/docs/guides/how-clerk-works/cookies y https://clerk.com/docs/guides/development/sdk-development/terminology.
+El flujo alternativo propio utiliza appsolux_session, cookie HttpOnly, SameSite=Lax y Secure en producción, con duración configurada en el código de siete días. No se utiliza simultáneamente por obligación si la instancia emplea solo Clerk. Estas cookies necesarias no se desactivan mediante las preferencias opcionales; bloquearlas en el navegador puede impedir la sesión.
+
+3. Paddle
+La librería de checkout solo se inicializa tras la contratación aceptada y la apertura del checkout correspondiente. El proveedor puede utilizar tecnologías necesarias para el pago solicitado y prevención de fraude en sus dominios. No se inventan nombres ni duraciones de cookies Paddle sin inspección de la instancia. El inventario aprobado de la sesión real de Sandbox y de la configuración que se vaya a publicar es: {{paddleCookieInventory}}. Si se detectan funciones de seguimiento que no sean necesarias y requieran consentimiento, deberán deshabilitarse o bloquearse antes de activarse, con una opción específica de rechazo; no se habilitan por la aceptación del contrato.
+
+4. Preferencias funcionales opcionales
+El menú puede recordar su estado mediante localStorage: facturom.sidebar.collapsed, facturom.sidebar.open-groups, facturom.sidebar.open-submenus, billing-sidebar-open y billing-sidebar-collapsed. No se leen ni escriben estas preferencias hasta habilitarlas en Preferencias de cookies. Permanecen hasta que se borren, se retire la preferencia o el navegador elimine el almacenamiento; no tienen una caducidad automática del tipo de una cookie. El registro local facturom.cookie-preferences.v1 conserva exclusivamente la elección de almacenamiento funcional, fecha y versión de la opción para aplicarla; no es una evidencia de aceptación contractual ni se envía al servidor para publicidad.
+
+5. Elección, rechazo y retirada
+El botón Preferencias de cookies permite habilitar preferencias funcionales, rechazarlas o modificar la decisión. Están desactivadas por defecto. Al rechazarlas se eliminan esas claves de preferencias conocidas, manteniendo las de autenticación y seguridad. Cerrar el cuadro sin guardar no activa funciones opcionales. El navegador permite además borrar cookies por dominio y almacenamiento del sitio. Esta limpieza puede cerrar sesiones; no debe confundirse con cancelación comercial de una suscripción.
+
+6. Inventario y cambios
+El inventario final debe describir por tecnología su nombre observado, proveedor y dominio, finalidad, categoría, duración o criterio y transferencias que correspondan: {{browserCookieInventory}}. No se consideran activas herramientas solamente por aparecer en documentación de terceros. Cualquier nueva analítica o marketing requiere evaluación y, cuando proceda, consentimiento previo, separado y revocable antes de cargar sus scripts o transmitir datos. Se actualizará esta política al cambiar tecnologías o finalidades y se solicitará una nueva elección cuando sea necesario. Consultas y derechos: {{privacyEmail}}.

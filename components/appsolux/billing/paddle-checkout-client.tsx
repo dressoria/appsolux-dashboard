@@ -11,6 +11,7 @@ type Props = {
   amount: number;
   customerEmail: string;
   checkoutIntentToken: string;
+  checkoutIntentId: string;
   paddleEnv: "sandbox" | "production";
   clientToken: string;
 };
@@ -22,6 +23,7 @@ export function PaddleCheckoutClient({
   amount,
   customerEmail,
   checkoutIntentToken,
+  checkoutIntentId,
   paddleEnv,
   clientToken,
 }: Props) {
@@ -57,11 +59,11 @@ export function PaddleCheckoutClient({
       eventCallback(event) {
         if (event.name === "checkout.completed") {
           setStatus("completed");
-          router.push("/billing?checkout=success");
+          router.push(`/billing?intentId=${encodeURIComponent(checkoutIntentId)}`);
         }
         if (event.name === "checkout.closed") {
           if (statusRef.current !== "completed") {
-            router.push("/billing?checkout=cancelled");
+            router.push(`/billing?intentId=${encodeURIComponent(checkoutIntentId)}`);
           }
         }
         if (event.name === "checkout.error") {
@@ -89,7 +91,7 @@ export function PaddleCheckoutClient({
     });
 
     return () => { cancelled = true; };
-  }, [paddleEnv, clientToken, openCheckout, router]);
+  }, [paddleEnv, clientToken, openCheckout, router, checkoutIntentId]);
 
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4">
@@ -103,7 +105,7 @@ export function PaddleCheckoutClient({
       )}
       {status === "completed" && (
         <div className="rounded-xl border border-facturom-primary/25 bg-facturom-primary/5 p-6 text-center">
-          <p className="font-semibold">Pago recibido. Estamos confirmando tu suscripción.</p>
+          <p className="font-semibold">Checkout completado. Estamos consultando la confirmación del proveedor.</p>
           <p className="mt-2 text-sm text-muted-foreground">Serás redirigido automáticamente.</p>
         </div>
       )}

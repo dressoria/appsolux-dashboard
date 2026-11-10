@@ -1,0 +1,41 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, writeFile, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { PrismaClient } from "@prisma/client";
+const url = process.env.FACTUROM_BILLING_MIGRATION_TEST_DATABASE_URL;
+test("Migration: additive upgrade preserves historical pending transfer, duplicate audits and expired Paddle intent", { skip: !url }, async () => {
+  const target = new URL(url!);
+  if (!["127.0.0.1", "localhost"].includes(target.hostname) || !target.pathname.endsWith("_migration_test")) throw new Error("An empty local *_migration_test database is required.");
+  const db = new PrismaClient({ datasourceUrl: url });
+  try {
+    const tables = await db.$queryRaw<Array<{ count: bigint }>>`SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'`;
+    assert.equal(Number(tables[0].count), 0, "Refusing to modify a database containing existing tables");
+    const directory = await mkdtemp(join(tmpdir(), "facturom-contract-migration-"));
+    const schema = join(directory, "before.prisma");
+    await writeFile(schema, execFileSync("git", ["show", "b3bdda6a6dc157df4de2919ff14502eb8085449b:prisma/schema.prisma"], { encoding: "utf8" }));
+    const env = { ...process.env, DATABASE_URL: url! };
+    const baseline = execFileSync("npx", ["prisma", "migrate", "diff", "--from-empty", "--to-schema-datamodel", schema, "--script"], { env, encoding: "utf8" });
+    const sql = join(directory, "before.sql"); await writeFile(sql, baseline);
+    execFileSync("npx", ["prisma", "db", "execute", "--url", url!, "--file", sql], { env, stdio: "pipe" });
+    await db.$executeRaw`INSERT INTO "User" (id, name, email, status, "updatedAt") VALUES ('legacy_owner', 'Synthetic migration owner', 'migration@example.invalid', 'active', NOW())`;
+    await db.$executeRaw`INSERT INTO "Tenant" (id, name, slug, status, "planKey", "updatedAt") VALUES ('legacy_tenant', 'Synthetic migration company', 'legacy-test', 'active', 'free', NOW())`;
+    await db.$executeRaw`INSERT INTO "Plan" (id, key, name, limits, features, "updatedAt") VALUES ('legacy_plan', 'free', 'Synthetic plan', '{}'::jsonb, '{}'::jsonb, NOW())`;
+    await db.$executeRaw`INSERT INTO "Membership" (id, "userId", "tenantId", role, status, "updatedAt") VALUES ('legacy_membership', 'legacy_owner', 'legacy_tenant', 'owner', 'active', NOW())`;
+    await db.$executeRaw`INSERT INTO "TenantSubscription" (id, "tenantId", "planId", status, "billingMode", "updatedAt") VALUES ('legacy_sub', 'legacy_tenant', 'legacy_plan', 'active', 'internal', NOW())`;
+    await db.$executeRaw`INSERT INTO "BankTransferRequest" (id, "tenantId", "requestedById", "planCode", "billingInterval", "amountUsd", "bankReference", "receiptFileId", "receiptFileName", "receiptFileType", "receiptFileSizeBytes", status, "invoiceStatus", "updatedAt") VALUES ('legacy_transfer', 'legacy_tenant', 'legacy_owner', 'ENTERPRISE', 'YEARLY', 299, 'LOCAL-ONLY-REFERENCE', 'local-synthetic', 'synthetic.pdf', 'application/pdf', 1, 'PENDING_REVIEW', 'pending', NOW())`;
+    await db.$executeRaw`INSERT INTO "AuditLog" (id, "tenantId", action, "entityType", "entityId") VALUES ('legacy_audit_1', 'legacy_tenant', 'commercial_invoice.pending', 'BankTransferRequest', 'legacy_transfer'), ('legacy_audit_2', 'legacy_tenant', 'commercial_invoice.pending', 'BankTransferRequest', 'legacy_transfer')`;
+    await db.$executeRaw`INSERT INTO "PaddleCheckoutIntent" (id, token, "tenantId", "userId", "planCode", "billingInterval", "expectedPriceId", "expiresAt", "updatedAt") VALUES ('legacy_intent', 'local-synthetic-cid', 'legacy_tenant', 'legacy_owner', 'ENTERPRISE', 'YEARLY', 'pri_synthetic', '2026-01-01', NOW())`;
+    const migration = "prisma/migrations/20261110000000_billing_reliability_legal/migration.sql";
+    assert.doesNotMatch(await readFile(migration, "utf8"), /DROP TABLE|TRUNCATE|DELETE FROM/i);
+    execFileSync("npx", ["prisma", "db", "execute", "--url", url!, "--file", migration], { env, stdio: "pipe" });
+    const transfer = await db.bankTransferRequest.findUniqueOrThrow({ where: { id: "legacy_transfer" } });
+    assert.equal(transfer.status, "PENDING_REVIEW"); assert.equal(transfer.invoiceStatus, "pending"); assert.equal(transfer.activatedSubscriptionId, null); assert.equal(transfer.legalAcceptanceId, null);
+    assert.equal(await db.auditLog.count({ where: { entityId: transfer.id } }), 2);
+    const intent = await db.paddleCheckoutIntent.findUniqueOrThrow({ where: { id: "legacy_intent" } }); assert.equal(intent.status, "pending"); assert.equal(intent.environment, null); assert.equal(intent.legalAcceptanceId, null);
+    assert.equal((await db.tenantSubscription.findUniqueOrThrow({ where: { id: "legacy_sub" } })).status, "active");
+    assert.equal(await db.legalRelease.count(), 0); assert.equal(await db.legalAcceptance.count(), 0);
+  } finally { await db.$disconnect(); }
+});

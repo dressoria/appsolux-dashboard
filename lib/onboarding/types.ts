@@ -17,6 +17,7 @@ export type CreateOnboardingRequestInput = {
 };
 
 export type NormalizedOnboardingRequest = {
+  legalProof?: unknown;
   user_name: string;
   email: string;
   password: string;

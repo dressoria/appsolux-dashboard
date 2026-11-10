@@ -62,9 +62,9 @@ test("fin de mes: enero 31 → febrero 28 (no 31)", () => {
 
 test("año bisiesto: feb 29 → feb 28 siguiente año", () => {
   const p = calculateSubscriptionPeriod(new Date("2028-02-29"), "YEARLY");
-  assert.equal(p.endsAt.getFullYear(), 2029);
-  assert.equal(p.endsAt.getMonth(), 1);
-  assert.equal(p.endsAt.getDate(), 28);
+  assert.equal(p.endsAt.getUTCFullYear(), 2029);
+  assert.equal(p.endsAt.getUTCMonth(), 1);
+  assert.equal(p.endsAt.getUTCDate(), 28);
 });
 
 test("fin de mes 30 días: abril 30 → mayo 30", () => {
@@ -233,8 +233,8 @@ test("buildPaddleSubscriptionSnapshot extrae datos correctamente", () => {
   assert.equal(snap.status, "active");
   assert.equal(snap.cancelAtPeriodEnd, false);
   assert.equal(snap.checkoutIntentToken, "intent_token_abc");
-  assert.equal(snap.currentPeriodStartsAt.toISOString(), "2026-11-01T00:00:00.000Z");
-  assert.equal(snap.currentPeriodEndsAt.toISOString(), "2026-12-01T00:00:00.000Z");
+  assert.equal(snap.currentPeriodStartsAt?.toISOString(), "2026-11-01T00:00:00.000Z");
+  assert.equal(snap.currentPeriodEndsAt?.toISOString(), "2026-12-01T00:00:00.000Z");
 });
 
 test("snapshot detecta cancelación programada", () => {
@@ -268,8 +268,7 @@ test("snapshot sin customData no tiene checkoutIntentToken", () => {
   assert.equal(snap.checkoutIntentToken, undefined);
 });
 
-test("snapshot sin billingPeriod usa fecha actual como fallback", () => {
-  const before = Date.now();
+test("snapshot sin billingPeriod no inventa períodos", () => {
   const snap = buildPaddleSubscriptionSnapshot({
     id: "sub_123",
     customerId: "ctm_456",
@@ -279,10 +278,9 @@ test("snapshot sin billingPeriod usa fecha actual como fallback", () => {
     scheduledChange: null,
     customData: null,
   }, "2026-11-01T00:00:00Z");
-  const after = Date.now();
 
-  assert.ok(snap.currentPeriodStartsAt.getTime() >= before);
-  assert.ok(snap.currentPeriodStartsAt.getTime() <= after);
+  assert.equal(snap.currentPeriodStartsAt, null);
+  assert.equal(snap.currentPeriodEndsAt, null);
 });
 
 test("snapshot sin items lanza error", () => {
@@ -294,7 +292,7 @@ test("snapshot sin items lanza error", () => {
     currentBillingPeriod: null,
     scheduledChange: null,
     customData: null,
-  }, "2026-11-01T00:00:00Z"), /falta price ID/);
+  }, "2026-11-01T00:00:00Z"), /PADDLE_ITEMS_INVALID/);
 });
 
 // ══════════════════════════════════════════════════════════════
