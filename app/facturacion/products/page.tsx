@@ -1,7 +1,7 @@
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { getProducts } from "@/lib/core/inventory-products";
-import { sanitizePage, sanitizePerPage } from "@/components/appsolux/people/pagination-bar";
+import { sanitizePage, sanitizePerPage } from "@/lib/pagination";
 import { ProductsListClient } from "./products-list-client";
 
 export default async function FacturacionProductsPage({ searchParams }: { searchParams: Promise<{ q?: string; type?: string; page?: string; perPage?: string; status?: string; saved?: string }> }) {

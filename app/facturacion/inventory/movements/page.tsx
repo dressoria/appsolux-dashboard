@@ -2,7 +2,7 @@ import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { getMovements } from "@/lib/core/inventory-movements";
 import { getWarehouses } from "@/lib/core/inventory-warehouses";
-import { sanitizePage, sanitizePerPage } from "@/components/appsolux/people/pagination-bar";
+import { sanitizePage, sanitizePerPage } from "@/lib/pagination";
 import { MovementsClient } from "./movements-client";
 
 export default async function FacturacionInventoryMovementsPage({
