@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { SriCredentialsSection } from "@/components/appsolux/sri-tax/sri-credentials-section";
 import { Label } from "@/components/ui/label";
 
-type ConfigTabId = "sistema" | "comprobantes" | "sri" | "accesos";
+type ConfigTabId = "sistema" | "comprobantes" | "sri" | "accesos" | "integraciones";
 
 type Settings = Record<string, unknown> & {
   id?: string;
@@ -21,6 +22,7 @@ const TABS: Array<{ id: ConfigTabId; label: string }> = [
   { id: "comprobantes", label: "Comprobantes" },
   { id: "sri", label: "SRI" },
   { id: "accesos", label: "Accesos directos" },
+  { id: "integraciones", label: "Integraciones" },
 ];
 
 function ToggleSwitch({
@@ -733,6 +735,7 @@ export function ConfigurationPageClient({ initialTab = "sistema" }: { initialTab
       {activeTab === "sri" && <SriCredentialsSection />}
 
       {activeTab === "accesos" && <AccesosTab />}
+      {activeTab === "integraciones" && <Card><CardHeader><CardTitle>Integraciones externas</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-muted-foreground">Conecta n8n y tus aplicaciones mediante claves API de tu empresa.</p><div className="flex flex-wrap gap-3"><Button asChild className="bg-[#1E52F1] hover:bg-[#1769E0]"><Link href="/settings/integrations/api-keys">Claves API</Link></Button><Button asChild variant="outline"><Link href="/settings/integrations/api-docs">Documentación API</Link></Button></div></CardContent></Card>}
     </div>
   );
 }

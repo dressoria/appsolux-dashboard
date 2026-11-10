@@ -13,12 +13,13 @@ import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { routes } from "@/config/routes";
 
 type AdjustmentsPageProps = {
-  searchParams: { item?: string; warehouse?: string };
+  searchParams: Promise<{ item?: string; warehouse?: string }>;
 };
 
 export default async function ErpInventoryAdjustmentsPage({
   searchParams,
 }: AdjustmentsPageProps) {
+  const resolvedSearchParams = await searchParams;
   const user = await getCurrentUser();
 
   if (!user) {
@@ -138,8 +139,8 @@ export default async function ErpInventoryAdjustmentsPage({
         <AdjustStockForm
           items={items}
           warehouses={warehouses}
-          initialItemCode={searchParams.item}
-          initialWarehouse={searchParams.warehouse}
+          initialItemCode={resolvedSearchParams.item}
+          initialWarehouse={resolvedSearchParams.warehouse}
         />
 
         <Card>

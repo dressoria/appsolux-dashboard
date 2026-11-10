@@ -5,6 +5,7 @@ import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { isTenantOwner } from "@/lib/auth/permissions";
 import { getPaddleBillingAvailability, getPaddleEnvironment } from "@/lib/core/billing/paddle-config";
+import { createCheckoutIntent } from "@/lib/core/billing/paddle-billing";
 import {
   isPaddleBillingInterval,
   isPaddlePlanCode,
@@ -34,6 +35,13 @@ export default async function PaddleCheckoutPage({
   const paddleEnv = getPaddleEnvironment();
   const clientToken = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN?.trim() ?? "";
 
+  const intent = await createCheckoutIntent({
+    tenantId: tenant.id,
+    userId: user.id,
+    planCode: params.planCode,
+    billingInterval: params.billingInterval,
+  });
+
   return (
     <DashboardShell>
       <PaddleCheckoutClient
@@ -42,8 +50,7 @@ export default async function PaddleCheckoutPage({
         billingInterval={selection.billingInterval}
         amount={selection.amount}
         customerEmail={user.email}
-        tenantId={tenant.id}
-        planCode={selection.planCode}
+        checkoutIntentToken={intent.token}
         paddleEnv={paddleEnv === "production" ? "production" : "sandbox"}
         clientToken={clientToken}
       />

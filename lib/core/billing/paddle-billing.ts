@@ -1,5 +1,7 @@
 import "@/lib/security/server-only";
 
+import { randomBytes } from "node:crypto";
+
 import { Prisma } from "@prisma/client";
 
 import { getPrismaClient } from "@/lib/db/prisma";
@@ -25,8 +27,46 @@ type PaddleSubscriptionSnapshot = {
   cancelAtPeriodEnd: boolean;
   status: string;
   occurredAt: Date;
-  tenantIdFromCustomData?: string;
+  checkoutIntentToken?: string;
 };
+
+const CHECKOUT_INTENT_TTL_MS = 2 * 60 * 60 * 1000;
+
+export async function createCheckoutIntent(input: {
+  tenantId: string;
+  userId: string;
+  planCode: PaddlePlanCode;
+  billingInterval: PaddleBillingInterval;
+}) {
+  const prisma = getPrismaClient();
+  const selection = resolvePaddlePrice(input.planCode, input.billingInterval);
+  const token = randomBytes(32).toString("hex");
+
+  const intent = await prisma.paddleCheckoutIntent.create({
+    data: {
+      token,
+      tenantId: input.tenantId,
+      userId: input.userId,
+      planCode: input.planCode,
+      billingInterval: input.billingInterval,
+      expectedPriceId: selection.priceId,
+      expiresAt: new Date(Date.now() + CHECKOUT_INTENT_TTL_MS),
+    },
+  });
+
+  return { intentId: intent.id, token: intent.token, expectedPriceId: selection.priceId };
+}
+
+export async function resolveCheckoutIntent(token: string) {
+  const prisma = getPrismaClient();
+  const intent = await prisma.paddleCheckoutIntent.findUnique({ where: { token } });
+
+  if (!intent) return null;
+  if (intent.status !== "pending") return null;
+  if (intent.expiresAt.getTime() < Date.now()) return null;
+
+  return intent;
+}
 
 export async function createPaddleCheckoutUrl(input: {
   tenantId: string;
@@ -115,7 +155,23 @@ export async function createPaddlePortal(input: { tenantId: string }) {
   );
 }
 
-async function findLocalSubscriptionByProvider(snapshot: PaddleSubscriptionSnapshot) {
+export function extractPreviousPaddleSubscriptionId(metadata: unknown): string | null {
+  if (
+    metadata &&
+    typeof metadata === "object" &&
+    !Array.isArray(metadata) &&
+    "previousPaddleSubscriptionId" in metadata
+  ) {
+    const val = (metadata as Record<string, unknown>).previousPaddleSubscriptionId;
+    return typeof val === "string" ? val : null;
+  }
+  return null;
+}
+
+async function findLocalSubscriptionByProvider(
+  snapshot: PaddleSubscriptionSnapshot,
+  resolvedIntent?: { tenantId: string } | null,
+) {
   const prisma = getPrismaClient();
   if (snapshot.id) {
     const bySubId = await prisma.tenantSubscription.findFirst({
@@ -125,9 +181,9 @@ async function findLocalSubscriptionByProvider(snapshot: PaddleSubscriptionSnaps
     });
     if (bySubId) return bySubId;
   }
-  if (snapshot.tenantIdFromCustomData) {
+  if (resolvedIntent) {
     return prisma.tenantSubscription.findFirst({
-      where: { tenantId: snapshot.tenantIdFromCustomData },
+      where: { tenantId: resolvedIntent.tenantId },
       include: { plan: true },
       orderBy: { startedAt: "desc" },
     });
@@ -140,7 +196,35 @@ export async function syncPaddleSubscription(input: {
   isFirstCreation?: boolean;
 }) {
   const prisma = getPrismaClient();
-  const local = await findLocalSubscriptionByProvider(input.snapshot);
+
+  let resolvedIntent: { tenantId: string; id: string; expectedPriceId: string } | null = null;
+  if (input.isFirstCreation && input.snapshot.checkoutIntentToken) {
+    const intent = await resolveCheckoutIntent(input.snapshot.checkoutIntentToken);
+    if (intent) {
+      if (intent.expectedPriceId !== input.snapshot.priceId) {
+        await prisma.auditLog.create({
+          data: {
+            tenantId: intent.tenantId,
+            action: "paddle_checkout_price_mismatch",
+            entityType: "PaddleCheckoutIntent",
+            entityId: intent.id,
+            metadata: {
+              expectedPriceId: intent.expectedPriceId,
+              receivedPriceId: input.snapshot.priceId,
+              paddleSubscriptionId: input.snapshot.id,
+            },
+          },
+        });
+        throw new Error(
+          `El precio recibido de Paddle (${input.snapshot.priceId}) no coincide con la intención `
+          + `de checkout (${intent.expectedPriceId}). Posible manipulación.`,
+        );
+      }
+      resolvedIntent = { tenantId: intent.tenantId, id: intent.id, expectedPriceId: intent.expectedPriceId };
+    }
+  }
+
+  const local = await findLocalSubscriptionByProvider(input.snapshot, resolvedIntent);
   if (!local) throw new Error("No existe mapping local para la suscripción Paddle.");
 
   if (
@@ -150,10 +234,44 @@ export async function syncPaddleSubscription(input: {
     return "stale" as const;
   }
 
+  const paddleStatus = input.snapshot.status;
+
+  if (local.billingMode === "manual") {
+    const previousPaddleSubId = extractPreviousPaddleSubscriptionId(local.providerMetadata);
+    const isNewCheckout =
+      input.isFirstCreation === true &&
+      input.snapshot.id !== previousPaddleSubId;
+
+    if (!isNewCheckout) {
+      await prisma.$transaction([
+        prisma.tenantSubscription.update({
+          where: { id: local.id },
+          data: { providerLastEventAt: input.snapshot.occurredAt },
+        }),
+        prisma.auditLog.create({
+          data: {
+            tenantId: local.tenantId,
+            action: "paddle_event_skipped_manual_mode",
+            entityType: "TenantSubscription",
+            entityId: local.id,
+            metadata: {
+              paddleEventStatus: paddleStatus,
+              paddleSubscriptionId: input.snapshot.id,
+              isFirstCreation: input.isFirstCreation ?? false,
+              previousPaddleSubId: previousPaddleSubId ?? null,
+              reason: "Suscripción en modo manual — evento Paddle registrado sin aplicar.",
+            },
+          },
+        }),
+      ]);
+      return "skipped_manual_mode" as const;
+    }
+  }
+
   const selection = resolvePaddlePriceId(input.snapshot.priceId);
   if (!selection) {
     await prisma.$transaction([
-      ...(input.snapshot.status === "canceled"
+      ...(paddleStatus === "canceled"
         ? [prisma.tenantSubscription.update({
             where: { id: local.id },
             data: {
@@ -176,7 +294,6 @@ export async function syncPaddleSubscription(input: {
     return "unknown_price" as const;
   }
 
-  const paddleStatus = input.snapshot.status;
   const shouldActivate = paddleStatus === "active" && (
     local.status !== "active" || input.isFirstCreation
   );
@@ -245,6 +362,13 @@ export async function syncPaddleSubscription(input: {
         })),
       });
     }
+
+    if (resolvedIntent) {
+      await tx.paddleCheckoutIntent.update({
+        where: { id: resolvedIntent.id },
+        data: { status: "completed", paddleSubscriptionId: input.snapshot.id },
+      });
+    }
   });
   return "processed" as const;
 }
@@ -274,9 +398,9 @@ export function buildPaddleSubscriptionSnapshot(subscription: {
     cancelAtPeriodEnd: subscription.scheduledChange?.action === "cancel",
     status: subscription.status,
     occurredAt: new Date(occurredAt),
-    tenantIdFromCustomData:
-      subscription.customData && typeof subscription.customData.tenantId === "string"
-        ? subscription.customData.tenantId
+    checkoutIntentToken:
+      subscription.customData && typeof subscription.customData.cid === "string"
+        ? subscription.customData.cid
         : undefined,
   };
 }

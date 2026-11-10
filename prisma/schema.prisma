@@ -137,6 +137,15 @@ enum PlanUpgradeRequestStatus {
   canceled
 }
 
+enum BankTransferRequestStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  ACTIVATION_FAILED
+  INVOICING_PENDING
+  INVOICING_FAILED
+}
+
 enum CommercialPlan {
   BASIC
   PLUS
@@ -644,6 +653,8 @@ model User {
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
+  apiKeys                              UserApiKey[] @relation("ApiKeyOwner")
+  revokedApiKeys                       UserApiKey[] @relation("ApiKeyRevoker")
   memberships                          Membership[]
   onboardingRequests                   OnboardingRequest[]
   auditLogs                            AuditLog[]
@@ -660,6 +671,9 @@ model User {
   purchaseReceiptsCreated              PurchaseReceipt[]            @relation("PurchaseReceiptsCreatedBy")
   purchaseSyncJobsRequested            PurchaseSriSyncJob[]         @relation("PurchaseSyncJobsRequestedBy")
   homePreferences                      UserHomePreference[]
+  requestedBankTransfers               BankTransferRequest[]        @relation("RequestedBankTransfers")
+  reviewedBankTransfers                BankTransferRequest[]        @relation("ReviewedBankTransfers")
+  paddleCheckoutIntents                PaddleCheckoutIntent[]       @relation("PaddleCheckoutIntents")
 }
 
 model Tenant {
@@ -682,6 +696,7 @@ model Tenant {
   createdAt                   DateTime     @default(now())
   updatedAt                   DateTime     @updatedAt
 
+  apiKeys                       UserApiKey[]
   memberships                   Membership[]
   integrations                  TenantIntegration[]
   onboardingRequests            OnboardingRequest[]
@@ -759,8 +774,9 @@ model Tenant {
   salesOrders                   SalesOrder[]
   salesCreditNotes              SalesCreditNote[]
   salesDebitNotes               SalesDebitNote[]
-  salesSriSyncDocumentResults SalesSriSyncDocument[]
-
+  salesSriSyncDocumentResults    SalesSriSyncDocument[]
+  bankTransferRequests          BankTransferRequest[]
+  paddleCheckoutIntents         PaddleCheckoutIntent[]
 }
 
 model Plan {
@@ -826,6 +842,65 @@ model BillingWebhookEvent {
   @@unique([provider, externalEventId])
   @@index([status])
   @@index([createdAt])
+}
+
+model BankTransferRequest {
+  id                      String                    @id @default(cuid())
+  tenantId                String
+  requestedById           String
+  planCode                String
+  billingInterval         BillingInterval
+  amountUsd               Decimal                   @db.Decimal(10, 2)
+  currency                String                    @default("USD")
+  bankReference           String
+  receiptFileId           String
+  receiptFileName         String
+  receiptFileType         String
+  receiptFileSizeBytes    Int
+  status                  BankTransferRequestStatus @default(PENDING_REVIEW)
+  reviewedById            String?
+  reviewedAt              DateTime?
+  adminNote               String?
+  activatedSubscriptionId String?
+  subscriptionStartsAt    DateTime?
+  subscriptionEndsAt      DateTime?
+  invoiceStatus           String?
+  invoiceReference        String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  requestedBy User   @relation("RequestedBankTransfers", fields: [requestedById], references: [id])
+  reviewedBy  User?  @relation("ReviewedBankTransfers", fields: [reviewedById], references: [id])
+
+  @@unique([bankReference])
+  @@index([tenantId])
+  @@index([status])
+  @@index([requestedById])
+  @@index([reviewedById])
+  @@index([createdAt])
+}
+
+model PaddleCheckoutIntent {
+  id                   String          @id @default(cuid())
+  token                String          @unique
+  tenantId             String
+  userId               String
+  planCode             String
+  billingInterval      BillingInterval
+  expectedPriceId      String
+  status               String          @default("pending")
+  paddleSubscriptionId String?
+  expiresAt            DateTime
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation("PaddleCheckoutIntents", fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([token])
 }
 
 model TenantOperationalConfig {
@@ -979,30 +1054,30 @@ model LightweightProduct {
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
 
-  tenant                Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  saleItems             LightweightSaleItem[]
-  stockMovements        LightweightStockMovement[]
-  category              LightweightProductCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  comboItems            LightweightComboItem[]       @relation("ComboProduct")
-  componentOf           LightweightComboItem[]       @relation("ComboComponent")
-  purchaseDocumentItems PurchaseDocumentItem[]
-  purchaseReceiptItems  PurchaseReceiptItem[]
-  defaultWarehouse      InventoryWarehouse?          @relation("ProductDefaultWarehouse", fields: [defaultWarehouseId], references: [id], onDelete: SetNull)
-  inventoryUnit         InventoryUnit?               @relation("ProductUnit", fields: [unitId], references: [id], onDelete: SetNull)
-  brand                 InventoryBrand?              @relation("ProductBrand", fields: [brandId], references: [id], onDelete: SetNull)
-  salesAccount          AccountingAccount?           @relation("ProductSalesAccount", fields: [salesAccountId], references: [id], onDelete: SetNull)
-  inventoryAccount      AccountingAccount?           @relation("ProductInventoryAccount", fields: [inventoryAccountId], references: [id], onDelete: SetNull)
-  cogsAccount           AccountingAccount?           @relation("ProductCogsAccount", fields: [cogsAccountId], references: [id], onDelete: SetNull)
-  purchaseAccount       AccountingAccount?           @relation("ProductPurchaseAccount", fields: [purchaseAccountId], references: [id], onDelete: SetNull)
-  stockBalances         InventoryStockBalance[]
-  inventoryMovements    InventoryMovement[]
-  physicalCountItems    InventoryPhysicalCountItem[]
-  transferItems         InventoryTransferItem[]
-  shipmentGuideItems    ShipmentGuideItem[]
-  orderItems            InventoryOrderItem[]
-  priceChanges          ProductPriceChange[]
-  salesOrderItems              SalesOrderItem[]
-  externalSalesDocumentItems   ExternalSalesDocumentItem[]
+  tenant                     Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  saleItems                  LightweightSaleItem[]
+  stockMovements             LightweightStockMovement[]
+  category                   LightweightProductCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  comboItems                 LightweightComboItem[]       @relation("ComboProduct")
+  componentOf                LightweightComboItem[]       @relation("ComboComponent")
+  purchaseDocumentItems      PurchaseDocumentItem[]
+  purchaseReceiptItems       PurchaseReceiptItem[]
+  defaultWarehouse           InventoryWarehouse?          @relation("ProductDefaultWarehouse", fields: [defaultWarehouseId], references: [id], onDelete: SetNull)
+  inventoryUnit              InventoryUnit?               @relation("ProductUnit", fields: [unitId], references: [id], onDelete: SetNull)
+  brand                      InventoryBrand?              @relation("ProductBrand", fields: [brandId], references: [id], onDelete: SetNull)
+  salesAccount               AccountingAccount?           @relation("ProductSalesAccount", fields: [salesAccountId], references: [id], onDelete: SetNull)
+  inventoryAccount           AccountingAccount?           @relation("ProductInventoryAccount", fields: [inventoryAccountId], references: [id], onDelete: SetNull)
+  cogsAccount                AccountingAccount?           @relation("ProductCogsAccount", fields: [cogsAccountId], references: [id], onDelete: SetNull)
+  purchaseAccount            AccountingAccount?           @relation("ProductPurchaseAccount", fields: [purchaseAccountId], references: [id], onDelete: SetNull)
+  stockBalances              InventoryStockBalance[]
+  inventoryMovements         InventoryMovement[]
+  physicalCountItems         InventoryPhysicalCountItem[]
+  transferItems              InventoryTransferItem[]
+  shipmentGuideItems         ShipmentGuideItem[]
+  orderItems                 InventoryOrderItem[]
+  priceChanges               ProductPriceChange[]
+  salesOrderItems            SalesOrderItem[]
+  externalSalesDocumentItems ExternalSalesDocumentItem[]
 
   @@unique([tenantId, primaryCode])
   @@unique([tenantId, barcode])
@@ -1084,11 +1159,11 @@ model LightweightCustomer {
   createdAt                   DateTime                               @default(now())
   updatedAt                   DateTime                               @updatedAt
 
-  tenant                  Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  relatedCustomer         LightweightCustomer?  @relation("CustomerRelated", fields: [relatedCustomerId], references: [id], onDelete: SetNull)
-  relatedByCustomers      LightweightCustomer[] @relation("CustomerRelated")
-  invoiceThirdPartyTarget LightweightCustomer?  @relation("CustomerInvoiceThirdParty", fields: [invoiceThirdPartyCustomerId], references: [id], onDelete: SetNull)
-  invoiceThirdPartyOf     LightweightCustomer[] @relation("CustomerInvoiceThirdParty")
+  tenant                  Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  relatedCustomer         LightweightCustomer?    @relation("CustomerRelated", fields: [relatedCustomerId], references: [id], onDelete: SetNull)
+  relatedByCustomers      LightweightCustomer[]   @relation("CustomerRelated")
+  invoiceThirdPartyTarget LightweightCustomer?    @relation("CustomerInvoiceThirdParty", fields: [invoiceThirdPartyCustomerId], references: [id], onDelete: SetNull)
+  invoiceThirdPartyOf     LightweightCustomer[]   @relation("CustomerInvoiceThirdParty")
   sales                   LightweightSale[]
   proformas               LightweightProforma[]
   aiInvoiceDrafts         AiInvoiceDraft[]
@@ -2050,9 +2125,9 @@ model SalesImportBatch {
   createdAt       DateTime               @default(now())
   completedAt     DateTime?
 
-  tenant           Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  createdBy        User                    @relation(fields: [createdByUserId], references: [id])
-  sales            LightweightSale[]
+  tenant            Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy         User                    @relation(fields: [createdByUserId], references: [id])
+  sales             LightweightSale[]
   externalDocuments ExternalSalesDocument[]
 
   @@index([tenantId])
@@ -2104,12 +2179,12 @@ model PurchaseDocument {
   supplierName           String?
   supplierIdentification String?
 
-  taxSupportCode          String?
-  purchaseType            PurchaseType?
-  sriPaymentCode          String?
-  accountingCostCenterId  String?
-  accountingProjectId     String?
-  tipAmount               Decimal          @default(0) @db.Decimal(12, 2)
+  taxSupportCode         String?
+  purchaseType           PurchaseType?
+  sriPaymentCode         String?
+  accountingCostCenterId String?
+  accountingProjectId    String?
+  tipAmount              Decimal       @default(0) @db.Decimal(12, 2)
 
   notes String?
 
@@ -2966,12 +3041,12 @@ model AccountingCostCenter {
   createdAt   DateTime                 @default(now())
   updatedAt   DateTime                 @updatedAt
 
-  tenant       Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  parent                 AccountingCostCenter?   @relation("CostCenterHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children               AccountingCostCenter[]  @relation("CostCenterHierarchy")
-  journalLines           AccountingJournalLine[]
-  purchasesByCostCenter  PurchaseDocument[]       @relation("PurchaseCostCenter")
-  purchasesByProject     PurchaseDocument[]       @relation("PurchaseProject")
+  tenant                Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent                AccountingCostCenter?   @relation("CostCenterHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children              AccountingCostCenter[]  @relation("CostCenterHierarchy")
+  journalLines          AccountingJournalLine[]
+  purchasesByCostCenter PurchaseDocument[]      @relation("PurchaseCostCenter")
+  purchasesByProject    PurchaseDocument[]      @relation("PurchaseProject")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -3690,11 +3765,11 @@ model SalesDebitNoteReason {
 // ══════════════════════════════════════════════════════════════════════════════
 
 model ExternalSalesDocument {
-  id                         String                        @id @default(cuid())
+  id                         String                      @id @default(cuid())
   tenantId                   String
   source                     SalesExternalSource
   sourceExternalId           String?
-  documentType               SalesExternalDocumentType     @default(INVOICE)
+  documentType               SalesExternalDocumentType   @default(INVOICE)
   documentNumber             String
   accessKey                  String?
   authorizationDate          DateTime?
@@ -3703,20 +3778,20 @@ model ExternalSalesDocument {
   customerIdentification     String?
   customerName               String
   customerId                 String?
-  subtotal                   Decimal                       @db.Decimal(12, 2)
-  taxTotal                   Decimal                       @default(0) @db.Decimal(12, 2)
-  total                      Decimal                       @db.Decimal(12, 2)
+  subtotal                   Decimal                     @db.Decimal(12, 2)
+  taxTotal                   Decimal                     @default(0) @db.Decimal(12, 2)
+  total                      Decimal                     @db.Decimal(12, 2)
   observation                String?
-  status                     SalesExternalDocumentStatus   @default(IMPORTED)
+  status                     SalesExternalDocumentStatus @default(IMPORTED)
   rawPayload                 Json?
   importBatchId              String?
   createdByUserId            String?
-  createdAt                  DateTime                      @default(now())
-  updatedAt                  DateTime                      @updatedAt
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
 
-  tenant      Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer    LightweightCustomer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  importBatch SalesImportBatch?            @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  tenant      Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer    LightweightCustomer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  importBatch SalesImportBatch?           @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
   items       ExternalSalesDocumentItem[]
 
   @@unique([tenantId, accessKey])
@@ -3754,18 +3829,18 @@ model ExternalSalesDocumentItem {
 }
 
 model SalesAutoSyncSettings {
-  id            String                  @id @default(cuid())
-  tenantId      String                  @unique
-  enabled       Boolean                 @default(false)
-  sriEnabled    Boolean                 @default(false)
-  apiEnabled    Boolean                 @default(false)
-  syncFrequency SalesAutoSyncFrequency  @default(DAILY)
+  id            String                 @id @default(cuid())
+  tenantId      String                 @unique
+  enabled       Boolean                @default(false)
+  sriEnabled    Boolean                @default(false)
+  apiEnabled    Boolean                @default(false)
+  syncFrequency SalesAutoSyncFrequency @default(DAILY)
   lastSyncAt    DateTime?
   lastSuccessAt DateTime?
   nextSyncAt    DateTime?
   lastError     String?
-  createdAt     DateTime                @default(now())
-  updatedAt     DateTime                @updatedAt
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
@@ -3848,4 +3923,77 @@ model SalesSriSyncDocument {
   @@unique([jobId, accessKey])
   @@index([tenantId, accessKey, outcome])
   @@index([jobId, queryDate])
+}
+
+
+// Integration secrets are never persisted. Full access is an explicit scope snapshot.
+model UserApiKey {
+  id String @id @default(cuid())
+  tenantId String
+  userId String
+  name String
+  keyPrefix String @unique
+  keyHash String @unique
+  scopes String[]
+  catalogVersion Int @default(1)
+  fullAccess Boolean @default(false)
+  status String @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  expiresAt DateTime?
+  lastUsedAt DateTime?
+  revokedAt DateTime?
+  revokedById String?
+  replacesKeyId String?
+  user User @relation("ApiKeyOwner", fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  revokedBy User? @relation("ApiKeyRevoker", fields: [revokedById], references: [id], onDelete: SetNull)
+  idempotencyRecords ApiIdempotencyRecord[]
+  usage ApiRequestLog[]
+  rateWindows ApiRateWindow[]
+  @@index([tenantId, userId, createdAt])
+}
+
+// A claim is committed BEFORE business side effects; an interrupted request is
+// never automatically re-executed. COMPLETED responses can be replayed safely.
+model ApiIdempotencyRecord {
+  id String @id @default(cuid())
+  apiKeyId String
+  keyDigest String
+  requestHash String
+  operation String
+  status String @default("PROCESSING")
+  response Json?
+  responseStatus Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  apiKey UserApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  @@unique([apiKeyId, keyDigest])
+  @@index([createdAt])
+}
+
+model ApiRateWindow {
+  apiKeyId String
+  bucket String
+  windowStart DateTime
+  count Int @default(1)
+  apiKey UserApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  @@id([apiKeyId, bucket, windowStart])
+  @@index([windowStart])
+}
+
+model ApiRequestLog {
+  id String @id @default(cuid())
+  apiKeyId String
+  tenantId String
+  userId String
+  endpoint String
+  method String
+  status Int
+  durationMs Int
+  requestId String
+  createdAt DateTime @default(now())
+  apiKey UserApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  @@index([tenantId, createdAt])
+  @@index([apiKeyId, createdAt])
 }

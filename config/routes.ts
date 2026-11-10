@@ -71,6 +71,7 @@ export const routes = {
   billing: "/billing",
   adminBilling: "/admin/billing",
   adminBillingUpgradeRequests: "/admin/billing/upgrade-requests",
+  adminBillingTransfers: "/admin/billing/transfers",
   settings: "/settings",
   workspace: "/workspace",
   sales: "/sales",

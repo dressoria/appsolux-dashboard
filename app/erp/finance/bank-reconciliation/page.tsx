@@ -11,11 +11,11 @@ import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { routes } from "@/config/routes";
 
 type BankReconciliationPageProps = {
-  searchParams: {
+  searchParams: Promise<{
     from?: string;
     to?: string;
     account?: string;
-  };
+  }>;
 };
 
 function getTodayDate() {
@@ -46,6 +46,7 @@ function getMovementAmount(paymentType: string | undefined, amount: number) {
 export default async function ErpFinanceBankReconciliationPage({
   searchParams,
 }: BankReconciliationPageProps) {
+  const resolvedSearchParams = await searchParams;
   const user = await getCurrentUser();
 
   if (!user) {
@@ -98,11 +99,11 @@ export default async function ErpFinanceBankReconciliationPage({
     );
   }
 
-  const from = isIsoDate(searchParams.from)
-    ? searchParams.from ?? getDefaultFromDate()
+  const from = isIsoDate(resolvedSearchParams.from)
+    ? resolvedSearchParams.from ?? getDefaultFromDate()
     : getDefaultFromDate();
-  const to = isIsoDate(searchParams.to) ? searchParams.to ?? getTodayDate() : getTodayDate();
-  const selectedAccount = searchParams.account ?? "";
+  const to = isIsoDate(resolvedSearchParams.to) ? resolvedSearchParams.to ?? getTodayDate() : getTodayDate();
+  const selectedAccount = resolvedSearchParams.account ?? "";
 
   const [accounts, payments] = await Promise.all([
     getCashAndBankAccounts().catch(() => []),

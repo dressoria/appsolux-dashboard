@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CheckCircle2, Clock3, ShieldCheck } from "lucide-react";
 
+import { BankTransferStatus } from "@/components/appsolux/billing/bank-transfer-status";
 import { CommercialPlanCatalog } from "@/components/appsolux/billing/commercial-plan-catalog";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
@@ -74,6 +75,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
             </div>
           </CardContent>
         </Card>
+
+        <BankTransferStatus />
 
         <section className="space-y-3 text-center">
           <h2 className="text-3xl font-black tracking-tight">Elige el plan para tu negocio</h2>

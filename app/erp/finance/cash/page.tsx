@@ -28,10 +28,11 @@ function isValidDate(value: string) {
 }
 
 type CashPageProps = {
-  searchParams: { date?: string };
+  searchParams: Promise<{ date?: string }>;
 };
 
 export default async function ErpFinanceCashPage({ searchParams }: CashPageProps) {
+  const resolvedSearchParams = await searchParams;
   const user = await getCurrentUser();
 
   if (!user) {
@@ -83,7 +84,7 @@ export default async function ErpFinanceCashPage({ searchParams }: CashPageProps
   }
 
   const today = getTodayDate();
-  const rawDate = searchParams.date ?? "";
+  const rawDate = resolvedSearchParams.date ?? "";
   const selectedDate = rawDate && isValidDate(rawDate) ? rawDate : today;
 
   const [allPayments, closingForDate] = await Promise.all([

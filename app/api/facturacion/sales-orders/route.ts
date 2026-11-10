@@ -1,3 +1,5 @@
+import type { Prisma } from "@prisma/client";
+import { createSalesOrder, SalesDocumentError } from "@/lib/core/sales-documents";
 import { NextRequest, NextResponse } from "next/server";
 
 import { getPrismaClient } from "@/lib/db/prisma";
@@ -16,9 +18,9 @@ export async function GET(request: NextRequest) {
   const perPageRaw = Number(url.searchParams.get("perPage") ?? "10");
   const perPage = [10, 20, 50, 100].includes(perPageRaw) ? perPageRaw : 10;
 
-  const where: Record<string, unknown> = { tenantId: tenant.id };
+  const where: Prisma.SalesOrderWhereInput = { tenantId: tenant.id };
   if (status && ["DRAFT", "CONFIRMED", "CONVERTED", "CANCELLED"].includes(status)) {
-    where.status = status;
+    where.status = status as Prisma.SalesOrderWhereInput["status"];
   }
   if (from) {
     const fromDate = new Date(`${from}T00:00:00.000-05:00`);
@@ -36,16 +38,15 @@ export async function GET(request: NextRequest) {
     ];
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [orders, total] = await Promise.all([
     prisma.salesOrder.findMany({
-      where: where as any,
+      where: where,
       include: { customer: { select: { name: true, identification: true } }, _count: { select: { items: true } } },
       orderBy: { createdAt: "desc" },
       take: perPage,
       skip: (page - 1) * perPage,
     }),
-    prisma.salesOrder.count({ where: where as any }),
+    prisma.salesOrder.count({ where: where }),
   ]);
 
   return NextResponse.json({
@@ -71,60 +72,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const { user, tenant } = await requireDashboardSession();
-  const prisma = getPrismaClient();
-  const body = await request.json();
-
-  const lastOrder = await prisma.salesOrder.findFirst({
-    where: { tenantId: tenant.id },
-    orderBy: { number: "desc" },
-    select: { number: true },
-  });
-  const nextNumber = (lastOrder?.number ?? 0) + 1;
-
-  const items = (body.items ?? []).map((item: Record<string, unknown>) => ({
-    productId: (item.productId as string) || null,
-    code: (item.code as string) || null,
-    productName: item.productName as string,
-    description: (item.description as string) || null,
-    quantity: Number(item.quantity),
-    unitPrice: Number(item.unitPrice),
-    discount: Number(item.discount ?? 0),
-    taxRate: Number(item.taxRate ?? 0),
-    taxCategory: (item.taxCategory as string) || null,
-    subtotal: Number(item.subtotal),
-    tax: Number(item.tax ?? 0),
-    total: Number(item.total),
-  }));
-
-  let customerSnapshot = null;
-  if (body.customerId) {
-    const c = await prisma.lightweightCustomer.findFirst({
-      where: { id: body.customerId, tenantId: tenant.id },
-      select: { name: true, identification: true, email: true, phone: true, address: true },
-    });
-    if (c) customerSnapshot = c;
+  try {
+    return NextResponse.json(await createSalesOrder(tenant.id, user.id, await request.json()));
+  } catch (error) {
+    if (error instanceof SalesDocumentError) return NextResponse.json({ error: error.message }, { status: error.status });
+    throw error;
   }
-
-  const order = await prisma.salesOrder.create({
-    data: {
-      tenantId: tenant.id,
-      number: nextNumber,
-      customerId: body.customerId || null,
-      customerSnapshot: customerSnapshot ?? undefined,
-      warehouseId: body.warehouseId || null,
-      issueDate: body.issueDate ? new Date(body.issueDate) : new Date(),
-      expectedDate: body.expectedDate ? new Date(body.expectedDate) : null,
-      sellerName: body.sellerName || null,
-      status: body.status === "CONFIRMED" ? "CONFIRMED" : "DRAFT",
-      observation: body.observation || null,
-      subtotal: Number(body.subtotal ?? 0),
-      discount: Number(body.discount ?? 0),
-      tax: Number(body.tax ?? 0),
-      total: Number(body.total ?? 0),
-      createdByUserId: user.id,
-      items: { create: items },
-    },
-  });
-
-  return NextResponse.json({ ok: true, id: order.id, number: nextNumber });
 }

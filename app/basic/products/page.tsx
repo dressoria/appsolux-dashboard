@@ -9,7 +9,7 @@ import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
-export default async function BasicProductsPage(_props?: { searchParams?: Promise<{ q?: string }> }) {
+export default async function BasicProductsPage(_props: { searchParams?: Promise<{ q?: string }> }) {
   void _props;
   const user = await getCurrentUser();
   if (!user) return <BasicModuleShell title="Productos" description="Catálogo comercial" activeHref={routes.basicProducts}><p>Sesión requerida.</p></BasicModuleShell>;

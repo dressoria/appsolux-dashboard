@@ -10,7 +10,7 @@ import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { routes } from "@/config/routes";
 
 type KardexPageProps = {
-  searchParams: { item?: string; warehouse?: string };
+  searchParams: Promise<{ item?: string; warehouse?: string }>;
 };
 
 function formatBalance(value: number | undefined) {
@@ -43,6 +43,7 @@ function getVoucherLabel(voucherType?: string) {
 export default async function ErpInventoryKardexPage({
   searchParams,
 }: KardexPageProps) {
+  const resolvedSearchParams = await searchParams;
   const user = await getCurrentUser();
 
   if (!user) {
@@ -93,8 +94,8 @@ export default async function ErpInventoryKardexPage({
     );
   }
 
-  const selectedItem = searchParams.item ?? null;
-  const selectedWarehouse = searchParams.warehouse ?? null;
+  const selectedItem = resolvedSearchParams.item ?? null;
+  const selectedWarehouse = resolvedSearchParams.warehouse ?? null;
 
   const [items, entries] = await Promise.all([
     getErpnextItems(),

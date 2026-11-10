@@ -21,6 +21,7 @@ services:
       - /home/ubuntu/appsolux-secure/sri-authorized-xml:/app/.appsolux-secure/sri-authorized-xml
       - /home/ubuntu/appsolux-secure/logos:/app/.appsolux-secure/logos
       - /home/ubuntu/appsolux-secure/product-images:/app/.appsolux-secure/product-images
+      - /home/ubuntu/appsolux-secure/bank-transfer-receipts:/app/.appsolux-secure/bank-transfer-receipts
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/login"]
       interval: 30s
