@@ -1404,11 +1404,11 @@ export async function createSale(input: CreateSaleInput) {
   });
 }
 
-export async function cancelSale(tenantId: string, saleId: string) {
+export async function cancelSale(tenantId: string, saleId: string, actorUserId?: string) {
   await requireTenantOperationalAccess(tenantId);
   const prisma = getPrismaClient();
 
-  const treasury = await prepareTreasuryIntegration(tenantId);
+  const treasury = await prepareTreasuryIntegration(tenantId, actorUserId);
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "LightweightSale" WHERE "id"=${saleId} AND "tenantId"=${tenantId} FOR UPDATE`;
     const sale = await tx.lightweightSale.findFirst({

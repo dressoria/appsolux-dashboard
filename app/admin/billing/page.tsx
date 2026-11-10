@@ -68,6 +68,11 @@ export default async function AdminBillingPage() {
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button asChild variant="outline">
+              <Link href={routes.adminBillingTransfers}>
+                Transferencias bancarias
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link href={routes.adminBillingUpgradeRequests}>
                 Ver solicitudes antiguas ({pendingUpgradeCount} pendientes)
               </Link>

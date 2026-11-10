@@ -1,3 +1,4 @@
+import { transitionSalesOrder, SalesDocumentError } from "@/lib/core/sales-documents";
 import { NextRequest, NextResponse } from "next/server";
 
 import { getPrismaClient } from "@/lib/db/prisma";
@@ -36,20 +37,12 @@ export async function PATCH(request: NextRequest, context: Context) {
 
   if (!order) return NextResponse.json({ error: "Orden no encontrada" }, { status: 404 });
 
-  if (body.action === "confirm") {
-    if (order.status !== "DRAFT") {
-      return NextResponse.json({ error: "Solo órdenes en borrador pueden confirmarse" }, { status: 409 });
+  if (body.action === "confirm" || body.action === "cancel") {
+    try { return NextResponse.json(await transitionSalesOrder(tenant.id, orderId, body.action)); }
+    catch (error) {
+      if (error instanceof SalesDocumentError) return NextResponse.json({ error: error.message }, { status: error.status });
+      throw error;
     }
-    await prisma.salesOrder.update({ where: { id: orderId }, data: { status: "CONFIRMED" } });
-    return NextResponse.json({ ok: true, status: "CONFIRMED" });
-  }
-
-  if (body.action === "cancel") {
-    if (order.status === "CONVERTED") {
-      return NextResponse.json({ error: "Orden ya convertida, no se puede cancelar" }, { status: 409 });
-    }
-    await prisma.salesOrder.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
-    return NextResponse.json({ ok: true, status: "CANCELLED" });
   }
 
   if (body.action === "convert") {

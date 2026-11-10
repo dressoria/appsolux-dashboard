@@ -8,7 +8,7 @@ import { getBasicUsageCounts, listCustomers } from "@/lib/core/lightweight-pos";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
-export default async function BasicCustomersPage(_props?: { searchParams?: Promise<{ q?: string }> }) {
+export default async function BasicCustomersPage(_props: { searchParams?: Promise<{ q?: string }> }) {
   void _props;
   const user = await getCurrentUser();
   if (!user) return <BasicModuleShell title="Clientes" description="Administra contactos y datos de facturación." activeHref={routes.basicCustomers}><p>Sesión requerida.</p></BasicModuleShell>;

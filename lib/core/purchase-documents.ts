@@ -246,9 +246,9 @@ export async function updatePurchaseDocumentCategory(
   });
 }
 
-export async function cancelPurchaseDocument(tenantId: string, id: string) {
+export async function cancelPurchaseDocument(tenantId: string, id: string, actorUserId?: string) {
   const prisma = getPrismaClient();
-  const treasury = await prepareTreasuryIntegration(tenantId);
+  const treasury = await prepareTreasuryIntegration(tenantId, actorUserId);
   return prisma.$transaction(async (tx) => {
   await tx.$queryRaw`SELECT "id" FROM "PurchaseDocument" WHERE "id"=${id} AND "tenantId"=${tenantId} FOR UPDATE`;
   if (treasury) await cancelTreasurySource(tx, treasury, "PURCHASE", id);

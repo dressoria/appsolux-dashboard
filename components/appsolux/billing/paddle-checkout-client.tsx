@@ -10,8 +10,7 @@ type Props = {
   billingInterval: string;
   amount: number;
   customerEmail: string;
-  tenantId: string;
-  planCode: string;
+  checkoutIntentToken: string;
   paddleEnv: "sandbox" | "production";
   clientToken: string;
 };
@@ -22,15 +21,20 @@ export function PaddleCheckoutClient({
   billingInterval,
   amount,
   customerEmail,
-  tenantId,
-  planCode,
+  checkoutIntentToken,
   paddleEnv,
   clientToken,
 }: Props) {
   const router = useRouter();
   const paddleRef = useRef<Paddle | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "completed" | "error">("loading");
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const openedRef = useRef(false);
+  const statusRef = useRef(status);
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   const openCheckout = useCallback((paddle: Paddle) => {
     if (openedRef.current) return;
@@ -40,9 +44,9 @@ export function PaddleCheckoutClient({
     paddle.Checkout.open({
       items: [{ priceId, quantity: 1 }],
       customer: { email: customerEmail },
-      customData: { tenantId, planCode, billingInterval },
+      customData: { cid: checkoutIntentToken },
     });
-  }, [priceId, customerEmail, tenantId, planCode, billingInterval]);
+  }, [priceId, customerEmail, checkoutIntentToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,8 +60,18 @@ export function PaddleCheckoutClient({
           router.push("/billing?checkout=success");
         }
         if (event.name === "checkout.closed") {
-          if (status !== "completed") {
+          if (statusRef.current !== "completed") {
             router.push("/billing?checkout=cancelled");
+          }
+        }
+        if (event.name === "checkout.error") {
+          setStatus("error");
+          const detail = (event.data as Record<string, unknown> | undefined)?.error;
+          if (typeof detail === "string") {
+            setErrorDetail(detail);
+          }
+          if (process.env.NODE_ENV === "development") {
+            console.error("[Paddle] checkout.error", event.data);
           }
         }
       },
@@ -65,12 +79,17 @@ export function PaddleCheckoutClient({
       if (cancelled || !paddle) return;
       paddleRef.current = paddle;
       openCheckout(paddle);
-    }).catch(() => {
-      if (!cancelled) setStatus("error");
+    }).catch((err) => {
+      if (!cancelled) {
+        setStatus("error");
+        if (process.env.NODE_ENV === "development") {
+          console.error("[Paddle] initialization failed", err);
+        }
+      }
     });
 
     return () => { cancelled = true; };
-  }, [paddleEnv, clientToken, openCheckout, router, status]);
+  }, [paddleEnv, clientToken, openCheckout, router]);
 
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4">
@@ -89,7 +108,23 @@ export function PaddleCheckoutClient({
         </div>
       )}
       {status === "error" && (
-        <p className="text-destructive">No se pudo cargar el checkout. Intenta de nuevo.</p>
+        <div className="rounded-xl border border-destructive/25 bg-destructive/5 p-6 text-center">
+          <p className="font-semibold text-destructive">No se pudo cargar el checkout.</p>
+          {errorDetail ? (
+            <p className="mt-2 text-sm text-muted-foreground">{errorDetail}</p>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Verifica tu conexión e intenta de nuevo. Si el problema persiste, contacta a soporte.
+            </p>
+          )}
+          <button
+            className="mt-4 rounded-lg bg-facturom-primary px-4 py-2 text-sm font-medium text-white hover:bg-facturom-primary/90"
+            onClick={() => router.push("/billing")}
+            type="button"
+          >
+            Volver a planes
+          </button>
+        </div>
       )}
     </div>
   );

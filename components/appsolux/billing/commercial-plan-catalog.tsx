@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { Check, Minus } from "lucide-react";
 
+import { useRouter } from "next/navigation";
+
 import { Button } from "@/components/ui/button";
 import {
   calculateAnnualSavings,
@@ -40,6 +42,7 @@ export function CommercialPlanCatalog({
   hasBillingCustomer = false,
   canManagePlan = false,
 }: Props) {
+  const router = useRouter();
   const [interval, setInterval] = useState<BillingInterval>("YEARLY");
   const [loading, setLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -135,24 +138,37 @@ export function CommercialPlanCatalog({
                   <Link href="/sign-up">Probar gratis 7 días</Link>
                 </Button>
               ) : (
-                <Button
-                  className="w-full rounded-xl"
-                  disabled={!onlinePaymentsAvailable || !canManagePlan || hasActiveSubscription || loading !== null}
-                  onClick={() => redirectFrom("/api/billing/checkout", { planCode: plan.code, billingInterval: interval })}
-                  variant={plan.highlighted ? "default" : "outline"}
-                >
-                  {!onlinePaymentsAvailable
-                    ? "Pagos próximamente"
-                    : !canManagePlan
-                      ? "Solo disponible para el propietario"
-                      : isCurrent && hasActiveSubscription && currentInterval === interval
-                        ? "Plan actual"
-                        : hasActiveSubscription
-                          ? "Cambiar desde el portal"
-                          : loading === requestKey
-                            ? "Abriendo…"
-                            : "Elegir plan"}
-                </Button>
+                <div className="space-y-2">
+                  <Button
+                    className="w-full rounded-xl"
+                    disabled={!onlinePaymentsAvailable || !canManagePlan || hasActiveSubscription || loading !== null}
+                    onClick={() => redirectFrom("/api/billing/checkout", { planCode: plan.code, billingInterval: interval })}
+                    variant={plan.highlighted ? "default" : "outline"}
+                  >
+                    {!onlinePaymentsAvailable
+                      ? "Pagos próximamente"
+                      : !canManagePlan
+                        ? "Solo disponible para el propietario"
+                        : isCurrent && hasActiveSubscription && currentInterval === interval
+                          ? "Plan actual"
+                          : hasActiveSubscription
+                            ? "Cambiar desde el portal"
+                            : loading === requestKey
+                              ? "Abriendo…"
+                              : "Elegir plan"}
+                  </Button>
+                  {canManagePlan && !hasActiveSubscription ? (
+                    <Button
+                      className="w-full rounded-xl"
+                      disabled={loading !== null}
+                      onClick={() => router.push(`/billing/transfer?plan=${plan.code}&interval=${interval}`)}
+                      variant="ghost"
+                      size="sm"
+                    >
+                      Pagar por transferencia
+                    </Button>
+                  ) : null}
+                </div>
               )}
             </article>
           );

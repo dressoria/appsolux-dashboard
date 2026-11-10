@@ -41,7 +41,8 @@ type SettingsTabId =
   | "sucursales"
   | "pagos"
   | "fiscal"
-  | "usuarios";
+  | "usuarios"
+  | "integraciones";
 
 type SettingsTabsProps = {
   initialTab?: SettingsTabId;
@@ -61,6 +62,7 @@ const TABS: Array<{ id: SettingsTabId; label: string }> = [
   { id: "pagos", label: "Pagos" },
   { id: "fiscal", label: "Fiscal / SRI" },
   { id: "usuarios", label: "Usuarios" },
+  { id: "integraciones", label: "Integraciones" },
 ];
 
 function ConfigurationPendingCard({
@@ -234,6 +236,10 @@ export function SettingsTabs({
           </button>
         ))}
       </div>
+
+      {activeTab === "integraciones" ? (
+        <Card><CardHeader><CardTitle>Integraciones</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-muted-foreground">Conecta n8n y aplicaciones externas mediante claves con permisos individuales o Full Access.</p><div className="flex flex-wrap gap-3"><Link className="rounded-lg bg-[#1E52F1] px-4 py-2 text-sm font-medium text-white hover:bg-[#1769E0]" href="/settings/integrations/api-keys">Claves API</Link><Link className="rounded-lg border px-4 py-2 text-sm" href="/settings/integrations/api-docs">Documentación API</Link></div></CardContent></Card>
+      ) : null}
 
       {activeTab === "empresa" ? (
         <CompanySettingsCard company={company} />

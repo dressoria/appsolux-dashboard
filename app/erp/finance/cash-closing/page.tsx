@@ -17,7 +17,7 @@ import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { routes } from "@/config/routes";
 
 type CashClosingPageProps = {
-  searchParams: { date?: string };
+  searchParams: Promise<{ date?: string }>;
 };
 
 function getTodayDate() {
@@ -39,6 +39,7 @@ function formatDate(value: Date | string) {
 export default async function ErpFinanceCashClosingPage({
   searchParams,
 }: CashClosingPageProps) {
+  const resolvedSearchParams = await searchParams;
   const user = await getCurrentUser();
 
   if (!user) {
@@ -93,7 +94,7 @@ export default async function ErpFinanceCashClosingPage({
 
   const today = getTodayDate();
   const selectedDate =
-    searchParams.date && isIsoDate(searchParams.date) ? searchParams.date : today;
+    resolvedSearchParams.date && isIsoDate(resolvedSearchParams.date) ? resolvedSearchParams.date : today;
 
   const [payments, accounts, closings, existingClosing] = await Promise.all([
     getErpnextPaymentEntries().catch(() => []),

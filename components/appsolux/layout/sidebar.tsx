@@ -213,6 +213,10 @@ export function buildSidebarNavigation(
           true,
         ),
         link("Configuración", routes.facturacionConfiguration, "settings-2"),
+        { kind: "submenu", title: "Integraciones", items: [
+          link("Claves API", "/settings/integrations/api-keys"),
+          link("Documentación API", "/settings/integrations/api-docs"),
+        ] },
       ],
     },
     {
