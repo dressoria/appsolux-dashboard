@@ -1,15 +1,24 @@
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { getProducts } from "@/lib/core/inventory-products";
+import { sanitizePage, sanitizePerPage } from "@/components/appsolux/people/pagination-bar";
 import { ProductsListClient } from "./products-list-client";
 
-export default async function FacturacionProductsPage({ searchParams }: { searchParams: Promise<{ q?: string; type?: string; page?: string; saved?: string }> }) {
+export default async function FacturacionProductsPage({ searchParams }: { searchParams: Promise<{ q?: string; type?: string; page?: string; perPage?: string; status?: string; saved?: string }> }) {
   const { tenant } = await requireDashboardSession();
   const params = await searchParams;
   const q = params.q?.trim() ?? "";
   const type = ["PRODUCT", "SERVICE", "COMBO"].includes(params.type ?? "") ? params.type! : "";
-  const page = Math.max(1, Math.min(1000000, Math.floor(Number(params.page) || 1)));
-  const productsResult = await getProducts(tenant.id, { take: 50, skip: (page - 1) * 50, q, type: type || undefined });
+  const status = params.status === "inactive" ? "inactive" : params.status === "all" ? "all" : "active";
+  const page = sanitizePage(params.page);
+  const perPage = sanitizePerPage(params.perPage);
+  const productsResult = await getProducts(tenant.id, {
+    take: perPage,
+    skip: (page - 1) * perPage,
+    q,
+    type: type || undefined,
+    isActive: status === "all" ? undefined : status === "active",
+  });
 
   return (
     <DashboardShell>
@@ -23,7 +32,9 @@ export default async function FacturacionProductsPage({ searchParams }: { search
           initialTotal={productsResult.total}
           q={q}
           type={type}
+          status={status}
           page={page}
+          perPage={perPage}
           saved={params.saved === "created" || params.saved === "updated" ? params.saved : undefined}
         />
       </div>

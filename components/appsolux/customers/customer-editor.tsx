@@ -77,16 +77,19 @@ export function CustomerEditor({
   existingSectors = [],
   existingGroups = [],
   existingZones = [],
+  defaultQuickMode = false,
 }: {
   customer?: Customer;
   tenantCustomers?: OtherCustomer[];
   existingSectors?: string[];
   existingGroups?: string[];
   existingZones?: string[];
+  defaultQuickMode?: boolean;
 }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [quickMode, setQuickMode] = useState(!customer && defaultQuickMode);
   const [type, setType] = useState<LightweightCustomerIdentificationType>(
     (customer?.identificationType as LightweightCustomerIdentificationType) ?? "RUC",
   );
@@ -188,43 +191,45 @@ export function CustomerEditor({
     setError("");
     const form = new FormData(event.currentTarget);
     const string = (key: string) => String(form.get(key) ?? "");
-    const payload = {
-      name,
-      tradeName,
-      identificationType: type,
-      identification,
-      address,
-      country: isForeign ? country : "Ecuador",
-      province,
-      city,
-      parish,
-      sector,
-      zone,
-      customerType: string("customerType"),
-      customerOrigin,
-      groupName,
-      assignedSellerId,
-      isRelated,
-      isForeign,
-      invoiceThirdParty,
-      notes: string("notes"),
-      emails,
-      phone: phones[0],
-      phoneNumbers: phones.slice(1),
-      isActive: form.get("isActive") === "on",
-      gender,
-      relatedCustomerId: isRelated ? relatedCustomerId : "",
-      invoiceThirdPartyCustomerId: invoiceThirdParty
-        ? invoiceThirdPartyCustomerId
-        : "",
-      taxpayerStatus: lookupData?.taxpayerStatus,
-      taxpayerLegalName: lookupData?.legalName,
-      taxpayerTradeName: lookupData?.tradeName,
-      taxpayerType: lookupData?.taxpayerType,
-      economicActivity: lookupData?.economicActivity,
-      taxDataSource: lookupData?.source,
-      taxDataQueriedAt: lookupData?.queriedAt,
-    };
+    const payload = quickMode
+      ? { name }
+      : {
+          name,
+          tradeName,
+          identificationType: type,
+          identification,
+          address,
+          country: isForeign ? country : "Ecuador",
+          province,
+          city,
+          parish,
+          sector,
+          zone,
+          customerType: string("customerType"),
+          customerOrigin,
+          groupName,
+          assignedSellerId,
+          isRelated,
+          isForeign,
+          invoiceThirdParty,
+          notes: string("notes"),
+          emails,
+          phone: phones[0],
+          phoneNumbers: phones.slice(1),
+          isActive: form.get("isActive") === "on",
+          gender,
+          relatedCustomerId: isRelated ? relatedCustomerId : "",
+          invoiceThirdPartyCustomerId: invoiceThirdParty
+            ? invoiceThirdPartyCustomerId
+            : "",
+          taxpayerStatus: lookupData?.taxpayerStatus,
+          taxpayerLegalName: lookupData?.legalName,
+          taxpayerTradeName: lookupData?.tradeName,
+          taxpayerType: lookupData?.taxpayerType,
+          economicActivity: lookupData?.economicActivity,
+          taxDataSource: lookupData?.source,
+          taxDataQueriedAt: lookupData?.queriedAt,
+        };
     const response = await fetch(
       customer ? `/api/basic/customers/${customer.id}` : "/api/basic/customers",
       {
@@ -249,312 +254,348 @@ export function CustomerEditor({
 
   return (
     <form onSubmit={submit} className="pb-8">
-      <header className="sticky top-0 z-20 -mx-4 mb-5 flex items-center justify-between gap-3 border-b border-[#E4E9F0] bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
-        <div>
-          <h1 className="text-xl font-semibold text-[#172033]">
-            {customer ? "Editar cliente" : "Nuevo cliente"}
-          </h1>
-          <p className="text-xs text-[#667085]">
-            Información comercial y tributaria
-          </p>
+      <header className="sticky top-0 z-20 -mx-4 mb-5 flex flex-col gap-3 border-b border-[#E4E9F0] bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold text-[#172033]">
+              {customer ? "Editar cliente" : "Nuevo cliente"}
+            </h1>
+            <p className="text-xs text-[#667085]">
+              {quickMode ? "Creación rápida — solo nombre" : "Información comercial y tributaria"}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button asChild variant="outline">
+              <Link href="/facturacion/customers">Cancelar</Link>
+            </Button>
+            <Button
+              disabled={saving}
+              className="bg-[#1E52F1] text-white hover:bg-[#1745CE]"
+            >
+              {saving ? "Guardando..." : "Guardar cliente"}
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button asChild variant="outline">
-            <Link href="/facturacion/customers">Cancelar</Link>
-          </Button>
-          <Button
-            disabled={saving}
-            className="bg-[#1E52F1] text-white hover:bg-[#1745CE]"
-          >
-            {saving ? "Guardando..." : "Guardar cliente"}
-          </Button>
-        </div>
+        {!customer && (
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setQuickMode(true)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${quickMode ? "bg-[#1E52F1] text-white" : "bg-[#F0F2F5] text-[#667085] hover:bg-[#E4E9F0]"}`}
+            >
+              Rápido
+            </button>
+            <button
+              type="button"
+              onClick={() => setQuickMode(false)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${!quickMode ? "bg-[#1E52F1] text-white" : "bg-[#F0F2F5] text-[#667085] hover:bg-[#E4E9F0]"}`}
+            >
+              Completo
+            </button>
+          </div>
+        )}
       </header>
 
       <div className="space-y-4">
-        <Section title="Identificación">
-          <Field label="Tipo de identificación">
-            <select
-              value={type}
-              onChange={(e) =>
-                setType(e.target.value as LightweightCustomerIdentificationType)
-              }
-              className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm"
-            >
-              <option value="RUC">RUC</option>
-              <option value="CEDULA">Cédula</option>
-              <option value="PASSPORT">Pasaporte</option>
-              <option value="FOREIGN_ID">Identificación exterior</option>
-            </select>
-          </Field>
-          <Field label="Identificación">
-            <div className="flex gap-2">
+        {quickMode ? (
+          <Section title="Datos básicos">
+            <Field label="Nombre del cliente" wide>
               <Input
-                value={identification}
-                onChange={(e) => {
-                  const v =
-                    inputMode === "numeric"
-                      ? e.target.value.replace(/\D/g, "")
-                      : e.target.value;
-                  setIdentification(v);
-                  setLookupData(null);
-                }}
-                maxLength={maxLen}
-                inputMode={inputMode}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 required
+                autoFocus
+                placeholder="Nombre o razón social"
               />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                title="Consultar datos tributarios"
-                aria-label="Consultar datos tributarios"
-                onClick={searchTaxpayer}
-                disabled={
-                  lookupLoading || (type !== "RUC" && type !== "CEDULA")
-                }
-              >
-                {lookupLoading ? (
-                  <LoaderCircle className="animate-spin" />
-                ) : (
-                  <Search />
-                )}
-              </Button>
-            </div>
-          </Field>
-          <Field label="Razón social / Nombres completos">
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </Field>
-          <Field label="Nombre comercial">
-            <Input
-              value={tradeName}
-              onChange={(e) => setTradeName(e.target.value)}
-            />
-          </Field>
-        </Section>
-
-        {lookupFeedback && (
-          <div
-            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${lookupFeedback.startsWith("✓") ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
-          >
-            {lookupFeedback.startsWith("✓") && <Check className="size-4" />}
-            <span>{lookupFeedback}</span>
-          </div>
-        )}
-
-        <Section title="Contacto">
-          <div className="sm:col-span-2">
-            <ArrayFields
-              title="Correos electrónicos"
-              values={emails}
-              setValues={setEmails}
-              max={5}
-              type="email"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <ArrayFields
-              title="Teléfonos"
-              values={phones}
-              setValues={setPhones}
-              max={3}
-              type="tel"
-            />
-          </div>
-        </Section>
-
-        <Section title="Ubicación">
-          <Field label="Dirección" wide>
-            <Input
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-            />
-          </Field>
-          {isForeign && country !== "Ecuador" ? (
-            <>
-              <Field label="País">
+            </Field>
+          </Section>
+        ) : (
+          <>
+            <Section title="Identificación">
+              <Field label="Tipo de identificación">
+                <select
+                  value={type}
+                  onChange={(e) =>
+                    setType(e.target.value as LightweightCustomerIdentificationType)
+                  }
+                  className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm"
+                >
+                  <option value="RUC">RUC</option>
+                  <option value="CEDULA">Cédula</option>
+                  <option value="PASSPORT">Pasaporte</option>
+                  <option value="FOREIGN_ID">Identificación exterior</option>
+                </select>
+              </Field>
+              <Field label="Identificación">
+                <div className="flex gap-2">
+                  <Input
+                    value={identification}
+                    onChange={(e) => {
+                      const v =
+                        inputMode === "numeric"
+                          ? e.target.value.replace(/\D/g, "")
+                          : e.target.value;
+                      setIdentification(v);
+                      setLookupData(null);
+                    }}
+                    maxLength={maxLen}
+                    inputMode={inputMode}
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    title="Consultar datos tributarios"
+                    aria-label="Consultar datos tributarios"
+                    onClick={searchTaxpayer}
+                    disabled={
+                      lookupLoading || (type !== "RUC" && type !== "CEDULA")
+                    }
+                  >
+                    {lookupLoading ? (
+                      <LoaderCircle className="animate-spin" />
+                    ) : (
+                      <Search />
+                    )}
+                  </Button>
+                </div>
+              </Field>
+              <Field label="Razón social / Nombres completos">
                 <Input
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   required
                 />
               </Field>
-              <Field label="Ciudad">
-                <Input value={city} onChange={(e) => setCity(e.target.value)} />
+              <Field label="Nombre comercial">
+                <Input
+                  value={tradeName}
+                  onChange={(e) => setTradeName(e.target.value)}
+                />
               </Field>
-            </>
-          ) : (
-            <div className="sm:col-span-2">
-              <EcuadorLocationPicker
-                province={province}
-                city={city}
-                parish={parish}
-                onProvinceChange={setProvince}
-                onCityChange={setCity}
-                onParishChange={setParish}
+            </Section>
+
+            {lookupFeedback && (
+              <div
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${lookupFeedback.startsWith("✓") ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
+              >
+                {lookupFeedback.startsWith("✓") && <Check className="size-4" />}
+                <span>{lookupFeedback}</span>
+              </div>
+            )}
+
+            <Section title="Contacto">
+              <div className="sm:col-span-2">
+                <ArrayFields
+                  title="Correos electrónicos"
+                  values={emails}
+                  setValues={setEmails}
+                  max={5}
+                  type="email"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <ArrayFields
+                  title="Teléfonos"
+                  values={phones}
+                  setValues={setPhones}
+                  max={3}
+                  type="tel"
+                />
+              </div>
+            </Section>
+
+            <Section title="Ubicación">
+              <Field label="Dirección" wide>
+                <Input
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                />
+              </Field>
+              {isForeign && country !== "Ecuador" ? (
+                <>
+                  <Field label="País">
+                    <Input
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      required
+                    />
+                  </Field>
+                  <Field label="Ciudad">
+                    <Input value={city} onChange={(e) => setCity(e.target.value)} />
+                  </Field>
+                </>
+              ) : (
+                <div className="sm:col-span-2">
+                  <EcuadorLocationPicker
+                    province={province}
+                    city={city}
+                    parish={parish}
+                    onProvinceChange={setProvince}
+                    onCityChange={setCity}
+                    onParishChange={setParish}
+                  />
+                </div>
+              )}
+            </Section>
+
+            <div className="flex flex-wrap gap-x-6 gap-y-3 rounded-xl border border-[#E4E9F0] bg-white px-4 py-3">
+              <Toggle
+                label="Extranjero"
+                checked={isForeign}
+                onChange={(v) => {
+                  setIsForeign(v);
+                  if (v && type !== "PASSPORT" && type !== "FOREIGN_ID") {
+                    setType("PASSPORT");
+                  }
+                }}
+              />
+              <Toggle label="Relacionado" checked={isRelated} onChange={setIsRelated} />
+              <Toggle
+                label="Facturar otra persona"
+                checked={invoiceThirdParty}
+                onChange={(v) => {
+                  setInvoiceThirdParty(v);
+                  if (!v) setInvoiceThirdPartyCustomerId("");
+                }}
               />
             </div>
-          )}
-        </Section>
 
-        <div className="flex flex-wrap gap-x-6 gap-y-3 rounded-xl border border-[#E4E9F0] bg-white px-4 py-3">
-          <Toggle
-            label="Extranjero"
-            checked={isForeign}
-            onChange={(v) => {
-              setIsForeign(v);
-              if (v && type !== "PASSPORT" && type !== "FOREIGN_ID") {
-                setType("PASSPORT");
-              }
-            }}
-          />
-          <Toggle label="Relacionado" checked={isRelated} onChange={setIsRelated} />
-          <Toggle
-            label="Facturar otra persona"
-            checked={invoiceThirdParty}
-            onChange={(v) => {
-              setInvoiceThirdParty(v);
-              if (!v) setInvoiceThirdPartyCustomerId("");
-            }}
-          />
-        </div>
+            {isRelated && (
+              <Section title="Cliente relacionado">
+                <Field label="Cliente vinculado" wide>
+                  <EntityCombobox
+                    name="relatedCustomerId"
+                    value={relatedCustomerId}
+                    onChange={setRelatedCustomerId}
+                    entities={tenantCustomers}
+                    excludeId={customer?.id}
+                    label="Buscar cliente..."
+                    emptyLabel="Solo marcar como parte relacionada"
+                  />
+                </Field>
+              </Section>
+            )}
 
-        {isRelated && (
-          <Section title="Cliente relacionado">
-            <Field label="Cliente vinculado" wide>
-              <EntityCombobox
-                name="relatedCustomerId"
-                value={relatedCustomerId}
-                onChange={setRelatedCustomerId}
-                entities={tenantCustomers}
-                excludeId={customer?.id}
-                label="Buscar cliente..."
-                emptyLabel="Solo marcar como parte relacionada"
-              />
-            </Field>
-          </Section>
+            {invoiceThirdParty && (
+              <Section title="Facturar por defecto a">
+                <Field label="Cliente destinatario fiscal" wide>
+                  <EntityCombobox
+                    name="invoiceThirdPartyCustomerId"
+                    value={invoiceThirdPartyCustomerId}
+                    onChange={setInvoiceThirdPartyCustomerId}
+                    entities={tenantCustomers}
+                    excludeId={customer?.id}
+                    label="Buscar cliente..."
+                  />
+                </Field>
+              </Section>
+            )}
+
+            <Section title="Datos adicionales">
+              <Field label="Vendedor">
+                <TenantUserSelect
+                  name="assignedSellerId"
+                  value={assignedSellerId}
+                  onChange={setAssignedSellerId}
+                  label="Vendedor"
+                  emptyLabel="Sin vendedor"
+                />
+              </Field>
+              <Field label="Origen de ingresos">
+                <select
+                  value={customerOrigin}
+                  onChange={(e) => setCustomerOrigin(e.target.value)}
+                  className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm"
+                >
+                  <option value="">Seleccionar</option>
+                  {ORIGIN_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                  {customerOrigin &&
+                    !ORIGIN_OPTIONS.some((o) => o.value === customerOrigin) && (
+                      <option value={customerOrigin}>{customerOrigin}</option>
+                    )}
+                </select>
+              </Field>
+              <Field label="Tipo de cliente">
+                <select
+                  name="customerType"
+                  defaultValue={String(customer?.customerType ?? "Público")}
+                  className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm"
+                >
+                  {CUSTOMER_TYPES.map((item) => (
+                    <option key={item}>{item}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Género">
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm"
+                >
+                  {GENDER_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Sector">
+                <TenantValueCombobox
+                  name="sector"
+                  value={sector}
+                  onChange={setSector}
+                  existingValues={existingSectors}
+                  label="Sector"
+                  emptyLabel="Sin sector"
+                  addLabel="+ Nuevo sector"
+                />
+              </Field>
+              <Field label="Zona">
+                <TenantValueCombobox
+                  name="zone"
+                  value={zone}
+                  onChange={setZone}
+                  existingValues={existingZones}
+                  label="Zona"
+                  emptyLabel="Sin zona"
+                  addLabel="+ Nueva zona"
+                />
+              </Field>
+              <Field label="Grupo">
+                <TenantValueCombobox
+                  name="groupName"
+                  value={groupName}
+                  onChange={setGroupName}
+                  existingValues={existingGroups}
+                  label="Grupo"
+                  emptyLabel="SIN GRUPO"
+                  addLabel="+ Nuevo grupo"
+                />
+              </Field>
+              <Field label="Observaciones" wide>
+                <textarea
+                  name="notes"
+                  defaultValue={String(customer?.notes ?? "")}
+                  className="min-h-24 w-full rounded-lg border border-[#E4E9F0] px-3 py-2 text-sm"
+                />
+              </Field>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  name="isActive"
+                  type="checkbox"
+                  defaultChecked={customer?.isActive ?? true}
+                />
+                Cliente activo
+              </label>
+            </Section>
+          </>
         )}
-
-        {invoiceThirdParty && (
-          <Section title="Facturar por defecto a">
-            <Field label="Cliente destinatario fiscal" wide>
-              <EntityCombobox
-                name="invoiceThirdPartyCustomerId"
-                value={invoiceThirdPartyCustomerId}
-                onChange={setInvoiceThirdPartyCustomerId}
-                entities={tenantCustomers}
-                excludeId={customer?.id}
-                label="Buscar cliente..."
-              />
-            </Field>
-          </Section>
-        )}
-
-        <Section title="Datos adicionales">
-          <Field label="Vendedor">
-            <TenantUserSelect
-              name="assignedSellerId"
-              value={assignedSellerId}
-              onChange={setAssignedSellerId}
-              label="Vendedor"
-              emptyLabel="Sin vendedor"
-            />
-          </Field>
-          <Field label="Origen de ingresos">
-            <select
-              value={customerOrigin}
-              onChange={(e) => setCustomerOrigin(e.target.value)}
-              className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm"
-            >
-              <option value="">Seleccionar</option>
-              {ORIGIN_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-              {customerOrigin &&
-                !ORIGIN_OPTIONS.some((o) => o.value === customerOrigin) && (
-                  <option value={customerOrigin}>{customerOrigin}</option>
-                )}
-            </select>
-          </Field>
-          <Field label="Tipo de cliente">
-            <select
-              name="customerType"
-              defaultValue={String(customer?.customerType ?? "Público")}
-              className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm"
-            >
-              {CUSTOMER_TYPES.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Género">
-            <select
-              value={gender}
-              onChange={(e) => setGender(e.target.value)}
-              className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm"
-            >
-              {GENDER_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Sector">
-            <TenantValueCombobox
-              name="sector"
-              value={sector}
-              onChange={setSector}
-              existingValues={existingSectors}
-              label="Sector"
-              emptyLabel="Sin sector"
-              addLabel="+ Nuevo sector"
-            />
-          </Field>
-          <Field label="Zona">
-            <TenantValueCombobox
-              name="zone"
-              value={zone}
-              onChange={setZone}
-              existingValues={existingZones}
-              label="Zona"
-              emptyLabel="Sin zona"
-              addLabel="+ Nueva zona"
-            />
-          </Field>
-          <Field label="Grupo">
-            <TenantValueCombobox
-              name="groupName"
-              value={groupName}
-              onChange={setGroupName}
-              existingValues={existingGroups}
-              label="Grupo"
-              emptyLabel="SIN GRUPO"
-              addLabel="+ Nuevo grupo"
-            />
-          </Field>
-          <Field label="Observaciones" wide>
-            <textarea
-              name="notes"
-              defaultValue={String(customer?.notes ?? "")}
-              className="min-h-24 w-full rounded-lg border border-[#E4E9F0] px-3 py-2 text-sm"
-            />
-          </Field>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              name="isActive"
-              type="checkbox"
-              defaultChecked={customer?.isActive ?? true}
-            />
-            Cliente activo
-          </label>
-        </Section>
 
         {error ? (
           <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">

@@ -46,7 +46,7 @@ export async function getValuation(
         warehouseCode: b.warehouse.code,
         warehouseName: b.warehouse.name,
         quantity: qty.toFixed(4),
-        averageCost: avgCost.toFixed(4),
+        unitCost: avgCost.toFixed(4),
         totalValue: value.toFixed(2),
       };
     });
@@ -54,6 +54,6 @@ export async function getValuation(
   return {
     rows,
     totalValue: totalValue.toFixed(2),
-    method: "WEIGHTED_AVERAGE" as const,
+    method: "CURRENT_COST" as const,
   };
 }

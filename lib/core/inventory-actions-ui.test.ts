@@ -24,7 +24,7 @@ test("AG: barcode enabled with selected products", () => {
 
 test("AA: create is always available and visible-row selection has an accessible label", async () => {
   const { ProductsListClient } = await import("../../app/facturacion/products/products-list-client");
-  const html = renderToStaticMarkup(createElement(ProductsListClient, { initialProducts: [], initialTotal: 0, q: "", type: "", page: 1 }));
+  const html = renderToStaticMarkup(createElement(ProductsListClient, { initialProducts: [], initialTotal: 0, q: "", type: "", status: "active", page: 1, perPage: 20 }));
   assert.match(html, /href="\/facturacion\/products\/new"/);
   assert.ok(html.includes("+ Crear producto"));
   assert.ok(html.includes("Seleccionar productos visibles"));

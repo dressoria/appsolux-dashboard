@@ -17,21 +17,30 @@ type Props = {
   categories: Array<{ id: string; name: string }>;
 };
 
-const TABS = [
+const BASE_TABS = [
   { key: "data", label: "Datos del producto" },
   { key: "prices", label: "Impuestos y precios" },
+  { key: "stock", label: "Stock" },
   { key: "accounting", label: "Cuentas contables" },
   { key: "additional", label: "Información adicional" },
 ] as const;
 
-type TabKey = (typeof TABS)[number]["key"];
+type TabKey = (typeof BASE_TABS)[number]["key"];
 
 export function ProductFormClient({ mode, product, warehouses, brands, units, categories }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("data");
+  const TABS = BASE_TABS.filter((t) => t.key !== "stock" || (mode === "edit" && product?.type !== "SERVICE"));
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const [error, setError] = useState("");
+  const [adjustQty, setAdjustQty] = useState("");
+  const [adjustWarehouseId, setAdjustWarehouseId] = useState("");
+  const [adjustType, setAdjustType] = useState<"ADJUSTMENT_IN" | "ADJUSTMENT_OUT">("ADJUSTMENT_IN");
+  const [adjustReason, setAdjustReason] = useState("");
+  const [adjustLoading, setAdjustLoading] = useState(false);
+  const [adjustError, setAdjustError] = useState("");
+  const [adjustSuccess, setAdjustSuccess] = useState("");
 
   const [form, setForm] = useState({
     name: (product?.name as string) ?? "",
@@ -64,6 +73,8 @@ export function ProductFormClient({ mode, product, warehouses, brands, units, ca
     isProcessed: (product?.isProcessed as boolean) ?? false,
     warrantyDuration: product?.warrantyDuration != null ? String(product.warrantyDuration) : "",
     warrantyUnit: (product?.warrantyUnit as string) ?? "",
+    initialStock: "",
+    initialWarehouseId: (product?.defaultWarehouseId as string) ?? "",
   });
 
   const set = (key: string, value: string | boolean) =>
@@ -76,7 +87,11 @@ export function ProductFormClient({ mode, product, warehouses, brands, units, ca
     setError("");
     let redirected = false;
     try {
-      const payload = normalizeProductInput(form);
+      const payload: Record<string, unknown> = normalizeProductInput(form);
+      if (mode === "create" && form.initialStock && form.initialWarehouseId) {
+        payload.initialStock = Number(form.initialStock);
+        payload.initialWarehouseId = form.initialWarehouseId;
+      }
 
       const url = mode === "create"
         ? "/api/inventory/products"
@@ -240,6 +255,39 @@ export function ProductFormClient({ mode, product, warehouses, brands, units, ca
                 <input type="checkbox" checked={form.trackInventory} onChange={(e) => set("trackInventory", e.target.checked)} />
                 Controlar inventario
               </label>}
+              {mode === "create" && form.type !== "SERVICE" && form.trackInventory && (
+                <div className="rounded-lg border border-[#E4E9F0] bg-[#F8F9FB] p-4 space-y-3">
+                  <p className="text-sm font-medium text-[#172033]">Stock inicial (opcional)</p>
+                  <p className="text-xs text-[#667085]">Si este producto ya tiene existencias, regístralas aquí. Se creará un movimiento de apertura.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="product-initialWarehouseId" className="text-sm font-medium">Bodega</label>
+                      <select
+                        id="product-initialWarehouseId"
+                        className="w-full mt-1 rounded-md border px-3 py-2 text-sm"
+                        value={form.initialWarehouseId}
+                        onChange={(e) => set("initialWarehouseId", e.target.value)}
+                      >
+                        <option value="">Seleccionar bodega</option>
+                        {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="product-initialStock" className="text-sm font-medium">Cantidad inicial</label>
+                      <Input
+                        id="product-initialStock"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={form.initialStock}
+                        onChange={(e) => set("initialStock", e.target.value)}
+                        className="mt-1"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
 
@@ -317,6 +365,102 @@ export function ProductFormClient({ mode, product, warehouses, brands, units, ca
               <div>
                 <label htmlFor="product-cogsAccountId" className="text-sm font-medium">Cuenta contable — Costos</label>
                 <Input id="product-cogsAccountId" value={form.cogsAccountId} onChange={(e) => set("cogsAccountId", e.target.value)} placeholder="ID de cuenta contable" className="mt-1" />
+              </div>
+            </div>
+          )}
+
+          {tab === "stock" && mode === "edit" && product && (
+            <div className="space-y-4">
+              <p className="text-sm font-medium text-[#172033]">Stock por bodega</p>
+              {Array.isArray(product.stockBalances) && (product.stockBalances as Array<{ warehouseId: string; quantity: string; warehouse: { name: string } }>).length > 0 ? (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-[#F8F9FB]">
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[#667085]">Bodega</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-[#667085]">Cantidad</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(product.stockBalances as Array<{ warehouseId: string; quantity: string; warehouse: { name: string } }>).map((sb) => (
+                      <tr key={sb.warehouseId} className="border-b last:border-0">
+                        <td className="px-3 py-2">{sb.warehouse.name}</td>
+                        <td className="px-3 py-2 text-right font-mono">{Number(sb.quantity).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-sm text-[#667085]">Sin stock registrado en ninguna bodega.</p>
+              )}
+              <div className="mt-4 rounded-lg border border-[#E4E9F0] bg-[#F8F9FB] p-4 space-y-3">
+                <p className="text-sm font-medium text-[#172033]">Ajustar stock</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-[#667085]">Tipo</label>
+                    <select
+                      className="w-full mt-1 rounded-md border px-3 py-2 text-sm"
+                      value={adjustType}
+                      onChange={(e) => setAdjustType(e.target.value as "ADJUSTMENT_IN" | "ADJUSTMENT_OUT")}
+                    >
+                      <option value="ADJUSTMENT_IN">Entrada (+)</option>
+                      <option value="ADJUSTMENT_OUT">Salida (−)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-[#667085]">Bodega</label>
+                    <select
+                      className="w-full mt-1 rounded-md border px-3 py-2 text-sm"
+                      value={adjustWarehouseId}
+                      onChange={(e) => setAdjustWarehouseId(e.target.value)}
+                    >
+                      <option value="">Seleccionar</option>
+                      {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-[#667085]">Cantidad</label>
+                    <Input type="number" min="0.01" step="0.01" value={adjustQty} onChange={(e) => setAdjustQty(e.target.value)} className="mt-1" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-[#667085]">Razón (opcional)</label>
+                    <Input value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)} className="mt-1" placeholder="Motivo del ajuste" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Button
+                    disabled={adjustLoading || !adjustWarehouseId || !adjustQty}
+                    onClick={async () => {
+                      setAdjustLoading(true);
+                      setAdjustError("");
+                      setAdjustSuccess("");
+                      const res = await fetch("/api/inventory/adjustments", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          productId: product.id,
+                          warehouseId: adjustWarehouseId,
+                          quantity: Number(adjustQty),
+                          type: adjustType,
+                          reason: adjustReason || undefined,
+                        }),
+                      });
+                      setAdjustLoading(false);
+                      if (!res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        setAdjustError((data as { error?: string }).error ?? "Error al registrar ajuste.");
+                        return;
+                      }
+                      setAdjustSuccess("Ajuste registrado correctamente.");
+                      setAdjustQty("");
+                      setAdjustReason("");
+                      router.refresh();
+                    }}
+                  >
+                    {adjustLoading ? "Registrando..." : "Registrar ajuste"}
+                  </Button>
+                  {adjustError && <span className="text-sm text-red-600">{adjustError}</span>}
+                  {adjustSuccess && <span className="text-sm text-emerald-600">{adjustSuccess}</span>}
+                </div>
               </div>
             </div>
           )}

@@ -127,6 +127,8 @@ function money(value: number) {
 
 export function BasicPosClient({
   tenantName,
+  tenantId = "",
+  userId = "",
   currentUserName,
   products,
   customers: initialCustomers,
@@ -140,6 +142,8 @@ export function BasicPosClient({
   issuePoints = [],
 }: {
   tenantName: string;
+  tenantId?: string;
+  userId?: string;
   currentUserName?: string;
   products: Product[];
   customers: Customer[];
@@ -231,6 +235,46 @@ export function BasicPosClient({
   const [newCustomerError, setNewCustomerError] = useState("");
 
   const tipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cartStorageKey = tenantId && userId ? `pos_cart_${tenantId}_${userId}` : "";
+
+  useEffect(() => {
+    if (!cartStorageKey) return;
+    try {
+      const raw = localStorage.getItem(cartStorageKey);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as {
+        cart?: CartItem[];
+        customerId?: string;
+        cartInputs?: Record<string, string>;
+        discountInputs?: Record<string, string>;
+        discountPctInputs?: Record<string, string>;
+        lineNotes?: Record<string, string>;
+      };
+      if (saved.cart?.length) {
+        setCart(saved.cart);
+        if (saved.cartInputs) setCartInputs(saved.cartInputs);
+        if (saved.discountInputs) setDiscountInputs(saved.discountInputs);
+        if (saved.discountPctInputs) setDiscountPctInputs(saved.discountPctInputs);
+        if (saved.lineNotes) setLineNotes(saved.lineNotes);
+        if (saved.customerId) setCustomerId(saved.customerId);
+      }
+    } catch {}
+  }, [cartStorageKey]);
+
+  useEffect(() => {
+    if (!cartStorageKey) return;
+    try {
+      if (cart.length === 0) {
+        localStorage.removeItem(cartStorageKey);
+      } else {
+        localStorage.setItem(
+          cartStorageKey,
+          JSON.stringify({ cart, customerId, cartInputs, discountInputs, discountPctInputs, lineNotes }),
+        );
+      }
+    } catch {}
+  }, [cartStorageKey, cart, customerId, cartInputs, discountInputs, discountPctInputs, lineNotes]);
 
   const displayProducts = useServerPagination ? serverProducts : products;
   const productById = new Map([

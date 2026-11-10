@@ -152,6 +152,8 @@ export default async function FacturacionPosPage({
             ) : null}
             <BasicPosClient
               tenantName={tenant.name}
+              tenantId={tenant.id}
+              userId={user.id}
               currentUserName={user.name}
               hasSriConfig={false}
               initialCustomerId=""
@@ -206,6 +208,8 @@ export default async function FacturacionPosPage({
         <div className="space-y-4">
           <BasicPosClient
             tenantName={tenant.name}
+            tenantId={tenant.id}
+            userId={user.id}
             currentUserName={user.name}
             hasSriConfig={hasSriConfig}
             initialCustomerId={initialCustomerId}

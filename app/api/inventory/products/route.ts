@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { getProducts, createProduct } from "@/lib/core/inventory-products";
+import { createMovement } from "@/lib/core/inventory-movements";
+import { Decimal } from "@prisma/client/runtime/library";
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
@@ -36,7 +38,29 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     if (!body || typeof body !== "object" || Array.isArray(body)) throw new ProductInputError("Datos de producto inválidos.");
 
+    const initialStock = Number(body.initialStock) || 0;
+    const initialWarehouseId = typeof body.initialWarehouseId === "string" ? body.initialWarehouseId : "";
+    delete body.initialStock;
+    delete body.initialWarehouseId;
+
     const product = await createProduct(tenant.id, body);
+
+    if (initialStock > 0 && initialWarehouseId && product.trackInventory) {
+      await createMovement(tenant.id, {
+        productId: product.id,
+        warehouseId: initialWarehouseId,
+        direction: "IN",
+        quantity: new Decimal(initialStock),
+        movementType: "OPENING",
+        date: new Date(),
+        description: "Stock inicial al crear producto",
+        sourceType: "product_creation",
+        sourceId: product.id,
+        createdByUserId: user.id,
+        unitCost: product.cost ? new Decimal(product.cost.toString()) : undefined,
+      });
+    }
+
     return NextResponse.json(product, { status: 201 });
   } catch (error) {
     const result = productErrorResponse(error);
