@@ -6,10 +6,15 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   FileCheck2,
-  Maximize2,
+  Minus,
   Package,
+  Pencil,
+  Plus,
   ReceiptText,
+  Search,
   Trash2,
   UserPlus,
   X,
@@ -19,6 +24,13 @@ import { cn } from "@/lib/utils";
 import { BillingWarehouseSelector } from "@/components/appsolux/billing/billing-warehouse-selector";
 import { SimpleReceipt } from "@/components/appsolux/basic/simple-receipt";
 import { SaleStatusBadge } from "@/components/appsolux/basic/sales-ui";
+import {
+  PaymentModal,
+  MultiplePaymentModal,
+  type TreasuryAccountOption,
+  type PaymentEntry,
+} from "@/components/appsolux/sales/payment-modal";
+import { COMMERCIAL_LABELS } from "@/lib/core/payment-method-labels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +40,7 @@ import {
   fiscalSelection,
 } from "@/lib/core/pos-checkout";
 
+// ── SRI payment codes ──────────────────────────────────────────────────────────
 const SRI_PAYMENT_OPTIONS = [
   { code: "01", label: "Sin utilización del sistema financiero (efectivo)" },
   { code: "16", label: "Tarjeta de débito" },
@@ -38,6 +51,25 @@ const SRI_PAYMENT_OPTIONS = [
   { code: "21", label: "Endoso de títulos" },
 ] as const;
 
+const CORE_PAYMENT_METHODS = [
+  { value: "cash", label: "Efectivo" },
+  { value: "check", label: "Cheque" },
+  { value: "deposit", label: "Depósito" },
+  { value: "transfer", label: "Transferencia" },
+  { value: "debit_card", label: "Débito" },
+  { value: "credit_card", label: "Tarjeta" },
+  { value: "credit", label: "Crédito" },
+  { value: "multiple", label: "Múltiple" },
+] as const;
+
+const ERP_PAYMENT_METHODS = [
+  { value: "cash", label: "Efectivo" },
+  { value: "transfer", label: "Transferencia" },
+  { value: "card", label: "Tarjeta" },
+  { value: "credit", label: "Crédito" },
+] as const;
+
+// ── Types ──────────────────────────────────────────────────────────────────────
 type Product = {
   id: string;
   name: string;
@@ -63,22 +95,23 @@ type Customer = {
 };
 
 type EstablishmentOption = { id: string; code: string; name: string };
-type IssuePointOption = {
-  id: string;
-  code: string;
-  name: string;
-  establishmentId: string;
-};
+type IssuePointOption = { id: string; code: string; name: string; establishmentId: string };
+type WarehouseOption = { name: string; label?: string | null };
 
-type WarehouseOption = {
+type ProductSnapshot = {
   name: string;
-  label?: string | null;
+  price: number;
+  taxRate: number;
+  stock: number;
+  primaryCode: string | null;
+  barcode: string | null;
 };
 
 type CartItem = {
   productId: string;
   quantity: number;
   discountAmount: number;
+  snapshot: ProductSnapshot;
 };
 
 type SaleResponse = {
@@ -110,13 +143,14 @@ type SaleOutputResult = {
   errorMessage?: string;
   sri?: {
     documentId: string;
-    flowState: "preparing" | "sending" | "received" | "authorized" | "rejected";
+    flowState: string;
     flowLabel: string;
     message: string;
     documentStatus: string;
   };
 };
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
 function toNumber(value: string | number) {
   return typeof value === "number" ? value : Number(value ?? 0);
 }
@@ -125,6 +159,33 @@ function money(value: number) {
   return `$${value.toFixed(2)}`;
 }
 
+function productInitials(name: string): string {
+  const words = name.trim().split(/\s+/);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
+function makeSnapshot(product: Product, availableStock: number): ProductSnapshot {
+  return {
+    name: product.name,
+    price: toNumber(product.price),
+    taxRate: toNumber(product.taxRate),
+    stock: availableStock,
+    primaryCode: product.primaryCode ?? null,
+    barcode: product.barcode ?? null,
+  };
+}
+
+function calcLine(item: CartItem) {
+  const { price, taxRate } = item.snapshot;
+  const gross = price * item.quantity;
+  const discount = Math.max(0, Math.min(item.discountAmount, gross));
+  const sub = gross - discount;
+  const tax = Math.round(sub * taxRate) / 100;
+  return { gross, discount, subtotal: sub, tax, total: sub + tax, taxRate };
+}
+
+// ── Component ──────────────────────────────────────────────────────────────────
 export function BasicPosClient({
   tenantName,
   tenantId = "",
@@ -157,75 +218,31 @@ export function BasicPosClient({
   issuePoints?: IssuePointOption[];
 }) {
   const router = useRouter();
+  const useServerPagination = engine === "CORE";
 
+  // ── Core state ─────────────────────────────────────────────────────────────
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerId, setCustomerId] = useState(initialCustomerId ?? "");
   const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [outputMode, setOutputMode] = useState<
-    "internal_receipt" | "sri_invoice"
-  >("internal_receipt");
+  const [outputMode, setOutputMode] = useState<"internal_receipt" | "sri_invoice">("internal_receipt");
   const [paidAmount, setPaidAmount] = useState("");
+  const paidAmountManual = useRef(false);
   const [search, setSearch] = useState("");
   const [lastSale, setLastSale] = useState<SaleResponse | null>(null);
   const [lastOutput, setLastOutput] = useState<SaleOutputResult | null>(null);
   const [error, setError] = useState("");
+  const [revalWarnings, setRevalWarnings] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
-  const [showInvoiceEditor, setShowInvoiceEditor] = useState(false);
-  const [invoiceSearch, setInvoiceSearch] = useState("");
-  const [customerSearch, setCustomerSearch] = useState("");
-  const [establishmentId, setEstablishmentId] = useState(
-    establishments[0]?.id ?? "",
-  );
-  const availableIssuePoints = issuePoints.filter(
-    (item) => item.establishmentId === establishmentId,
-  );
-  const [issuePointId, setIssuePointId] = useState(
-    availableIssuePoints[0]?.id ?? "",
-  );
 
-  const [cartInputs, setCartInputs] = useState<Record<string, string>>({});
-  const [discountInputs, setDiscountInputs] = useState<Record<string, string>>(
-    {},
-  );
-  const [discountPctInputs, setDiscountPctInputs] = useState<
-    Record<string, string>
-  >({});
-  const [lineNotes, setLineNotes] = useState<Record<string, string>>({});
-
-  const [transferBank, setTransferBank] = useState("");
-  const [transferRef, setTransferRef] = useState("");
-
+  // ── Customer state ─────────────────────────────────────────────────────────
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
-  const [selectedWarehouse, setSelectedWarehouse] =
-    useState(initialWarehouseName);
-
-  // ── Server-side product pagination (CORE mode) ──
-  const [serverProducts, setServerProducts] = useState<Product[]>([]);
-  const [productPage, setProductPage] = useState(1);
-  const [productPerPage, setProductPerPage] = useState(12);
-  const [productTotal, setProductTotal] = useState(0);
-  const [productTotalPages, setProductTotalPages] = useState(1);
-  const [availability, setAvailability] = useState<"available" | "all" | "out_of_stock">("available");
-  const [productLoading, setProductLoading] = useState(false);
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [customerSearch, setCustomerSearch] = useState("");
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
+  const [customerEditing, setCustomerEditing] = useState(false);
   const customerDropdownRef = useRef<HTMLDivElement>(null);
-  const useServerPagination = engine === "CORE";
 
-  // Invoice editor customer fields (editable overrides)
-  const [invoiceCustomerName, setInvoiceCustomerName] =
-    useState("Consumidor Final");
-  const [invoiceCustomerIdentification, setInvoiceCustomerIdentification] =
-    useState("9999999999999");
-  const [invoiceCustomerPhone, setInvoiceCustomerPhone] = useState("");
-  const [invoiceCustomerEmail, setInvoiceCustomerEmail] = useState("");
-  const [invoiceCustomerAddress, setInvoiceCustomerAddress] = useState("");
-  const [invoiceCustomerNotes, setInvoiceCustomerNotes] = useState("");
-
-  const [sriPaymentCode, setSriPaymentCode] = useState("01");
-
-  const [showComprobanteTip, setShowComprobanteTip] = useState(false);
+  // ── New customer ───────────────────────────────────────────────────────────
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
@@ -234,15 +251,56 @@ export function BasicPosClient({
   const [newCustomerLoading, setNewCustomerLoading] = useState(false);
   const [newCustomerError, setNewCustomerError] = useState("");
 
-  const tipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ── Cart state ─────────────────────────────────────────────────────────────
+  const [cartInputs, setCartInputs] = useState<Record<string, string>>({});
+  const [discountInputs, setDiscountInputs] = useState<Record<string, string>>({});
+  const [discountPctInputs, setDiscountPctInputs] = useState<Record<string, string>>({});
+  const [lineNotes, setLineNotes] = useState<Record<string, string>>({});
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [clearCartConfirm, setClearCartConfirm] = useState(false);
+
+  // ── SRI state ──────────────────────────────────────────────────────────────
+  const [establishmentId, setEstablishmentId] = useState(establishments[0]?.id ?? "");
+  const availableIssuePoints = issuePoints.filter((ip) => ip.establishmentId === establishmentId);
+  const [issuePointId, setIssuePointId] = useState(availableIssuePoints[0]?.id ?? "");
+  const [sriPaymentCode, setSriPaymentCode] = useState("01");
+  const [sriFieldsOpen, setSriFieldsOpen] = useState(false);
+
+  // ── Treasury / payment (CORE) ──────────────────────────────────────────────
+  const [treasuryAccounts, setTreasuryAccounts] = useState<TreasuryAccountOption[]>([]);
+  const [payments, setPayments] = useState<PaymentEntry[]>([]);
+  const [showPaymentModal, setShowPaymentModal] = useState<string | null>(null);
+  const [showMultiplePaymentModal, setShowMultiplePaymentModal] = useState(false);
+
+  // ── Server pagination (CORE) ───────────────────────────────────────────────
+  const [serverProducts, setServerProducts] = useState<Product[]>([]);
+  const [productPage, setProductPage] = useState(1);
+  const [productPerPage, setProductPerPage] = useState(12);
+  const [productTotal, setProductTotal] = useState(0);
+  const [productTotalPages, setProductTotalPages] = useState(1);
+  const [availability, setAvailability] = useState<"available" | "all" | "out_of_stock">("available");
+  const [productLoading, setProductLoading] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Warehouse (SHARED_ERP) ─────────────────────────────────────────────────
+  const [selectedWarehouse, setSelectedWarehouse] = useState(initialWarehouseName);
+
+  // ── Refs ────────────────────────────────────────────────────────────────────
+  const hydrated = useRef(false);
+  const submittingRef = useRef(false);
+  const cartProductCache = useRef(new Map<string, Product>());
+
+  // Seed cache with initial products
+  for (const p of products) cartProductCache.current.set(p.id, p);
 
   const cartStorageKey = tenantId && userId ? `pos_cart_${tenantId}_${userId}` : "";
 
+  // ── Cart persistence: load ─────────────────────────────────────────────────
   useEffect(() => {
-    if (!cartStorageKey) return;
+    if (!cartStorageKey) { hydrated.current = true; return; }
     try {
       const raw = localStorage.getItem(cartStorageKey);
-      if (!raw) return;
+      if (!raw) { hydrated.current = true; return; }
       const saved = JSON.parse(raw) as {
         cart?: CartItem[];
         customerId?: string;
@@ -250,45 +308,55 @@ export function BasicPosClient({
         discountInputs?: Record<string, string>;
         discountPctInputs?: Record<string, string>;
         lineNotes?: Record<string, string>;
+        paymentMethod?: string;
+        outputMode?: string;
       };
       if (saved.cart?.length) {
-        setCart(saved.cart);
-        if (saved.cartInputs) setCartInputs(saved.cartInputs);
-        if (saved.discountInputs) setDiscountInputs(saved.discountInputs);
-        if (saved.discountPctInputs) setDiscountPctInputs(saved.discountPctInputs);
-        if (saved.lineNotes) setLineNotes(saved.lineNotes);
+        const validCart = saved.cart.filter((item) => {
+          if (item.snapshot) return true;
+          const cached = cartProductCache.current.get(item.productId);
+          if (cached) {
+            (item as CartItem).snapshot = makeSnapshot(cached, cached.stock);
+            return true;
+          }
+          return false;
+        });
+        if (validCart.length) {
+          setCart(validCart);
+          if (saved.cartInputs) setCartInputs(saved.cartInputs);
+          if (saved.discountInputs) setDiscountInputs(saved.discountInputs);
+          if (saved.discountPctInputs) setDiscountPctInputs(saved.discountPctInputs);
+          if (saved.lineNotes) setLineNotes(saved.lineNotes);
+        }
         if (saved.customerId) setCustomerId(saved.customerId);
+        if (saved.paymentMethod) setPaymentMethod(saved.paymentMethod);
+        if (saved.outputMode === "internal_receipt" || saved.outputMode === "sri_invoice") setOutputMode(saved.outputMode);
       }
-    } catch {}
+    } catch { /* ignore */ }
+    hydrated.current = true;
   }, [cartStorageKey]);
 
+  // ── Cart persistence: save ─────────────────────────────────────────────────
   useEffect(() => {
-    if (!cartStorageKey) return;
+    if (!cartStorageKey || !hydrated.current) return;
     try {
       if (cart.length === 0) {
         localStorage.removeItem(cartStorageKey);
       } else {
-        localStorage.setItem(
-          cartStorageKey,
-          JSON.stringify({ cart, customerId, cartInputs, discountInputs, discountPctInputs, lineNotes }),
-        );
+        localStorage.setItem(cartStorageKey, JSON.stringify({
+          cart, customerId, cartInputs, discountInputs, discountPctInputs, lineNotes,
+          paymentMethod, outputMode,
+        }));
       }
-    } catch {}
-  }, [cartStorageKey, cart, customerId, cartInputs, discountInputs, discountPctInputs, lineNotes]);
+    } catch { /* ignore */ }
+  }, [cartStorageKey, cart, customerId, cartInputs, discountInputs, discountPctInputs, lineNotes, paymentMethod, outputMode]);
 
-  const displayProducts = useServerPagination ? serverProducts : products;
-  const productById = new Map([
-    ...products.map((p) => [p.id, p] as const),
-    ...displayProducts.map((p) => [p.id, p] as const),
-  ]);
-
-  // ── Fetch products server-side ──
-  const fetchProducts = useRef(async (q: string, pg: number, pp: number, avail: string, wh: string) => {
+  // ── Fetch products (CORE) ──────────────────────────────────────────────────
+  const fetchProducts = useRef(async (q: string, pg: number, pp: number, avail: string) => {
     if (!useServerPagination) return;
     setProductLoading(true);
     try {
       const params = new URLSearchParams({ q, page: String(pg), perPage: String(pp), availability: avail });
-      if (wh) params.set("warehouseId", wh);
       const res = await fetch(`/api/facturacion/pos/products?${params}`);
       const data = await res.json();
       if (data.ok) {
@@ -296,6 +364,7 @@ export function BasicPosClient({
         setProductTotal(data.total);
         setProductTotalPages(data.totalPages);
         setProductPage(data.page);
+        for (const p of data.products) cartProductCache.current.set(p.id, p);
       }
     } finally {
       setProductLoading(false);
@@ -303,7 +372,7 @@ export function BasicPosClient({
   }).current;
 
   useEffect(() => {
-    fetchProducts(search, productPage, productPerPage, availability, "");
+    fetchProducts(search, productPage, productPerPage, availability);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productPage, productPerPage, availability]);
 
@@ -312,73 +381,41 @@ export function BasicPosClient({
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => {
       setProductPage(1);
-      fetchProducts(search, 1, productPerPage, availability, "");
+      fetchProducts(search, 1, productPerPage, availability);
     }, 300);
     return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
-  // ── Customer dropdown click-outside ──
+  // ── Treasury accounts (CORE) ───────────────────────────────────────────────
+  useEffect(() => {
+    if (engine !== "CORE") return;
+    fetch("/api/facturacion/payment-options")
+      .then((r) => r.json())
+      .then((data) => { if (data.ok) setTreasuryAccounts(data.accounts); })
+      .catch(() => {});
+  }, [engine]);
+
+  // ── Customer dropdown click-outside ────────────────────────────────────────
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (customerDropdownRef.current && !customerDropdownRef.current.contains(e.target as Node)) {
         setCustomerDropdownOpen(false);
+        setCustomerEditing(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  // ── Warehouse default ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!warehouses.length) return;
-    if (
-      selectedWarehouse &&
-      warehouses.some((warehouse) => warehouse.name === selectedWarehouse)
-    ) {
-      return;
-    }
+    if (selectedWarehouse && warehouses.some((w) => w.name === selectedWarehouse)) return;
     setSelectedWarehouse(initialWarehouseName || warehouses[0]?.name || "");
   }, [initialWarehouseName, selectedWarehouse, warehouses]);
 
-  // Sync invoice customer fields when selection changes
-  useEffect(() => {
-    if (!customerId) {
-      setInvoiceCustomerName("Consumidor Final");
-      setInvoiceCustomerIdentification("9999999999999");
-      setInvoiceCustomerPhone("");
-      setInvoiceCustomerEmail("");
-      setInvoiceCustomerAddress("");
-    } else {
-      const found = customers.find((c) => c.id === customerId);
-      if (found) {
-        setInvoiceCustomerName(found.name);
-        setInvoiceCustomerIdentification(found.identification ?? "");
-        setInvoiceCustomerPhone(found.phone ?? "");
-        setInvoiceCustomerEmail(found.email ?? "");
-        setInvoiceCustomerAddress(found.address ?? "");
-      }
-    }
-  }, [customerId, customers]);
-
-  function calcLine(item: CartItem) {
-    const product = productById.get(item.productId);
-    if (!product)
-      return {
-        gross: 0,
-        discount: 0,
-        subtotal: 0,
-        tax: 0,
-        total: 0,
-        taxRate: 0,
-      };
-    const gross = toNumber(product.price) * item.quantity;
-    const discount = Math.max(0, Math.min(item.discountAmount, gross));
-    const sub = gross - discount;
-    const taxRate = toNumber(product.taxRate);
-    const tax = Math.round(sub * taxRate) / 100;
-    return { gross, discount, subtotal: sub, tax, total: sub + tax, taxRate };
-  }
-
+  // ── Auto-update paid amount ────────────────────────────────────────────────
   const cartTotals = cart.reduce(
     (acc, item) => {
       const line = calcLine(item);
@@ -392,74 +429,52 @@ export function BasicPosClient({
     { subtotal: 0, taxTotal: 0, discountTotal: 0, total: 0 },
   );
 
+  useEffect(() => {
+    if (!paidAmountManual.current && paymentMethod !== "credit") {
+      setPaidAmount(cartTotals.total > 0 ? cartTotals.total.toFixed(2) : "");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartTotals.total, paymentMethod]);
+
   const subtotalByRate = cart.reduce(
     (acc, item) => {
       const line = calcLine(item);
-      const r = line.taxRate;
-      acc[r] = (acc[r] ?? 0) + line.subtotal;
+      acc[line.taxRate] = (acc[line.taxRate] ?? 0) + line.subtotal;
       return acc;
     },
     {} as Record<number, number>,
   );
 
+  // ── Derived values ─────────────────────────────────────────────────────────
+  const displayProducts = useServerPagination ? serverProducts : products;
   const filteredProducts = useServerPagination
     ? serverProducts
-    : products.filter((product) => {
+    : products.filter((p) => {
         const term = search.trim().toLowerCase();
         if (!term) return true;
-        return (
-          product.name.toLowerCase().includes(term) ||
-          (product.barcode ?? "").toLowerCase().includes(term) ||
-          (product.primaryCode ?? "").toLowerCase().includes(term) ||
-          (product.auxiliaryCode ?? "").toLowerCase().includes(term) ||
-          (product.description ?? "").toLowerCase().includes(term)
-        );
+        return p.name.toLowerCase().includes(term) ||
+          (p.barcode ?? "").toLowerCase().includes(term) ||
+          (p.primaryCode ?? "").toLowerCase().includes(term) ||
+          (p.auxiliaryCode ?? "").toLowerCase().includes(term) ||
+          (p.description ?? "").toLowerCase().includes(term);
       });
+
   const customerMatches = customerSearch.trim()
-    ? customers
-        .filter((customer) =>
-          [
-            customer.identification,
-            customer.name,
-            customer.tradeName,
-            customer.email,
-          ].some((value) =>
-            value?.toLowerCase().includes(customerSearch.toLowerCase()),
-          ),
-        )
-        .slice(0, 8)
-    : [];
-  const selectedCustomer = customers.find(
-    (customer) => customer.id === customerId,
-  );
-
-  const filteredInvoiceProducts = invoiceSearch.trim()
-    ? products
-        .filter(
-          (p) =>
-            p.name.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
-            (p.barcode ?? "")
-              .toLowerCase()
-              .includes(invoiceSearch.toLowerCase()),
-        )
-        .slice(0, 6)
+    ? customers.filter((c) =>
+        [c.identification, c.name, c.tradeName, c.email].some((v) =>
+          v?.toLowerCase().includes(customerSearch.toLowerCase()),
+        ),
+      ).slice(0, 8)
     : [];
 
+  const selectedCustomer = customers.find((c) => c.id === customerId);
   const creditWithoutCustomer = paymentMethod === "credit" && !customerId;
-
-  const paidNum = paidAmount
-    ? Number(paidAmount)
-    : paymentMethod === "credit"
-      ? 0
-      : cartTotals.total;
-  const saldo =
-    paymentMethod === "credit"
-      ? cartTotals.total
-      : Math.max(0, cartTotals.total - paidNum);
-  const vuelto =
-    paymentMethod !== "credit" && paidNum > cartTotals.total
-      ? paidNum - cartTotals.total
-      : 0;
+  const paidNum = paidAmount ? Number(paidAmount) : paymentMethod === "credit" ? 0 : cartTotals.total;
+  const saldo = paymentMethod === "credit" ? cartTotals.total : Math.max(0, cartTotals.total - paidNum);
+  const vuelto = paymentMethod !== "credit" && paidNum > cartTotals.total ? paidNum - cartTotals.total : 0;
+  const hasIva = cartTotals.taxTotal > 0;
+  const hasDiscount = cartTotals.discountTotal > 0;
+  const cartItemMap = new Map(cart.map((item) => [item.productId, item]));
 
   function getAvailableStock(product: Product) {
     if (engine !== "SHARED_ERP") return product.stock;
@@ -467,31 +482,17 @@ export function BasicPosClient({
     return Math.max(0, product.warehouseStock?.[selectedWarehouse] ?? 0);
   }
 
-  function showTip() {
-    if (tipTimerRef.current) clearTimeout(tipTimerRef.current);
-    tipTimerRef.current = setTimeout(() => setShowComprobanteTip(true), 400);
-  }
-
-  function hideTip() {
-    if (tipTimerRef.current) clearTimeout(tipTimerRef.current);
-    tipTimerRef.current = null;
-    setShowComprobanteTip(false);
-  }
-
-  function handleTipClick() {
-    if (tipTimerRef.current) {
-      clearTimeout(tipTimerRef.current);
-      tipTimerRef.current = null;
-    }
-    setShowComprobanteTip((v) => !v);
-  }
-
+  // ── Cart actions ───────────────────────────────────────────────────────────
   function addProduct(productId: string) {
     setError("");
+    setRevalWarnings([]);
+    const product = cartProductCache.current.get(productId) ??
+      displayProducts.find((p) => p.id === productId);
+    if (!product) return;
+    const availableStock = getAvailableStock(product);
+    if (availableStock <= 0) return;
+
     setCart((current) => {
-      const product = productById.get(productId);
-      const availableStock = product ? getAvailableStock(product) : 0;
-      if (!product || availableStock <= 0) return current;
       const existing = current.find((item) => item.productId === productId);
       if (existing) {
         if (existing.quantity >= availableStock) {
@@ -500,13 +501,9 @@ export function BasicPosClient({
         }
         const newQty = existing.quantity + 1;
         setCartInputs((prev) => ({ ...prev, [productId]: String(newQty) }));
-        // recalculate pct display after qty change
-        const gross = toNumber(product.price) * newQty;
+        const gross = existing.snapshot.price * newQty;
         const pct = gross > 0 ? (existing.discountAmount / gross) * 100 : 0;
-        setDiscountPctInputs((prev) => ({
-          ...prev,
-          [productId]: pct.toFixed(1),
-        }));
+        setDiscountPctInputs((prev) => ({ ...prev, [productId]: pct.toFixed(1) }));
         return current.map((item) =>
           item.productId === productId ? { ...item, quantity: newQty } : item,
         );
@@ -514,35 +511,31 @@ export function BasicPosClient({
       setCartInputs((prev) => ({ ...prev, [productId]: "1" }));
       setDiscountInputs((prev) => ({ ...prev, [productId]: "0" }));
       setDiscountPctInputs((prev) => ({ ...prev, [productId]: "0.0" }));
-      return [...current, { productId, quantity: 1, discountAmount: 0 }];
+      return [...current, {
+        productId,
+        quantity: 1,
+        discountAmount: 0,
+        snapshot: makeSnapshot(product, availableStock),
+      }];
     });
   }
 
   function commitQuantity(productId: string) {
     const raw = cartInputs[productId] ?? "";
-    const product = productById.get(productId);
     const parsed = parseInt(raw, 10);
-    const availableStock = product ? getAvailableStock(product) : parsed;
-    const safe =
-      !Number.isFinite(parsed) || parsed < 1
-        ? 1
-        : product
-          ? Math.min(parsed, availableStock)
-          : parsed;
+    const item = cart.find((i) => i.productId === productId);
+    const maxStock = item?.snapshot.stock ?? parsed;
+    const safe = !Number.isFinite(parsed) || parsed < 1 ? 1 : Math.min(parsed, maxStock);
     setCartInputs((prev) => ({ ...prev, [productId]: String(safe) }));
     setCart((current) => {
-      const updated = current.map((item) =>
-        item.productId === productId ? { ...item, quantity: safe } : item,
+      const updated = current.map((ci) =>
+        ci.productId === productId ? { ...ci, quantity: safe } : ci,
       );
-      // recalculate pct after qty change
-      const cartItem = updated.find((i) => i.productId === productId);
-      if (product && cartItem) {
-        const gross = toNumber(product.price) * safe;
+      const cartItem = updated.find((ci) => ci.productId === productId);
+      if (cartItem) {
+        const gross = cartItem.snapshot.price * safe;
         const pct = gross > 0 ? (cartItem.discountAmount / gross) * 100 : 0;
-        setDiscountPctInputs((prev) => ({
-          ...prev,
-          [productId]: pct.toFixed(1),
-        }));
+        setDiscountPctInputs((prev) => ({ ...prev, [productId]: pct.toFixed(1) }));
       }
       return updated;
     });
@@ -552,26 +545,17 @@ export function BasicPosClient({
     const raw = discountInputs[productId] ?? "0";
     const parsed = parseFloat(raw);
     const safe = !Number.isFinite(parsed) || parsed < 0 ? 0 : parsed;
-    const product = productById.get(productId);
-    const cartItem = cart.find((i) => i.productId === productId);
-    const maxDiscount =
-      product && cartItem ? toNumber(product.price) * cartItem.quantity : safe;
+    const item = cart.find((i) => i.productId === productId);
+    const maxDiscount = item ? item.snapshot.price * item.quantity : safe;
     const clamped = Math.min(safe, maxDiscount);
     setDiscountInputs((prev) => ({ ...prev, [productId]: clamped.toFixed(2) }));
-    if (product && cartItem) {
-      const gross = toNumber(product.price) * cartItem.quantity;
+    if (item) {
+      const gross = item.snapshot.price * item.quantity;
       const pct = gross > 0 ? (clamped / gross) * 100 : 0;
-      setDiscountPctInputs((prev) => ({
-        ...prev,
-        [productId]: pct.toFixed(1),
-      }));
+      setDiscountPctInputs((prev) => ({ ...prev, [productId]: pct.toFixed(1) }));
     }
     setCart((current) =>
-      current.map((item) =>
-        item.productId === productId
-          ? { ...item, discountAmount: clamped }
-          : item,
-      ),
+      current.map((ci) => ci.productId === productId ? { ...ci, discountAmount: clamped } : ci),
     );
   }
 
@@ -579,95 +563,160 @@ export function BasicPosClient({
     const raw = discountPctInputs[productId] ?? "0";
     const pct = parseFloat(raw);
     const safePct = !Number.isFinite(pct) || pct < 0 ? 0 : Math.min(pct, 100);
-    const product = productById.get(productId);
-    const cartItem = cart.find((i) => i.productId === productId);
-    if (!product || !cartItem) return;
-    const gross = toNumber(product.price) * cartItem.quantity;
+    const item = cart.find((i) => i.productId === productId);
+    if (!item) return;
+    const gross = item.snapshot.price * item.quantity;
     const discountAmt = Math.round(gross * safePct) / 100;
-    setDiscountPctInputs((prev) => ({
-      ...prev,
-      [productId]: safePct.toFixed(1),
-    }));
-    setDiscountInputs((prev) => ({
-      ...prev,
-      [productId]: discountAmt.toFixed(2),
-    }));
+    setDiscountPctInputs((prev) => ({ ...prev, [productId]: safePct.toFixed(1) }));
+    setDiscountInputs((prev) => ({ ...prev, [productId]: discountAmt.toFixed(2) }));
     setCart((current) =>
-      current.map((item) =>
-        item.productId === productId
-          ? { ...item, discountAmount: discountAmt }
-          : item,
-      ),
+      current.map((ci) => ci.productId === productId ? { ...ci, discountAmount: discountAmt } : ci),
     );
   }
 
   function removeFromCart(productId: string) {
-    setCart((current) =>
-      current.filter((item) => item.productId !== productId),
-    );
-    setCartInputs((prev) => {
-      const n = { ...prev };
-      delete n[productId];
-      return n;
-    });
-    setDiscountInputs((prev) => {
-      const n = { ...prev };
-      delete n[productId];
-      return n;
-    });
-    setDiscountPctInputs((prev) => {
-      const n = { ...prev };
-      delete n[productId];
-      return n;
-    });
-    setLineNotes((prev) => {
-      const n = { ...prev };
-      delete n[productId];
-      return n;
-    });
+    setCart((current) => current.filter((ci) => ci.productId !== productId));
+    setCartInputs((prev) => { const n = { ...prev }; delete n[productId]; return n; });
+    setDiscountInputs((prev) => { const n = { ...prev }; delete n[productId]; return n; });
+    setDiscountPctInputs((prev) => { const n = { ...prev }; delete n[productId]; return n; });
+    setLineNotes((prev) => { const n = { ...prev }; delete n[productId]; return n; });
+    if (editingProductId === productId) setEditingProductId(null);
   }
 
+  function clearCart() {
+    setCart([]);
+    setCartInputs({});
+    setDiscountInputs({});
+    setDiscountPctInputs({});
+    setLineNotes({});
+    setEditingProductId(null);
+    setClearCartConfirm(false);
+  }
+
+  // ── Payment handling ───────────────────────────────────────────────────────
+  function handlePaymentMethodChange(method: string) {
+    setPaymentMethod(method);
+    setSriPaymentCode(defaultSriPaymentCode(method));
+    setPayments([]);
+    paidAmountManual.current = false;
+    setPaidAmount("");
+
+    if (engine === "CORE" && method !== "credit") {
+      if (method === "multiple") {
+        setShowMultiplePaymentModal(true);
+      } else {
+        setShowPaymentModal(method);
+      }
+    }
+  }
+
+  function handlePaymentSave(entry: PaymentEntry) {
+    setPayments([entry]);
+    setShowPaymentModal(null);
+    if (entry.amount > 0) {
+      setPaidAmount(entry.amount.toFixed(2));
+      paidAmountManual.current = true;
+    }
+  }
+
+  function handleMultiplePaymentSave(entries: PaymentEntry[]) {
+    setPayments(entries);
+    setShowMultiplePaymentModal(false);
+    const total = entries.reduce((s, p) => s + p.amount, 0);
+    if (total > 0) {
+      setPaidAmount(total.toFixed(2));
+      paidAmountManual.current = true;
+    }
+  }
+
+  function buildPaymentsPayload() {
+    if (engine !== "CORE" || payments.length === 0) return undefined;
+    return payments.map((p) => ({
+      method: p.method,
+      amount: p.amount,
+      treasuryAccountId: p.accountId || undefined,
+      referenceNumber: p.referenceNumber || undefined,
+      batchNumber: p.batchNumber || undefined,
+      voucherNumber: p.voucherNumber || undefined,
+      dueDate: p.dueDate || undefined,
+    }));
+  }
+
+  // ── Submit sale ────────────────────────────────────────────────────────────
   async function submitSale() {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setIsLoading(true);
     setError("");
+    setRevalWarnings([]);
 
     try {
       if (creditWithoutCustomer) {
-        throw new Error(
-          "Para vender a crédito debes seleccionar o crear un cliente.",
-        );
+        throw new Error("Para vender a crédito debes seleccionar o crear un cliente.");
       }
-      for (const item of cart) {
-        const product = productById.get(item.productId);
-        if (!product || item.quantity > getAvailableStock(product)) {
-          throw new Error(
-            `Stock insuficiente para ${product?.name ?? "producto"}.`,
-          );
+
+      // Pre-sale revalidation (CORE)
+      if (engine === "CORE" && cart.length > 0) {
+        const ids = cart.map((i) => i.productId).join(",");
+        const revalRes = await fetch(`/api/facturacion/pos/products?ids=${encodeURIComponent(ids)}&availability=all`);
+        const revalData = await revalRes.json();
+        if (revalData.ok) {
+          const freshMap = new Map<string, Product>(revalData.products.map((p: Product) => [p.id, p]));
+          const warnings: string[] = [];
+          for (const item of cart) {
+            const fresh = freshMap.get(item.productId);
+            if (!fresh) {
+              warnings.push(`"${item.snapshot.name}" ya no existe o fue desactivado.`);
+              continue;
+            }
+            const freshPrice = toNumber(fresh.price);
+            if (Math.abs(freshPrice - item.snapshot.price) > 0.005) {
+              warnings.push(`"${item.snapshot.name}": precio cambió de ${money(item.snapshot.price)} a ${money(freshPrice)}.`);
+            }
+            if (fresh.stock < item.quantity) {
+              warnings.push(`"${item.snapshot.name}": stock insuficiente (disponible: ${fresh.stock}, en carrito: ${item.quantity}).`);
+            }
+          }
+          if (warnings.length > 0) {
+            setRevalWarnings(warnings);
+            setIsLoading(false);
+            submittingRef.current = false;
+            return;
+          }
         }
       }
+
+      // Stock check for SHARED_ERP
+      if (engine === "SHARED_ERP") {
+        for (const item of cart) {
+          if (item.quantity > item.snapshot.stock) {
+            throw new Error(`Stock insuficiente para ${item.snapshot.name}.`);
+          }
+        }
+      }
+
+      const body: Record<string, unknown> = {
+        customerId: customerId || undefined,
+        paymentMethod: paymentMethod === "multiple" ? "cash" : paymentMethod,
+        paidAmount: paymentMethod === "credit" ? 0 : paidNum,
+        outputMode,
+        sriPaymentCode,
+        ...fiscalSelection(outputMode, establishmentId, issuePointId),
+        warehouseName: selectedWarehouse || undefined,
+        items: cart.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          discountAmount: item.discountAmount,
+        })),
+      };
+
+      const paymentsPayload = buildPaymentsPayload();
+      if (paymentsPayload) body.payments = paymentsPayload;
 
       const response = await fetch(saleEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerId,
-          paymentMethod,
-          paidAmount:
-            paymentMethod === "credit"
-              ? 0
-              : paidAmount
-                ? Number(paidAmount)
-                : cartTotals.total,
-          outputMode,
-          sriPaymentCode,
-          ...fiscalSelection(outputMode, establishmentId, issuePointId),
-          warehouseName: selectedWarehouse || undefined,
-          items: cart.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            discountAmount: item.discountAmount,
-          })),
-        }),
+        body: JSON.stringify(body),
       });
       const result = (await response.json()) as {
         ok?: boolean;
@@ -687,24 +736,22 @@ export function BasicPosClient({
       setLineNotes({});
       setCustomerId("");
       setPaidAmount("");
-      setTransferBank("");
-      setTransferRef("");
+      setPayments([]);
       setShowReceipt(false);
-      setShowInvoiceEditor(false);
+      setEditingProductId(null);
+      paidAmountManual.current = false;
       setLastSale(result.sale ?? null);
       setLastOutput(result.output ?? null);
       router.refresh();
     } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No se pudo confirmar venta.",
-      );
+      setError(requestError instanceof Error ? requestError.message : "No se pudo confirmar venta.");
     } finally {
       setIsLoading(false);
+      submittingRef.current = false;
     }
   }
 
+  // ── New customer ───────────────────────────────────────────────────────────
   async function handleNewCustomer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setNewCustomerLoading(true);
@@ -720,17 +767,12 @@ export function BasicPosClient({
           address: newCustomerAddr.trim() || undefined,
         }),
       });
-      const result = (await response.json()) as {
-        ok?: boolean;
-        message?: string;
-        customer?: Customer;
-      };
-      if (!response.ok || !result.ok) {
-        throw new Error(result.message ?? "No se pudo crear cliente.");
-      }
+      const result = (await response.json()) as { ok?: boolean; message?: string; customer?: Customer };
+      if (!response.ok || !result.ok) throw new Error(result.message ?? "No se pudo crear cliente.");
       if (result.customer) {
         setCustomers((prev) => [...prev, result.customer!]);
         setCustomerId(result.customer.id);
+        setCustomerEditing(false);
       }
       setShowNewCustomer(false);
       setNewCustomerName("");
@@ -738,9 +780,7 @@ export function BasicPosClient({
       setNewCustomerEmail("");
       setNewCustomerAddr("");
     } catch (err) {
-      setNewCustomerError(
-        err instanceof Error ? err.message : "No se pudo crear cliente.",
-      );
+      setNewCustomerError(err instanceof Error ? err.message : "No se pudo crear cliente.");
     } finally {
       setNewCustomerLoading(false);
     }
@@ -750,943 +790,172 @@ export function BasicPosClient({
     setLastSale(null);
     setLastOutput(null);
     setShowReceipt(false);
-    setShowInvoiceEditor(false);
-    setCartInputs({});
-    setDiscountInputs({});
-    setDiscountPctInputs({});
-    setLineNotes({});
+    setEditingProductId(null);
     setError("");
+    setRevalWarnings([]);
+    paidAmountManual.current = false;
   }
 
-  const hasIva = cartTotals.taxTotal > 0;
-  const hasDiscount = cartTotals.discountTotal > 0;
-  const todayStr = new Date().toLocaleDateString("es-EC", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
+  const submitLabel = outputMode === "sri_invoice" ? "COBRAR Y EMITIR FACTURA" : "COBRAR Y FINALIZAR";
+  const canSubmit = !isLoading && cart.length > 0 && !creditWithoutCustomer &&
+    !(outputMode === "sri_invoice" && !hasSriConfig);
 
-  // Expanded line table used inside the invoice editor modal
-  function InvoiceLineTable() {
-    if (cart.length === 0) {
-      return (
-        <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center">
-          <p className="text-sm text-slate-400">
-            Sin productos. Busca arriba para agregar.
-          </p>
-        </div>
-      );
-    }
-    return (
-      <div className="overflow-x-auto rounded-xl border border-slate-200">
-        <table className="w-full min-w-[860px] text-sm">
-          <thead className="bg-slate-50">
-            <tr className="border-b border-slate-200 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-              <th className="w-20 px-3 py-3 text-left">Código</th>
-              <th className="px-4 py-3 text-left">Producto</th>
-              <th className="w-28 px-3 py-3 text-left">Observación</th>
-              <th className="w-16 px-3 py-3 text-right">Cant.</th>
-              <th className="w-22 px-3 py-3 text-right">P. unit.</th>
-              <th className="w-14 px-3 py-3 text-right">IVA%</th>
-              <th className="w-18 px-3 py-3 text-right">Desc.%</th>
-              <th className="w-22 px-3 py-3 text-right">Desc.$</th>
-              <th className="w-18 px-3 py-3 text-right">IVA$</th>
-              <th className="w-22 px-3 py-3 text-right">Total</th>
-              <th className="w-8 px-2 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {cart.map((item) => {
-              const product = productById.get(item.productId);
-              const line = calcLine(item);
-              return (
-                <tr
-                  key={item.productId}
-                  className="align-middle transition hover:bg-slate-50/50"
-                >
-                  <td className="px-3 py-2.5 text-[11px] text-slate-400 font-mono">
-                    {product?.barcode ?? "—"}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <p className="font-medium text-slate-800 leading-tight">
-                      {product?.name}
-                    </p>
-                    {line.taxRate === 0 && (
-                      <p className="text-[10px] text-slate-400">Sin IVA</p>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <Input
-                      value={lineNotes[item.productId] ?? ""}
-                      onChange={(e) =>
-                        setLineNotes((prev) => ({
-                          ...prev,
-                          [item.productId]: e.target.value,
-                        }))
-                      }
-                      placeholder="Obs."
-                      className="h-7 w-full text-xs rounded-lg border-slate-200"
-                    />
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <Input
-                      type="number"
-                      min="1"
-                      max={product?.stock ?? undefined}
-                      value={
-                        cartInputs[item.productId] ?? String(item.quantity)
-                      }
-                      onChange={(e) =>
-                        setCartInputs((prev) => ({
-                          ...prev,
-                          [item.productId]: e.target.value,
-                        }))
-                      }
-                      onBlur={() => commitQuantity(item.productId)}
-                      className="h-7 w-14 text-right text-xs rounded-lg"
-                    />
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-slate-600 text-xs">
-                    {money(toNumber(product?.price ?? 0))}
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-slate-500 text-xs">
-                    {line.taxRate}%
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <Input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      value={discountPctInputs[item.productId] ?? "0.0"}
-                      onChange={(e) =>
-                        setDiscountPctInputs((prev) => ({
-                          ...prev,
-                          [item.productId]: e.target.value,
-                        }))
-                      }
-                      onBlur={() => commitDiscountPct(item.productId)}
-                      className="h-7 w-16 text-right text-xs rounded-lg"
-                      placeholder="0.0"
-                    />
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={discountInputs[item.productId] ?? "0.00"}
-                      onChange={(e) =>
-                        setDiscountInputs((prev) => ({
-                          ...prev,
-                          [item.productId]: e.target.value,
-                        }))
-                      }
-                      onBlur={() => commitDiscount(item.productId)}
-                      className="h-7 w-20 text-right text-xs rounded-lg"
-                      placeholder="0.00"
-                    />
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-slate-600 text-xs">
-                    {money(line.tax)}
-                  </td>
-                  <td className="px-3 py-2.5 text-right font-semibold text-slate-900 text-xs">
-                    {money(line.total)}
-                  </td>
-                  <td className="px-2 py-2.5">
-                    <button
-                      type="button"
-                      onClick={() => removeFromCart(item.productId)}
-                      className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-300 hover:bg-red-50 hover:text-red-500"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
-
+  // ── RENDER ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      {/* ── New customer modal ─────────────────────────────────────────────── */}
+      {/* ── New customer modal ──────────────────────────────────────────────── */}
       {showNewCustomer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-sm rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-slate-900">
-                Nuevo cliente
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowNewCustomer(false)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              >
+              <h3 className="text-base font-semibold text-slate-900">Nuevo cliente</h3>
+              <button type="button" onClick={() => setShowNewCustomer(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
                 <X className="h-4 w-4" />
               </button>
             </div>
             <form onSubmit={handleNewCustomer} className="space-y-3">
               <div className="space-y-1.5">
                 <Label htmlFor="nc-name">Nombre / Razón social</Label>
-                <Input
-                  id="nc-name"
-                  value={newCustomerName}
-                  onChange={(e) => setNewCustomerName(e.target.value)}
-                  placeholder="Ej. Juan Pérez"
-                  required
-                  disabled={newCustomerLoading}
-                />
+                <Input id="nc-name" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} placeholder="Ej. Juan Pérez" required disabled={newCustomerLoading} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="nc-phone">Teléfono</Label>
-                <Input
-                  id="nc-phone"
-                  value={newCustomerPhone}
-                  onChange={(e) => setNewCustomerPhone(e.target.value)}
-                  placeholder="0999000000"
-                  disabled={newCustomerLoading}
-                />
+                <Input id="nc-phone" value={newCustomerPhone} onChange={(e) => setNewCustomerPhone(e.target.value)} placeholder="0999000000" disabled={newCustomerLoading} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="nc-email">Email</Label>
-                <Input
-                  id="nc-email"
-                  type="email"
-                  value={newCustomerEmail}
-                  onChange={(e) => setNewCustomerEmail(e.target.value)}
-                  placeholder="correo@ejemplo.com"
-                  disabled={newCustomerLoading}
-                />
+                <Input id="nc-email" type="email" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} placeholder="correo@ejemplo.com" disabled={newCustomerLoading} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="nc-addr">Dirección</Label>
-                <Input
-                  id="nc-addr"
-                  value={newCustomerAddr}
-                  onChange={(e) => setNewCustomerAddr(e.target.value)}
-                  placeholder="Opcional"
-                  disabled={newCustomerLoading}
-                />
+                <Input id="nc-addr" value={newCustomerAddr} onChange={(e) => setNewCustomerAddr(e.target.value)} placeholder="Opcional" disabled={newCustomerLoading} />
               </div>
-              {newCustomerError && (
-                <p className="text-sm text-destructive">{newCustomerError}</p>
-              )}
+              {newCustomerError && <p className="text-sm text-destructive">{newCustomerError}</p>}
               <div className="flex gap-2 pt-1">
-                <Button
-                  type="submit"
-                  disabled={newCustomerLoading}
-                  className="flex-1 bg-[#004080] hover:bg-[#003060]"
-                >
-                  {newCustomerLoading ? "Guardando..." : "Crear cliente"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowNewCustomer(false)}
-                >
-                  Cancelar
-                </Button>
+                <Button type="submit" disabled={newCustomerLoading} className="flex-1 bg-[#1E52F1] hover:bg-[#1E52F1]/90">{newCustomerLoading ? "Guardando..." : "Crear cliente"}</Button>
+                <Button type="button" variant="outline" onClick={() => setShowNewCustomer(false)}>Cancelar</Button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* ── Professional invoice editor modal ──────────────────────────────── */}
-      {showInvoiceEditor && (
-        <div className="fixed inset-0 z-40 overflow-y-auto bg-black/50">
-          <div className="flex min-h-full items-start justify-center p-4 pt-6">
-            <div className="mb-8 w-full max-w-6xl rounded-2xl border border-slate-200 bg-white shadow-2xl">
-              {/* Modal header */}
-              <div className="flex items-start justify-between border-b border-slate-100 px-6 py-4">
-                <div>
-                  <div className="flex items-center gap-2.5">
-                    <h2 className="text-base font-semibold text-slate-900">
-                      {outputMode === "sri_invoice"
-                        ? "Factura electrónica SRI"
-                        : "Recibo interno de venta"}
-                    </h2>
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                        outputMode === "sri_invoice"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-slate-100 text-slate-500",
-                      )}
-                    >
-                      {outputMode === "sri_invoice" ? "SRI" : "Interno"}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-slate-400">{todayStr}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowInvoiceEditor(false)}
-                  className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              {/* Modal body */}
-              <div className="grid lg:grid-cols-[1fr_288px]">
-                {/* ── Left column: document data + customer + products ─── */}
-                <div className="space-y-6 p-6">
-                  {/* Tipo de comprobante */}
-                  <div>
-                    <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                      Tipo de comprobante
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setOutputMode("internal_receipt")}
-                        className={cn(
-                          "flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition",
-                          outputMode === "internal_receipt"
-                            ? "border-[#004080] bg-blue-50 text-[#004080]"
-                            : "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700",
-                        )}
-                      >
-                        <ReceiptText className="h-3.5 w-3.5" />
-                        Recibo interno
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          hasSriConfig && setOutputMode("sri_invoice")
-                        }
-                        disabled={!hasSriConfig}
-                        title={
-                          !hasSriConfig
-                            ? "Configura el módulo SRI primero"
-                            : undefined
-                        }
-                        className={cn(
-                          "flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition",
-                          outputMode === "sri_invoice"
-                            ? "border-[#004080] bg-blue-50 text-[#004080]"
-                            : hasSriConfig
-                              ? "border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700"
-                              : "cursor-not-allowed border-slate-100 text-slate-300",
-                        )}
-                      >
-                        <FileCheck2 className="h-3.5 w-3.5" />
-                        Factura SRI
-                        {!hasSriConfig && (
-                          <span className="ml-1 text-[10px]">
-                            (sin config.)
-                          </span>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Datos del documento */}
-                  <div>
-                    <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                      Datos del documento
-                    </h3>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-1">
-                        <Label className="text-xs text-slate-500">Fecha</Label>
-                        <Input
-                          value={todayStr}
-                          readOnly
-                          className="rounded-lg bg-slate-50 text-sm text-slate-700"
-                        />
-                      </div>
-                      <div className="space-y-1 sm:col-span-2">
-                        <Label className="text-xs text-slate-500">
-                          Establecimiento / Punto de emisión
-                        </Label>
-                        <Input
-                          readOnly
-                          value={
-                            outputMode === "internal_receipt"
-                              ? "No requerido para recibo interno"
-                              : `${establishments.find((item) => item.id === establishmentId)?.code ?? "—"}-${issuePoints.find((item) => item.id === issuePointId)?.code ?? "—"}`
-                          }
-                          className="rounded-lg bg-slate-50 text-sm text-slate-700"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-slate-500">
-                          Cajero / Vendedor
-                        </Label>
-                        <Input
-                          value={currentUserName ?? "—"}
-                          readOnly
-                          className="rounded-lg bg-slate-50 text-sm text-slate-700"
-                        />
-                      </div>
-                      {outputMode === "sri_invoice" ? (
-                        <div className="space-y-1 sm:col-span-2">
-                          <Label className="text-xs text-slate-500">
-                            Forma de pago (SRI)
-                          </Label>
-                          <select
-                            value={sriPaymentCode}
-                            onChange={(e) => setSriPaymentCode(e.target.value)}
-                            className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700"
-                          >
-                            {SRI_PAYMENT_OPTIONS.map((o) => (
-                              <option key={o.code} value={o.code}>
-                                {o.code} – {o.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      ) : null}
-                      <div className="space-y-1 sm:col-span-2">
-                        <Label className="text-xs text-slate-500">
-                          N. Guía de remisión{" "}
-                          <span className="text-slate-400">(opcional)</span>
-                        </Label>
-                        <div className="flex items-center gap-1.5">
-                          <Input
-                            disabled
-                            placeholder="000"
-                            className="w-14 rounded-lg bg-slate-50 text-center text-sm opacity-50"
-                          />
-                          <span className="text-slate-400">-</span>
-                          <Input
-                            disabled
-                            placeholder="000"
-                            className="w-14 rounded-lg bg-slate-50 text-center text-sm opacity-50"
-                          />
-                          <span className="text-slate-400">-</span>
-                          <Input
-                            disabled
-                            placeholder="000000000"
-                            className="flex-1 rounded-lg bg-slate-50 text-center text-sm opacity-50"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id="modal-reimburse"
-                          disabled
-                          className="cursor-not-allowed opacity-40"
-                          title="Disponible con ERP"
-                        />
-                        <Label
-                          htmlFor="modal-reimburse"
-                          className="cursor-not-allowed text-xs text-slate-400"
-                          title="Disponible con ERP"
-                        >
-                          Factura por reembolso
-                        </Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id="modal-export"
-                          disabled
-                          className="cursor-not-allowed opacity-40"
-                          title="Disponible con ERP"
-                        />
-                        <Label
-                          htmlFor="modal-export"
-                          className="cursor-not-allowed text-xs text-slate-400"
-                          title="Disponible con ERP"
-                        >
-                          Factura de exportación
-                        </Label>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Datos del cliente */}
-                  <div>
-                    <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                      Datos del cliente
-                    </h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-xs text-slate-500">
-                          Seleccionar cliente
-                        </Label>
-                        {engine === "CORE" ? (
-                          <Link
-                            href={routes.facturacionCustomers + "/new"}
-                            className="flex items-center gap-1 text-xs text-[#004080] hover:text-[#003060]"
-                          >
-                            <UserPlus className="h-3 w-3" />
-                            Nuevo cliente
-                          </Link>
-                        ) : null}
-                      </div>
-                      <select
-                        value={customerId}
-                        onChange={(e) => setCustomerId(e.target.value)}
-                        className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
-                      >
-                        <option value="">Consumidor Final</option>
-                        {customers.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="space-y-1">
-                          <Label className="text-xs text-slate-500">
-                            Nombre / Razón social
-                          </Label>
-                          <Input
-                            value={invoiceCustomerName}
-                            onChange={(e) =>
-                              setInvoiceCustomerName(e.target.value)
-                            }
-                            placeholder="Consumidor Final"
-                            className="rounded-lg text-sm"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-slate-500">
-                            Cédula / RUC / Pasaporte
-                          </Label>
-                          <Input
-                            value={invoiceCustomerIdentification}
-                            onChange={(e) =>
-                              setInvoiceCustomerIdentification(e.target.value)
-                            }
-                            placeholder="9999999999999"
-                            className="rounded-lg text-sm"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-slate-500">
-                            Teléfono
-                          </Label>
-                          <Input
-                            value={invoiceCustomerPhone}
-                            onChange={(e) =>
-                              setInvoiceCustomerPhone(e.target.value)
-                            }
-                            placeholder="0999000000"
-                            className="rounded-lg text-sm"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-slate-500">
-                            Correo electrónico
-                          </Label>
-                          <Input
-                            type="email"
-                            value={invoiceCustomerEmail}
-                            onChange={(e) =>
-                              setInvoiceCustomerEmail(e.target.value)
-                            }
-                            placeholder="correo@ejemplo.com"
-                            className="rounded-lg text-sm"
-                          />
-                        </div>
-                        <div className="space-y-1 sm:col-span-2">
-                          <Label className="text-xs text-slate-500">
-                            Dirección
-                          </Label>
-                          <Input
-                            value={invoiceCustomerAddress}
-                            onChange={(e) =>
-                              setInvoiceCustomerAddress(e.target.value)
-                            }
-                            placeholder="Dirección del cliente"
-                            className="rounded-lg text-sm"
-                          />
-                        </div>
-                        <div className="space-y-1 sm:col-span-2">
-                          <Label className="text-xs text-slate-500">
-                            Observaciones
-                          </Label>
-                          <Input
-                            value={invoiceCustomerNotes}
-                            onChange={(e) =>
-                              setInvoiceCustomerNotes(e.target.value)
-                            }
-                            placeholder="Información adicional para la factura"
-                            className="rounded-lg text-sm"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Productos */}
-                  <div>
-                    <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                      Productos
-                    </h3>
-                    <div className="space-y-3">
-                      <div className="relative">
-                        <Input
-                          value={invoiceSearch}
-                          onChange={(e) => setInvoiceSearch(e.target.value)}
-                          placeholder="Buscar y agregar producto por nombre o código..."
-                          className="rounded-xl border-slate-200 bg-slate-50 text-sm"
-                        />
-                        {filteredInvoiceProducts.length > 0 && (
-                          <div className="absolute left-0 right-0 top-full z-10 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-                            {filteredInvoiceProducts.map((p) => (
-                              <button
-                                key={p.id}
-                                type="button"
-                                onClick={() => {
-                                  addProduct(p.id);
-                                  setInvoiceSearch("");
-                                }}
-                                disabled={p.stock <= 0}
-                                className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-slate-50 disabled:opacity-40"
-                              >
-                                <span className="font-medium text-slate-800">
-                                  {p.name}
-                                </span>
-                                <span className="shrink-0 text-xs text-slate-500">
-                                  {money(toNumber(p.price))} · stock {p.stock}
-                                  {toNumber(p.taxRate) > 0 &&
-                                    ` · IVA ${p.taxRate}%`}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <InvoiceLineTable />
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── Right column: totals + payment + actions ────────── */}
-                <div className="flex flex-col gap-4 border-t border-slate-100 p-6 lg:border-l lg:border-t-0">
-                  {/* Resumen detallado */}
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-sm">
-                    <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                      Resumen
-                    </p>
-
-                    {Object.entries(subtotalByRate)
-                      .sort(([a], [b]) => Number(a) - Number(b))
-                      .map(([rate, base]) => (
-                        <div
-                          key={rate}
-                          className="flex justify-between text-slate-600"
-                        >
-                          <span>Base IVA {rate}%</span>
-                          <span>{money(base)}</span>
-                        </div>
-                      ))}
-
-                    {hasDiscount && (
-                      <div className="flex justify-between text-slate-600">
-                        <span>Descuento</span>
-                        <span className="text-red-600">
-                          -{money(cartTotals.discountTotal)}
-                        </span>
-                      </div>
-                    )}
-
-                    {hasIva && (
-                      <div className="flex justify-between text-slate-600">
-                        <span>IVA</span>
-                        <span>{money(cartTotals.taxTotal)}</span>
-                      </div>
-                    )}
-
-                    <div className="flex justify-between border-t border-slate-200 pt-2 font-semibold text-slate-900">
-                      <span>Total factura</span>
-                      <span className="text-base">
-                        {money(cartTotals.total)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Forma de pago */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-slate-700">
-                      Forma de pago comercial
-                    </Label>
-                    <select
-                      value={paymentMethod}
-                      onChange={(e) => {
-                        setPaymentMethod(e.target.value);
-                        setSriPaymentCode(
-                          defaultSriPaymentCode(e.target.value),
-                        );
-                      }}
-                      className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
-                    >
-                      <option value="cash">Efectivo</option>
-                      <option value="transfer">Transferencia</option>
-                      <option value="card">Tarjeta</option>
-                      <option value="credit">Fiado / Crédito</option>
-                    </select>
-                  </div>
-
-                  {/* Monto pagado */}
-                  {paymentMethod !== "credit" && (
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-medium text-slate-700">
-                        Monto pagado
-                      </Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={paidAmount}
-                        placeholder={cartTotals.total.toFixed(2)}
-                        onChange={(e) => setPaidAmount(e.target.value)}
-                        className="rounded-xl"
-                      />
-                    </div>
-                  )}
-
-                  {/* Saldo / Vuelto */}
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-1.5 text-sm">
-                    <div className="flex justify-between text-slate-600">
-                      <span>Monto pagado</span>
-                      <span>{money(paidNum)}</span>
-                    </div>
-                    {vuelto > 0 ? (
-                      <div className="flex justify-between font-medium text-emerald-700">
-                        <span>Vuelto</span>
-                        <span>{money(vuelto)}</span>
-                      </div>
-                    ) : (
-                      <div
-                        className={cn(
-                          "flex justify-between font-medium",
-                          saldo > 0 ? "text-amber-700" : "text-emerald-700",
-                        )}
-                      >
-                        <span>Saldo pendiente</span>
-                        <span>{money(saldo)}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {paymentMethod === "credit" && (
-                    <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                      El saldo quedará pendiente en la cuenta del cliente.
-                    </p>
-                  )}
-
-                  {creditWithoutCustomer && (
-                    <p className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                      <AlertCircle className="h-3 w-3 shrink-0" />
-                      Selecciona un cliente para usar crédito.
-                    </p>
-                  )}
-
-                  {error && (
-                    <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-destructive">
-                      {error}
-                    </p>
-                  )}
-
-                  {/* Actions */}
-                  <div className="mt-auto space-y-2 pt-2">
-                    <Button
-                      type="button"
-                      onClick={submitSale}
-                      disabled={
-                        isLoading || cart.length === 0 || creditWithoutCustomer
-                      }
-                      className="w-full bg-[#004080] hover:bg-[#003060]"
-                    >
-                      {isLoading ? "Procesando..." : "Cobrar y finalizar"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled
-                      title="Próximamente: guardar como borrador"
-                      className="w-full cursor-not-allowed opacity-50"
-                    >
-                      Guardar borrador
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => setShowInvoiceEditor(false)}
-                      className="w-full text-slate-500"
-                    >
-                      Cerrar
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* ── Payment config modals (CORE) ───────────────────────────────────── */}
+      {showPaymentModal && engine === "CORE" && (
+        <PaymentModal
+          method={showPaymentModal}
+          accounts={treasuryAccounts}
+          invoiceTotal={cartTotals.total}
+          pendingAmount={cartTotals.total}
+          customerName={selectedCustomer?.name ?? null}
+          hasCustomer={!!customerId}
+          onSave={handlePaymentSave}
+          onClose={() => setShowPaymentModal(null)}
+        />
+      )}
+      {showMultiplePaymentModal && engine === "CORE" && (
+        <MultiplePaymentModal
+          accounts={treasuryAccounts}
+          invoiceTotal={cartTotals.total}
+          customerName={selectedCustomer?.name ?? null}
+          hasCustomer={!!customerId}
+          initialPayments={payments}
+          onSave={handleMultiplePaymentSave}
+          onClose={() => setShowMultiplePaymentModal(false)}
+        />
       )}
 
-      {/* ── Compact success strip ───────────────────────────────────────────── */}
+      {/* ── Success strip ──────────────────────────────────────────────────── */}
       {lastOutput && lastSale ? (
-        <div className="space-y-3 rounded-[22px] border border-emerald-200 bg-emerald-50 px-4 py-3">
+        <div className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
               <span className="text-sm font-medium text-emerald-800">
                 {lastOutput.mode === "sri_invoice"
-                  ? lastOutput.status === "partial"
-                    ? "Venta creada · Factura SRI con observaciones"
-                    : "Venta finalizada · Factura SRI iniciada"
+                  ? lastOutput.status === "partial" ? "Venta creada · Factura SRI con observaciones" : "Venta finalizada · Factura SRI iniciada"
                   : "Venta finalizada · Recibo interno listo"}
               </span>
             </div>
             <div className="flex flex-wrap gap-2">
               {lastOutput.mode === "internal_receipt" && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setShowReceipt((v) => !v)}
-                >
+                <Button size="sm" variant="outline" onClick={() => setShowReceipt((v) => !v)}>
                   {showReceipt ? "Ocultar recibo" : "Ver recibo"}
                 </Button>
               )}
-              {lastOutput.mode === "sri_invoice" &&
-                lastOutput.sri?.documentId && (
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={`/sri/documents/${lastOutput.sri.documentId}`}>
-                      Ver factura SRI
-                    </Link>
-                  </Button>
-                )}
-              {engine === "CORE" ? (
+              {lastOutput.mode === "sri_invoice" && lastOutput.sri?.documentId && (
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/sri/documents/${lastOutput.sri.documentId}`}>Ver factura SRI</Link>
+                </Button>
+              )}
+              {engine === "CORE" && (
                 <Button asChild size="sm" variant="outline">
                   <Link href={`/basic/sales/${lastSale.id}`}>Ver venta</Link>
                 </Button>
-              ) : null}
-              <Button
-                size="sm"
-                className="bg-[#004080] hover:bg-[#003060]"
-                onClick={startNewSale}
-              >
-                Nueva venta
-              </Button>
+              )}
+              <Button size="sm" className="bg-[#1E52F1] hover:bg-[#1E52F1]/90" onClick={startNewSale}>Nueva venta</Button>
             </div>
           </div>
-
-          {lastOutput.mode === "sri_invoice" &&
-            lastOutput.status === "partial" &&
-            lastOutput.errorMessage && (
-              <p className="text-xs text-amber-700">
-                {lastOutput.errorMessage}
-              </p>
-            )}
-
+          {lastOutput.mode === "sri_invoice" && lastOutput.status === "partial" && lastOutput.errorMessage && (
+            <p className="text-xs text-amber-700">{lastOutput.errorMessage}</p>
+          )}
           {showReceipt && lastOutput.mode === "internal_receipt" && (
-            <div className="pt-1">
-              <SimpleReceipt tenantName={tenantName} sale={lastSale} />
-            </div>
+            <div className="pt-1"><SimpleReceipt tenantName={tenantName} sale={lastSale} /></div>
           )}
         </div>
       ) : null}
 
-      {engine === "SHARED_ERP" ? (
-        <BillingWarehouseSelector
-          warehouses={warehouses}
-          selectedWarehouse={selectedWarehouse}
-          preferredWarehouse={initialWarehouseName}
-          onChange={setSelectedWarehouse}
-          disabled={isLoading}
-        />
-      ) : null}
+      {/* ── Warehouse selector (SHARED_ERP) ────────────────────────────────── */}
+      {engine === "SHARED_ERP" && (
+        <BillingWarehouseSelector warehouses={warehouses} selectedWarehouse={selectedWarehouse} preferredWarehouse={initialWarehouseName} onChange={setSelectedWarehouse} disabled={isLoading} />
+      )}
 
+      {/* ── Establishment/Issue point bar ───────────────────────────────────── */}
       <div className="grid gap-3 rounded-2xl border bg-white p-3 text-sm sm:grid-cols-3">
         <label className="grid gap-1 text-xs text-slate-500">
           Establecimiento
-          <select
-            className="h-9 rounded-lg border px-2 text-sm"
-            value={establishmentId}
-            onChange={(event) => {
-              const id = event.target.value;
-              setEstablishmentId(id);
-              setIssuePointId(
-                issuePoints.find((item) => item.establishmentId === id)?.id ??
-                  "",
-              );
-            }}
-          >
+          <select className="h-9 rounded-lg border px-2 text-sm" value={establishmentId} onChange={(e) => { setEstablishmentId(e.target.value); setIssuePointId(issuePoints.find((ip) => ip.establishmentId === e.target.value)?.id ?? ""); }}>
             <option value="">Sin configurar</option>
-            {establishments.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.code} · {item.name}
-              </option>
-            ))}
+            {establishments.map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}
           </select>
         </label>
         <label className="grid gap-1 text-xs text-slate-500">
           Punto de emisión
-          <select
-            className="h-9 rounded-lg border px-2 text-sm"
-            value={issuePointId}
-            onChange={(event) => setIssuePointId(event.target.value)}
-          >
+          <select className="h-9 rounded-lg border px-2 text-sm" value={issuePointId} onChange={(e) => setIssuePointId(e.target.value)}>
             <option value="">Sin configurar</option>
-            {availableIssuePoints.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.code} · {item.name}
-              </option>
-            ))}
+            {availableIssuePoints.map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}</option>)}
           </select>
         </label>
         <div className="grid gap-1 text-xs text-slate-500">
           <span>Vendedor · Fecha</span>
           <span className="h-9 rounded-lg border px-3 py-2 text-sm text-slate-700">
-            {currentUserName ?? "—"} · {todayStr}
+            {currentUserName ?? "—"} · {new Date().toLocaleDateString("es-EC", { day: "2-digit", month: "short", year: "numeric" })}
           </span>
         </div>
       </div>
 
-      {/* ── POS grid ────────────────────────────────────────────────────────── */}
-      <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
-        {/* Left: product search + grid */}
+      {/* ── POS grid ───────────────────────────────────────────────────────── */}
+      <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
+        {/* ── Left: Product catalog ──────────────────────────────────────── */}
         <div className="space-y-4">
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <Label className="text-sm font-medium text-slate-900">
-                Productos
-              </Label>
-              <SaleStatusBadge
-                label={useServerPagination ? `${productTotal} productos` : `${filteredProducts.length} disponibles`}
-                variant="info"
-              />
+              <Label className="text-sm font-semibold text-slate-900">Productos</Label>
+              <SaleStatusBadge label={useServerPagination ? `${productTotal} productos` : `${filteredProducts.length} disponibles`} variant="info" />
             </div>
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar producto o codigo"
-              className="rounded-2xl border-slate-200 bg-white"
-            />
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar producto o código" className="rounded-xl border-slate-200 bg-white pl-10" />
+            </div>
             {useServerPagination && (
               <div className="flex flex-wrap items-center gap-2">
                 {(["available", "all", "out_of_stock"] as const).map((av) => (
-                  <button
-                    key={av}
-                    type="button"
-                    onClick={() => { setAvailability(av); setProductPage(1); }}
-                    className={cn(
-                      "rounded-lg px-3 py-1.5 text-xs font-medium transition",
-                      availability === av
-                        ? "bg-[#F97316] text-white"
-                        : "border border-slate-200 text-slate-500 hover:border-slate-300",
-                    )}
-                  >
+                  <button key={av} type="button" onClick={() => { setAvailability(av); setProductPage(1); }}
+                    className={cn("rounded-lg px-3 py-1.5 text-xs font-medium transition", availability === av ? "bg-[#1E52F1] text-white" : "border border-slate-200 text-slate-500 hover:border-slate-300")}>
                     {av === "available" ? "Disponibles" : av === "all" ? "Todos" : "Agotados"}
                   </button>
                 ))}
-                <select
-                  className="ml-auto h-7 rounded-lg border px-2 text-xs"
-                  value={productPerPage}
-                  onChange={(e) => { setProductPerPage(Number(e.target.value)); setProductPage(1); }}
-                >
+                <select className="ml-auto h-7 rounded-lg border px-2 text-xs" value={productPerPage} onChange={(e) => { setProductPerPage(Number(e.target.value)); setProductPage(1); }}>
                   <option value={12}>12</option>
                   <option value={24}>24</option>
                   <option value={48}>48</option>
@@ -1695,68 +964,59 @@ export function BasicPosClient({
             )}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-            {filteredProducts.map((product) => (
-              <button
-                key={product.id}
-                type="button"
-                onClick={() => addProduct(product.id)}
-                className="rounded-xl border border-slate-200 bg-white p-3 text-left text-sm shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={isLoading || getAvailableStock(product) <= 0}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
-                      <Package className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <span className="block font-medium text-slate-900">
-                        {product.name}
-                      </span>
-                      <span className="block text-xs text-slate-400">
-                        {product.primaryCode ?? product.barcode ?? "Sin código"}
-                      </span>
-                      <span className="text-slate-500">
-                        {money(toNumber(product.price))} · stock{" "}
-                        {getAvailableStock(product)}
-                      </span>
-                      {engine === "SHARED_ERP" ? (
-                        <span className="block text-xs text-slate-400">
-                          Total ERP {product.stock}
-                        </span>
-                      ) : null}
-                      {toNumber(product.taxRate) > 0 && (
-                        <span className="block text-xs text-slate-400">
-                          IVA {product.taxRate}%
-                        </span>
-                      )}
-                    </div>
+          {/* Product grid */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+            {filteredProducts.map((product) => {
+              const inCart = cartItemMap.get(product.id);
+              const stock = getAvailableStock(product);
+              const outOfStock = stock <= 0;
+              return (
+                <button
+                  key={product.id}
+                  type="button"
+                  onClick={() => addProduct(product.id)}
+                  disabled={isLoading || outOfStock}
+                  title={product.name}
+                  className={cn(
+                    "relative flex flex-col items-center rounded-xl border bg-white p-3 text-center shadow-sm transition hover:shadow-md",
+                    outOfStock ? "cursor-not-allowed border-slate-100 opacity-50" : "border-slate-200 hover:border-[#1E52F1]/40",
+                    inCart && "ring-2 ring-[#1E52F1]/20",
+                  )}
+                >
+                  {/* Price badge */}
+                  <span className="absolute left-2 top-2 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-800">
+                    {money(toNumber(product.price))}
+                  </span>
+                  {/* Qty badge */}
+                  {inCart && (
+                    <span className="absolute right-2 top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#1E52F1] px-1 text-[10px] font-bold text-white">
+                      {inCart.quantity}
+                    </span>
+                  )}
+                  {/* Initials */}
+                  <div className="mb-2 mt-5 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-lg font-bold text-slate-400">
+                    {productInitials(product.name)}
                   </div>
-                  <SaleStatusBadge
-                    label={
-                      getAvailableStock(product) > 0 ? "Disponible" : "Agotado"
-                    }
-                    variant={
-                      getAvailableStock(product) > 0 ? "success" : "danger"
-                    }
-                  />
-                </div>
-                <p className="mt-3 text-xs text-slate-500">
-                  Toca para agregar al carrito.
-                </p>
-              </button>
-            ))}
+                  {/* Name */}
+                  <p className="w-full truncate text-sm font-medium text-slate-900">{product.name}</p>
+                  {/* Code */}
+                  <p className="w-full truncate text-xs font-mono text-slate-400">{product.primaryCode ?? product.barcode ?? "—"}</p>
+                  {/* Stock */}
+                  <p className={cn("mt-1 text-xs", outOfStock ? "font-medium text-red-500" : "text-slate-500")}>
+                    {outOfStock ? "Agotado" : `Stock: ${stock}`}
+                  </p>
+                </button>
+              );
+            })}
           </div>
 
-          {filteredProducts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {productLoading ? "Cargando productos..." : "No hay productos disponibles."}
-            </p>
-          ) : null}
+          {filteredProducts.length === 0 && (
+            <p className="text-sm text-slate-500">{productLoading ? "Cargando productos..." : "No hay productos disponibles."}</p>
+          )}
 
           {useServerPagination && productTotalPages > 1 && (
             <div className="flex items-center justify-between text-sm text-slate-500">
-              <span>{productTotal} producto{productTotal !== 1 ? "s" : ""} · Página {productPage} de {productTotalPages}</span>
+              <span>Página {productPage} de {productTotalPages}</span>
               <div className="flex gap-1">
                 <Button variant="outline" size="sm" disabled={productPage <= 1} onClick={() => setProductPage((p) => p - 1)}>←</Button>
                 <Button variant="outline" size="sm" disabled={productPage >= productTotalPages} onClick={() => setProductPage((p) => p + 1)}>→</Button>
@@ -1765,408 +1025,311 @@ export function BasicPosClient({
           )}
         </div>
 
-        {/* Right: cart + checkout */}
-        <div className="space-y-4 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-          {/* Cart header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-900">Carrito</p>
-              {hasIva || hasDiscount ? (
-                <p className="text-xs text-slate-500">
-                  {hasDiscount && `Desc. ${money(cartTotals.discountTotal)} · `}
-                  {hasIva && `IVA ${money(cartTotals.taxTotal)} · `}
-                  Total {money(cartTotals.total)}
-                </p>
-              ) : (
-                <p className="text-xs text-slate-500">
-                  Total: {money(cartTotals.total)}
-                </p>
+        {/* ── Right: Cart + checkout sidebar ─────────────────────────────── */}
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
+
+          {/* §1 CARRITO ─────────────────────────────────────────────────── */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-slate-900">Carrito</h3>
+                {cart.length > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#1E52F1] px-1.5 text-[10px] font-bold text-white">{cart.length}</span>
+                )}
+              </div>
+              {cart.length > 0 && (
+                clearCartConfirm ? (
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <span className="text-slate-500">¿Vaciar?</span>
+                    <button type="button" onClick={clearCart} className="font-medium text-red-600 hover:text-red-700">Sí</button>
+                    <button type="button" onClick={() => setClearCartConfirm(false)} className="font-medium text-slate-500 hover:text-slate-700">No</button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setClearCartConfirm(true)} className="text-xs text-slate-400 hover:text-red-500">Vaciar</button>
+                )
               )}
             </div>
+
+            {cart.length === 0 ? (
+              <p className="py-6 text-center text-sm text-slate-400">Sin productos en el carrito</p>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {cart.map((item) => {
+                  const line = calcLine(item);
+                  const isEditing = editingProductId === item.productId;
+                  return (
+                    <div key={item.productId} className="py-2">
+                      {/* Cart row */}
+                      <div className="flex items-center gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-slate-900" title={item.snapshot.name}>{item.snapshot.name}</p>
+                          <p className="text-xs text-slate-500">
+                            {item.quantity} × {money(item.snapshot.price)} = {money(line.total)}
+                            {item.discountAmount > 0 && <span className="ml-1 text-red-500">-{money(line.discount)}</span>}
+                          </p>
+                        </div>
+                        <button type="button" onClick={() => setEditingProductId(isEditing ? null : item.productId)} className={cn("rounded-lg p-1.5 transition", isEditing ? "bg-[#1E52F1]/10 text-[#1E52F1]" : "text-slate-400 hover:bg-slate-100 hover:text-slate-600")} title="Editar">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button type="button" onClick={() => removeFromCart(item.productId)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500" title="Eliminar">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Inline detail editor */}
+                      {isEditing && (
+                        <div className="mt-2 space-y-2 rounded-xl border border-[#1E52F1]/20 bg-slate-50 p-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-slate-700">Cantidad</span>
+                            <div className="flex items-center gap-1">
+                              <button type="button" onClick={() => { const newQty = Math.max(1, item.quantity - 1); setCartInputs((p) => ({ ...p, [item.productId]: String(newQty) })); setCart((c) => c.map((ci) => ci.productId === item.productId ? { ...ci, quantity: newQty } : ci)); }}
+                                className="flex h-7 w-7 items-center justify-center rounded-lg border text-slate-600 hover:bg-white"><Minus className="h-3 w-3" /></button>
+                              <Input type="number" min="1" max={item.snapshot.stock} value={cartInputs[item.productId] ?? String(item.quantity)}
+                                onChange={(e) => setCartInputs((p) => ({ ...p, [item.productId]: e.target.value }))}
+                                onBlur={() => commitQuantity(item.productId)}
+                                className="h-7 w-14 text-center text-xs" />
+                              <button type="button" onClick={() => { const newQty = Math.min(item.snapshot.stock, item.quantity + 1); setCartInputs((p) => ({ ...p, [item.productId]: String(newQty) })); setCart((c) => c.map((ci) => ci.productId === item.productId ? { ...ci, quantity: newQty } : ci)); }}
+                                className="flex h-7 w-7 items-center justify-center rounded-lg border text-slate-600 hover:bg-white"><Plus className="h-3 w-3" /></button>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-slate-700">P. unitario</span>
+                            <span className="text-xs text-slate-600">{money(item.snapshot.price)}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="shrink-0 text-xs font-medium text-slate-700">Desc. %</span>
+                            <Input type="number" min="0" max="100" step="0.1" value={discountPctInputs[item.productId] ?? "0.0"}
+                              onChange={(e) => setDiscountPctInputs((p) => ({ ...p, [item.productId]: e.target.value }))}
+                              onBlur={() => commitDiscountPct(item.productId)}
+                              className="h-7 w-20 text-right text-xs" />
+                            <span className="shrink-0 text-xs font-medium text-slate-700">$</span>
+                            <Input type="number" min="0" step="0.01" value={discountInputs[item.productId] ?? "0.00"}
+                              onChange={(e) => setDiscountInputs((p) => ({ ...p, [item.productId]: e.target.value }))}
+                              onBlur={() => commitDiscount(item.productId)}
+                              className="h-7 w-20 text-right text-xs" />
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-xs font-medium text-slate-700">Observación</span>
+                            <Input value={lineNotes[item.productId] ?? ""} onChange={(e) => setLineNotes((p) => ({ ...p, [item.productId]: e.target.value }))} placeholder="Ej. Entregar mañana" className="h-7 text-xs" />
+                          </div>
+                          <div className="flex items-center justify-between border-t border-slate-200 pt-2">
+                            <span className="text-xs font-medium text-slate-700">Total línea</span>
+                            <span className="text-sm font-bold text-slate-900">{money(line.total)}</span>
+                          </div>
+                          <button type="button" onClick={() => removeFromCart(item.productId)} className="flex w-full items-center justify-center gap-1 rounded-lg border border-red-200 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
+                            <Trash2 className="h-3 w-3" /> Eliminar del carrito
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Cart total */}
             {cart.length > 0 && (
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    const draftPayload = {
-                      customerId: customerId || null,
-                      warehouseId: null,
-                      establishmentId: establishmentId || null,
-                      issuePointId: issuePointId || null,
-                      paymentMethod,
-                      lines: cart.map((ci) => {
-                        const p = productById.get(ci.productId);
-                        const unitPrice = p ? toNumber(p.price) : 0;
-                        const gross = unitPrice * ci.quantity;
-                        const discountPct = gross > 0 ? (ci.discountAmount / gross) * 100 : 0;
-                        return {
-                          productId: ci.productId,
-                          quantity: ci.quantity,
-                          unitPrice,
-                          discountPct: Math.round(discountPct * 100) / 100,
-                          description: lineNotes[ci.productId] ?? "",
-                        };
-                      }),
-                    };
-                    const res = await fetch("/api/facturacion/drafts", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ payload: draftPayload }),
-                    });
-                    const data = await res.json();
-                    if (data.draft?.id) {
-                      router.push(`${routes.facturacionSalesNew}?draftId=${data.draft.id}`);
-                    }
-                  } catch {
-                    setError("No se pudo crear el borrador.");
-                  }
-                }}
-                className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs text-slate-500 transition hover:border-[#004080] hover:text-[#004080]"
-                title="Editar detalle de venta"
-              >
-                <Maximize2 className="h-3.5 w-3.5" />
-                Editar detalle
-              </button>
+              <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2">
+                <span className="text-sm font-medium text-slate-700">Total carrito</span>
+                <span className="text-base font-bold text-slate-900">{money(cartTotals.total)}</span>
+              </div>
             )}
           </div>
 
-          {/* Compact cart rows */}
-          <div className="space-y-2">
-            {cart.map((item) => {
-              const product = productById.get(item.productId);
-              const rawValue =
-                cartInputs[item.productId] ?? String(item.quantity);
-              const line = calcLine(item);
-              return (
-                <div
-                  key={item.productId}
-                  className="grid grid-cols-[1fr_80px_32px] items-center gap-2"
-                >
-                  <div>
-                    <p className="text-sm text-slate-900">{product?.name}</p>
-                    <p className="text-xs text-slate-500">
-                      {money(toNumber(product?.price ?? 0))}
-                      {line.taxRate > 0 && ` · IVA ${line.taxRate}%`}
-                      {item.discountAmount > 0 &&
-                        ` · Desc. ${money(item.discountAmount)}`}
-                    </p>
-                  </div>
-                  <Input
-                    type="number"
-                    min="1"
-                    max={product?.stock ?? undefined}
-                    value={rawValue}
-                    onChange={(event) =>
-                      setCartInputs((prev) => ({
-                        ...prev,
-                        [item.productId]: event.target.value,
-                      }))
-                    }
-                    onBlur={() => commitQuantity(item.productId)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeFromCart(item.productId)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
-                    title="Eliminar del carrito"
-                  >
-                    <Trash2 className="h-4 w-4" />
+          {/* §2 CLIENTE ─────────────────────────────────────────────────── */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Cliente</h3>
+              <button type="button" onClick={() => setShowNewCustomer(true)} className="flex items-center gap-1 text-xs text-[#1E52F1] hover:text-[#1E52F1]/80">
+                <UserPlus className="h-3 w-3" /> Nuevo
+              </button>
+            </div>
+            <div className="relative" ref={customerDropdownRef}>
+              {customerId && selectedCustomer && !customerEditing ? (
+                <div className="flex h-9 items-center justify-between rounded-xl border border-slate-200 bg-white px-3">
+                  <span className="truncate text-sm font-medium text-slate-900">{selectedCustomer.name}</span>
+                  <button type="button" onClick={() => { setCustomerId(""); setCustomerEditing(false); }} className="ml-2 shrink-0 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+                    <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
-              );
-            })}
-          </div>
-
-          {/* Customer selector */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="customerId">Cliente</Label>
-              {engine === "CORE" ? (
-                <Link
-                  href={routes.facturacionCustomers + "/new"}
-                  className="flex items-center gap-1 text-xs text-[#004080] hover:text-[#003060]"
-                >
-                  <UserPlus className="h-3 w-3" />
-                  Nuevo cliente
-                </Link>
-              ) : null}
-            </div>
-            {initialCustomerId && customerId === initialCustomerId && (
-              <p className="text-xs text-slate-500">
-                Cliente seleccionado desde conversacion.
-              </p>
-            )}
-            <div className="relative" ref={customerDropdownRef}>
-              <Input
-                id="customerId"
-                value={customerSearch}
-                onChange={(event) => { setCustomerSearch(event.target.value); setCustomerDropdownOpen(true); }}
-                onKeyDown={(e) => { if (e.key === "Escape") { setCustomerDropdownOpen(false); setCustomerSearch(""); } }}
-                onFocus={() => setCustomerDropdownOpen(true)}
-                placeholder="RUC/cédula, nombre, nombre comercial o email"
-              />
-              {customerDropdownOpen && customerMatches.length ? (
+              ) : customerEditing || customerDropdownOpen ? (
+                <Input
+                  autoFocus
+                  value={customerSearch}
+                  onChange={(e) => { setCustomerSearch(e.target.value); setCustomerDropdownOpen(true); }}
+                  onKeyDown={(e) => { if (e.key === "Escape") { setCustomerDropdownOpen(false); setCustomerEditing(false); setCustomerSearch(""); } }}
+                  placeholder="Buscar cliente..."
+                  className="rounded-xl"
+                />
+              ) : (
+                <button type="button" onClick={() => { setCustomerEditing(true); setCustomerDropdownOpen(true); }}
+                  className="flex h-9 w-full items-center rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-500 hover:border-slate-300">
+                  CONSUMIDOR FINAL
+                </button>
+              )}
+              {customerDropdownOpen && customerMatches.length > 0 && (
                 <div className="absolute z-20 mt-1 w-full rounded-xl border bg-white shadow-lg">
-                  {customerMatches.map((customer) => (
-                    <button
-                      type="button"
-                      key={customer.id}
-                      className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
-                      onClick={() => {
-                        setCustomerId(customer.id);
-                        setCustomerSearch("");
-                        setCustomerDropdownOpen(false);
-                      }}
-                    >
-                      {customer.name} ·{" "}
-                      {customer.identification ?? "Sin identificación"}
+                  {customerMatches.map((c) => (
+                    <button key={c.id} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                      onClick={() => { setCustomerId(c.id); setCustomerSearch(""); setCustomerDropdownOpen(false); setCustomerEditing(false); }}>
+                      <span className="font-medium">{c.name}</span>
+                      {c.identification && <span className="ml-2 text-xs text-slate-400">{c.identification}</span>}
                     </button>
                   ))}
                 </div>
-              ) : null}
+              )}
             </div>
-            {selectedCustomer ? (
-              <p className="text-xs text-slate-500">
-                <strong>{selectedCustomer.name}</strong> ·{" "}
-                {selectedCustomer.identification ?? "—"} ·{" "}
-                {selectedCustomer.tradeName ?? "Sin nombre comercial"} ·{" "}
-                {selectedCustomer.phone ?? "—"} ·{" "}
-                {selectedCustomer.address ?? "—"} ·{" "}
-                {selectedCustomer.customerType ?? "Sin tipo"}
+            {outputMode === "sri_invoice" && customerId && selectedCustomer && !selectedCustomer.identification && (
+              <p className="mt-1.5 flex items-center gap-1 text-xs text-amber-700">
+                <AlertCircle className="h-3 w-3 shrink-0" /> Sin identificación fiscal. Requerida para factura SRI.
               </p>
-            ) : (
-              <button
-                type="button"
-                className="text-left text-xs text-slate-500"
-                onClick={() => setCustomerId("")}
-              >
-                <strong>CONSUMIDOR FINAL</strong> · 9999999999999
-              </button>
             )}
-
             {creditWithoutCustomer && (
-              <p className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                <AlertCircle className="h-3 w-3 shrink-0" />
-                Para vender a crédito debes seleccionar o crear un cliente.
+              <p className="mt-1.5 flex items-center gap-1 text-xs text-amber-700">
+                <AlertCircle className="h-3 w-3 shrink-0" /> Selecciona un cliente para vender a crédito.
               </p>
             )}
           </div>
 
-          {/* Payment method */}
-          <div className="space-y-2">
-            <Label htmlFor="paymentMethod">Forma de pago comercial</Label>
-            <select
-              id="paymentMethod"
-              value={paymentMethod}
-              onChange={(event) => {
-                setPaymentMethod(event.target.value);
-                setSriPaymentCode(defaultSriPaymentCode(event.target.value));
-              }}
-              className="h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm"
-            >
-              <option value="cash">Efectivo</option>
-              <option value="transfer">Transferencia</option>
-              <option value="card">Tarjeta</option>
-              <option value="credit">Fiado / Crédito</option>
-            </select>
-          </div>
-
-          {outputMode === "sri_invoice" ? (
-            <div className="space-y-2">
-              <Label htmlFor="sriPaymentCode">Forma de pago SRI</Label>
-              <select
-                id="sriPaymentCode"
-                value={sriPaymentCode}
-                onChange={(event) => setSriPaymentCode(event.target.value)}
-                className="h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm"
-              >
-                {SRI_PAYMENT_OPTIONS.map((option) => (
-                  <option key={option.code} value={option.code}>
-                    {option.code} · {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
-
-          {/* Transfer fields */}
-          {paymentMethod === "transfer" && (
-            <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-              <p className="text-xs font-medium text-slate-600">
-                Datos de transferencia
-              </p>
-              <div className="space-y-1.5">
-                <Label htmlFor="transferBank">Banco</Label>
-                <Input
-                  id="transferBank"
-                  value={transferBank}
-                  onChange={(e) => setTransferBank(e.target.value)}
-                  placeholder="Ej. Banco Pichincha"
-                  className="bg-white"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="transferRef">Número / referencia</Label>
-                <Input
-                  id="transferRef"
-                  value={transferRef}
-                  onChange={(e) => setTransferRef(e.target.value)}
-                  placeholder="Ej. 00123456"
-                  className="bg-white"
-                />
-              </div>
-              <p className="text-xs text-slate-400">
-                Referencia visual — no se almacena en esta versión.
-              </p>
-            </div>
-          )}
-
-          {/* Paid amount */}
-          <div className="space-y-2">
-            <Label htmlFor="paidAmount">Monto pagado</Label>
-            <Input
-              id="paidAmount"
-              type="number"
-              step="0.01"
-              min="0"
-              value={paidAmount}
-              placeholder={cartTotals.total.toFixed(2)}
-              onChange={(event) => setPaidAmount(event.target.value)}
-              disabled={paymentMethod === "credit"}
-            />
-            {paymentMethod === "credit" ? (
-              <p className="text-xs text-slate-500">
-                El total quedará pendiente en el saldo del cliente.
-              </p>
-            ) : null}
-          </div>
-
-          {/* Sale output mode + tooltip */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Label className="text-sm font-medium text-slate-900">
-                Comprobante
-              </Label>
-              <div className="relative">
-                <button
-                  type="button"
-                  onMouseEnter={showTip}
-                  onMouseLeave={hideTip}
-                  onFocus={showTip}
-                  onBlur={hideTip}
-                  onClick={handleTipClick}
-                  className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 text-[10px] text-slate-400 hover:border-slate-300 hover:text-slate-600"
-                  aria-label="Información sobre tipos de comprobante"
-                >
-                  ?
-                </button>
-                {showComprobanteTip && (
-                  <div className="absolute bottom-full left-0 z-50 mb-2 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-lg space-y-1.5">
-                    <div
-                      className="absolute -bottom-1.5 left-2 h-3 w-3 rotate-45 border-b border-r border-slate-200 bg-white"
-                      aria-hidden
-                    />
-                    <p className="text-xs text-slate-600">
-                      <span className="font-medium text-slate-800">
-                        Recibo interno:{" "}
-                      </span>
-                      Registra la venta, descuenta inventario y genera un recibo
-                      operativo sin enviarlo al SRI.
-                    </p>
-                    <p className="text-xs text-slate-600">
-                      <span className="font-medium text-slate-800">
-                        Factura SRI:{" "}
-                      </span>
-                      Registra la venta, descuenta inventario y emite una
-                      factura electrónica autorizada por el SRI.
-                    </p>
+          {/* §3 FORMA DE PAGO ───────────────────────────────────────────── */}
+          <div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Forma de pago</h3>
+            {engine === "CORE" ? (
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-1.5">
+                  {CORE_PAYMENT_METHODS.map((m) => (
+                    <button key={m.value} type="button" onClick={() => handlePaymentMethodChange(m.value)}
+                      className={cn("rounded-lg px-2.5 py-1.5 text-xs font-medium transition",
+                        paymentMethod === m.value ? "bg-[#1E52F1] text-white" : "border border-slate-200 text-slate-600 hover:border-slate-300")}>
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+                {payments.length > 0 && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs">
+                    {payments.map((p, i) => (
+                      <div key={i} className="flex items-center justify-between">
+                        <span className="text-slate-600">{COMMERCIAL_LABELS[p.method] ?? p.method}{p.accountName ? ` · ${p.accountName}` : ""}</span>
+                        <span className="font-medium">{money(p.amount)}</span>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => paymentMethod === "multiple" ? setShowMultiplePaymentModal(true) : setShowPaymentModal(paymentMethod)}
+                      className="mt-1 text-[#1E52F1] hover:underline">Editar</button>
                   </div>
                 )}
               </div>
-            </div>
-
-            <div className="flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
-              <button
-                type="button"
-                onClick={() => setOutputMode("internal_receipt")}
-                className={cn(
-                  "flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition",
-                  outputMode === "internal_receipt"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700",
-                )}
-              >
-                <ReceiptText className="h-4 w-4 shrink-0" />
-                Recibo interno
-              </button>
-              <button
-                type="button"
-                onClick={() => hasSriConfig && setOutputMode("sri_invoice")}
-                disabled={!hasSriConfig}
-                className={cn(
-                  "flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition",
-                  outputMode === "sri_invoice"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : hasSriConfig
-                      ? "text-slate-500 hover:text-slate-700"
-                      : "cursor-not-allowed text-slate-300",
-                )}
-              >
-                <FileCheck2 className="h-4 w-4 shrink-0" />
-                Factura SRI
-              </button>
-            </div>
-
-            {!hasSriConfig && (
-              <p className="text-xs text-slate-500">
-                Para emitir facturas SRI,{" "}
-                <Link
-                  href={routes.sri}
-                  className="underline text-[#004080] hover:text-[#003060]"
-                >
-                  configura el módulo SRI
-                </Link>
-                .
-              </p>
-            )}
-
-            {outputMode === "sri_invoice" && !hasSriConfig && (
-              <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
-                <p className="flex items-center gap-1.5 text-xs font-medium text-amber-800">
-                  <AlertCircle className="h-3 w-3 shrink-0" />
-                  Falta completar la configuración SRI.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    asChild
-                    size="sm"
-                    variant="outline"
-                    className="border-amber-300 text-amber-800 hover:bg-amber-100"
-                  >
-                    <Link href={routes.sri}>Completar SRI</Link>
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setOutputMode("internal_receipt")}
-                  >
-                    Usar recibo
-                  </Button>
-                </div>
-              </div>
+            ) : (
+              <select value={paymentMethod} onChange={(e) => handlePaymentMethodChange(e.target.value)}
+                className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm">
+                {ERP_PAYMENT_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
             )}
           </div>
 
-          <Button
-            type="button"
-            onClick={() => setShowInvoiceEditor(true)}
-            disabled={isLoading || cart.length === 0 || creditWithoutCustomer}
-            className="w-full"
-          >
-            {isLoading ? "Procesando..." : "Cobrar"}
-          </Button>
+          {/* §4 MONTO PAGADO ────────────────────────────────────────────── */}
+          <div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Monto pagado</h3>
+            {paymentMethod !== "credit" ? (
+              <Input type="number" step="0.01" min="0" value={paidAmount} placeholder={cartTotals.total.toFixed(2)}
+                onChange={(e) => { setPaidAmount(e.target.value); paidAmountManual.current = true; }}
+                onBlur={() => { if (!paidAmount.trim()) paidAmountManual.current = false; }}
+                className="rounded-xl" />
+            ) : (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                El total quedará pendiente en el saldo del cliente.
+              </p>
+            )}
+            <div className="mt-2 space-y-1 text-xs">
+              <div className="flex justify-between text-slate-600"><span>Total</span><span className="font-medium">{money(cartTotals.total)}</span></div>
+              <div className="flex justify-between text-slate-600"><span>Pagado</span><span className="font-medium">{money(paidNum)}</span></div>
+              {vuelto > 0 ? (
+                <div className="flex justify-between font-medium text-emerald-700"><span>Vuelto</span><span>{money(vuelto)}</span></div>
+              ) : saldo > 0 ? (
+                <div className="flex justify-between font-medium text-amber-700"><span>Saldo pendiente</span><span>{money(saldo)}</span></div>
+              ) : null}
+            </div>
+          </div>
 
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {/* §5 COMPROBANTE ─────────────────────────────────────────────── */}
+          <div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Comprobante</h3>
+            <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+              <button type="button" onClick={() => setOutputMode("internal_receipt")}
+                className={cn("flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition",
+                  outputMode === "internal_receipt" ? "bg-[#1E52F1] text-white shadow-sm" : "text-slate-500 hover:text-slate-700")}>
+                <ReceiptText className="h-3.5 w-3.5" /> Recibo interno
+              </button>
+              <button type="button" onClick={() => hasSriConfig && setOutputMode("sri_invoice")} disabled={!hasSriConfig}
+                className={cn("flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition",
+                  outputMode === "sri_invoice" ? "bg-[#1E52F1] text-white shadow-sm" : hasSriConfig ? "text-slate-500 hover:text-slate-700" : "cursor-not-allowed text-slate-300")}>
+                <FileCheck2 className="h-3.5 w-3.5" /> Factura SRI
+              </button>
+            </div>
+            {!hasSriConfig && (
+              <p className="mt-1.5 text-xs text-slate-500">
+                Para emitir facturas SRI, <Link href={routes.sri} className="text-[#1E52F1] underline">configura el módulo SRI</Link>.
+              </p>
+            )}
+          </div>
+
+          {/* §6 SRI FIELDS (conditional) ────────────────────────────────── */}
+          {outputMode === "sri_invoice" && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3">
+              <button type="button" onClick={() => setSriFieldsOpen((v) => !v)} className="flex w-full items-center justify-between text-xs font-semibold text-[#1E52F1]">
+                Campos SRI
+                {sriFieldsOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </button>
+              {sriFieldsOpen && (
+                <div className="mt-3 space-y-2">
+                  <label className="block text-xs text-slate-600">
+                    Forma de pago SRI
+                    <select value={sriPaymentCode} onChange={(e) => setSriPaymentCode(e.target.value)} className="mt-1 h-8 w-full rounded-lg border px-2 text-xs">
+                      {SRI_PAYMENT_OPTIONS.map((o) => <option key={o.code} value={o.code}>{o.code} – {o.label}</option>)}
+                    </select>
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* §7 RESUMEN ─────────────────────────────────────────────────── */}
+          {cart.length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
+              <p className="mb-2 font-semibold uppercase tracking-wide text-slate-400">Resumen</p>
+              {Object.entries(subtotalByRate).sort(([a], [b]) => Number(a) - Number(b)).map(([rate, base]) => (
+                <div key={rate} className="flex justify-between text-slate-600">
+                  <span>Base IVA {rate}%</span><span>{money(base)}</span>
+                </div>
+              ))}
+              {hasDiscount && (
+                <div className="flex justify-between text-slate-600"><span>Descuento</span><span className="text-red-600">-{money(cartTotals.discountTotal)}</span></div>
+              )}
+              {hasIva && (
+                <div className="flex justify-between text-slate-600"><span>IVA</span><span>{money(cartTotals.taxTotal)}</span></div>
+              )}
+              <div className="mt-1.5 flex justify-between border-t border-slate-200 pt-1.5 font-semibold text-slate-900">
+                <span>Total a cobrar</span><span className="text-base">{money(cartTotals.total)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* §8 ERRORS / WARNINGS ───────────────────────────────────────── */}
+          {revalWarnings.length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              <p className="mb-1 font-semibold">Verificar antes de cobrar:</p>
+              <ul className="list-inside list-disc space-y-0.5">
+                {revalWarnings.map((w, i) => <li key={i}>{w}</li>)}
+              </ul>
+              <button type="button" onClick={() => setRevalWarnings([])} className="mt-2 text-[#1E52F1] hover:underline">Ignorar y continuar</button>
+            </div>
+          )}
+          {error && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-destructive">{error}</p>}
+
+          {/* §9 SUBMIT ──────────────────────────────────────────────────── */}
+          <Button type="button" onClick={submitSale} disabled={!canSubmit}
+            className="w-full bg-[#1E52F1] text-sm font-bold uppercase tracking-wide hover:bg-[#1E52F1]/90">
+            {isLoading ? "Procesando..." : submitLabel}
+          </Button>
         </div>
       </div>
     </div>

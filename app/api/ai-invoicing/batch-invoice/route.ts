@@ -25,6 +25,8 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as Record<string, unknown>;
   const proposalIds = Array.isArray(body.proposalIds) ? body.proposalIds as string[] : [];
+  const establishmentId = typeof body.establishmentId === "string" ? body.establishmentId : undefined;
+  const issuePointId = typeof body.issuePointId === "string" ? body.issuePointId : undefined;
 
   if (proposalIds.length === 0) {
     return NextResponse.json(
@@ -41,6 +43,10 @@ export async function POST(request: Request) {
     saleId?: string;
     error?: string;
     alreadyConverted?: boolean;
+    sriStatus?: "success" | "failed";
+    sriDocumentId?: string;
+    sriFlowState?: string;
+    sriError?: string;
   }> = [];
 
   for (const proposalId of proposalIds) {
@@ -127,17 +133,26 @@ export async function POST(request: Request) {
         },
       });
 
+      let sriStatus: "success" | "failed" = "success";
+      let sriDocumentId: string | undefined;
+      let sriFlowState: string | undefined;
+      let sriError: string | undefined;
       try {
-        await startSriFlowFromBasicSale({
+        const sriResult = await startSriFlowFromBasicSale({
           tenantId: access.tenant.id,
           saleId: sale.id,
           requestedByUserId: access.user.id,
+          establishmentId,
+          issuePointId,
         });
-      } catch {
-        // SRI failure doesn't rollback the sale
+        sriDocumentId = sriResult.documentId;
+        sriFlowState = sriResult.flowState;
+      } catch (err) {
+        sriStatus = "failed";
+        sriError = err instanceof Error ? err.message : "Error al iniciar flujo SRI.";
       }
 
-      results.push({ proposalId, ok: true, saleId: sale.id });
+      results.push({ proposalId, ok: true, saleId: sale.id, sriStatus, sriDocumentId, sriFlowState, sriError });
     } catch (error) {
       await prisma.aiInvoiceDraft.update({
         where: { id: draft.id },

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
+import { getSriModuleStatus } from "@/lib/core/sri";
 import { routes } from "@/config/routes";
 import { AiInvoicingClient } from "./ai-invoicing-client";
 
@@ -14,12 +15,17 @@ export default async function AiInvoicingPage() {
     redirect(routes.facturacion);
   }
 
+  const sriStatus = await getSriModuleStatus(tenant.id);
+  const hasSriConfig =
+    sriStatus.readinessLabel === "ready_for_testing" ||
+    sriStatus.readinessLabel === "production_ready";
+
   return (
     <DashboardShell
       mainClassName="px-4 py-5 sm:px-6 sm:py-6"
       contentClassName="mx-auto max-w-5xl"
     >
-      <AiInvoicingClient />
+      <AiInvoicingClient hasSriConfig={hasSriConfig} />
     </DashboardShell>
   );
 }

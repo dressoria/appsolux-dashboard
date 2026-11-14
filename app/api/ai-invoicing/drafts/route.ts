@@ -39,6 +39,23 @@ export async function GET() {
     take: 5,
   });
 
+  const convertedSaleIds = recentConverted
+    .map((d) => d.convertedSaleId)
+    .filter((id): id is string => !!id);
+
+  const sriDocs = convertedSaleIds.length > 0
+    ? await prisma.sriDocument.findMany({
+        where: {
+          tenantId: access.tenant.id,
+          sourceType: "BASIC_SALE",
+          sourceId: { in: convertedSaleIds },
+        },
+        select: { id: true, sourceId: true, status: true },
+      })
+    : [];
+
+  const sriBySource = new Map(sriDocs.map((d) => [d.sourceId, d]));
+
   return NextResponse.json({
     ok: true,
     drafts: drafts.map((d) => ({
@@ -54,6 +71,7 @@ export async function GET() {
       selectedProposalId: d.selectedProposalId,
       savedAt: d.savedAt,
       createdAt: d.createdAt,
+      originalPrompt: d.originalPrompt,
       activeProposal: d.proposals[0] ? {
         id: d.proposals[0].id,
         proposalNumber: d.proposals[0].proposalNumber,
@@ -62,6 +80,9 @@ export async function GET() {
         total: d.proposals[0].total.toString(),
         items: d.proposals[0].items,
         combinationHash: d.proposals[0].combinationHash,
+        isExact: d.requestedAmount
+          ? d.proposals[0].total.toDecimalPlaces(2).eq(d.requestedAmount.toDecimalPlaces(2))
+          : true,
       } : null,
     })),
     recentConverted: recentConverted.map((d) => ({
@@ -70,6 +91,8 @@ export async function GET() {
       customer: d.customer,
       convertedSaleId: d.convertedSaleId,
       convertedAt: d.convertedAt,
+      sriDocumentId: sriBySource.get(d.convertedSaleId ?? "")?.id ?? null,
+      sriDocumentStatus: sriBySource.get(d.convertedSaleId ?? "")?.status ?? null,
     })),
   });
 }

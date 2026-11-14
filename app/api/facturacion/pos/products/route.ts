@@ -15,12 +15,16 @@ export async function GET(request: NextRequest) {
   const perPageRaw = Number(url.searchParams.get("perPage") ?? "12");
   const perPage = [12, 24, 48].includes(perPageRaw) ? perPageRaw : 12;
 
+  const ids = url.searchParams.get("ids");
+
   const where: Record<string, unknown> = {
     tenantId: tenant.id,
     isActive: true,
   };
 
-  if (q) {
+  if (ids) {
+    where.id = { in: ids.split(",").filter(Boolean).slice(0, 200) };
+  } else if (q) {
     where.OR = [
       { name: { contains: q, mode: "insensitive" } },
       { barcode: { contains: q, mode: "insensitive" } },
@@ -112,9 +116,10 @@ export async function GET(request: NextRequest) {
   }
 
   const total = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / perPage));
-  const safePage = Math.min(page, totalPages);
-  const products = filtered.slice((safePage - 1) * perPage, safePage * perPage);
+  const skipPagination = !!ids;
+  const totalPages = skipPagination ? 1 : Math.max(1, Math.ceil(total / perPage));
+  const safePage = skipPagination ? 1 : Math.min(page, totalPages);
+  const products = skipPagination ? filtered : filtered.slice((safePage - 1) * perPage, safePage * perPage);
 
   return NextResponse.json({
     ok: true,

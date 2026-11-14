@@ -20,12 +20,16 @@ function isPaymentMethod(v: string): v is "cash" | "transfer" | "card" | "credit
   return v === "cash" || v === "transfer" || v === "card" || v === "credit";
 }
 
-export async function POST(_req: NextRequest, { params }: RouteParams) {
+export async function POST(req: NextRequest, { params }: RouteParams) {
   const access = await requireAiInvoicingAccess();
   if (!access.ok) return access.response;
 
   const { proposalId } = await params;
   const prisma = getPrismaClient();
+
+  const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+  const establishmentId = typeof body.establishmentId === "string" ? body.establishmentId : undefined;
+  const issuePointId = typeof body.issuePointId === "string" ? body.issuePointId : undefined;
 
   const proposal = await prisma.aiInvoiceProposal.findFirst({
     where: { id: proposalId, tenantId: access.tenant.id },
@@ -138,23 +142,28 @@ export async function POST(_req: NextRequest, { params }: RouteParams) {
       },
     });
 
-    let sriResult = null;
+    let sriResult: Record<string, unknown> | null = null;
+    let sriStatus: "success" | "failed" = "success";
+    let sriError: string | null = null;
     try {
       sriResult = await startSriFlowFromBasicSale({
         tenantId: access.tenant.id,
         saleId: sale.id,
         requestedByUserId: access.user.id,
-      });
-    } catch (sriError) {
-      sriResult = {
-        error: sriError instanceof Error ? sriError.message : "Error al iniciar flujo SRI.",
-      };
+        establishmentId,
+        issuePointId,
+      }) as unknown as Record<string, unknown>;
+    } catch (err) {
+      sriStatus = "failed";
+      sriError = err instanceof Error ? err.message : "Error al iniciar flujo SRI.";
     }
 
     return NextResponse.json({
       ok: true,
       saleId: sale.id,
+      sriStatus,
       sri: sriResult,
+      sriError,
     });
   } catch (error) {
     await prisma.aiInvoiceDraft.update({
