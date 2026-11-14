@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { requireAiInvoicingAccess } from "@/lib/core/require-ai-invoicing-access";
 import { createSale } from "@/lib/core/lightweight-pos";
-import { startSriFlowFromBasicSale } from "@/lib/core/basic-sales-sri";
+import { startSriFlowFromBasicSale, validateSriPrerequisites } from "@/lib/core/basic-sales-sri";
 import { calculateSaleTotals } from "@/lib/core/sale-totals-calculator";
 import { Prisma } from "@prisma/client";
 
@@ -32,6 +32,18 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { ok: false, error: "No hay propuestas para facturar." },
       { status: 400 },
+    );
+  }
+
+  const sriCheck = await validateSriPrerequisites({
+    tenantId: access.tenant.id,
+    establishmentId,
+    issuePointId,
+  });
+  if (!sriCheck.ok) {
+    return NextResponse.json(
+      { ok: false, error: sriCheck.error },
+      { status: 422 },
     );
   }
 

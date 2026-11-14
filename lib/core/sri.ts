@@ -8,6 +8,7 @@ import { isValidEcuadorRuc } from "@/lib/core/ecuador-tax-id";
 import { buildSriAccessKey, createStableNumericCode } from "./sri-access-key";
 import { getSriSignatureReadiness } from "./sri-signature-readiness";
 import { requireResolvedSriTaxRegime } from "./sri-tax-regime-service";
+import { resolveSriTaxRegime } from "./sri-tax-regime";
 
 export type SriModuleStatus = {
   hasProfile: boolean;
@@ -162,6 +163,7 @@ export async function upsertSriProfile(
     specialTaxpayerNumber?: string | null;
     withholdingAgentResolution?: string | null;
     environment: "TEST" | "PRODUCTION";
+    contribuyenteRimpe?: string | null;
   },
 ) {
   const prisma = getPrismaClient();
@@ -169,23 +171,41 @@ export async function upsertSriProfile(
     where: { tenantId },
     select: { ruc: true },
   });
-  const resetResolvedRegime =
-    existing && existing.ruc !== data.ruc
-      ? {
-          taxpayerStatus: null,
-          taxpayerClass: null,
-          taxpayerType: null,
-          taxRegimeCode: null,
-          contribuyenteRimpe: null,
-          taxRegimeSource: null,
-          taxRegimeSourceUpdatedAt: null,
-          taxRegimeQueriedAt: null,
-        }
+  const rucChanged = existing && existing.ruc !== data.ruc;
+  const resetResolvedRegime = rucChanged
+    ? {
+        taxpayerStatus: null,
+        taxpayerClass: null,
+        taxpayerType: null,
+        taxRegimeCode: null,
+        contribuyenteRimpe: null,
+        taxRegimeSource: null,
+        taxRegimeSourceUpdatedAt: null,
+        taxRegimeQueriedAt: null,
+      }
+    : {};
+
+  const manualRegime =
+    !rucChanged && data.contribuyenteRimpe
+      ? (() => {
+          const resolved = resolveSriTaxRegime({
+            contribuyenteRimpe: data.contribuyenteRimpe!,
+          });
+          if (!resolved) return {};
+          return {
+            taxRegimeCode: resolved.code,
+            contribuyenteRimpe: resolved.label,
+            taxRegimeSource: "MANUAL",
+            taxRegimeQueriedAt: new Date(),
+          };
+        })()
       : {};
+
+  const { contribuyenteRimpe: _unused, ...coreData } = data;
   return prisma.sriTaxpayerProfile.upsert({
     where: { tenantId },
-    create: { tenantId, ...data, status: "CONFIGURED" },
-    update: { ...data, ...resetResolvedRegime, status: "CONFIGURED" },
+    create: { tenantId, ...coreData, ...manualRegime, status: "CONFIGURED" },
+    update: { ...coreData, ...resetResolvedRegime, ...manualRegime, status: "CONFIGURED" },
   });
 }
 

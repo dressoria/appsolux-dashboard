@@ -65,13 +65,12 @@ export async function resolveAndPersistSriTaxRegime(tenantId: string) {
     }
   }
 
-  if (!resolved && profile.contribuyenteRimpe && profile.taxRegimeQueriedAt) {
-    const cacheAge = Date.now() - profile.taxRegimeQueriedAt.getTime();
-    if (cacheAge <= CACHE_MAX_AGE_MS) {
-      resolved = resolveSriTaxRegime({
-        taxRegime: profile.contribuyenteRimpe,
-        contribuyenteRimpe: profile.contribuyenteRimpe,
-      });
+  if (!resolved && profile.contribuyenteRimpe) {
+    resolved = resolveSriTaxRegime({
+      taxRegime: profile.contribuyenteRimpe,
+      contribuyenteRimpe: profile.contribuyenteRimpe,
+    });
+    if (resolved) {
       sourceData = {
         taxpayerStatus: local?.taxpayerStatus ?? profile.taxpayerStatus,
         taxpayerClass: local?.taxpayerClass ?? profile.taxpayerClass,
@@ -82,9 +81,28 @@ export async function resolveAndPersistSriTaxRegime(tenantId: string) {
         contribuyenteRimpe: profile.contribuyenteRimpe,
         source: profile.taxRegimeSource ?? "PROFILE_CACHE",
         sourceUpdatedAt: profile.taxRegimeSourceUpdatedAt,
-        queriedAt: profile.taxRegimeQueriedAt,
+        queriedAt: profile.taxRegimeQueriedAt ?? profile.updatedAt,
       };
     }
+  }
+
+  if (!resolved && profile.taxRegimeCode) {
+    resolved = {
+      code: profile.taxRegimeCode as import("./sri-tax-regime").SriTaxRegimeCode,
+      label: profile.contribuyenteRimpe || profile.taxRegimeCode,
+      officialValue: profile.contribuyenteRimpe || profile.taxRegimeCode,
+    };
+    sourceData = sourceData ?? {
+      taxpayerStatus: profile.taxpayerStatus,
+      taxpayerClass: profile.taxpayerClass,
+      taxpayerType: profile.taxpayerType,
+      accountingRequired: profile.accountingRequired,
+      taxRegime: profile.contribuyenteRimpe ?? profile.taxRegimeCode,
+      contribuyenteRimpe: profile.contribuyenteRimpe ?? profile.taxRegimeCode,
+      source: profile.taxRegimeSource ?? "PROFILE_PERSISTED",
+      sourceUpdatedAt: profile.taxRegimeSourceUpdatedAt,
+      queriedAt: profile.taxRegimeQueriedAt ?? profile.updatedAt,
+    };
   }
 
   if (sourceData) {

@@ -10,6 +10,7 @@ import {
   reserveSriDocumentNumberingForTesting,
 } from "@/lib/core/sri";
 import { getSriDocumentTechnicalChecklist } from "@/lib/core/sri-technical-checklist";
+import { requireResolvedSriTaxRegime } from "@/lib/core/sri-tax-regime-service";
 
 export type SaleSriFlowState =
   "preparing" | "sending" | "received" | "authorized" | "rejected";
@@ -52,6 +53,78 @@ function mapFlowState(params: {
   }
 
   return { flowState: "preparing", flowLabel: "Preparando" };
+}
+
+export async function validateSriPrerequisites(params: {
+  tenantId: string;
+  customerId?: string;
+  establishmentId?: string;
+  issuePointId?: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const prisma = getPrismaClient();
+
+  try {
+    await requireTenantOperationalAccess(params.tenantId);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Tenant no operativo." };
+  }
+
+  try {
+    await requireResolvedSriTaxRegime(params.tenantId);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "No se pudo resolver el régimen tributario." };
+  }
+
+  const establishment = await prisma.sriEstablishment.findFirst({
+    where: {
+      tenantId: params.tenantId,
+      isActive: true,
+      ...(params.establishmentId ? { id: params.establishmentId } : {}),
+    },
+    select: { id: true },
+  });
+  if (!establishment) {
+    return { ok: false, error: "No hay establecimientos SRI activos. Configura al menos uno." };
+  }
+
+  const issuePoint = await prisma.sriIssuePoint.findFirst({
+    where: {
+      tenantId: params.tenantId,
+      establishmentId: establishment.id,
+      isActive: true,
+      ...(params.issuePointId ? { id: params.issuePointId } : {}),
+    },
+    select: { id: true },
+  });
+  if (!issuePoint) {
+    return { ok: false, error: "No hay puntos de emisión activos para el establecimiento." };
+  }
+
+  const sequence = await prisma.sriDocumentSequence.findFirst({
+    where: {
+      tenantId: params.tenantId,
+      establishmentId: establishment.id,
+      issuePointId: issuePoint.id,
+      documentType: "INVOICE",
+      isActive: true,
+    },
+    select: { id: true },
+  });
+  if (!sequence) {
+    return { ok: false, error: "No hay secuencia de factura configurada para este establecimiento y punto de emisión." };
+  }
+
+  if (params.customerId) {
+    const customer = await prisma.lightweightCustomer.findFirst({
+      where: { id: params.customerId, tenantId: params.tenantId },
+      select: { identificationType: true, identification: true },
+    });
+    if (customer && (!customer.identification || !customer.identificationType)) {
+      return { ok: false, error: "El cliente no tiene datos de identificación fiscal completos para factura SRI." };
+    }
+  }
+
+  return { ok: true };
 }
 
 export async function startSriFlowFromBasicSale(params: {

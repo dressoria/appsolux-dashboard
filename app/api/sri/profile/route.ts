@@ -41,6 +41,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "El RUC debe tener 13 digitos numericos." }, { status: 422 });
   }
 
+  const contribuyenteRimpe =
+    typeof data.contribuyenteRimpe === "string" && data.contribuyenteRimpe.trim()
+      ? data.contribuyenteRimpe.trim()
+      : null;
+
   const profile = await upsertSriProfile(tenant.id, {
     legalName,
     tradeName: typeof data.tradeName === "string" && data.tradeName.trim() ? data.tradeName.trim() : null,
@@ -50,6 +55,7 @@ export async function POST(req: NextRequest) {
     specialTaxpayerNumber: typeof data.specialTaxpayerNumber === "string" && data.specialTaxpayerNumber.trim() ? data.specialTaxpayerNumber.trim() : null,
     withholdingAgentResolution: typeof data.withholdingAgentResolution === "string" && data.withholdingAgentResolution.trim() ? data.withholdingAgentResolution.trim() : null,
     environment: "PRODUCTION",
+    contribuyenteRimpe,
   });
 
   try {

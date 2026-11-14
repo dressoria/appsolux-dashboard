@@ -12,7 +12,8 @@ type SriProfile = {
   ruc: string | null;
   legalName: string | null;
   tradeName: string | null;
-  taxRegime: string | null;
+  contribuyenteRimpe: string | null;
+  taxRegimeCode: string | null;
   accountingRequired: boolean;
 };
 
@@ -171,10 +172,10 @@ export function SriCredentialsSection() {
                   <p className="text-sm">{profile.tradeName}</p>
                 </div>
               )}
-              {profile.taxRegime && (
+              {(profile.contribuyenteRimpe || profile.taxRegimeCode) && (
                 <div>
                   <p className="text-xs text-muted-foreground">Régimen tributario</p>
-                  <p className="text-sm">{profile.taxRegime}</p>
+                  <p className="text-sm">{profile.contribuyenteRimpe || profile.taxRegimeCode}</p>
                 </div>
               )}
               <div>

@@ -2,7 +2,7 @@ import { LightweightPaymentMethod } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { startSriFlowFromBasicSale } from "@/lib/core/basic-sales-sri";
+import { startSriFlowFromBasicSale, validateSriPrerequisites } from "@/lib/core/basic-sales-sri";
 import { createSale, listSales } from "@/lib/core/lightweight-pos";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 
@@ -107,6 +107,30 @@ export async function POST(request: Request) {
           dueDate: typeof p.dueDate === "string" ? p.dueDate : undefined,
         }))
       : undefined;
+
+    if (outputMode === "sri_invoice") {
+      const sriCheck = await validateSriPrerequisites({
+        tenantId: tenant.id,
+        customerId:
+          typeof body.customerId === "string" && body.customerId
+            ? body.customerId
+            : undefined,
+        establishmentId:
+          typeof body.establishmentId === "string"
+            ? body.establishmentId
+            : undefined,
+        issuePointId:
+          typeof body.issuePointId === "string"
+            ? body.issuePointId
+            : undefined,
+      });
+      if (!sriCheck.ok) {
+        return NextResponse.json(
+          { ok: false, message: sriCheck.error },
+          { status: 422 },
+        );
+      }
+    }
 
     const sale = await createSale({
       tenantId: tenant.id,
