@@ -35,7 +35,6 @@ export default async function NewCustomerPage() {
         existingSectors={distinctValues.sectors}
         existingGroups={distinctValues.groups}
         existingZones={distinctValues.zones}
-        defaultQuickMode
       />
     </DashboardShell>
   );

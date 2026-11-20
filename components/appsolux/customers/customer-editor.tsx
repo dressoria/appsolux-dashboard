@@ -1,12 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
-import { LoaderCircle, Plus, Search, X, Check } from "lucide-react";
+import { Children, cloneElement, isValidElement, useId, useState, type FormEvent, type ReactElement } from "react";
+import { LoaderCircle, Plus, Search, X, Check, FileText, Zap, LockKeyhole, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AnimatedSegmentedControl } from "@/components/ui/animated-segmented-control";
+import { AnimatedSwitch } from "@/components/ui/animated-switch";
+import { BlobButton } from "@/components/ui/blob-button";
+import { AnimatedFormPanel } from "@/components/ui/animated-form-panel";
 import { EcuadorLocationPicker } from "@/components/appsolux/people/ecuador-location-picker";
 import { TenantUserSelect } from "@/components/appsolux/people/tenant-user-select";
 import { TenantValueCombobox } from "@/components/appsolux/people/tenant-value-combobox";
@@ -101,7 +105,7 @@ export function CustomerEditor({
     ...(customer?.additionalEmails ?? []),
   ]);
   const [phones, setPhones] = useState([
-    String(customer?.phone ?? "+593"),
+    String(customer?.phone ?? ""),
     ...(customer?.phoneNumbers ?? []),
   ]);
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -110,11 +114,15 @@ export function CustomerEditor({
   const [name, setName] = useState(String(customer?.name ?? ""));
   const [tradeName, setTradeName] = useState(String(customer?.tradeName ?? ""));
   const [address, setAddress] = useState(String(customer?.address ?? ""));
+  const [internalCode, setInternalCode] = useState(String(customer?.internalCode ?? ""));
+  const [notes, setNotes] = useState(String(customer?.notes ?? ""));
+  const [isActive, setIsActive] = useState(customer?.isActive ?? true);
+  const [customerType, setCustomerType] = useState(String(customer?.customerType ?? "Público"));
   const [province, setProvince] = useState(String(customer?.province ?? ""));
   const [city, setCity] = useState(String(customer?.city ?? ""));
   const [parish, setParish] = useState(String(customer?.parish ?? ""));
   const [country, setCountry] = useState(String(customer?.country ?? "Ecuador"));
-  const [isForeign, setIsForeign] = useState(Boolean(customer?.isForeign));
+  const [isForeign, setIsForeign] = useState(Boolean(customer?.isForeign) || isForeignIdentificationType(type));
   const [isRelated, setIsRelated] = useState(Boolean(customer?.isRelated));
   const [invoiceThirdParty, setInvoiceThirdParty] = useState(
     Boolean(customer?.invoiceThirdParty),
@@ -137,22 +145,13 @@ export function CustomerEditor({
   const [invoiceThirdPartyCustomerId, setInvoiceThirdPartyCustomerId] =
     useState(String(customer?.invoiceThirdPartyCustomerId ?? ""));
 
-  useEffect(() => {
-    const foreign = isForeignIdentificationType(type);
-    if (foreign && !isForeign) {
-      setIsForeign(true);
-    }
-    if (!foreign && isForeign && (type === "RUC" || type === "CEDULA")) {
-      setIsForeign(false);
-      setCountry("Ecuador");
-    }
-  }, [type]);
-
-  useEffect(() => {
-    if (!isForeign) {
-      setCountry("Ecuador");
-    }
-  }, [isForeign]);
+  function changeIdentificationType(nextType: LightweightCustomerIdentificationType) {
+    setType(nextType);
+    const foreign = isForeignIdentificationType(nextType);
+    setIsForeign(foreign);
+    if (!foreign) setCountry("Ecuador");
+    setLookupData(null);
+  }
 
   async function searchTaxpayer() {
     setError("");
@@ -180,6 +179,8 @@ export function CustomerEditor({
       if (data.parish) setParish(data.parish);
       setLookupFeedback("✓ Datos del SRI cargados");
       setTimeout(() => setLookupFeedback(""), 4000);
+    } catch {
+      setLookupFeedback("No se pudo consultar. Puedes completar los datos manualmente.");
     } finally {
       setLookupLoading(false);
     }
@@ -187,127 +188,133 @@ export function CustomerEditor({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving) return;
     setSaving(true);
     setError("");
-    const form = new FormData(event.currentTarget);
-    const string = (key: string) => String(form.get(key) ?? "");
-    const payload = quickMode
-      ? { name }
-      : {
-          name,
-          tradeName,
-          identificationType: type,
-          identification,
-          address,
-          country: isForeign ? country : "Ecuador",
-          province,
-          city,
-          parish,
-          sector,
-          zone,
-          customerType: string("customerType"),
-          customerOrigin,
-          groupName,
-          assignedSellerId,
-          isRelated,
-          isForeign,
-          invoiceThirdParty,
-          notes: string("notes"),
-          emails,
-          phone: phones[0],
-          phoneNumbers: phones.slice(1),
-          isActive: form.get("isActive") === "on",
-          gender,
-          relatedCustomerId: isRelated ? relatedCustomerId : "",
-          invoiceThirdPartyCustomerId: invoiceThirdParty
-            ? invoiceThirdPartyCustomerId
-            : "",
-          taxpayerStatus: lookupData?.taxpayerStatus,
-          taxpayerLegalName: lookupData?.legalName,
-          taxpayerTradeName: lookupData?.tradeName,
-          taxpayerType: lookupData?.taxpayerType,
-          economicActivity: lookupData?.economicActivity,
-          taxDataSource: lookupData?.source,
-          taxDataQueriedAt: lookupData?.queriedAt,
-        };
-    const response = await fetch(
-      customer ? `/api/basic/customers/${customer.id}` : "/api/basic/customers",
-      {
-        method: customer ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      },
-    );
-    const data = (await response.json()) as {
-      message?: string;
-      customer?: { id: string };
+    const common = { name, phone: phones[0], address, internalCode, isActive, notes };
+    // Keep previously entered full-mode data when saving from quick mode.
+    // A name-only customer has no fiscal identification, including no fake type.
+    const payload = {
+      ...common,
+      tradeName,
+      identificationType: quickMode && !identification.trim() ? null : type,
+      identification,
+      country: isForeign ? country : "Ecuador",
+      province,
+      city,
+      parish,
+      sector,
+      zone,
+      customerType,
+      customerOrigin,
+      groupName,
+      assignedSellerId,
+      isRelated,
+      isForeign,
+      invoiceThirdParty,
+      emails,
+      phoneNumbers: phones.slice(1),
+      gender,
+      relatedCustomerId: isRelated ? relatedCustomerId : "",
+      invoiceThirdPartyCustomerId: invoiceThirdParty ? invoiceThirdPartyCustomerId : "",
+      taxpayerStatus: lookupData?.taxpayerStatus,
+      taxpayerLegalName: lookupData?.legalName,
+      taxpayerTradeName: lookupData?.tradeName,
+      taxpayerType: lookupData?.taxpayerType,
+      economicActivity: lookupData?.economicActivity,
+      taxDataSource: lookupData?.source,
+      taxDataQueriedAt: lookupData?.queriedAt,
     };
-    setSaving(false);
-    if (!response.ok) return setError(data.message ?? "No se pudo guardar.");
-    router.push(`/facturacion/customers/${customer?.id ?? data.customer?.id}`);
-    router.refresh();
+    try {
+      const response = await fetch(
+        customer ? `/api/basic/customers/${customer.id}` : "/api/basic/customers",
+        {
+          method: customer ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+      const data = (await response.json()) as {
+        message?: string;
+        customer?: { id: string };
+      };
+      if (!response.ok) return setError(data.message ?? "No se pudo guardar.");
+      const savedId = customer?.id ?? data.customer?.id;
+      if (!savedId) throw new Error("El servidor no devolvió el cliente guardado.");
+      router.push(`/facturacion/customers/${savedId}`);
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudo guardar. Intenta nuevamente.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const maxLen = getIdentificationMaxLength(type);
   const inputMode = getIdentificationInputMode(type);
-  const showEcuadorLocation = !isForeign || country === "Ecuador";
 
   return (
-    <form onSubmit={submit} className="pb-8">
+    <form onSubmit={submit} aria-busy={saving} className="customer-editor pb-8">
       <header className="sticky top-0 z-20 -mx-4 mb-5 flex flex-col gap-3 border-b border-[#E4E9F0] bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <h1 className="text-xl font-semibold text-[#172033]">
               {customer ? "Editar cliente" : "Nuevo cliente"}
             </h1>
-            <p className="text-xs text-[#667085]">
-              {quickMode ? "Creación rápida — solo nombre" : "Información comercial y tributaria"}
+            <p className="mt-1 text-sm text-[#667085]">
+              {quickMode ? "Empieza con un nombre y completa los datos cuando lo necesites." : "Información comercial y tributaria de tu cliente."}
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button asChild variant="outline">
+          <div className="grid grid-cols-2 gap-2 sm:flex">
+            <Button asChild variant="outline" className="h-11 rounded-xl px-4">
               <Link href="/facturacion/customers">Cancelar</Link>
             </Button>
-            <Button
+            <BlobButton
+              type="submit"
               disabled={saving}
-              className="bg-[#1E52F1] text-white hover:bg-[#1745CE]"
             >
+              {saving ? <LoaderCircle className="motion-safe:animate-spin" /> : <Save />}
               {saving ? "Guardando..." : "Guardar cliente"}
-            </Button>
+            </BlobButton>
           </div>
         </div>
         {!customer && (
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setQuickMode(true)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${quickMode ? "bg-[#1E52F1] text-white" : "bg-[#F0F2F5] text-[#667085] hover:bg-[#E4E9F0]"}`}
-            >
-              Rápido
-            </button>
-            <button
-              type="button"
-              onClick={() => setQuickMode(false)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${!quickMode ? "bg-[#1E52F1] text-white" : "bg-[#F0F2F5] text-[#667085] hover:bg-[#E4E9F0]"}`}
-            >
-              Completo
-            </button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+            <AnimatedSegmentedControl
+              label="Modo de creación del cliente"
+              value={quickMode ? "quick" : "full"}
+              onValueChange={(value) => setQuickMode(value === "quick")}
+              options={[
+                { value: "full", label: "Completo", icon: <FileText className="size-4" /> },
+                { value: "quick", label: "Rápido", icon: <Zap className="size-4" /> },
+              ]}
+              disabled={saving}
+              className="w-full sm:w-72"
+            />
+            <p className="text-xs text-[#667085]">Puedes cambiar de modo sin perder lo escrito.</p>
           </div>
         )}
       </header>
 
-      <div className="space-y-4">
+      <AnimatedFormPanel mode={quickMode ? "quick" : "full"}>
+      <div className="space-y-5">
         {quickMode ? (
           <Section title="Datos básicos">
-            <Field label="Nombre del cliente" wide>
+            <Field label="Nombre del cliente o razón social *" wide>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                autoFocus
                 placeholder="Nombre o razón social"
               />
             </Field>
+            <Field label="Teléfono (opcional)">
+              <Input type="tel" autoComplete="tel" value={phones[0]} onChange={(e) => setPhones([e.target.value, ...phones.slice(1)])} placeholder="Ej. 099 123 4567 o +593…" />
+            </Field>
+            <Field label="Dirección (opcional)">
+              <Input value={address} onChange={(e) => setAddress(e.target.value)} autoComplete="street-address" placeholder="Calle, número y referencia" />
+            </Field>
+            <p className="text-xs text-[#667085] sm:col-span-2">Solo el nombre es obligatorio. Los datos fiscales se pueden completar después.</p>
           </Section>
         ) : (
           <>
@@ -316,7 +323,7 @@ export function CustomerEditor({
                 <select
                   value={type}
                   onChange={(e) =>
-                    setType(e.target.value as LightweightCustomerIdentificationType)
+                    changeIdentificationType(e.target.value as LightweightCustomerIdentificationType)
                   }
                   className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm"
                 >
@@ -341,6 +348,7 @@ export function CustomerEditor({
                     maxLength={maxLen}
                     inputMode={inputMode}
                     required
+                    aria-label="Número de identificación"
                   />
                   <Button
                     type="button"
@@ -354,7 +362,7 @@ export function CustomerEditor({
                     }
                   >
                     {lookupLoading ? (
-                      <LoaderCircle className="animate-spin" />
+                      <LoaderCircle className="motion-safe:animate-spin" />
                     ) : (
                       <Search />
                     )}
@@ -446,8 +454,9 @@ export function CustomerEditor({
                 checked={isForeign}
                 onChange={(v) => {
                   setIsForeign(v);
+                  if (!v) setCountry("Ecuador");
                   if (v && type !== "PASSPORT" && type !== "FOREIGN_ID") {
-                    setType("PASSPORT");
+                    changeIdentificationType("PASSPORT");
                   }
                 }}
               />
@@ -524,12 +533,14 @@ export function CustomerEditor({
               <Field label="Tipo de cliente">
                 <select
                   name="customerType"
-                  defaultValue={String(customer?.customerType ?? "Público")}
+                  value={customerType}
+                  onChange={(e) => setCustomerType(e.target.value)}
                   className="h-8 w-full rounded-lg border border-[#E4E9F0] bg-white px-2 text-sm"
                 >
                   {CUSTOMER_TYPES.map((item) => (
                     <option key={item}>{item}</option>
                   ))}
+                  {!CUSTOMER_TYPES.includes(customerType) && <option value={customerType}>{customerType || "Sin clasificación"}</option>}
                 </select>
               </Field>
               <Field label="Género">
@@ -578,31 +589,35 @@ export function CustomerEditor({
                   addLabel="+ Nuevo grupo"
                 />
               </Field>
-              <Field label="Observaciones" wide>
-                <textarea
-                  name="notes"
-                  defaultValue={String(customer?.notes ?? "")}
-                  className="min-h-24 w-full rounded-lg border border-[#E4E9F0] px-3 py-2 text-sm"
-                />
-              </Field>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  name="isActive"
-                  type="checkbox"
-                  defaultChecked={customer?.isActive ?? true}
-                />
-                Cliente activo
-              </label>
             </Section>
           </>
         )}
 
+        <Section title="Gestión interna">
+          <Field label="Código interno de cliente (opcional)">
+            <Input name="internalCode" value={internalCode} onChange={(e) => setInternalCode(e.target.value)} maxLength={100} placeholder="Ej. CLI-001" aria-describedby="customer-code-help" />
+            <p id="customer-code-help" className="text-xs text-[#667085]">Referencia única en tu empresa. Es independiente de la cédula o RUC.</p>
+          </Field>
+          <div className="flex min-h-20 items-center justify-between gap-4 rounded-xl border border-[#E4E9F0] bg-slate-50 px-4 py-3">
+            <div>
+              <Label htmlFor="customer-active">Cliente {isActive ? "activo" : "inactivo"}</Label>
+              <p className="mt-1 text-xs text-[#667085]">Estado del registro en tu empresa.</p>
+            </div>
+            <AnimatedSwitch id="customer-active" checked={isActive} onCheckedChange={setIsActive} aria-label="Cliente activo" />
+          </div>
+          <Field label="Observación interna (opcional)" wide>
+            <textarea name="notes" value={notes} onChange={(e) => setNotes(e.target.value)} aria-describedby="customer-notes-help" placeholder="Notas para tu equipo sobre este cliente…" className="min-h-28 w-full resize-y rounded-xl border border-[#E4E9F0] px-3 py-2.5 text-sm outline-none" />
+            <p id="customer-notes-help" className="flex items-center gap-1.5 text-xs text-[#667085]"><LockKeyhole className="size-3.5 shrink-0" aria-hidden="true" />Solo para uso interno; no se incluye en comprobantes electrónicos.</p>
+          </Field>
+        </Section>
+
         {error ? (
-          <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+          <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
             {error}
           </p>
         ) : null}
       </div>
+      </AnimatedFormPanel>
     </form>
   );
 }
@@ -615,8 +630,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-[#E4E9F0] bg-white p-4">
-      <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-[#172033]">
+    <section className="min-w-0 rounded-2xl border border-[#E4E9F0] bg-white p-4 shadow-sm shadow-slate-200/30 sm:p-6">
+      <h2 className="mb-5 border-b border-[#E4E9F0] pb-3 text-sm font-semibold text-[#172033]">
         {title}
       </h2>
       <div className="grid gap-4 sm:grid-cols-2">{children}</div>
@@ -632,10 +647,13 @@ function Field({
   children: React.ReactNode;
   wide?: boolean;
 }) {
+  const id = useId();
+  const items = Children.toArray(children);
+  const controlIndex = items.findIndex((child) => isValidElement(child) && (child.type === Input || child.type === "select" || child.type === "textarea"));
   return (
-    <div className={`space-y-1.5 ${wide ? "sm:col-span-2" : ""}`}>
-      <Label>{label}</Label>
-      {children}
+    <div role={controlIndex < 0 ? "group" : undefined} aria-labelledby={controlIndex < 0 ? `${id}-label` : undefined} className={`min-w-0 space-y-2 ${wide ? "sm:col-span-2" : ""}`}>
+      <Label id={`${id}-label`} htmlFor={controlIndex >= 0 ? id : undefined}>{label}</Label>
+      {items.map((child, index) => index === controlIndex ? cloneElement(child as ReactElement<{ id?: string }>, { id }) : child)}
     </div>
   );
 }
@@ -649,18 +667,8 @@ function Toggle({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex items-center gap-2 text-sm text-[#172033]">
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={`relative h-5 w-9 rounded-full transition-colors ${checked ? "bg-[#1E52F1]" : "bg-slate-300"}`}
-      >
-        <span
-          className={`absolute left-0.5 top-0.5 size-4 rounded-full bg-white transition-transform ${checked ? "translate-x-4" : ""}`}
-        />
-      </button>
+    <label className="flex min-h-11 items-center gap-2 text-sm text-[#172033]">
+      <AnimatedSwitch checked={checked} onCheckedChange={onChange} aria-label={label} />
       {label}
     </label>
   );
@@ -703,6 +711,7 @@ function ArrayFields({
           <div key={index} className="flex gap-2">
             <Input
               type={type}
+              aria-label={`${title}: ${index === 0 ? "principal" : index + 1}`}
               value={value}
               onChange={(e) =>
                 setValues(
@@ -716,6 +725,7 @@ function ArrayFields({
               type="button"
               size="icon"
               variant="ghost"
+              aria-label={`Quitar ${title.toLowerCase()}: ${index + 1}`}
               disabled={values.length === 1}
               onClick={() => setValues(values.filter((_, i) => i !== index))}
             >

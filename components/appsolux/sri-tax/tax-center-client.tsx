@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { SRI_TAX_NAVIGATION } from "@/config/sri-tax-navigation";
+import { BlobButton } from "@/components/ui/blob-button";
 import type { buildSriTaxSummary } from "@/lib/core/sri-tax/sri-tax-summary";
 import type { getReceivedSyncState } from "@/lib/core/sri-tax/received-documents";
 import type { TaxIssue } from "@/lib/core/sri-tax/types";
 import { ReceivedDocumentsClient } from "./received-documents-client";
 import { AtsReportClient } from "./ats-report-client";
 import { Iva104Client } from "./iva-104-client";
+import { ObligationsOverview } from "./obligations-overview";
 import {
   currency,
   fieldClass,
@@ -49,19 +49,22 @@ export function TaxCenterClient({
     frequency: "MONTHLY",
   });
   const [period, setPeriod] = useState(selection);
+  const [revision, setRevision] = useState(0);
   if (view === "received") return <ReceivedDocumentsClient />;
   return (
     <div className="space-y-6">
       <form
-        className="flex flex-wrap items-end gap-3 rounded-xl border p-4"
+        className="flex flex-wrap items-end gap-3 rounded-2xl border bg-white p-4 sm:p-5"
         onSubmit={(event) => {
           event.preventDefault();
           setPeriod({ ...selection });
+          setRevision((value) => value + 1);
         }}
       >
         <label className="grid gap-1 text-sm">
           Presentación
           <select
+            aria-label="Frecuencia de consulta"
             className={fieldClass}
             value={selection.frequency}
             onChange={(e) => {
@@ -85,6 +88,7 @@ export function TaxCenterClient({
         <label className="grid gap-1 text-sm">
           {selection.frequency === "MONTHLY" ? "Mes" : "Semestre"}
           <select
+            aria-label={selection.frequency === "MONTHLY" ? "Mes" : "Semestre"}
             className={fieldClass}
             value={selection.month}
             onChange={(e) =>
@@ -132,12 +136,11 @@ export function TaxCenterClient({
             }
           />
         </label>
-        <Button
-          className="bg-blue-600 text-white hover:bg-blue-700"
+        <BlobButton
           type="submit"
         >
-          {view === "ats" ? "Generar ATS" : "Consultar período"}
-        </Button>
+          {view === "ats" ? "Preparar ATS" : "Consultar período"}
+        </BlobButton>
       </form>
       <p className="text-sm text-muted-foreground">
         Período consultado: {period.month.toString().padStart(2, "0")}/
@@ -145,53 +148,39 @@ export function TaxCenterClient({
         {period.frequency === "MONTHLY" ? "Mensual" : "Semestral"}. La
         frecuencia requiere verificar tu obligación tributaria.
       </p>
-      {view === "summary" && <SummaryClient query={periodQuery(period)} />}
+      {view === "summary" && <SummaryClient query={`${periodQuery(period)}&revision=${revision}`} />}
       {(view === "ats" || view === "ats-summary") && (
         <AtsReportClient
           key={periodQuery(period)}
           query={periodQuery(period)}
           summary={view === "ats-summary"}
+          revision={revision}
         />
       )}
       {view === "iva-104" && (
         <Iva104Client key={periodQuery(period)} period={period} />
       )}
       {view === "validations" && (
-        <ValidationsClient query={periodQuery(period)} />
+        <ValidationsClient query={`${periodQuery(period)}&revision=${revision}`} />
       )}
     </div>
   );
 }
 
 function SummaryClient({ query }: { query: string }) {
-  const { data, loading, error } = useTaxResource<
+  const { data, loading, error, loadedAt } = useTaxResource<
     ReturnType<typeof buildSriTaxSummary> & {
       sync: Awaited<ReturnType<typeof getReceivedSyncState>>;
     }
   >(`/api/sri-tax/summary?${query}`);
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {SRI_TAX_NAVIGATION.slice(1).map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="rounded-xl border bg-background p-4 font-medium transition-colors hover:border-blue-400"
-          >
-            {item.title}
-            <span className="mt-2 block text-sm font-normal text-blue-600">
-              Abrir →
-            </span>
-          </Link>
-        ))}
-      </div>
       <LoadingError loading={loading} error={error} />
       {data && (
         <>
-          <p className="text-sm">
-            {data.company?.legalName ?? "Empresa por completar"} · RUC{" "}
-            {data.company?.ruc ?? "Por completar"}
-          </p>
+          <ObligationsOverview company={data.company} period={data.period.label} loadedAt={loadedAt} />
+          <h2 className="pt-2 text-lg font-semibold">Actividad registrada en Facturom</h2>
+          <p className="text-sm text-slate-600">Información secundaria del período. Los valores registrados no equivalen a valores declarados ante el SRI.</p>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Metric
               label="Ventas netas registradas"

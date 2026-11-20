@@ -13,6 +13,9 @@
   --facturom-primary-soft: #EAF3FF;
   --facturom-primary-soft-2: #DCEBFF;
   --facturom-accent: #F59E0B;
+  --facturom-action: #EC008C;
+  --facturom-action-strong: #C90077;
+  --facturom-action-soft: #FFF0F8;
   --facturom-yellow: #FDE68A;
   --facturom-bg: #F6F8FB;
   --facturom-surface: #FFFFFF;
@@ -29,6 +32,9 @@
   --color-facturom-primary-soft-2: var(--facturom-primary-soft-2);
   --color-facturom-sidebar: var(--facturom-sidebar);
   --color-facturom-accent: var(--facturom-accent);
+  --color-facturom-action: var(--facturom-action);
+  --color-facturom-action-strong: var(--facturom-action-strong);
+  --color-facturom-action-soft: var(--facturom-action-soft);
   --color-facturom-yellow: var(--facturom-yellow);
   --color-facturom-bg: var(--facturom-bg);
   --color-facturom-surface: var(--facturom-surface);
@@ -158,4 +164,22 @@
   html {
     @apply font-sans;
   }
+}
+
+/* Scoped to the customer editor; other modules retain their existing controls. */
+.customer-editor :is(input:not([type="checkbox"]), select) {
+  min-height: 2.75rem;
+  border-radius: 0.75rem;
+}
+.customer-editor :is(input, select, textarea):focus-visible {
+  outline: 2px solid var(--facturom-action-strong);
+  outline-offset: 2px;
+  border-color: var(--facturom-action);
+  box-shadow: none;
+}
+.customer-editor :is(input, select, textarea) {
+  min-width: 0;
+}
+@media (max-width: 639px) {
+  .customer-editor :is(input, select, textarea) { font-size: 1rem; }
 }

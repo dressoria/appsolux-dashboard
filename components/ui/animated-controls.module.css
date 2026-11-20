@@ -1,0 +1,131 @@
+.segmented {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--facturom-border);
+  border-radius: 1rem;
+  background: #f0f2f6;
+}
+
+.indicator {
+  position: absolute;
+  z-index: -1;
+  inset: 0.25rem auto 0.25rem 0.25rem;
+  width: calc((100% - 0.25rem) / var(--segment-count) - 0.25rem);
+  transform: translateX(calc(var(--segment-index) * (100% + 0.25rem)));
+  border-radius: 0.75rem;
+  /* A subtle shade keeps small white labels above 4.5:1 contrast. */
+  background: linear-gradient(#00000012, #00000012), var(--facturom-action);
+  box-shadow: 0 2px 6px #b000681f;
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.segment {
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  color: var(--facturom-text-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+.segment[aria-checked="true"] { color: white; }
+.segment[aria-checked="false"]:hover { color: var(--facturom-action-strong); background: #ec008c0a; }
+.segment:active { transform: scale(0.97); }
+.segment:disabled { cursor: default; opacity: 0.5; }
+
+.segment:focus-visible,
+.switch:focus-visible,
+.blobButton:focus-visible {
+  outline: 2px solid var(--facturom-action-strong);
+  outline-offset: 3px;
+}
+
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  width: 3rem;
+  height: 1.75rem;
+  padding: 0.25rem;
+  border: 1px solid #8a94a4;
+  border-radius: 999px;
+  background: #8a94a4;
+  cursor: pointer;
+  transition: background-color 220ms ease, border-color 220ms ease;
+}
+
+.switch[aria-checked="true"] { background: var(--facturom-action); border-color: var(--facturom-action); }
+.switch:hover:not(:disabled) { border-color: var(--facturom-action-strong); }
+.switch:disabled { opacity: 0.5; cursor: default; }
+.thumb {
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 3px #17203330;
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.switch[aria-checked="true"] .thumb { transform: translateX(1.25rem); }
+.switch:active:not(:disabled) .thumb { scale: 0.9; }
+
+.blobButton {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 2.75rem;
+  padding-inline: 1.25rem;
+  border-radius: 0.875rem;
+  border: 1px solid var(--facturom-action);
+  background: linear-gradient(#00000012, #00000012), var(--facturom-action);
+  color: white;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+.blobButton[data-variant="outline"] { background: white; color: var(--facturom-action-strong); }
+.blobButton:hover:not(:disabled) { box-shadow: 0 4px 12px #ec008c24; }
+.blobButton[data-variant="outline"]:is(:hover, :focus-visible):not(:disabled) { color: white; }
+.blobButton:active:not(:disabled) { transform: translateY(1px); }
+.blobs { position: absolute; z-index: -1; inset: 0; overflow: hidden; border-radius: inherit; }
+.blob {
+  position: absolute;
+  bottom: -0.5rem;
+  width: 38%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--facturom-action-strong);
+  transform: translateY(110%) scale(0.6);
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.blob:nth-child(1) { left: -8%; }
+.blob:nth-child(2) { left: 18%; transition-delay: 35ms; }
+.blob:nth-child(3) { left: 44%; transition-delay: 70ms; }
+.blob:nth-child(4) { left: 70%; transition-delay: 105ms; }
+.blobButton:is(:hover, :focus-visible):not(:disabled) .blob { transform: translateY(15%) scale(1.9); }
+.buttonLabel { position: relative; display: inline-flex; align-items: center; gap: 0.5rem; }
+
+.formPanel { transition: height 240ms cubic-bezier(0.22, 1, 0.36, 1); }
+.formContent { display: flow-root; animation: form-enter 220ms ease-out; }
+@keyframes form-enter {
+  from { opacity: 0.65; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .indicator, .segment, .switch, .thumb, .blobButton, .blob, .formPanel {
+    transition: none;
+  }
+  .formContent { animation: none; }
+  .segment:active, .blobButton:active:not(:disabled), .switch:active:not(:disabled) .thumb { transform: none; scale: none; }
+}

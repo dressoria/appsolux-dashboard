@@ -1,0 +1,16 @@
+.center { min-width: 0; }
+.center :is(input, select, textarea) { min-width: 0; max-width: 100%; min-height: 2.75rem; }
+.center :is(input, select, textarea):focus-visible { outline: 2px solid var(--facturom-action-strong); outline-offset: 2px; box-shadow: none; }
+.nav { max-width: 100%; overflow-x: auto; border: 1px solid var(--facturom-border); border-radius: 1rem; background: #f0f2f6; }
+.navTrack { position: relative; isolation: isolate; display: flex; width: max-content; min-width: 100%; gap: 0.25rem; padding: 0.25rem; }
+.navPill { position: absolute; z-index: -1; top: 0.25rem; bottom: 0.25rem; left: 0; border-radius: 0.75rem; background: linear-gradient(#00000012, #00000012), var(--facturom-action); transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), width 320ms cubic-bezier(0.22, 1, 0.36, 1); }
+.navLink { display: flex; align-items: center; min-height: 2.75rem; padding: 0.5rem 1rem; border-radius: 0.75rem; font-size: 0.875rem; font-weight: 600; color: #475467; white-space: nowrap; }
+.navLink[aria-current="page"] { color: white; }
+.navLink:not([aria-current]):hover { color: var(--facturom-action-strong); background: #ec008c0a; }
+.navLink:focus-visible { outline: 2px solid var(--facturom-action-strong); outline-offset: -2px; }
+.navTrack[data-measured="false"] .navLink[aria-current="page"] { background: var(--facturom-action-strong); }
+.panel { min-width: 0; border: 1px solid var(--facturom-border); border-radius: 1rem; background: white; padding: 1.25rem; }
+.center :global(details > summary) { cursor: pointer; }
+.center :global(details > summary):focus-visible { outline: 2px solid var(--facturom-action-strong); outline-offset: 3px; }
+@media (max-width: 639px) { .center :is(input, select, textarea) { font-size: 1rem; } }
+@media (prefers-reduced-motion: reduce) { .navPill { transition: none; } .center :global(.animate-pulse) { animation: none; } }

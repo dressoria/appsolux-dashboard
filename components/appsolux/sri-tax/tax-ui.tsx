@@ -42,23 +42,25 @@ export function useTaxResource<T>(url: string | null) {
     url: string | null;
     data: T | null;
     error: string | null;
-  }>({ url: null, data: null, error: null });
+    loadedAt: string | null;
+  }>({ url: null, data: null, error: null, loadedAt: null });
   useEffect(() => {
     if (!url) return;
     const controller = new AbortController();
     fetch(url, { signal: controller.signal })
       .then(async (res) => {
         const data = await res.json();
-        if (!res.ok)
-          throw new Error(data.error ?? "No se pudo cargar la información.");
+        if (!res.ok || data?.ok === false || typeof data?.error === "string")
+          throw new Error(data.error ?? data.message ?? "No se pudo cargar la información.");
         if (!controller.signal.aborted)
-          setState({ url, data: data as T, error: null });
+          setState({ url, data: data as T, error: null, loadedAt: new Date().toISOString() });
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted)
           setState({
             url,
             data: null,
+            loadedAt: null,
             error:
               error instanceof Error ? error.message : "Error de conexión.",
           });
@@ -70,6 +72,7 @@ export function useTaxResource<T>(url: string | null) {
     data: current ? state.data : null,
     error: current ? state.error : null,
     loading: !!url && !current,
+    loadedAt: current ? state.loadedAt : null,
   };
 }
 
@@ -237,7 +240,7 @@ export function IssuesTable({ issues }: { issues: TaxIssue[] }) {
 }
 
 export async function downloadResponse(res: Response, filename: string) {
-  if (!res.ok) {
+  if (!res.ok || res.headers.get("content-type")?.includes("application/json")) {
     const data = await res.json();
     throw new Error(data.error ?? "No se pudo exportar el reporte.");
   }

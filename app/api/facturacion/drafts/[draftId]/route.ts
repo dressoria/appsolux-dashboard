@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { getPrismaClient } from "@/lib/db/prisma";
+import { validateInvoiceDraftSeller } from "@/lib/core/invoice-sellers";
 
 export async function GET(
   _request: Request,
@@ -50,8 +51,11 @@ export async function PATCH(
     }
 
     const data: Record<string, unknown> = {};
-    if (body.payload && typeof body.payload === "object") {
-      data.payload = body.payload;
+    if (body.payload !== undefined) {
+      if (!body.payload || typeof body.payload !== "object" || Array.isArray(body.payload)) {
+        return NextResponse.json({ ok: false, message: "Payload requerido." }, { status: 400 });
+      }
+      data.payload = await validateInvoiceDraftSeller(tenant.id, user.id, body.payload, existing.payload);
     }
     if (body.status === "CONVERTED" && typeof body.convertedSaleId === "string") {
       data.status = "CONVERTED";

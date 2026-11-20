@@ -1146,6 +1146,7 @@ model LightweightCustomer {
   tenantId                    String
   name                        String
   tradeName                   String?
+  internalCode                String?                                @db.VarChar(100)
   phone                       String?
   phoneNumbers                String[]                               @default([])
   email                       String?
@@ -1197,6 +1198,7 @@ model LightweightCustomer {
   treasuryChecks          PostdatedCheck[]
 
   @@unique([tenantId, identification])
+  @@unique([tenantId, internalCode])
   @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, name])

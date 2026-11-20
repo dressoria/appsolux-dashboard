@@ -12,6 +12,7 @@ import {
 } from "@prisma/client";
 
 import { getPrismaClient } from "@/lib/db/prisma";
+import { normalizeCustomerInternalCode } from "@/lib/core/customer-internal-code";
 import { getLimit } from "@/lib/core/plans";
 import { calculateLine } from "@/lib/core/sale-totals-calculator";
 import { isUnlimitedCommercialVolume } from "@/lib/core/billing-access-policy";
@@ -63,6 +64,7 @@ type CreateCustomerInput = {
   tenantId: string;
   name: string;
   tradeName?: string;
+  internalCode?: string;
   phone?: string;
   phoneNumbers?: string[];
   email?: string;
@@ -635,6 +637,15 @@ function normalizeCustomerPhones(
   return phones;
 }
 
+async function validateCustomerInternalCode(tenantId: string, internalCode: string | null, customerId?: string) {
+  if (!internalCode) return;
+  const duplicate = await getPrismaClient().lightweightCustomer.findFirst({
+    where: { tenantId, internalCode, ...(customerId ? { id: { not: customerId } } : {}) },
+    select: { id: true },
+  });
+  if (duplicate) throw new Error("Ya existe un cliente con este código interno en tu empresa.");
+}
+
 async function validateCustomerFiscalInput(
   tenantId: string,
   type: LightweightCustomerIdentificationType | null | undefined,
@@ -708,6 +719,8 @@ export async function createCustomer(input: CreateCustomerInput) {
 
   const emails = normalizeCustomerEmails(input.email, input.additionalEmails);
   const phones = normalizeCustomerPhones(input.phone, input.phoneNumbers);
+  const internalCode = normalizeCustomerInternalCode(input.internalCode);
+  await validateCustomerInternalCode(input.tenantId, internalCode);
   const identification = await validateCustomerFiscalInput(
     input.tenantId,
     input.identificationType,
@@ -724,6 +737,7 @@ export async function createCustomer(input: CreateCustomerInput) {
       tenantId: input.tenantId,
       name,
       tradeName: input.tradeName?.trim() || undefined,
+      internalCode,
       phone: phones[0],
       phoneNumbers: phones.slice(1),
       email: emails[0],
@@ -784,6 +798,12 @@ export async function updateCustomer(input: UpdateCustomerInput) {
   }
 
   const data: Prisma.LightweightCustomerUncheckedUpdateInput = {};
+
+  if (input.internalCode !== undefined) {
+    const internalCode = normalizeCustomerInternalCode(input.internalCode);
+    await validateCustomerInternalCode(input.tenantId, internalCode, input.customerId);
+    data.internalCode = internalCode;
+  }
 
   if (
     input.identificationType !== undefined ||

@@ -13,6 +13,8 @@ export function EditableNumberInput({
   selectOnFocus = true,
   className,
   disabled,
+  id,
+  "aria-label": ariaLabel,
 }: {
   value: number;
   onChange: (v: number) => void;
@@ -23,6 +25,8 @@ export function EditableNumberInput({
   selectOnFocus?: boolean;
   className?: string;
   disabled?: boolean;
+  id?: string;
+  "aria-label"?: string;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const ref = useRef<HTMLInputElement>(null);
@@ -59,6 +63,8 @@ export function EditableNumberInput({
   return (
     <Input
       ref={ref}
+      id={id}
+      aria-label={ariaLabel}
       className={className}
       type="text"
       inputMode="decimal"

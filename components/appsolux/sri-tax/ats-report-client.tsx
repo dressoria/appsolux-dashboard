@@ -3,12 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { BlobButton } from "@/components/ui/blob-button";
+import { AnimatedSegmentedControl } from "@/components/ui/animated-segmented-control";
+import { AnimatedFormPanel } from "@/components/ui/animated-form-panel";
+import { atsPreparationState } from "@/lib/core/sri-tax/ui-state";
+import { TaxDiagnostics } from "./tax-diagnostics";
 import type { AtsPeriodData } from "@/lib/core/sri-tax/ats-data";
 import { TAX_REPORT_FOOTER } from "@/lib/core/sri-tax/ats-summary";
 import {
   currency,
   downloadResponse,
-  IssuesTable,
   LoadingError,
   Metric,
   Notice,
@@ -20,12 +24,16 @@ import {
 export function AtsReportClient({
   query,
   summary,
+  revision = 0,
 }: {
   query: string;
   summary: boolean;
+  revision?: number;
 }) {
+  const [stage, setStage] = useState("prepare");
+  const [attempt, setAttempt] = useState(0);
   const { data, loading, error } = useTaxResource<AtsPeriodData>(
-    `/api/sri-tax/ats/preview?${query}`,
+    `/api/sri-tax/ats/preview?${query}&revision=${revision}&attempt=${attempt}`,
   );
   const [exportError, setExportError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -56,10 +64,14 @@ export function AtsReportClient({
         ...data.cancelled,
       ]
     : [];
+  const state = data ? atsPreparationState(data) : null;
   return (
     <div className="space-y-5">
       <LoadingError loading={loading} error={error} />
       {exportError && <Notice error>{exportError}</Notice>}
+      {!summary && <AnimatedSegmentedControl label="Etapas del ATS" value={stage} onValueChange={setStage}
+        options={[{ value: "prepare", label: "Preparar" }, { value: "review", label: "Revisar" }, { value: "generate", label: "Generar" }]} className="w-full max-w-xl" />}
+      {!summary && <p className="text-sm text-slate-600">Prepara los registros, revisa los diagnósticos y comprueba los requisitos del XML. Este flujo no envía anexos al SRI.</p>}
       {data && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -80,21 +92,13 @@ export function AtsReportClient({
                 disabled={busy}
                 onClick={() => download("pdf")}
               >
-                Descargar PDF del resumen
+                Resumen local (PDF)
               </Button>
-              <Button
-                className="bg-blue-600 text-white hover:bg-blue-700"
-                disabled={
-                  busy ||
-                  data.domainStatus !== "DOMAIN_VALIDATION_OK" ||
-                  data.xsdStatus === "XSD_VALIDATION_ERROR"
-                }
-                onClick={() => download("xml")}
-              >
-                Descargar XML ATS
-              </Button>
+              <BlobButton disabled={busy || loading} onClick={() => { setStage("generate"); setAttempt((value) => value + 1); setExportError(null); }}>Generar ATS</BlobButton>
             </div>
           </div>
+          <AnimatedFormPanel mode={summary ? "summary" : stage}>
+          <div className="space-y-5">
           {!data.hasInformation && (
             <Notice>
               Sin información definitiva registrada en el período. Los totales
@@ -102,6 +106,8 @@ export function AtsReportClient({
               período antes de usar un anexo sin transacciones.
             </Notice>
           )}
+          {(summary || stage === "prepare") && <>
+          <p className="rounded-xl border bg-white p-4 text-sm text-slate-600">Frecuencia consultada: {data.period.frequency === "MONTHLY" ? "mensual" : "semestral"}. Su aplicabilidad a esta empresa requiere confirmar la obligación tributaria; no se deduce de sus movimientos.</p>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Metric
               label="Ventas"
@@ -124,6 +130,11 @@ export function AtsReportClient({
               detail="Aplicabilidad ATS por verificar"
             />
           </div>
+          <Metric label="Documentos modificados registrados" value={String([...data.sales, ...data.purchases].filter((document) => ["CREDIT_NOTE", "DEBIT_NOTE"].includes(document.type)).length)} detail="Notas de crédito y débito en los registros del período." />
+          {!summary && <Button type="button" variant="outline" onClick={() => setStage("review")}>Revisar documentos y diagnósticos</Button>}
+          </>}
+          {(summary || stage === "generate") && <>
+          {state && <Notice error={state.errors.length > 0 || data.xsdStatus === "XSD_VALIDATION_ERROR"}><strong className="block">{state.title}</strong><span className="mt-1 block">{state.nextAction}</span></Notice>}
           <section className="grid gap-2 rounded-xl border p-4 text-sm">
             <h3 className="font-semibold">Estado de validación</h3>
             <p>
@@ -147,8 +158,10 @@ export function AtsReportClient({
               estructural no acredita la presentación ni aceptación del anexo.
             </p>
           </section>
-          <IssuesTable issues={data.issues} />
-          {!summary && (
+          <div className="space-y-2"><BlobButton disabled={busy || !state?.canDownloadXml} onClick={() => download("xml")}>Descargar XML ATS</BlobButton><p className="text-xs text-slate-600">La descarga requiere validaciones internas y XSD correctas y XML generado. Un resumen visual no sustituye al XML ni acredita presentación o aceptación del SRI.</p></div>
+          </>}
+          {(summary || stage === "review" || stage === "generate") && <TaxDiagnostics issues={data.issues} />}
+          {!summary && stage === "review" && (
             <section className="space-y-3">
               <h3 className="font-semibold">Vista previa de registros</h3>
               {!docs.length ? (
@@ -211,6 +224,8 @@ export function AtsReportClient({
               )}
             </section>
           )}
+          </div>
+          </AnimatedFormPanel>
           <p className="text-xs text-muted-foreground">{TAX_REPORT_FOOTER}</p>
         </>
       )}

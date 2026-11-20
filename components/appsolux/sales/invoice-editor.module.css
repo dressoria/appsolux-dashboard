@@ -1,0 +1,10 @@
+.editor { min-width: 0; }
+.editor :is(select, input) { min-width: 0; max-width: 100%; }
+.editor select { width: 100%; }
+.editor header [data-slot="button"] { min-height: 2.5rem; }
+.editor fieldset.contents > section { margin-top: 1.25rem; }
+.editor :is(input, select, textarea):focus-visible { outline: 2px solid var(--facturom-action-strong); outline-offset: 2px; box-shadow: none; }
+.enter { animation: selected-enter 200ms ease-out; }
+@keyframes selected-enter { from { opacity: 0.6; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .enter { animation: none; } }
+@media (max-width: 639px) { .editor :is(input, select, textarea) { font-size: 1rem; } }

@@ -11,11 +11,21 @@ import {
   Send,
   Trash2,
   X,
+  BookOpen,
+  List,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Children, cloneElement, isValidElement, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AnimatedSegmentedControl } from "@/components/ui/animated-segmented-control";
+import { AnimatedSwitch } from "@/components/ui/animated-switch";
+import { BlobButton } from "@/components/ui/blob-button";
+import { InvoiceSellerSelect } from "./invoice-seller-select";
+import { SelectedInvoiceCustomer } from "./selected-invoice-customer";
+import { InvoiceJournalPanel } from "./invoice-journal-panel";
+import type { InvoiceSellerContext } from "@/types/invoice-ui";
+import styles from "./invoice-editor.module.css";
 import { EditableNumberInput } from "./editable-number-input";
 import {
   PaymentModal,
@@ -88,7 +98,8 @@ type SavedResult = {
   flowLabel?: string;
 };
 type InvoiceKind = "NORMAL" | "EXPORT" | "REIMBURSEMENT";
-type DraftPayload = {
+export type InvoiceDraftPayload = {
+  sellerId?: string;
   customerId: string;
   lines: Line[];
   paymentMethod: string;
@@ -155,7 +166,8 @@ const priceFor = (product: Product, tier: string) =>
   );
 
 export function InvoiceEditor({
-  currentUserName,
+  sellerContext,
+  issueDateLabel,
   submissionEnabled = true,
   submissionMessage,
   customers,
@@ -171,11 +183,11 @@ export function InvoiceEditor({
   initialPaymentMethod,
   initialSriPaymentCode,
   aiDraftId,
-  aiProposalId,
   draftId: initialDraftId,
   draftPayload,
 }: {
-  currentUserName: string;
+  sellerContext: InvoiceSellerContext;
+  issueDateLabel: string;
   submissionEnabled?: boolean;
   submissionMessage?: string;
   customers: Customer[];
@@ -193,13 +205,15 @@ export function InvoiceEditor({
   aiDraftId?: string;
   aiProposalId?: string;
   draftId?: string;
-  draftPayload?: DraftPayload;
+  draftPayload?: InvoiceDraftPayload;
 }) {
   const defaultWarehouse = warehouses.find((w) => w.isDefault) ?? warehouses[0] ?? null;
   const defaultEstablishment = establishments[0] ?? null;
   const defaultIssuePoint = issuePoints.find((ip) => ip.establishmentId === defaultEstablishment?.id) ?? null;
 
   const [customerId, setCustomerId] = useState(draftPayload?.customerId ?? initialCustomerId ?? "");
+  const [sellerId, setSellerId] = useState(draftPayload?.sellerId ?? sellerContext.defaultSellerId);
+  const [detailView, setDetailView] = useState("details");
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [productSearch, setProductSearch] = useState("");
@@ -235,6 +249,7 @@ export function InvoiceEditor({
   const prevPaymentMethodRef = useRef(paymentMethod);
 
   const customerSearchRef = useRef<HTMLDivElement>(null);
+  const customerInputRef = useRef<HTMLInputElement>(null);
   const productSearchRef = useRef<HTMLDivElement>(null);
   const guideSearchRef = useRef<HTMLDivElement>(null);
 
@@ -459,6 +474,8 @@ export function InvoiceEditor({
     setExportData({ incoterm: "", destinationPort: "", countryCode: "", countryName: "" });
     setReimbursementData({ reimbursementDocType: "", reimbursementDocNumber: "", reimbursementTaxpayerId: "" });
     setDraftId("");
+    setSellerId(sellerContext.defaultSellerId);
+    setDetailView("details");
   }
 
   function buildItems() {
@@ -551,7 +568,8 @@ export function InvoiceEditor({
     setSaving(true);
     setMessage("");
     try {
-      const payload: DraftPayload = {
+      const payload: InvoiceDraftPayload = {
+        sellerId,
         customerId,
         lines,
         paymentMethod,
@@ -761,7 +779,7 @@ export function InvoiceEditor({
       : PAYMENT_METHODS.find((m) => m.value === paymentMethod)?.label ?? paymentMethod;
 
   return (
-    <div className="space-y-4 pb-10">
+    <div className={`${styles.editor} space-y-5 pb-10`}>
       <header className="sticky top-0 z-30 -mx-3 flex flex-wrap items-center justify-between gap-2 border-b bg-white/95 px-3 py-3 backdrop-blur sm:-mx-5 sm:px-5">
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-semibold text-[#172033]">Nueva factura</h1>
@@ -783,16 +801,14 @@ export function InvoiceEditor({
             <Save />
             Guardar borrador
           </Button>
-          <Button
-            size="sm"
-            className="bg-[#1E52F1] text-white"
+          <BlobButton
             disabled={!submissionEnabled || saving || !lines.length || Boolean(saved)}
             title={!submissionEnabled ? submissionMessage : undefined}
             onClick={() => save(true)}
           >
             <Send />
             Guardar y enviar al SRI
-          </Button>
+          </BlobButton>
           <Button
             size="sm"
             variant="outline"
@@ -847,11 +863,12 @@ export function InvoiceEditor({
         </p>
       ) : null}
 
+      <div className="contents">
       <fieldset disabled={Boolean(saved)} className="contents">
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid min-w-0 items-start gap-5 lg:grid-cols-2">
           {/* Invoice data card */}
           <Card title="Datos de factura">
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
               {establishments.length > 1 ? (
                 <Field label="Establecimiento">
                   <select
@@ -909,17 +926,12 @@ export function InvoiceEditor({
               <Field label="Fecha de emisión">
                 <Input
                   readOnly
-                  value={new Intl.DateTimeFormat("es-EC", {
-                    dateStyle: "medium",
-                  }).format(new Date())}
+                  value={issueDateLabel}
                 />
-              </Field>
-              <Field label="Vendedor">
-                <Input readOnly value={currentUserName} />
               </Field>
               <Field label="Forma de pago">
                 <select
-                  className="h-8 rounded-lg border px-2 text-sm"
+                  className="h-11 min-w-0 w-full rounded-xl border px-3 text-sm"
                   value={paymentMethod}
                   onChange={(e) => handlePaymentMethodChange(e.target.value)}
                 >
@@ -928,9 +940,12 @@ export function InvoiceEditor({
                   ))}
                 </select>
               </Field>
-              <Field label="Pag. SRI">
+              <Field label="Forma de pago SRI" wide>
                 <select
-                  className="h-8 rounded-lg border px-2 text-sm"
+                  className="h-11 min-w-0 w-full rounded-xl border px-3 text-sm"
+                  title={SRI_PAYMENT_CODES.find((item) => item.code === sriPaymentCode)?.label}
+                  aria-label="Forma de pago SRI"
+                  aria-describedby="invoice-sri-payment-description"
                   value={sriPaymentCode}
                   onChange={(e) => setSriPaymentCode(e.target.value)}
                 >
@@ -938,7 +953,9 @@ export function InvoiceEditor({
                     <option key={c.code} value={c.code}>{c.label}</option>
                   ))}
                 </select>
+                <span id="invoice-sri-payment-description" className="break-words text-xs leading-relaxed text-slate-600">{SRI_PAYMENT_CODES.find((item) => item.code === sriPaymentCode)?.label}</span>
               </Field>
+              <InvoiceSellerSelect value={sellerId} onChange={setSellerId} sellers={sellerContext.sellers} canSelect={sellerContext.canSelectSeller} disabled={Boolean(saved) || saving} />
               <Field label="Costo">
                 <select
                   className="h-8 rounded-lg border px-2 text-sm"
@@ -952,6 +969,7 @@ export function InvoiceEditor({
                 <div className="relative" ref={guideSearchRef}>
                   <Search className="absolute left-2 top-2 size-3.5 text-slate-400" />
                   <Input
+                    aria-label="Buscar guía de remisión"
                     className="h-8 pl-7 pr-7 text-sm"
                     value={shipmentGuideSearch || (shipmentGuideId ? shipmentGuides.find((g) => g.id === shipmentGuideId)?.number ?? "" : "")}
                     onChange={(e) => {
@@ -996,24 +1014,22 @@ export function InvoiceEditor({
               </Field>
             </div>
             {/* Reembolso / Exportación toggles */}
-            <div className="mt-3 flex flex-wrap gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
+            <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2">
+              <label className="flex min-h-12 items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-sm">
+                <span>Factura Reembolso</span>
+                <AnimatedSwitch
+                  aria-label="Factura Reembolso"
                   checked={invoiceKind === "REIMBURSEMENT"}
-                  onChange={(e) => setInvoiceKind(e.target.checked ? "REIMBURSEMENT" : "NORMAL")}
-                  className="size-4 rounded border-slate-300"
+                  onCheckedChange={(checked) => setInvoiceKind(checked ? "REIMBURSEMENT" : "NORMAL")}
                 />
-                Factura Reembolso
               </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
+              <label className="flex min-h-12 items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-sm">
+                <span>Factura de Exportación</span>
+                <AnimatedSwitch
+                  aria-label="Factura de Exportación"
                   checked={invoiceKind === "EXPORT"}
-                  onChange={(e) => setInvoiceKind(e.target.checked ? "EXPORT" : "NORMAL")}
-                  className="size-4 rounded border-slate-300"
+                  onCheckedChange={(checked) => setInvoiceKind(checked ? "EXPORT" : "NORMAL")}
                 />
-                Factura de Exportación
               </label>
             </div>
             {payments.length > 0 && (
@@ -1022,7 +1038,7 @@ export function InvoiceEditor({
                 <span className="font-medium">{paymentSummary}</span>
                 {paymentMethod === "multiple" && payments.length > 0 && (
                   <span className="ml-2 text-xs text-slate-400">
-                    Pag. SRI: Múltiple
+                    Forma de pago SRI: Múltiple
                   </span>
                 )}
               </div>
@@ -1032,11 +1048,13 @@ export function InvoiceEditor({
           {/* Customer card */}
           <Card title="Cliente">
             <div className="relative" ref={customerSearchRef}>
-              <Label>Buscar cliente</Label>
-              <div className="mt-1 flex gap-2">
-                <div className="relative flex-1">
+              <Label htmlFor="invoice-customer-search">Buscar cliente</Label>
+              <div className="mt-2 flex min-w-0 flex-col gap-2 sm:flex-row">
+                <div className="relative min-w-0 flex-1">
                   <Search className="absolute left-3 top-2 size-4 text-slate-400" />
                   <Input
+                    id="invoice-customer-search"
+                    ref={customerInputRef}
                     className="pl-9 pr-8"
                     value={customerSearch}
                     onChange={(event) => {
@@ -1049,6 +1067,7 @@ export function InvoiceEditor({
                   {(customerId || customerSearch) && (
                     <button
                       type="button"
+                      aria-label="Limpiar búsqueda y selección de cliente"
                       className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
                       onClick={() => {
                         setCustomerId("");
@@ -1069,7 +1088,7 @@ export function InvoiceEditor({
                           key={item.id}
                           onClick={() => {
                             setCustomerId(item.id);
-                            setCustomerSearch(item.name);
+                            setCustomerSearch("");
                             setCustomerDropdownOpen(false);
                             setSaved(null);
                           }}
@@ -1086,14 +1105,10 @@ export function InvoiceEditor({
               </div>
             </div>
             {selectedCustomer ? (
-              <div className="mt-3 grid gap-1 rounded-lg bg-slate-50 p-3 text-sm sm:grid-cols-2">
-                <p><b>{selectedCustomer.name}</b></p>
-                <p>{selectedCustomer.identification ?? "—"}</p>
-                <p>{selectedCustomer.tradeName ?? "—"}</p>
-                <p>{selectedCustomer.phone ?? "—"}</p>
-                <p>{selectedCustomer.address ?? "—"}</p>
-                <p>{selectedCustomer.email ?? "—"}</p>
-              </div>
+              <SelectedInvoiceCustomer customer={selectedCustomer}
+                onChange={() => { setCustomerSearch(""); setCustomerDropdownOpen(true); customerInputRef.current?.focus(); }}
+                onClear={() => { setCustomerId(""); setCustomerSearch(""); setCustomerDropdownOpen(false); setSaved(null); }}
+              />
             ) : (
               <button
                 type="button"
@@ -1107,8 +1122,9 @@ export function InvoiceEditor({
               </button>
             )}
             <div className="mt-3">
-              <Label>Observación</Label>
+              <Label htmlFor="invoice-notes">Observación de factura</Label>
               <Input
+                id="invoice-notes"
                 className="mt-1"
                 value={notes}
                 onChange={(event) => {
@@ -1157,10 +1173,16 @@ export function InvoiceEditor({
             </div>
           </Card>
         )}
+      </fieldset>
 
         {/* Detail + totals */}
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_310px]">
+        <div className="mt-5 grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_310px]">
           <Card title="Detalle de factura">
+            <AnimatedSegmentedControl label="Sección de la factura" value={detailView} onValueChange={setDetailView}
+              options={[{ value: "details", label: "Detalles", icon: <List className="size-4" /> }, { value: "journal", label: "Asiento", icon: <BookOpen className="size-4" /> }]}
+              className="mb-5 w-full sm:w-80" />
+            <div hidden={detailView !== "details"} role="region" aria-label="Detalles de la factura">
+            <fieldset disabled={Boolean(saved)} className="min-w-0">
             <div className="mb-3 grid gap-2 md:grid-cols-[180px_150px_minmax(0,1fr)]">
               {warehouses.length > 1 ? (
                 <select
@@ -1199,6 +1221,7 @@ export function InvoiceEditor({
                   }}
                   onFocus={() => setProductDropdownOpen(true)}
                   placeholder="Código principal, auxiliar, nombre o descripción"
+                  aria-label="Buscar producto"
                 />
                 {productDropdownOpen && productMatches.length > 0 ? (
                   <div className="absolute z-20 mt-1 w-full rounded-lg border bg-white shadow-lg">
@@ -1227,7 +1250,7 @@ export function InvoiceEditor({
                 ) : null}
               </div>
             </div>
-            <div className="overflow-x-auto rounded-lg border">
+            <div className="max-w-full overflow-x-auto rounded-xl border" role="region" aria-label="Productos de la factura" tabIndex={0}>
               <table className="w-full min-w-[1100px] text-left text-xs">
                 <thead className="bg-slate-50 text-slate-500">
                   <tr>
@@ -1274,6 +1297,7 @@ export function InvoiceEditor({
                         </td>
                         <td className="px-2">
                           <Input
+                            aria-label={`Observación de ${item.product.name}`}
                             className="h-7 w-36"
                             value={item.description}
                             onChange={(event) =>
@@ -1284,6 +1308,7 @@ export function InvoiceEditor({
                         <td className="px-2">{stockLabel}</td>
                         <td className="px-2">
                           <EditableNumberInput
+                            aria-label={`Cantidad de ${item.product.name}`}
                             className="h-7 w-16"
                             value={item.quantity}
                             onChange={(v) =>
@@ -1300,6 +1325,7 @@ export function InvoiceEditor({
                         </td>
                         <td className="px-2">
                           <EditableNumberInput
+                            aria-label={`Precio de ${item.product.name}`}
                             className="h-7 w-24"
                             value={item.unitPrice}
                             onChange={(v) =>
@@ -1313,6 +1339,7 @@ export function InvoiceEditor({
                         <td className="px-2">{taxLabel}</td>
                         <td className="px-2">
                           <EditableNumberInput
+                            aria-label={`Descuento porcentual de ${item.product.name}`}
                             className="h-7 w-16"
                             value={item.discountPct}
                             onChange={(v) =>
@@ -1330,6 +1357,7 @@ export function InvoiceEditor({
                         <td className="px-2 font-semibold">{money(item.total)}</td>
                         <td className="px-2">
                           <Button
+                            aria-label={`Quitar ${item.product.name}`}
                             size="icon-sm"
                             variant="ghost"
                             onClick={() =>
@@ -1382,10 +1410,13 @@ export function InvoiceEditor({
                 />
               </Field>
             </div>
+            </fieldset>
+            </div>
+            {detailView === "journal" ? <InvoiceJournalPanel saleId={saved?.saleId} /> : null}
           </Card>
 
           {/* Totals sidebar — fixed 11 rows, always visible */}
-          <aside className="h-fit rounded-xl border bg-white p-4">
+          <aside className="min-w-0 h-fit rounded-2xl border bg-white p-4 sm:p-5">
             <h2 className="mb-3 font-semibold">Totales</h2>
             <Total label="Subtotal" value={totalsData.subtotalBruto} />
             <Total label={`Subtotal dif ${totalsData.ivaRate || 0}%`} value={totalsData.taxableBase} />
@@ -1402,17 +1433,17 @@ export function InvoiceEditor({
               <span className="font-semibold">Total Pagar</span>
               <strong className="text-2xl text-[#172033]">{money(totalsData.totalPagar)}</strong>
             </div>
-            <Button
-              className="mt-4 w-full bg-[#1E52F1] text-white"
+            <BlobButton
+              className="mt-4 w-full"
               disabled={!submissionEnabled || saving || !lines.length || Boolean(saved)}
               title={!submissionEnabled ? submissionMessage : undefined}
               onClick={() => save(false)}
             >
               {saving ? "Guardando..." : "Guardar factura"}
-            </Button>
+            </BlobButton>
           </aside>
         </div>
-      </fieldset>
+      </div>
 
       {/* Payment modals */}
       {showPaymentModal && singlePaymentMethod && (
@@ -1444,19 +1475,21 @@ export function InvoiceEditor({
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border bg-white p-4">
-      <h2 className="mb-3 font-semibold text-[#172033]">{title}</h2>
+    <section className="min-w-0 rounded-2xl border bg-white p-4 shadow-sm shadow-slate-200/30 sm:p-5">
+      <h2 className="mb-4 border-b pb-3 font-semibold text-[#172033]">{title}</h2>
       {children}
     </section>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
+  const id = useId();
   return (
-    <label className="grid gap-1 text-xs text-slate-500">
-      <span>{label}</span>
-      {children}
-    </label>
+    <div className={`grid min-w-0 gap-1.5 text-xs text-slate-600 ${wide ? "sm:col-span-2" : ""}`}>
+      <Label htmlFor={id} className="text-xs text-slate-600">{label}</Label>
+      {Children.map(children, (child) => isValidElement(child) && (child.type === Input || child.type === "select" || child.type === EditableNumberInput)
+        ? cloneElement(child as ReactElement<{ id?: string }>, { id }) : child)}
+    </div>
   );
 }
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { updateCustomer } from "@/lib/core/lightweight-pos";
+import { isCustomerInternalCodeConflict } from "@/lib/core/customer-internal-code";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { requireTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
@@ -78,6 +79,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       customerId,
       name: getString(body, "name"),
       tradeName: getString(body, "tradeName"),
+      internalCode: getString(body, "internalCode"),
       phone: getString(body, "phone"),
       phoneNumbers: getStrings(body, "phoneNumbers"),
       email: emails?.[0] ?? getString(body, "email"),
@@ -122,6 +124,9 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     return NextResponse.json({ ok: true, customer });
   } catch (error) {
+    if (isCustomerInternalCodeConflict(error)) {
+      return NextResponse.json({ ok: false, message: "Ya existe un cliente con este código interno en tu empresa." }, { status: 409 });
+    }
     return NextResponse.json(
       {
         ok: false,

@@ -33,6 +33,9 @@ export function parseReceivedFilters(params: URLSearchParams) {
   if (!["", "PENDING", "REGISTERED", "IGNORED", "PROBLEM"].includes(status))
     throw new TaxInputError("Estado inválido.");
   const type = params.get("type") ?? "";
+  const view = params.get("view") ?? "";
+  if (!["", "UNREGISTERED", "REGISTERED", "CANCELLED"].includes(view))
+    throw new TaxInputError("Vista de recibidos inválida.");
   if (
     type &&
     ![...Object.values(PurchaseDocumentType), "WITHHOLDING"].includes(
@@ -52,6 +55,7 @@ export function parseReceivedFilters(params: URLSearchParams) {
     from,
     to,
     status,
+    view,
     type,
     q: text("q"),
     ruc: text("ruc"),
@@ -118,6 +122,12 @@ export async function listReceivedDocuments(
     inboxWhere.status = "NEEDS_REVIEW";
     purchaseWhere.status = { in: ["NEEDS_REVIEW", "REJECTED"] };
   }
+  // Registration is a local purchase state. No SRI cancellation evidence is stored here.
+  const groupWhere = (view: string): { inbox: Prisma.PurchaseInboxItemWhereInput; purchase: Prisma.PurchaseDocumentWhereInput } => ({
+    inbox: { ...inboxWhere, ...(view === "REGISTERED" ? { AND: [{ status: { in: [] } }] } : view === "CANCELLED" ? { AND: [{ status: "IGNORED" as const }] } : view === "UNREGISTERED" ? { AND: [{ status: { not: "IGNORED" as const } }] } : {}) },
+    purchase: { ...purchaseWhere, ...(view === "REGISTERED" ? { AND: [{ status: { in: ["REGISTERED", "AUTHORIZED"] } }] } : view === "CANCELLED" ? { AND: [{ status: "CANCELLED" }] } : view === "UNREGISTERED" ? { AND: [{ status: { in: ["DRAFT", "NEEDS_REVIEW", "REJECTED"] } }] } : {}) },
+  });
+  const selectedWhere = groupWhere(filters.view);
   const take = filters.page * filters.pageSize;
   const [
     inbox,
@@ -128,12 +138,12 @@ export async function listReceivedDocuments(
     purchaseTypes,
   ] = await Promise.all([
     db.purchaseInboxItem.findMany({
-      where: inboxWhere,
+      where: selectedWhere.inbox,
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take,
     }),
     db.purchaseDocument.findMany({
-      where: purchaseWhere,
+      where: selectedWhere.purchase,
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take,
       include: {
@@ -143,8 +153,8 @@ export async function listReceivedDocuments(
         inboxItem: { select: { tenantId: true, subtotal: true } },
       },
     }),
-    db.purchaseInboxItem.count({ where: inboxWhere }),
-    db.purchaseDocument.count({ where: purchaseWhere }),
+    db.purchaseInboxItem.count({ where: selectedWhere.inbox }),
+    db.purchaseDocument.count({ where: selectedWhere.purchase }),
     db.purchaseInboxItem.findMany({
       where: { tenantId, purchaseDocumentId: null },
       distinct: ["documentType"],
@@ -156,6 +166,16 @@ export async function listReceivedDocuments(
       select: { documentType: true },
     }),
   ]);
+  const countView = async (view: string) => {
+    const where = groupWhere(view);
+    const [inboxTotal, purchaseTotal] = await Promise.all([
+      db.purchaseInboxItem.count({ where: where.inbox }), db.purchaseDocument.count({ where: where.purchase }),
+    ]);
+    return inboxTotal + purchaseTotal;
+  };
+  const [unregistered, registered, cancelled] = await Promise.all([
+    countView("UNREGISTERED"), countView("REGISTERED"), countView("CANCELLED"),
+  ]);
   const items = [
     ...inbox.map((d) => ({
       id: d.id,
@@ -165,6 +185,7 @@ export async function listReceivedDocuments(
       name: d.supplierName,
       ruc: d.supplierRuc,
       date: d.issueDate?.toISOString() ?? null,
+      authorizationDate: null as string | null,
       base: money(d.subtotal),
       iva: money(d.ivaTotal),
       total: money(d.total),
@@ -192,6 +213,7 @@ export async function listReceivedDocuments(
         d.supplierIdentification ??
         (d.supplier?.tenantId === tenantId ? d.supplier.identification : null),
       date: d.issueDate?.toISOString() ?? null,
+      authorizationDate: d.authorizationDate?.toISOString() ?? null,
       base:
         d.status === "NEEDS_REVIEW" && d.inboxItem?.tenantId === tenantId
           ? money(d.inboxItem.subtotal)
@@ -229,6 +251,7 @@ export async function listReceivedDocuments(
     page: filters.page,
     pageSize: filters.pageSize,
     totalPages: Math.ceil(total / filters.pageSize),
+    counts: { unregistered, registered, cancelled },
     supportedTypes: [
       ...new Set(
         [...inboxTypes, ...purchaseTypes]

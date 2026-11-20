@@ -4,13 +4,15 @@ import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { getEcuadorSriDateParts } from "@/lib/core/sri-ecuador-date";
 import { SRI_TAX_NAVIGATION } from "@/config/sri-tax-navigation";
 import { TaxCenterClient, type TaxView } from "./tax-center-client";
+import { TaxNavigation } from "./tax-navigation";
+import styles from "./sri-center.module.css";
 
 export async function TaxPage({ view }: { view: TaxView }) {
   const { tenant } = await requireDashboardSession();
   const today = getEcuadorSriDateParts(new Date());
   return (
     <DashboardShell>
-      <div className="space-y-6">
+      <div className={`${styles.center} space-y-6`}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm text-muted-foreground">
@@ -33,20 +35,7 @@ export async function TaxPage({ view }: { view: TaxView }) {
             Configuración → SRI
           </Link>
         </div>
-        <nav
-          aria-label="Centro tributario SRI"
-          className="flex gap-2 overflow-x-auto pb-2"
-        >
-          {SRI_TAX_NAVIGATION.map((item) => (
-            <Link
-              className="shrink-0 rounded-lg border px-3 py-2 text-sm hover:border-blue-400"
-              key={item.href}
-              href={item.href}
-            >
-              {item.title}
-            </Link>
-          ))}
-        </nav>
+        <TaxNavigation activeHref={`/facturacion/sri${view === "summary" ? "" : view === "ats-summary" ? "/ats/summary" : `/${view}`}`} />
         <TaxCenterClient
           view={view}
           initialYear={Number(today.year)}

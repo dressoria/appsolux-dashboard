@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { createCustomer } from "@/lib/core/lightweight-pos";
+import { isCustomerInternalCodeConflict } from "@/lib/core/customer-internal-code";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import {
   validateTenantMembership,
@@ -60,6 +61,7 @@ export async function POST(request: Request) {
       tenantId: tenant.id,
       name: getString(body, "name"),
       tradeName: getString(body, "tradeName") || undefined,
+      internalCode: getString(body, "internalCode") || undefined,
       phone: getString(body, "phone") || undefined,
       phoneNumbers: getStrings(body, "phoneNumbers"),
       email: getEmails(body)[0] || getString(body, "email") || undefined,
@@ -99,6 +101,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, customer });
   } catch (error) {
+    if (isCustomerInternalCodeConflict(error)) {
+      return NextResponse.json({ ok: false, message: "Ya existe un cliente con este código interno en tu empresa." }, { status: 409 });
+    }
     return NextResponse.json(
       {
         ok: false,

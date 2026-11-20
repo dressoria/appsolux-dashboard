@@ -115,6 +115,7 @@ test("received reads only the session tenant even if the query contains another 
           totalPages: 0,
           supportedTypes: [],
           xmlNotice: "",
+          counts: { unregistered: 0, registered: 0, cancelled: 0 },
         };
       },
     },
@@ -155,6 +156,32 @@ test("ATS export responds 422 when required fiscal information is missing", asyn
   assert.equal(response.headers.get("content-disposition"), null);
   const data = await response.json();
   assert.equal(data.validation.xsdStatus, "XSD_VALIDATION_PENDING");
+});
+test("ATS XML uses only the authorized profile RUC even when the browser supplies another informant", async () => {
+  const response = await handleTaxRequest(new NextRequest("http://localhost/api/sri-tax/ats/xml?year=2025&month=9&tenantId=tenant-b&ruc=9999999999999"), "ats-xml", {
+    ...services,
+    loadTaxSnapshot: async (tenantId) => {
+      assert.equal(tenantId, "tenant-a");
+      return { ...snapshot, profile: { ruc: "1790016919001", legalName: "Empresa autorizada de prueba", regime: null } };
+    },
+  });
+  assert.equal(response.status, 200);
+  const xml = await response.text();
+  assert.ok(xml.includes("<IdInformante>1790016919001</IdInformante>"));
+  assert.ok(!xml.includes("9999999999999"));
+  assert.match(response.headers.get("content-disposition") ?? "", /1790016919001/);
+});
+test("ATS controller blocks direct XML download when XSD validation is pending or failed", async () => {
+  for (const status of ["XSD_VALIDATION_PENDING", "XSD_VALIDATION_ERROR"] as const) {
+    const response = await handleTaxRequest(new NextRequest("http://localhost/api/sri-tax/ats/xml?year=2025&month=9"), "ats-xml", {
+      ...services,
+      loadTaxSnapshot: async () => ({ ...snapshot, profile: { ruc: "1790016919001", legalName: "Empresa de prueba", regime: null } }),
+      validateAtsXsd: async () => ({ status, detail: "Resultado simulado del validador local." }),
+    });
+    assert.equal(response.status, 422);
+    assert.equal(response.headers.get("content-disposition"), null);
+    assert.equal((await response.json()).validation.xsdStatus, status);
+  }
 });
 test("IVA exports return genuine PDF and XLSX content with attachment headers", async () => {
   for (const format of ["pdf", "xlsx"]) {

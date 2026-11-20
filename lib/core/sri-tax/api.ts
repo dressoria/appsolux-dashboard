@@ -45,6 +45,7 @@ const defaultServices = {
   loadTaxSnapshot,
   listReceivedDocuments,
   getReceivedSyncState,
+  validateAtsXsd,
 };
 function json(value: unknown, status = 200) {
   return NextResponse.json(value, { status, headers: noStore });
@@ -184,7 +185,7 @@ export async function handleTaxRequest(
     if (ats.domainStatus === "DOMAIN_VALIDATION_OK") {
       xml = buildAtsXml(ats);
       ats.xmlStatus = "XML_GENERATED";
-      const xsd = await validateAtsXsd(xml);
+      const xsd = await services.validateAtsXsd(xml);
       ats.xsdStatus = xsd.status;
       if (xsd.status === "XSD_VALIDATION_ERROR")
         ats.issues.push({
@@ -199,10 +200,12 @@ export async function handleTaxRequest(
         });
     }
     if (endpoint === "ats-xml") {
-      if (!xml || ats.xsdStatus === "XSD_VALIDATION_ERROR")
+      if (!xml || ats.xsdStatus !== "XSD_VALIDATED")
         return json(
           {
-            error: "Exportación ATS bloqueada. Revise las validaciones.",
+            error: xml && ats.xsdStatus === "XSD_VALIDATION_PENDING"
+              ? "Exportación ATS bloqueada: la validación XSD está pendiente en el servidor."
+              : "Exportación ATS bloqueada. Revise las validaciones.",
             ...buildAtsSummary(ats),
           },
           422,

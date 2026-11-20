@@ -1,9 +1,10 @@
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
-import { InvoiceEditor } from "@/components/appsolux/sales/invoice-editor";
+import { InvoiceEditor, type InvoiceDraftPayload } from "@/components/appsolux/sales/invoice-editor";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { listSriEstablishments, listSriIssuePoints } from "@/lib/core/sri";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
 import { getPrismaClient } from "@/lib/db/prisma";
+import { getInvoiceSellerContext } from "@/lib/core/invoice-sellers";
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
@@ -29,6 +30,7 @@ export default async function NewInvoicePage({
     warehouseStocks,
     shipmentGuides,
     treasuryAccounts,
+    sellerContext,
   ] = await Promise.all([
     prisma.lightweightCustomer.findMany({
       where: { tenantId: tenant.id, isActive: true },
@@ -60,6 +62,7 @@ export default async function NewInvoicePage({
       where: { tenantId: tenant.id, active: true },
       orderBy: { name: "asc" },
     }),
+    getInvoiceSellerContext(tenant.id, user.id),
   ]);
 
   let initialCustomerId: string | undefined;
@@ -119,7 +122,8 @@ export default async function NewInvoicePage({
       mainClassName="px-3 py-4 sm:px-5"
     >
       <InvoiceEditor
-        currentUserName={user.name}
+        sellerContext={sellerContext}
+        issueDateLabel={new Intl.DateTimeFormat("es-EC", { dateStyle: "medium", timeZone: "America/Guayaquil" }).format(new Date())}
         submissionEnabled={!tenantMode.canUseAdvancedErp}
         submissionMessage={
           tenantMode.canUseAdvancedErp
@@ -211,7 +215,7 @@ export default async function NewInvoicePage({
         aiDraftId={aiDraftId}
         aiProposalId={aiProposalId}
         draftId={draftIdParam}
-        draftPayload={draftPayload as any}
+        draftPayload={draftPayload as InvoiceDraftPayload | undefined}
       />
     </DashboardShell>
   );
