@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { BlobFill } from "./blob-fill";
 import styles from "./animated-controls.module.css";
 
 export function BlobButton({
@@ -14,11 +15,8 @@ export function BlobButton({
   variant?: "solid" | "outline";
 }) {
   return (
-    <Button {...props} type={type} variant={variant === "outline" ? "outline" : "default"} data-variant={variant} className={cn(styles.blobButton, className)}>
-      <span aria-hidden="true" className={styles.blobs}>
-        <span className={styles.blob} /><span className={styles.blob} />
-        <span className={styles.blob} /><span className={styles.blob} />
-      </span>
+    <Button {...props} type={type} variant={variant === "outline" ? "outline" : "default"} data-variant={variant} className={cn(styles.blobHost, styles.blobButton, className)}>
+      <BlobFill />
       <span className={styles.buttonLabel}>{children}</span>
     </Button>
   );

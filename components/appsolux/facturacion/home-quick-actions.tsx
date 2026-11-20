@@ -6,6 +6,8 @@ import {
 } from "lucide-react";
 import type { ShortcutEntry } from "@/lib/core/home-preferences";
 import { HomeShortcutsEditor } from "./home-shortcuts-editor";
+import { BlobFill } from "@/components/ui/blob-fill";
+import blobStyles from "@/components/ui/animated-controls.module.css";
 import styles from "./home.module.css";
 
 const icons: Record<string, LucideIcon> = {
@@ -31,7 +33,8 @@ export function HomeQuickActions({ shortcuts, initialKeys, catalog }: {
         {shortcuts.map(({ key, title, description, icon, href }) => {
           const Icon = icons[icon] || FileCheck2;
           return (
-            <Link key={key} href={href} className={styles.shortcut}>
+            <Link key={key} href={href} className={`${styles.shortcut} ${blobStyles.blobHost}`}>
+              <BlobFill />
               <span className={styles.shortcutTop}>
                 <span className={styles.shortcutIcon}><Icon size={23} aria-hidden="true" /></span>
                 <span className={styles.shortcutArrow}><ArrowUpRight size={19} aria-hidden="true" /></span>

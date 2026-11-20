@@ -80,10 +80,12 @@
 .switch[aria-checked="true"] .thumb { transform: translateX(1.25rem); }
 .switch:active:not(:disabled) .thumb { scale: 0.9; }
 
-.blobButton {
+.blobHost {
   position: relative;
   isolation: isolate;
   overflow: hidden;
+}
+.blobButton {
   min-height: 2.75rem;
   padding-inline: 1.25rem;
   border-radius: 0.875rem;
@@ -94,17 +96,17 @@
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
 .blobButton[data-variant="outline"] { background: white; color: var(--facturom-action-strong); }
-.blobButton:hover:not(:disabled) { box-shadow: 0 4px 12px #ec008c24; }
+.blobButton:hover:not(:disabled) { box-shadow: var(--blob-shadow, 0 4px 12px #ec008c24); }
 .blobButton[data-variant="outline"]:is(:hover, :focus-visible):not(:disabled) { color: white; }
 .blobButton:active:not(:disabled) { transform: translateY(1px); }
 .blobs { position: absolute; z-index: -1; inset: 0; overflow: hidden; border-radius: inherit; }
 .blob {
   position: absolute;
   bottom: -0.5rem;
-  width: 38%;
+  width: var(--blob-size, 38%);
   aspect-ratio: 1;
   border-radius: 50%;
-  background: var(--facturom-action-strong);
+  background: var(--blob-fill, var(--facturom-action-strong));
   transform: translateY(110%) scale(0.6);
   transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -112,7 +114,7 @@
 .blob:nth-child(2) { left: 18%; transition-delay: 35ms; }
 .blob:nth-child(3) { left: 44%; transition-delay: 70ms; }
 .blob:nth-child(4) { left: 70%; transition-delay: 105ms; }
-.blobButton:is(:hover, :focus-visible):not(:disabled) .blob { transform: translateY(15%) scale(1.9); }
+.blobHost:is(:hover, :focus-visible):not(:disabled) .blob { transform: translateY(15%) scale(1.9); }
 .buttonLabel { position: relative; display: inline-flex; align-items: center; gap: 0.5rem; }
 
 .formPanel { transition: height 240ms cubic-bezier(0.22, 1, 0.36, 1); }

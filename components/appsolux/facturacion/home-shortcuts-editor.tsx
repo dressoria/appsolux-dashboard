@@ -136,7 +136,7 @@ export function HomeShortcutsEditor({ initialKeys, catalog }: EditorProps) {
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Trigger asChild>
-      <BlobButton variant="outline" className="shrink-0 px-4 text-xs" aria-label="Editar accesos rápidos">
+      <BlobButton variant="outline" className={`${styles.brandButton} shrink-0 px-4 text-xs`} aria-label="Editar accesos rápidos">
         <Pencil className="size-3.5" />
         Editar
       </BlobButton>
@@ -214,7 +214,7 @@ export function HomeShortcutsEditor({ initialKeys, catalog }: EditorProps) {
                 <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
                   Cancelar
                 </Button>
-                <BlobButton type="button" onClick={save} disabled={saving || !dirty} className="px-3 text-xs">
+                <BlobButton type="button" onClick={save} disabled={saving || !dirty} className={`${styles.brandButton} px-3 text-xs`}>
                   {saving ? "Guardando…" : "Guardar cambios"}
                 </BlobButton>
               </div>

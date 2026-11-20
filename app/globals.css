@@ -6,6 +6,8 @@
 
 /* Facturom brand tokens */
 :root {
+  --facturom-brand-pink: #FF0099;
+  --facturom-brand-navy: #000345;
   --facturom-primary: #1769E0;
   --facturom-primary-strong: #1D72F3;
   --facturom-primary-dark: #0F2A44;

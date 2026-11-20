@@ -240,6 +240,7 @@ export default async function FacturacionPage() {
               value={String(dashboard.documentCounts.pending)}
               icon={AlertTriangle}
               tone="amber"
+              semanticPending
             />
           </div>
         </CardContent>
@@ -435,13 +436,15 @@ function KpiMetric({
   value,
   icon: Icon,
   tone,
+  semanticPending = false,
 }: {
   label: string;
   value: string;
   icon: LucideIcon;
   tone: "blue" | "amber";
+  semanticPending?: boolean;
 }) {
-  const toneClass = tone === "amber" ? styles.metricPink : styles.metricNavy;
+  const toneClass = semanticPending ? styles.metricPending : tone === "amber" ? styles.metricPink : styles.metricNavy;
 
   return (
     <div className={`flex items-center gap-3 ${toneClass}`}>

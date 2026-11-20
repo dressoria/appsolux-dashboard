@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
 import { isClerkAuth } from "@/lib/auth/provider";
 import { getTenantModeState } from "@/lib/core/tenant-mode";
+import { getTenantSubscription } from "@/lib/core/plans";
 import { DashboardFrame } from "./dashboard-frame";
 import { buildSidebarNavigation } from "./sidebar";
 
@@ -19,7 +20,10 @@ export async function DashboardShell({
   contentClassName = "mx-auto max-w-6xl",
 }: DashboardShellProps) {
   const { user, tenant } = await requireDashboardSession();
-  const tenantMode = await getTenantModeState(tenant);
+  const [tenantMode, subscription] = await Promise.all([
+    getTenantModeState(tenant),
+    getTenantSubscription(tenant.id).catch(() => null),
+  ]);
   const navigationGroups = buildSidebarNavigation(tenantMode);
   const userName = user.name?.trim() || "Usuario";
   const tenantName = tenant.name?.trim() || "Tu empresa";
@@ -31,8 +35,7 @@ export async function DashboardShell({
       contentClassName={contentClassName}
       userName={userName}
       tenantName={tenantName}
-      modeLabel="Cuenta activa"
-      planName={tenantMode.planName}
+      planName={subscription?.plan.name?.trim() || undefined}
       navigationGroups={navigationGroups}
       clerkActive={isClerkAuth()}
     >

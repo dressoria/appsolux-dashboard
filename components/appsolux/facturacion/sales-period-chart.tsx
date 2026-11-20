@@ -139,8 +139,8 @@ export function SalesPeriodChart({ items }: { items: SalesPoint[] }) {
         >
           <defs>
             <linearGradient id="salesAreaFill" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="#EC008C" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#EC008C" stopOpacity="0.02" />
+              <stop offset="0%" stopColor="var(--facturom-brand-pink)" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="var(--facturom-brand-pink)" stopOpacity="0.02" />
             </linearGradient>
           </defs>
           {[0, 1, 2, 3].map((line) => (
@@ -160,7 +160,7 @@ export function SalesPeriodChart({ items }: { items: SalesPoint[] }) {
               <path
                 d={linePath}
                 fill="none"
-                stroke="#EC008C"
+                stroke="var(--facturom-brand-pink)"
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -173,7 +173,7 @@ export function SalesPeriodChart({ items }: { items: SalesPoint[] }) {
               x2={hoverPoint.x}
               y1={top}
               y2={top + plotHeight}
-              stroke="#EC008C"
+              stroke="var(--facturom-brand-pink)"
               strokeWidth="1"
               strokeDasharray="4 3"
               opacity="0.5"
@@ -186,8 +186,8 @@ export function SalesPeriodChart({ items }: { items: SalesPoint[] }) {
                   cx={point.x}
                   cy={point.y}
                   r={hoverIndex === index ? 5.5 : 3.5}
-                  fill={hoverIndex === index ? "#EC008C" : "#fff"}
-                  stroke="#EC008C"
+                  fill={hoverIndex === index ? "var(--facturom-brand-pink)" : "#fff"}
+                  stroke="var(--facturom-brand-pink)"
                   strokeWidth="2"
                   className="transition-[r] duration-150 motion-reduce:transition-none"
                 />
@@ -237,7 +237,7 @@ export function SalesPeriodChart({ items }: { items: SalesPoint[] }) {
             <p className="font-medium text-[#000345]">
               {fullDateFmt.format(new Date(`${hoverPoint.date}T00:00:00Z`))}
             </p>
-            <p className="mt-0.5 font-semibold text-[#EC008C]">
+            <p className="mt-0.5 font-semibold text-[#B8006E]">
               Ventas: {money.format(hoverPoint.value)}
             </p>
           </div>

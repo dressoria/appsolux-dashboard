@@ -1,0 +1,70 @@
+.shell {
+  --shell-pink: var(--facturom-brand-pink);
+  --shell-navy: var(--facturom-brand-navy);
+  --shell-muted: #65687B;
+  --shell-border: #E7E7EF;
+}
+.sidebar {
+  color: white;
+  background: linear-gradient(180deg, var(--shell-pink) 0%, #EF246C 55%, #D92336 100%);
+  border-right: 1px solid #FFFFFF0F;
+}
+.sidebarHeader { min-height: 89px; display: flex; align-items: center; }
+.sidebarHeader > div { width: 100%; }
+.shell .sidebarItem {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: white;
+  background-color: #0003452B;
+  border: 1px solid transparent;
+  transition: border-color 220ms ease, background-color 220ms ease, color 220ms ease;
+}
+.sidebarItem::before {
+  position: absolute;
+  z-index: -1;
+  content: "";
+  inset: -100% -20%;
+  border-radius: 45%;
+  background: linear-gradient(110deg, #FFFFFF1A, #00034515);
+  transform: translateX(-110%) rotate(-12deg);
+  transition: transform 480ms cubic-bezier(.22, 1, .36, 1);
+}
+.shell .sidebarItem:is(:hover, :focus-visible) { color: white; border-color: #FFFFFF18; background-color: #00034540; }
+.sidebarItem:is(:hover, :focus-visible)::before { transform: translateX(0) rotate(-12deg); }
+.shell .sidebarItem[aria-current="page"] {
+  background: var(--shell-navy);
+  border-color: #FFFFFF29;
+  box-shadow: 0 3px 9px #0003451A;
+  color: white;
+}
+.shell .sidebarItem:focus-visible { outline: 2px solid var(--shell-navy); outline-offset: 2px; }
+.topbar { position: sticky; top: 0; z-index: 30; color: var(--shell-navy); border-bottom: 1px solid var(--shell-border); background: #FFFFFFF5; backdrop-filter: blur(12px); }
+.topbarInner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 89px; padding: 1rem clamp(1rem, 3vw, 2.5rem); }
+.topbarTenant, .topbarAccount, .planGroup { display: flex; align-items: center; gap: .85rem; min-width: 0; }
+.topbarTenant { flex: 1; }
+.tenantText { min-width: 0; }
+.tenantText > p:first-child { color: var(--shell-muted); font-size: .68rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.tenantText > p:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; font-weight: 650; }
+.planPill { display: inline-flex; align-items: center; gap: .4rem; max-width: 20rem; border: 1px solid #FF00991A; border-radius: 999px; padding: .55rem .9rem; font-size: .75rem; background: #FFF5FB; color: var(--shell-muted); }
+.planPill strong { color: var(--shell-navy); font-weight: 650; overflow-wrap: anywhere; }
+.planPill::before { content: ""; width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--shell-pink); }
+.avatar { display: inline-flex; flex-shrink: 0; align-items: center; }
+.planLink { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: .6rem 1rem; border: 1px solid var(--shell-border); border-radius: .85rem; color: var(--shell-navy); background: white; font-size: .8rem; font-weight: 650; transition: border-color 220ms ease, box-shadow 220ms ease; }
+.planLink:hover { border-color: var(--shell-pink); box-shadow: 0 4px 12px #00034508; }
+.dialogOverlay { position: fixed; inset: 0; z-index: 50; background: #00034555; backdrop-filter: blur(4px); }
+.mobileDrawer { position: fixed; z-index: 51; inset: 0 auto 0 0; width: min(88vw, 320px); box-shadow: 12px 0 50px #00034526; }
+.sidebar :is(a, button):focus-visible { outline: 2px solid white; outline-offset: 3px; }
+.topbar :is(a, button):focus-visible { outline: 2px solid var(--shell-navy); outline-offset: 3px; }
+.dialogOverlay[data-state="open"], .mobileDrawer[data-state="open"] { animation: shell-enter 180ms ease-out; }
+@keyframes shell-enter { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 639px) {
+  .topbarInner { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: .9rem; padding: .9rem 1rem; }
+  .topbarAccount { display: contents; }
+  .planGroup { grid-column: 1 / -1; grid-row: 2; justify-content: space-between; gap: .6rem; }
+  .avatar { grid-column: 2; grid-row: 1; }
+  .planPill { padding: .45rem .7rem; font-size: .72rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar, .sidebar *, .sidebar *::before, .topbar *, .mobileDrawer, .dialogOverlay { transition: none !important; animation: none !important; }
+}

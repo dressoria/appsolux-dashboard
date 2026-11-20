@@ -39,7 +39,7 @@ async function main() {
         import React from 'react';
         import { DashboardFrame } from '@/components/appsolux/layout/dashboard-frame';
         import { buildSidebarNavigation } from '@/components/appsolux/layout/sidebar';
-        export const referenceProps = { mainClassName: 'px-6 py-8', contentClassName: 'mx-auto max-w-6xl', userName: '131 studio', tenantName: '131 studio', planName: 'Negocio', modeLabel: 'Cuenta activa', navigationGroups: buildSidebarNavigation({}), clerkActive: true };
+        export const referenceProps = { mainClassName: 'px-6 py-8', contentClassName: 'mx-auto max-w-6xl', userName: '131 studio', tenantName: '131 studio', planName: new URLSearchParams(location.search).has('noPlan') ? undefined : 'Negocio', navigationGroups: buildSidebarNavigation({}), clerkActive: true };
         export function DashboardShell(props) { return <DashboardFrame {...referenceProps} {...props} />; }`,
       'next/link': `import React from 'react';export default function Link({ children, ...props }) { return <a {...props}>{children}</a>; }`,
       'next/navigation': `export const usePathname = () => location.pathname; export const useRouter = () => ({ push: () => {}, refresh: () => {} });`,
@@ -52,11 +52,12 @@ async function main() {
         import { hydrateRoot } from 'react-dom/client';
         import FacturacionPage from '@/app/facturacion/page';
         import { DashboardShell } from '@/components/appsolux/layout/dashboard-shell';
+        import { BlobButton } from '@/components/ui/blob-button';
         import '@/app/globals.css';
         (async () => {
           const ui = location.pathname === '/facturacion'
             ? await FacturacionPage()
-            : <DashboardShell><h1>Página de referencia fuera de Inicio</h1></DashboardShell>;
+            : <DashboardShell><h1>Página de referencia fuera de Inicio</h1><BlobButton>Control compartido</BlobButton></DashboardShell>;
           const root = document.getElementById('root');
           root.innerHTML = renderToString(ui); hydrateRoot(root, ui);
         })();
@@ -105,7 +106,7 @@ async function main() {
       if (!screenshots) return;
       await fs.mkdir(screenshots, { recursive: true });
       await page.waitForTimeout(260);
-      await page.screenshot({ path: path.join(screenshots, name), fullPage: !name.includes('menu-mobile') });
+      await page.screenshot({ path: path.join(screenshots, name), fullPage: !/menu-mobile|editar/.test(name) });
     };
     await open();
     await page.getByRole('heading', { name: 'Hola, 131 studio 👋', exact: true }).waitFor();
@@ -114,8 +115,9 @@ async function main() {
     assert.equal(await page.getByText('Mi plan', { exact: true }).count(), 0);
     assert.equal(await page.getByText('Cuenta activa', { exact: true }).count(), 0);
     assert.equal(await page.getByRole('button', { name: 'Acceso de usuario' }).count(), 1);
-    assert.equal(await page.locator('aside:visible').evaluate((el) => getComputedStyle(el).backgroundColor), 'rgb(0, 3, 69)');
-    pass('Empresa, plan real único, avatar y sidebar con identidad #000345');
+    const sidebarGradient = await page.locator('aside:visible').evaluate((el) => getComputedStyle(el).backgroundImage);
+    assert.match(sidebarGradient, /255, 0, 153/);
+    pass('Empresa, plan único, avatar y degradado rosado #FF0099');
 
     const actions = page.getByRole('region', { name: 'Acciones rápidas' });
     const expected = {
@@ -131,15 +133,37 @@ async function main() {
 
     const card = actions.getByRole('link').first();
     const transform = (locator, pseudo) => locator.evaluate((el, pseudo) => getComputedStyle(el, pseudo).transform, pseudo);
-    const start = await transform(card, '::before');
+    const circles = (host) => host.locator(':scope > span[aria-hidden="true"] > span');
+    const editButton = page.getByRole('button', { name: 'Editar accesos rápidos' });
+    const timing = (host) => circles(host).evaluateAll((nodes) => nodes.map((el) => {
+      const s = getComputedStyle(el);
+      return [s.transitionDuration, s.transitionTimingFunction, s.transitionDelay, s.backgroundColor];
+    }));
+    const referenceTiming = await timing(editButton);
+    assert.equal(referenceTiming.length, 4);
+    assert.ok(referenceTiming.every((values) => values[0] === '0.42s' && values[3] === 'rgb(255, 0, 153)'));
+    const start = await transform(circles(card).first());
     await card.hover(); await page.waitForTimeout(90);
-    const midway = await transform(card, '::before');
-    await page.waitForTimeout(500);
+    const midway = await transform(circles(card).first());
+    await page.waitForTimeout(550);
     assert.notEqual(start, midway);
-    assert.notEqual(midway, await transform(card, '::before'), 'hover has a real intermediate animation state');
-    assert.notEqual(await transform(card), 'none');
+    assert.notEqual(midway, await transform(circles(card).first()));
     await shot('inicio-hover.png');
-    pass('Barrido blob, elevación e icono tienen transiciones reales');
+    for (const link of await actions.getByRole('link').all()) {
+      assert.deepEqual(await timing(link), referenceTiming, 'each card shares the Edit mechanism, color, timing and stagger');
+      await link.hover(); await page.waitForTimeout(600);
+      assert.ok(await link.evaluate((el) => {
+        const rect = el.getBoundingClientRect();
+        const blobs = [...el.querySelectorAll(':scope > span[aria-hidden="true"] > span')].map((blob) => blob.getBoundingClientRect());
+        return [[rect.left + 3, rect.top + 3], [rect.right - 3, rect.top + 3], [rect.left + 3, rect.bottom - 3], [rect.right - 3, rect.bottom - 3], [rect.x + rect.width / 2, rect.y + rect.height / 2]].every(([x, y]) => blobs.some((b) => ((x - b.x - b.width / 2) / (b.width / 2)) ** 2 + ((y - b.y - b.height / 2) / (b.height / 2)) ** 2 <= 1));
+      }), 'the expanded circles cover the whole card');
+    }
+    await editButton.hover(); await page.waitForTimeout(600);
+    await shot('editar-hover.png');
+    assert.equal(await editButton.evaluate((el) => getComputedStyle(el).color), 'rgb(0, 3, 69)');
+    await page.mouse.move(1400, 100); await page.waitForTimeout(600);
+    assert.equal(await transform(circles(card).first()), start, 'fill reverses smoothly to its initial transform');
+    pass('Las ocho tarjetas y Editar comparten cuatro blobs, 420ms, escalonado y relleno completo reversible');
 
     const navigation = page.getByRole('navigation', { name: 'Navegación principal' });
     const people = navigation.getByRole('button', { name: 'Personas', exact: true });
@@ -178,6 +202,7 @@ async function main() {
     await dialog.getByRole('status').filter({ hasText: 'No se pudo guardar en la prueba.' }).waitFor();
     assert.equal(await dialog.isVisible(), true);
     await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Editar accesos rápidos');
     assert.equal(await edit.evaluate((el) => document.activeElement === el), true);
     failSave = false;
     await edit.click();
@@ -233,6 +258,7 @@ async function main() {
       assert.ok(await drawer.evaluate((el) => el.contains(document.activeElement)), 'mobile focus remains in the dialog');
     }
     await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Abrir menú');
     assert.equal(await page.getByRole('button', { name: 'Abrir menú' }).evaluate((el) => document.activeElement === el), true);
     await page.getByRole('button', { name: 'Abrir menú' }).click();
     await page.setViewportSize({ width: 1440, height: 1024 });
@@ -242,14 +268,24 @@ async function main() {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await card.focus();
     assert.equal(await card.evaluate((el) => getComputedStyle(el).transitionDuration), '0s');
-    assert.equal(await card.evaluate((el) => getComputedStyle(el, '::before').transitionDuration), '0s');
+    assert.equal(await circles(card).first().evaluate((el) => getComputedStyle(el).transitionDuration), '0s');
     assert.notEqual(await card.evaluate((el) => getComputedStyle(el).outlineStyle), 'none');
     pass('Reduced motion y foco visible en accesos');
 
-    await open('/facturacion/products');
-    assert.match(await page.locator('aside:visible').evaluate((el) => getComputedStyle(el).backgroundImage), /30, 82, 241/);
-    assert.equal(await page.getByRole('link', { name: 'Mi plan', exact: true }).count(), 1);
-    pass('La apariencia del layout fuera de Inicio conserva el esquema anterior');
+    for (const route of ['/facturacion/customers', '/facturacion/sales/new', '/facturacion/sri', '/facturacion/treasury', '/facturacion/products', '/facturacion/accounting/journal', '/facturacion/reports', '/facturacion/settings', '/facturacion/settings/users', '/facturacion']) {
+      await open(route);
+      assert.equal(await page.locator('aside:visible').evaluate((el) => getComputedStyle(el).backgroundImage), sidebarGradient);
+      assert.equal(await page.getByRole('link', { name: 'Planes', exact: true }).count(), 1);
+      assert.equal(await page.getByText('Cuenta activa', { exact: true }).count(), 0);
+      await page.reload();
+      await page.getByRole('heading', { level: 1 }).waitFor();
+      assert.equal(await page.locator('aside:visible').evaluate((el) => getComputedStyle(el).backgroundImage), sidebarGradient);
+    }
+    await open('/facturacion/customers?noPlan=1');
+    assert.match(await page.locator('header').first().innerText(), /Sin información/);
+    pass('Sidebar y cabecera iguales en diez rutas y sus recargas; plan ausente muestra estado neutral');
+    assert.equal(await circles(page.getByRole('button', { name: 'Control compartido' })).first().evaluate((el) => getComputedStyle(el).backgroundColor), 'rgb(201, 0, 119)');
+    pass('BlobButton conserva su color y comportamiento predeterminados fuera de Inicio');
     assert.deepEqual(errors, [], 'no hydration, JavaScript or accessibility warnings');
     console.log(`PASS ${passed} browser checks; screenshots: ${screenshots || '(not requested)'}`);
   } finally {
