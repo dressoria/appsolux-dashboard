@@ -1,5 +1,6 @@
 import "@/lib/security/server-only";
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   findAppsoluxUserByClerkId,
@@ -16,7 +17,21 @@ export async function getAppUser(): Promise<AppsoluxUser | null> {
     return null;
   }
 
-  const byId = await findAppsoluxUserByClerkId(userId);
+  const headersList = await headers();
+  const authHeader = headersList.get("authorization");
+  const isBearerAuth = typeof authHeader === "string" && authHeader.startsWith("Bearer ");
+  const requestedTenantId = isBearerAuth
+    ? (headersList.get("x-tenant-id") || undefined)
+    : undefined;
+
+  const byId = await findAppsoluxUserByClerkId(userId, requestedTenantId);
+
+  if (requestedTenantId) {
+    if (!byId || !byId.tenant) {
+      return null;
+    }
+    return byId;
+  }
 
   if (byId) {
     return byId;

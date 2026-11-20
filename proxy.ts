@@ -16,6 +16,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/webhooks(.*)",
   "/api/health(.*)",
   "/api/v1/(.*)", // Authenticated by API key, independently of browser sessions.
+  "/api/mobile/(.*)", // Mobile app authenticates via Bearer token; route handlers verify auth and return JSON errors.
 ]);
 
 function getAuthorizedParties(): string[] {

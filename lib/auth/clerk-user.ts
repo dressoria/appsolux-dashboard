@@ -38,15 +38,21 @@ export type ClerkUserInput = {
 };
 
 export async function findAppsoluxUserByClerkId(
-  clerkUserId: string
+  clerkUserId: string,
+  tenantId?: string,
 ): Promise<AppsoluxUser | null> {
   const prisma = getPrismaClient();
+
+  const membershipWhere: { status: "active"; tenantId?: string } = { status: "active" };
+  if (tenantId) {
+    membershipWhere.tenantId = tenantId;
+  }
 
   const user = await prisma.user.findUnique({
     where: { clerkUserId },
     include: {
       memberships: {
-        where: { status: "active" },
+        where: membershipWhere,
         include: {
           tenant: { include: { integrations: true } },
         },
@@ -61,6 +67,15 @@ export async function findAppsoluxUserByClerkId(
   }
 
   if (user.memberships.length === 0) {
+    if (tenantId) {
+      console.warn("[auth][clerk] explicit tenant requested but no active membership", {
+        clerkUserId,
+        userId: user.id,
+        email: maskEmail(user.email),
+        requestedTenantId: tenantId,
+      });
+      return null;
+    }
     console.info("[auth][clerk] user resolved without tenant membership", {
       clerkUserId,
       userId: user.id,
