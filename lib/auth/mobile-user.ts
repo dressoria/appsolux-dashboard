@@ -1,6 +1,6 @@
 import "@/lib/security/server-only";
 import { getPrismaClient } from "@/lib/db/prisma";
-import { getTenantPlanState, type PlanKey } from "@/lib/core/plans";
+import { getTenantPlanState } from "@/lib/core/plans";
 import { getTenantOperationalAccess } from "@/lib/core/tenant-operational-access";
 import {
   resolveEffectiveTenantAccessForTenant,
@@ -131,7 +131,7 @@ export async function resolveMobileTenantContext(
     resolveEffectiveTenantAccessForTenant({ tenantId }).catch(
       (err): EffectiveTenantAccess | null => {
         effectiveAccessFailed = true;
-        console.error("[mobile-auth] effective access resolution failed — using base plan features", {
+        console.error("[mobile-auth] effective access resolution failed — denying access", {
           tenantId,
           error: err instanceof Error ? err.message : "unknown",
         });
@@ -140,14 +140,13 @@ export async function resolveMobileTenantContext(
     ),
   ]);
 
-  const canOperate = operationalAccessFailed
-    ? false
-    : (operationalAccess?.canOperate ?? false);
+  const accessResolutionFailed = operationalAccessFailed || effectiveAccessFailed || !effectiveAccess;
+  const canOperate = !accessResolutionFailed && operationalAccess?.canOperate === true;
 
   const subscription: MobileSubscriptionState = {
     plan: planState.planKey,
     planName: planState.planName,
-    status: operationalAccessFailed ? "error" : planState.status,
+    status: accessResolutionFailed ? "error" : planState.status,
     canOperate,
     trialDaysRemaining: operationalAccess?.trialDaysRemaining ?? null,
     currentPeriodEndsAt: planState.currentPeriodEndsAt?.toISOString() ?? null,
@@ -160,14 +159,18 @@ export async function resolveMobileTenantContext(
       access[key] = value === true;
     }
   } else {
-    for (const [key, value] of Object.entries(planState.features)) {
-      access[key] = value === true;
+    // Preserve known keys as denials, never grant base-plan capabilities.
+    for (const key of Object.keys(planState.features)) {
+      access[key] = false;
     }
   }
 
   if (!subscription.canOperate) {
     for (const key of Object.keys(access)) {
-      if (key !== "sri_invoicing" && key !== "sri_configuration") {
+      if (
+        operationalAccess?.canRead !== true ||
+        (key !== "sri_invoicing" && key !== "sri_configuration")
+      ) {
         access[key] = false;
       }
     }

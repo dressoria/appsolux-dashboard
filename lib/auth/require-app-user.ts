@@ -19,15 +19,21 @@ export async function getAppUser(): Promise<AppsoluxUser | null> {
 
   const headersList = await headers();
   const authHeader = headersList.get("authorization");
-  const isBearerAuth = typeof authHeader === "string" && authHeader.startsWith("Bearer ");
+  const isBearerAuth = /^Bearer(?:\s|$)/i.test(authHeader ?? "");
   const requestedTenantId = isBearerAuth
-    ? (headersList.get("x-tenant-id") || undefined)
+    ? (headersList.get("x-tenant-id")?.trim() || undefined)
     : undefined;
+
+  // Business requests must explicitly select a tenant; /api/mobile/me resolves
+  // the user's profile independently and does not require a selected tenant.
+  if (isBearerAuth && !requestedTenantId) {
+    return null;
+  }
 
   const byId = await findAppsoluxUserByClerkId(userId, requestedTenantId);
 
-  if (requestedTenantId) {
-    if (!byId || !byId.tenant) {
+  if (isBearerAuth) {
+    if (!byId || !byId.tenant || byId.tenant.id !== requestedTenantId) {
       return null;
     }
     return byId;

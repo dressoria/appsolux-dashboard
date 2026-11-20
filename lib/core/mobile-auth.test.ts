@@ -1,174 +1,30 @@
 import assert from "node:assert/strict";
-import test, { describe } from "node:test";
+import { createRequire } from "node:module";
+import { resolve } from "node:path";
+import test, { mock } from "node:test";
+import type { MembershipRole } from "@prisma/client";
+import type { NextRequest } from "next/server";
 
-// =============================================================================
-// These tests exercise the BUSINESS LOGIC of mobile authentication and
-// authorization. They replicate the decision paths in:
-//   - require-app-user.ts  (Bearer-only X-Tenant-Id, fail-closed)
-//   - clerk-user.ts        (explicit tenant → null on no membership)
-//   - mobile-user.ts       (subscription fail-closed, feature resolution)
-//   - select-tenant/route  (membership + subscription + access validation)
-//   - me/route             (profile + tenant listing)
-//
-// Each test constructs inputs matching what the real functions receive and
-// asserts the correct decision, using the same branching logic.
-// =============================================================================
-
-// --- Helpers that mirror real resolution logic ---
-
+// Load production authentication modules and HTTP handlers. Only external
+// dependencies (Clerk, request headers, Prisma and policy services) are mocked.
+// The Prisma fixture applies query predicates; authorization stays in real code.
 type Membership = {
-  userId: string;
-  tenantId: string;
-  status: "active" | "inactive";
-  role: string;
+  userId: string; tenantId: string; status: "active" | "inactive";
+  role: MembershipRole;
   tenant: { id: string; name: string; slug: string; status: string };
 };
-
 type UserRecord = {
-  id: string;
-  clerkUserId: string;
-  name: string;
-  email: string;
-  status: "active" | "disabled";
-  memberships: Membership[];
+  id: string; clerkUserId: string; name: string; email: string;
+  status: "active" | "disabled"; memberships: Membership[];
 };
-
-type OperationalAccess = {
-  canOperate: boolean;
-  canRead: boolean;
-  effectiveStatus: string;
-  reason: string;
-  trialDaysRemaining: number | null;
-} | null;
-
-type EffectiveAccess = {
-  features: Record<string, boolean>;
-} | null;
-
 type PlanState = {
-  planKey: string;
-  planName: string;
-  status: string;
-  features: Record<string, boolean>;
-  currentPeriodEndsAt: Date | null;
+  planKey: string; planName: string; status: string;
+  features: Record<string, boolean>; currentPeriodEndsAt: Date | null;
 };
-
-/**
- * Mirrors require-app-user.ts: getAppUser() tenant resolution.
- * Returns the resolved tenant ID, or null for auth failure.
- */
-function resolveGetAppUserTenant(params: {
-  clerkUserId: string | null;
-  authorizationHeader: string | null;
-  xTenantIdHeader: string | null;
-  users: UserRecord[];
-}): { userId: string; tenantId: string | null } | null {
-  const { clerkUserId, authorizationHeader, xTenantIdHeader, users } = params;
-
-  // Step 1: Clerk auth
-  if (!clerkUserId) return null;
-
-  // Step 2: Bearer detection (require-app-user.ts lines 22-25)
-  const isBearerAuth =
-    typeof authorizationHeader === "string" &&
-    authorizationHeader.startsWith("Bearer ");
-  const requestedTenantId = isBearerAuth
-    ? (xTenantIdHeader || undefined)
-    : undefined;
-
-  // Step 3: findAppsoluxUserByClerkId (clerk-user.ts)
-  const user = users.find((u) => u.clerkUserId === clerkUserId);
-  if (!user || user.status === "disabled") return null;
-
-  const membershipFilter = requestedTenantId
-    ? (m: Membership) => m.status === "active" && m.tenantId === requestedTenantId
-    : (m: Membership) => m.status === "active";
-  const matchedMemberships = user.memberships.filter(membershipFilter);
-
-  if (matchedMemberships.length === 0) {
-    // clerk-user.ts fix: explicit tenant with no membership → null
-    if (requestedTenantId) return null;
-    // Original: user without tenant (onboarding)
-    return { userId: user.id, tenantId: null };
-  }
-
-  const resolvedTenantId = matchedMemberships[0].tenant.id;
-
-  // Step 4: require-app-user.ts fail-closed block
-  if (requestedTenantId) {
-    if (!resolvedTenantId) return null;
-    return { userId: user.id, tenantId: resolvedTenantId };
-  }
-
-  return { userId: user.id, tenantId: resolvedTenantId };
-}
-
-/**
- * Mirrors mobile-user.ts: resolveMobileTenantContext() subscription logic.
- * Returns { canOperate, status } reflecting the fail-closed fix.
- */
-function resolveSubscriptionAccess(params: {
-  operationalAccess: OperationalAccess;
-  operationalAccessFailed: boolean;
-  planState: PlanState;
-}): { canOperate: boolean; status: string } {
-  const { operationalAccess, operationalAccessFailed, planState } = params;
-
-  // mobile-user.ts fix: service failure → deny operation
-  const canOperate = operationalAccessFailed
-    ? false
-    : (operationalAccess?.canOperate ?? false);
-
-  const status = operationalAccessFailed ? "error" : planState.status;
-
-  return { canOperate, status };
-}
-
-/**
- * Mirrors mobile-user.ts: feature resolution with canOperate gate.
- */
-function resolveFeatureAccess(params: {
-  effectiveAccess: EffectiveAccess;
-  effectiveAccessFailed: boolean;
-  planState: PlanState;
-  canOperate: boolean;
-}): Record<string, boolean> {
-  const { effectiveAccess, effectiveAccessFailed, planState, canOperate } = params;
-
-  const access: Record<string, boolean> = {};
-
-  const features = effectiveAccess
-    ? effectiveAccess.features
-    : planState.features;
-
-  for (const [key, value] of Object.entries(features)) {
-    access[key] = value === true;
-  }
-
-  if (!canOperate) {
-    for (const key of Object.keys(access)) {
-      if (key !== "sri_invoicing" && key !== "sri_configuration") {
-        access[key] = false;
-      }
-    }
-  }
-
-  return access;
-}
-
-/**
- * Mirrors mobile-user.ts: getMobileUserProfile() tenant filtering.
- */
-function filterVisibleTenants(memberships: Membership[]): Membership[] {
-  return memberships
-    .filter((m) => m.status === "active")
-    .filter(
-      (m) =>
-        m.tenant.status === "active" || m.tenant.status === "provisioning",
-    );
-}
-
-// --- Fixtures ---
+type UserQuery = {
+  where: { clerkUserId?: string; id?: string; email?: string };
+  include?: { memberships: { where: { status: string; tenantId?: string }; take?: number } };
+};
 
 const USERS: UserRecord[] = [
   {
@@ -306,550 +162,358 @@ const USERS: UserRecord[] = [
 ];
 
 const ACTIVE_PLAN: PlanState = {
-  planKey: "pro",
-  planName: "Negocio",
-  status: "active",
-  features: {
-    pos_basic: true,
-    sales_basic: true,
-    customers_basic: true,
-    inventory_basic: true,
-    reports_basic: true,
-    sri_invoicing: true,
-    sri_configuration: true,
-    advanced_reports: false,
-    dedicated_erp: false,
-    shared_erp: false,
-    purchases: false,
-  },
+  planKey: "pro", planName: "Negocio", status: "active",
+  features: { basic_pos: true, basic_sales: true, sri: true, advanced_reports: true },
   currentPeriodEndsAt: new Date("2027-01-01"),
 };
-
 const FREE_PLAN: PlanState = {
-  planKey: "free",
-  planName: "Gratis",
-  status: "active",
-  features: {
-    pos_basic: true,
-    sales_basic: true,
-    customers_basic: true,
-    inventory_basic: true,
-    reports_basic: true,
-    sri_invoicing: false,
-    sri_configuration: false,
-    advanced_reports: false,
-    dedicated_erp: false,
-    shared_erp: false,
-    purchases: false,
-  },
+  ...ACTIVE_PLAN, planKey: "free", planName: "Gratis",
+  features: { basic_pos: true, basic_sales: true, sri: false, advanced_reports: false },
   currentPeriodEndsAt: null,
 };
 
-// =============================================================================
-// TESTS
-// =============================================================================
+let users: UserRecord[];
+let clerkUserId: string | null;
+let requestHeaders: Headers;
+let userQueries: UserQuery[];
+let writes: number;
+let clerkLookups: number;
+let planState: PlanState;
+let operationalAccess: { canOperate: boolean; canRead: boolean; trialDaysRemaining: number | null };
+let effectiveFeatures: Record<string, boolean>;
+let failOperational: boolean;
+let failEffective: boolean;
+let policyTenantIds: string[];
+let clerkProfile: {
+  id: string; firstName: string; lastName: string; primaryEmailAddressId: string;
+  emailAddresses: { id: string; emailAddress: string; verification: { status: string } }[];
+} | null;
 
-describe("1. Sin token", () => {
-  test("missing Authorization header returns no user", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: null,
-      authorizationHeader: null,
-      xTenantIdHeader: null,
-      users: USERS,
-    });
-    assert.equal(result, null);
-  });
-});
-
-describe("2. Token inválido", () => {
-  test("invalid clerkUserId resolves to no user", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_nonexistent",
-      authorizationHeader: "Bearer eyJ...",
-      xTenantIdHeader: null,
-      users: USERS,
-    });
-    assert.equal(result, null);
-  });
-});
-
-describe("3. Usuario deshabilitado", () => {
-  test("disabled user returns null regardless of valid membership", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_disabled",
-      authorizationHeader: "Bearer eyJ...",
-      xTenantIdHeader: "t1",
-      users: USERS,
-    });
-    assert.equal(result, null);
-  });
-});
-
-describe("4. Usuario sin empresa", () => {
-  test("user with zero memberships gets tenantId null", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_no_company",
-      authorizationHeader: "Bearer eyJ...",
-      xTenantIdHeader: null,
-      users: USERS,
-    });
-    assert.ok(result !== null);
-    assert.equal(result.tenantId, null);
-  });
-});
-
-describe("5. Usuario con una empresa", () => {
-  test("single-company user resolves to that company", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_single",
-      authorizationHeader: "Bearer eyJ...",
-      xTenantIdHeader: null,
-      users: USERS,
-    });
-    assert.ok(result !== null);
-    assert.equal(result.tenantId, "t1");
-  });
-});
-
-describe("6. Usuario con múltiples empresas", () => {
-  test("multi-company user without X-Tenant-Id resolves to first active membership", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_active_owner",
-      authorizationHeader: "Bearer eyJ...",
-      xTenantIdHeader: null,
-      users: USERS,
-    });
-    assert.ok(result !== null);
-    assert.equal(result.tenantId, "t1");
-  });
-
-  test("profile lists all active memberships with active/provisioning tenants", () => {
-    const user = USERS.find((u) => u.clerkUserId === "clerk_multi_mixed")!;
-    const visible = filterVisibleTenants(user.memberships);
-    assert.equal(visible.length, 2);
-    assert.ok(visible.some((m) => m.tenantId === "t1"));
-    assert.ok(visible.some((m) => m.tenantId === "t5"));
-    assert.ok(!visible.some((m) => m.tenantId === "t4"), "inactive membership excluded");
-  });
-});
-
-describe("7. Selección válida", () => {
-  test("selecting a tenant the user has membership in succeeds", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_active_owner",
-      authorizationHeader: "Bearer eyJ...",
-      xTenantIdHeader: "t2",
-      users: USERS,
-    });
-    assert.ok(result !== null);
-    assert.equal(result.tenantId, "t2");
-  });
-});
-
-describe("8. Selección de empresa ajena", () => {
-  test("selecting a tenant without membership fails with null", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_active_owner",
-      authorizationHeader: "Bearer eyJ...",
-      xTenantIdHeader: "t999",
-      users: USERS,
-    });
-    assert.equal(result, null, "foreign tenant must be rejected");
-  });
-
-  test("does NOT fall back to another tenant when requested one is unauthorized", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_active_owner",
-      authorizationHeader: "Bearer eyJ...",
-      xTenantIdHeader: "t999",
-      users: USERS,
-    });
-    assert.equal(result, null, "must not resolve to any tenant");
-  });
-});
-
-describe("9. Membresía desactivada", () => {
-  test("user with only inactive memberships gets no tenant (mobile with header)", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_inactive_membership",
-      authorizationHeader: "Bearer eyJ...",
-      xTenantIdHeader: "t1",
-      users: USERS,
-    });
-    assert.equal(result, null);
-  });
-});
-
-describe("10. TenantId inexistente", () => {
-  test("non-existent tenantId fails — no fallback", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_single",
-      authorizationHeader: "Bearer eyJ...",
-      xTenantIdHeader: "nonexistent-tenant",
-      users: USERS,
-    });
-    assert.equal(result, null);
-  });
-});
-
-describe("11. TenantId manipulado en request web", () => {
-  test("X-Tenant-Id on a web (cookie) request is ignored", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_active_owner",
-      authorizationHeader: null,
-      xTenantIdHeader: "t2",
-      users: USERS,
-    });
-    assert.ok(result !== null);
-    assert.equal(result.tenantId, "t1", "web must resolve to first membership, not header");
-  });
-
-  test("even a valid cookie request with Bearer-less auth ignores X-Tenant-Id", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_active_owner",
-      authorizationHeader: "Cookie session=abc",
-      xTenantIdHeader: "t2",
-      users: USERS,
-    });
-    assert.ok(result !== null);
-    assert.equal(result.tenantId, "t1");
-  });
-});
-
-describe("12. Solicitud móvil sin X-Tenant-Id cuando usa Bearer", () => {
-  test("Bearer without X-Tenant-Id resolves to first membership", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_active_owner",
-      authorizationHeader: "Bearer eyJ...",
-      xTenantIdHeader: null,
-      users: USERS,
-    });
-    assert.ok(result !== null);
-    assert.equal(result.tenantId, "t1");
-  });
-});
-
-describe("13. Suscripción activa", () => {
-  test("active subscription with operational access returns canOperate=true", () => {
-    const result = resolveSubscriptionAccess({
-      operationalAccess: {
-        canOperate: true,
-        canRead: true,
-        effectiveStatus: "active",
-        reason: "active",
-        trialDaysRemaining: null,
-      },
-      operationalAccessFailed: false,
-      planState: ACTIVE_PLAN,
-    });
-    assert.equal(result.canOperate, true);
-    assert.equal(result.status, "active");
-  });
-});
-
-describe("14. Suscripción suspendida", () => {
-  test("suspended subscription returns canOperate=false", () => {
-    const result = resolveSubscriptionAccess({
-      operationalAccess: {
-        canOperate: false,
-        canRead: true,
-        effectiveStatus: "suspended",
-        reason: "subscription_suspended",
-        trialDaysRemaining: null,
-      },
-      operationalAccessFailed: false,
-      planState: { ...ACTIVE_PLAN, status: "suspended" },
-    });
-    assert.equal(result.canOperate, false);
-    assert.equal(result.status, "suspended");
-  });
-});
-
-describe("15. Suscripción vencida", () => {
-  test("expired trial returns canOperate=false", () => {
-    const result = resolveSubscriptionAccess({
-      operationalAccess: {
-        canOperate: false,
-        canRead: true,
-        effectiveStatus: "trial_expired",
-        reason: "trial_expired",
-        trialDaysRemaining: 0,
-      },
-      operationalAccessFailed: false,
-      planState: { ...ACTIVE_PLAN, status: "trialing" },
-    });
-    assert.equal(result.canOperate, false);
-  });
-});
-
-describe("16. Error de consulta de política operativa (FAIL-CLOSED)", () => {
-  test("operational access service error must NOT grant canOperate", () => {
-    const result = resolveSubscriptionAccess({
-      operationalAccess: null,
-      operationalAccessFailed: true,
-      planState: ACTIVE_PLAN,
-    });
-    assert.equal(result.canOperate, false, "service failure must deny operation");
-    assert.equal(result.status, "error");
-  });
-
-  test("even with planState.status=active, service error denies operation", () => {
-    const result = resolveSubscriptionAccess({
-      operationalAccess: null,
-      operationalAccessFailed: true,
-      planState: { ...ACTIVE_PLAN, status: "active" },
-    });
-    assert.equal(result.canOperate, false, "fail-closed: active plan + error ≠ access");
-  });
-});
-
-describe("17. Error de resolución de permisos", () => {
-  test("feature resolution failure falls back to base plan features", () => {
-    const access = resolveFeatureAccess({
-      effectiveAccess: null,
-      effectiveAccessFailed: true,
-      planState: ACTIVE_PLAN,
-      canOperate: true,
-    });
-    assert.equal(access.pos_basic, true);
-    assert.equal(access.advanced_reports, false);
-    assert.equal(access.sri_invoicing, true);
-  });
-
-  test("canOperate=false zeroes features except SRI even on fallback", () => {
-    const access = resolveFeatureAccess({
-      effectiveAccess: null,
-      effectiveAccessFailed: true,
-      planState: ACTIVE_PLAN,
-      canOperate: false,
-    });
-    assert.equal(access.pos_basic, false);
-    assert.equal(access.sales_basic, false);
-    assert.equal(access.sri_invoicing, true);
-    assert.equal(access.sri_configuration, true);
-  });
-});
-
-describe("18. Cambio de empresa", () => {
-  test("switching tenant clears previous context and scopes to new tenant", () => {
-    const firstSelect = resolveGetAppUserTenant({
-      clerkUserId: "clerk_active_owner",
-      authorizationHeader: "Bearer eyJ...",
-      xTenantIdHeader: "t1",
-      users: USERS,
-    });
-    assert.ok(firstSelect !== null);
-    assert.equal(firstSelect.tenantId, "t1");
-
-    // Clear state (simulates switchTenant)
-    let activeTenantId: string | null = null;
-    let cachedAccess: Record<string, boolean> = {};
-    activeTenantId = null;
-    cachedAccess = {};
-
-    // Select new tenant
-    const secondSelect = resolveGetAppUserTenant({
-      clerkUserId: "clerk_active_owner",
-      authorizationHeader: "Bearer eyJ...",
-      xTenantIdHeader: "t2",
-      users: USERS,
-    });
-    assert.ok(secondSelect !== null);
-    assert.equal(secondSelect.tenantId, "t2");
-    assert.notEqual(firstSelect.tenantId, secondSelect.tenantId);
-    assert.equal(activeTenantId, null, "activeTenantId cleared before reselection");
-    assert.equal(Object.keys(cachedAccess).length, 0, "cached access cleared");
-  });
-});
-
-describe("19. Revocación de membresía", () => {
-  test("saved tenantId fails validation after membership revocation", () => {
-    // Before revocation: user has membership
-    const before = resolveGetAppUserTenant({
-      clerkUserId: "clerk_active_owner",
-      authorizationHeader: "Bearer eyJ...",
-      xTenantIdHeader: "t2",
-      users: USERS,
-    });
-    assert.ok(before !== null);
-    assert.equal(before.tenantId, "t2");
-
-    // After revocation: modify user data to simulate revocation
-    const revokedUsers = USERS.map((u) => {
-      if (u.clerkUserId !== "clerk_active_owner") return u;
-      return {
-        ...u,
-        memberships: u.memberships.map((m) =>
-          m.tenantId === "t2" ? { ...m, status: "inactive" as const } : m,
-        ),
-      };
-    });
-
-    const after = resolveGetAppUserTenant({
-      clerkUserId: "clerk_active_owner",
-      authorizationHeader: "Bearer eyJ...",
-      xTenantIdHeader: "t2",
-      users: revokedUsers,
-    });
-    assert.equal(after, null, "revoked membership must deny access");
-  });
-});
-
-describe("20. Intento de acceso a datos de otro tenant", () => {
-  test("X-Tenant-Id for someone else's company yields null", () => {
-    // u4 (clerk_single) only has membership in t1
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_single",
-      authorizationHeader: "Bearer eyJ...",
-      xTenantIdHeader: "t2",
-      users: USERS,
-    });
-    assert.equal(result, null, "cross-tenant access must be denied");
-  });
-});
-
-describe("21. Intento de operación sin permiso", () => {
-  test("free plan lacks advanced features", () => {
-    const access = resolveFeatureAccess({
-      effectiveAccess: null,
-      effectiveAccessFailed: false,
-      planState: FREE_PLAN,
-      canOperate: true,
-    });
-    assert.equal(access.advanced_reports, false);
-    assert.equal(access.dedicated_erp, false);
-    assert.equal(access.purchases, false);
-    assert.equal(access.pos_basic, true);
-  });
-
-  test("canOperate=false disables all features except SRI read", () => {
-    const access = resolveFeatureAccess({
-      effectiveAccess: {
-        features: {
-          pos_basic: true,
-          sales_basic: true,
-          sri_invoicing: true,
-          sri_configuration: true,
-          dedicated_erp: true,
-        },
-      },
-      effectiveAccessFailed: false,
-      planState: ACTIVE_PLAN,
-      canOperate: false,
-    });
-    assert.equal(access.pos_basic, false, "operational features disabled");
-    assert.equal(access.sales_basic, false);
-    assert.equal(access.dedicated_erp, false);
-    assert.equal(access.sri_invoicing, true, "SRI read preserved");
-    assert.equal(access.sri_configuration, true, "SRI config preserved");
-  });
-});
-
-describe("22. Acceso a API web sin modificación de comportamiento", () => {
-  test("web request (no Bearer) resolves user via first membership", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_active_owner",
-      authorizationHeader: null,
-      xTenantIdHeader: null,
-      users: USERS,
-    });
-    assert.ok(result !== null);
-    assert.equal(result.tenantId, "t1");
-  });
-
-  test("web user without tenant gets null tenantId for onboarding flow", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_no_company",
-      authorizationHeader: null,
-      xTenantIdHeader: null,
-      users: USERS,
-    });
-    assert.ok(result !== null);
-    assert.equal(result.tenantId, null);
-  });
-});
-
-describe("23. Header X-Tenant-Id malicioso enviado a una ruta web", () => {
-  test("malicious X-Tenant-Id on web request is completely ignored", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_single",
-      authorizationHeader: null,
-      xTenantIdHeader: "t2",
-      users: USERS,
-    });
-    assert.ok(result !== null);
-    assert.equal(
-      result.tenantId,
-      "t1",
-      "web must ignore X-Tenant-Id header",
-    );
-  });
-
-  test("even a foreign tenantId in X-Tenant-Id is ignored for web", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_single",
-      authorizationHeader: null,
-      xTenantIdHeader: "foreign-t999",
-      users: USERS,
-    });
-    assert.ok(result !== null);
-    assert.equal(result.tenantId, "t1");
-  });
-});
-
-describe("24. Solicitud móvil sin sesión válida", () => {
-  test("Bearer token present but Clerk userId is null returns null", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: null,
-      authorizationHeader: "Bearer expired-or-invalid",
-      xTenantIdHeader: "t1",
-      users: USERS,
-    });
-    assert.equal(result, null);
-  });
-});
-
-describe("25. Regresión de autenticación web", () => {
-  test("web auth chain is unchanged: cookie auth resolves to first membership", () => {
-    for (const user of USERS) {
-      if (user.status === "disabled") continue;
-      const result = resolveGetAppUserTenant({
-        clerkUserId: user.clerkUserId,
-        authorizationHeader: null,
-        xTenantIdHeader: null,
-        users: USERS,
-      });
-      assert.ok(result !== null, `user ${user.id} should resolve`);
-
-      const activeMemberships = user.memberships.filter(
-        (m) => m.status === "active",
+const db = {
+  user: {
+    findUnique: async (query: UserQuery) => {
+      userQueries.push(query);
+      const user = users.find((candidate) => Object.entries(query.where).every(
+        ([key, value]) => candidate[key as keyof UserRecord] === value,
+      ));
+      if (!user) return null;
+      if (!query.include) return user;
+      const { where, take } = query.include.memberships;
+      const memberships = user.memberships.filter((m) =>
+        Object.entries(where).every(([key, value]) => m[key as keyof Membership] === value),
       );
-      if (activeMemberships.length === 0) {
-        assert.equal(result.tenantId, null, `user ${user.id} has no active membership`);
-      } else {
-        assert.equal(
-          result.tenantId,
-          activeMemberships[0].tenant.id,
-          `user ${user.id} should resolve to first active membership`,
-        );
-      }
-    }
-  });
+      return {
+        ...user,
+        memberships: memberships.slice(0, take).map((m) => ({
+          ...m, tenant: { ...m.tenant, integrations: [], planKey: "pro" },
+        })),
+      };
+    },
+    create: async ({ data }: { data: Omit<UserRecord, "id" | "memberships"> }) => {
+      writes++;
+      const user: UserRecord = { ...data, id: "created-user", memberships: [] };
+      users.push(user);
+      return user;
+    },
+  },
+  membership: {
+    findFirst: async ({ where }: { where: { userId: string; tenantId: string; status: string } }) =>
+      users.flatMap((u) => u.memberships).find((m) =>
+        Object.entries(where).every(([key, value]) => m[key as keyof Membership] === value),
+      ) ?? null,
+  },
+};
 
-  test("disabled web user returns null", () => {
-    const result = resolveGetAppUserTenant({
-      clerkUserId: "clerk_disabled",
-      authorizationHeader: null,
-      xTenantIdHeader: null,
-      users: USERS,
+let appUser: typeof import("../auth/require-app-user");
+let mobileUser: typeof import("../auth/mobile-user");
+let me: typeof import("../../app/api/mobile/me/route");
+let selectTenant: typeof import("../../app/api/mobile/select-tenant/route");
+
+test.before(async () => {
+  // tsx loads this project's TS files as CommonJS; mock Clerk's matching export.
+  const require = createRequire(import.meta.url);
+  mock.module(resolve("lib/security/server-only.ts"), { namedExports: {} });
+  mock.module(require.resolve("@clerk/nextjs/server"), { namedExports: {
+    auth: async () => ({ userId: clerkUserId }),
+    currentUser: async () => { clerkLookups++; return clerkProfile; },
+    clerkClient: async () => ({ users: { getUser: async () => { clerkLookups++; return clerkProfile; } } }),
+  } });
+  mock.module("next/headers", { namedExports: { headers: async () => requestHeaders } });
+  mock.module("next/navigation", { namedExports: {
+    redirect: (path: string) => { throw new Error(`redirect:${path}`); },
+  } });
+  mock.module(resolve("lib/db/prisma.ts"), { namedExports: { getPrismaClient: () => db } });
+  mock.module(resolve("lib/core/plans.ts"), { namedExports: {
+    getTenantPlanState: async (tenantId: string) => { policyTenantIds.push(tenantId); return planState; },
+  } });
+  mock.module(resolve("lib/core/tenant-operational-access.ts"), { namedExports: {
+    getTenantOperationalAccess: async (tenantId: string) => {
+      policyTenantIds.push(tenantId);
+      if (failOperational) throw new Error("operational service unavailable");
+      return operationalAccess;
+    },
+  } });
+  mock.module(resolve("lib/core/tenant-features.ts"), { namedExports: {
+    resolveEffectiveTenantAccessForTenant: async ({ tenantId }: { tenantId: string }) => {
+      policyTenantIds.push(tenantId);
+      if (failEffective) throw new Error("effective permissions unavailable");
+      return { features: effectiveFeatures };
+    },
+  } });
+  appUser = await import("../auth/require-app-user");
+  mobileUser = await import("../auth/mobile-user");
+  me = await import("../../app/api/mobile/me/route");
+  selectTenant = await import("../../app/api/mobile/select-tenant/route");
+});
+
+test.beforeEach(() => {
+  users = structuredClone(USERS);
+  clerkUserId = "clerk_active_owner";
+  requestHeaders = new Headers({ authorization: "Bearer test-token" });
+  userQueries = []; writes = 0; clerkLookups = 0; policyTenantIds = [];
+  planState = structuredClone(ACTIVE_PLAN);
+  operationalAccess = { canOperate: true, canRead: true, trialDaysRemaining: null };
+  effectiveFeatures = {
+    pos_basic: true, sales_basic: true, customers_basic: true, inventory_basic: true,
+    sri_invoicing: true, sri_configuration: true, advanced_reports: false, dedicated_erp: false,
+  };
+  failOperational = false; failEffective = false;
+  clerkProfile = null;
+});
+
+const context = async (tenantId = "t1", userId = "clerk_active_owner") => {
+  const result = await mobileUser.resolveMobileTenantContext(userId, tenantId);
+  if (!result.ok) throw new Error(result.message);
+  return result.context;
+};
+const assertDenied = (result: Awaited<ReturnType<typeof context>>) => {
+  assert.equal(result.subscription.canOperate, false);
+  assert.equal(result.subscription.status, "error");
+  assert.ok(Object.values(result.access).every((value) => value === false), "no unverified capability is granted");
+};
+const tenantRequest = (tenantId: string) => new Request("http://localhost/api/mobile/select-tenant", {
+  method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tenantId }),
+}) as NextRequest;
+
+test("getAppUser rejects an unauthenticated request before querying Prisma", async () => {
+  clerkUserId = null;
+  requestHeaders.set("x-tenant-id", "t1");
+  assert.equal(await appUser.getAppUser(), null);
+  assert.equal(userQueries.length, 0);
+});
+
+for (const userId of ["clerk_no_company", "clerk_single", "clerk_active_owner"]) {
+  for (const tenantId of [null, "", "   "]) {
+    test(`Bearer user ${userId} with tenant ${JSON.stringify(tenantId)} is denied without fallback`, async () => {
+      clerkUserId = userId;
+      if (tenantId !== null) requestHeaders.set("x-tenant-id", tenantId);
+      assert.equal(await appUser.getAppUser(), null);
+      assert.equal(userQueries.length, 0, "no first-membership lookup");
+      assert.equal(clerkLookups, 0, "no provisioning fallback");
+      assert.equal(writes, 0);
     });
-    assert.equal(result, null);
-  });
+  }
+}
 
-  test("tenant states filter correctly in profile listing", () => {
-    const user = USERS.find((u) => u.clerkUserId === "clerk_suspended_tenant")!;
-    const visible = filterVisibleTenants(user.memberships);
-    assert.ok(!visible.some((m) => m.tenant.status === "suspended"), "suspended tenant excluded");
-    assert.ok(visible.some((m) => m.tenantId === "t1"), "active tenant included");
+for (const authorization of ["bearer test-token", "BEARER test-token", "Bearer"]) {
+  test(`Bearer scheme ${authorization} cannot bypass the tenant requirement`, async () => {
+    requestHeaders.set("authorization", authorization);
+    assert.equal(await appUser.getAppUser(), null);
+    assert.equal(userQueries.length, 0);
   });
+}
+
+for (const tenantId of ["t1", "t2"]) {
+  test(`getAppUser selects only the explicitly requested tenant ${tenantId}`, async () => {
+    requestHeaders.set("x-tenant-id", tenantId);
+    const user = await appUser.getAppUser();
+    assert.equal(user?.tenant?.id, tenantId);
+    assert.deepEqual(userQueries[0].include?.memberships.where, { status: "active", tenantId });
+    assert.equal(userQueries[0].include?.memberships.take, 1);
+    assert.equal(clerkLookups, 0);
+  });
+}
+
+test("getAppUser trims the explicit tenant before membership validation", async () => {
+  requestHeaders.set("x-tenant-id", "  t2  ");
+  assert.equal((await appUser.getAppUser())?.tenant?.id, "t2");
+});
+
+for (const [userId, tenantId] of [
+  ["clerk_active_owner", "t999"], ["clerk_single", "t2"],
+  ["clerk_inactive_membership", "t1"], ["clerk_disabled", "t1"],
+  ["clerk_no_company", "t1"], ["clerk_nonexistent", "t1"],
+]) {
+  test(`getAppUser denies ${userId}/${tenantId} without trying another tenant or provisioning`, async () => {
+    clerkUserId = userId;
+    requestHeaders.set("x-tenant-id", tenantId);
+    assert.equal(await appUser.getAppUser(), null);
+    assert.equal(userQueries.length, 1);
+    assert.equal(clerkLookups, 0);
+    assert.equal(writes, 0);
+  });
+}
+
+test("a revoked membership cannot be reused by a later Bearer request", async () => {
+  requestHeaders.set("x-tenant-id", "t2");
+  assert.equal((await appUser.getAppUser())?.tenant?.id, "t2");
+  users[0].memberships[1].status = "inactive";
+  assert.equal(await appUser.getAppUser(), null);
+});
+
+for (const authorization of [null, "Cookie session=test"]) {
+  test(`web request with authorization=${authorization} ignores a supplied tenant header`, async () => {
+    if (authorization === null) requestHeaders.delete("authorization");
+    else requestHeaders.set("authorization", authorization);
+    requestHeaders.set("x-tenant-id", "t999");
+    assert.equal((await appUser.getAppUser())?.tenant?.id, "t1");
+    assert.deepEqual(userQueries[0].include?.memberships.where, { status: "active" });
+  });
+}
+
+test("web user without membership keeps the onboarding profile", async () => {
+  clerkUserId = "clerk_no_company";
+  requestHeaders.delete("authorization");
+  const user = await appUser.getAppUser();
+  assert.equal(user?.id, "u3");
+  assert.equal(user?.tenant, null);
+});
+
+test("web first-login provisioning remains available", async () => {
+  clerkUserId = "clerk_new_user";
+  requestHeaders.delete("authorization");
+  clerkProfile = {
+    id: clerkUserId, firstName: "New", lastName: "User", primaryEmailAddressId: "email-new",
+    emailAddresses: [{ id: "email-new", emailAddress: "new@example.com", verification: { status: "verified" } }],
+  };
+  const user = await appUser.getAppUser();
+  assert.equal(user?.id, "created-user");
+  assert.equal(user?.tenant, null);
+  assert.equal(writes, 1);
+});
+
+test("requireAppUser does not return an enterprise user for an unscoped Bearer request", async () => {
+  await assert.rejects(appUser.requireAppUser(), /redirect:\/sign-in/);
+});
+
+for (const [userId, tenantIds] of [
+  ["clerk_no_company", []], ["clerk_single", ["t1"]],
+  ["clerk_active_owner", ["t1", "t2"]], ["clerk_multi_mixed", ["t1", "t5"]],
+  ["clerk_suspended_tenant", ["t1"]],
+] as const) {
+  test(`GET /api/mobile/me lists ${userId}'s tenants without X-Tenant-Id`, async () => {
+    clerkUserId = userId;
+    const response = await me.GET();
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.ok, true);
+    assert.deepEqual(body.tenants.map((tenant: { id: string }) => tenant.id), tenantIds);
+    assert.equal(writes, 0);
+    assert.equal(policyTenantIds.length, 0);
+  });
+}
+
+for (const [userId, status] of [[null, 401], ["clerk_disabled", 403]] as const) {
+  test(`GET /api/mobile/me rejects user ${userId} with HTTP ${status}`, async () => {
+    clerkUserId = userId;
+    assert.equal((await me.GET()).status, status);
+  });
+}
+
+test("a valid mobile context uses only the selected membership and tenant policy", async () => {
+  const result = await context("t2");
+  assert.equal(result.tenant.id, "t2");
+  assert.equal(result.user.role, "seller");
+  assert.equal(result.subscription.canOperate, true);
+  assert.equal(result.subscription.status, "active");
+  assert.equal(result.access.pos_basic, true);
+  assert.equal(result.access.advanced_reports, false, "effective denial overrides an enabled base plan");
+  assert.deepEqual(result.access, effectiveFeatures, "successful responses preserve the effective permission map");
+  assert.deepEqual(policyTenantIds, ["t2", "t2", "t2"]);
+});
+
+for (const [userId, tenantId, code] of [
+  ["clerk_disabled", "t1", "USER_DISABLED"],
+  ["clerk_nonexistent", "t1", "USER_DISABLED"],
+  ["clerk_single", "t2", "NO_MEMBERSHIP"],
+  ["clerk_inactive_membership", "t1", "NO_MEMBERSHIP"],
+  ["clerk_active_owner", "nonexistent", "NO_MEMBERSHIP"],
+  ["clerk_suspended_tenant", "t3", "TENANT_SUSPENDED"],
+]) {
+  test(`resolveMobileTenantContext rejects ${userId}/${tenantId} before querying policy`, async () => {
+    const result = await mobileUser.resolveMobileTenantContext(userId, tenantId);
+    assert.equal(result.ok, false);
+    if (result.ok) throw new Error("Expected denied context");
+    assert.equal(result.code, code);
+    assert.equal(result.status, 403);
+    assert.equal(policyTenantIds.length, 0);
+  });
+}
+
+test("a free plan does not override explicitly resolved capabilities", async () => {
+  planState = structuredClone(FREE_PLAN);
+  effectiveFeatures.sri_invoicing = false;
+  effectiveFeatures.sri_configuration = false;
+  const result = await context();
+  assert.equal(result.access.pos_basic, true);
+  assert.equal(result.access.sri_invoicing, false);
+  assert.equal(result.access.dedicated_erp, false);
+});
+
+for (const status of ["suspended", "trialing"]) {
+  test(`${status} subscription preserves only verified existing read capabilities`, async () => {
+    planState.status = status;
+    operationalAccess.canOperate = false;
+    const result = await context();
+    assert.equal(result.subscription.canOperate, false);
+    assert.equal(result.subscription.status, status);
+    assert.equal(result.access.pos_basic, false);
+    assert.equal(result.access.sales_basic, false);
+    assert.equal(result.access.sri_invoicing, true);
+    assert.equal(result.access.sri_configuration, true);
+  });
+}
+
+test("an explicitly denied read capability is never restored by the plan", async () => {
+  operationalAccess.canOperate = false;
+  effectiveFeatures.sri_configuration = false;
+  const result = await context();
+  assert.equal(result.access.sri_invoicing, true);
+  assert.equal(result.access.sri_configuration, false);
+});
+
+test("without verified operational read access all capabilities are denied", async () => {
+  operationalAccess = { canOperate: false, canRead: false, trialDaysRemaining: null };
+  const result = await context();
+  assert.equal(result.subscription.canOperate, false);
+  assert.ok(Object.values(result.access).every((value) => value === false));
+});
+
+for (const failure of ["operational", "effective", "both"] as const) {
+  test(`${failure} service failure denies operations and every unverified capability`, async (t) => {
+    t.mock.method(console, "error", () => undefined);
+    failOperational = failure !== "effective";
+    failEffective = failure !== "operational";
+    assertDenied(await context());
+  });
+}
+
+test("POST /api/mobile/select-tenant returns a fail-closed context when permissions fail", async (t) => {
+  t.mock.method(console, "error", () => undefined);
+  failEffective = true;
+  const response = await selectTenant.POST(tenantRequest("t2"));
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.ok, true, "membership is valid; operational access remains explicitly denied");
+  assert.equal(body.tenant.id, "t2");
+  assert.equal(body.subscription.canOperate, false);
+  assert.equal(body.subscription.status, "error");
+  assert.ok(Object.values(body.access).every((value) => value === false));
+});
+
+test("POST /api/mobile/select-tenant rejects another company's ID", async () => {
+  clerkUserId = "clerk_single";
+  const response = await selectTenant.POST(tenantRequest("t2"));
+  assert.equal(response.status, 403);
+  assert.equal((await response.json()).error.code, "NO_MEMBERSHIP");
 });

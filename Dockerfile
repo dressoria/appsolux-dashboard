@@ -48,7 +48,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/node_modules ./node_modules
 
 # Prisma schema and generated client/runtime assets used by migrate/client.
-COPY --from=builder /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+# Normalize restrictive source permissions before switching to the runtime user.
+RUN chmod -R u=rwX,go=rX /app/prisma
 
 # PDFKit: font metrics (.afm) loaded at runtime via __dirname — not traced by nft
 COPY --from=builder /app/node_modules/pdfkit/js/data ./node_modules/pdfkit/js/data
