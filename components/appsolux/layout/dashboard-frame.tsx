@@ -2,8 +2,9 @@
 import { readFunctionalPreference, saveFunctionalPreference } from "@/lib/legal/browser-storage";
 
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import { Dialog } from "radix-ui";
 import {
   Archive,
   BarChart3,
@@ -36,6 +37,7 @@ import { FacturomBrand as FacturomBrandLogo } from "@/components/public/facturom
 import { routes } from "@/config/routes";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
+import homeStyles from "../facturacion/home.module.css";
 import type { NavGroup, SidebarEntry, SidebarIconName } from "./sidebar";
 
 type DashboardFrameProps = {
@@ -46,6 +48,7 @@ type DashboardFrameProps = {
   userName: string;
   tenantName: string;
   modeLabel: string;
+  planName?: string;
   navigationGroups: NavGroup[];
   clerkActive: boolean;
 };
@@ -118,18 +121,30 @@ export function DashboardFrame({
   userName,
   tenantName,
   modeLabel,
+  planName,
   navigationGroups,
   clerkActive,
 }: DashboardFrameProps) {
   const pathname = usePathname();
+  const isHome = pathname === routes.facturacion;
+  const mobileMenuButton = useRef<HTMLButtonElement>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    if (!isHome) return;
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const closeOnDesktop = () => { if (desktop.matches) setMobileOpen(false); };
+    desktop.addEventListener("change", closeOnDesktop);
+    return () => desktop.removeEventListener("change", closeOnDesktop);
+  }, [isHome]);
+
+  useEffect(() => {
     const storedValue = readFunctionalPreference(SIDEBAR_STORAGE_KEY);
     if (storedValue === "1") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Hydrate consented browser preferences after SSR; preserve existing layout behavior.
       setCollapsed(true);
     }
     try {
@@ -151,6 +166,7 @@ export function DashboardFrame({
   }, [collapsed]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize the existing drawer and navigation groups with an external route change.
     setMobileOpen(false);
     const activeGroup = navigationGroups.find((group) => groupContainsPath(group, pathname));
     if (activeGroup && !activeGroup.direct) {
@@ -184,6 +200,7 @@ export function DashboardFrame({
   }
 
   const sidebarWidth = collapsed ? "lg:w-20" : "lg:w-64";
+  const activeLinkClass = isHome ? "font-semibold" : "bg-white/95 font-semibold text-[#132B68] shadow-sm";
   const activeGroupKey = navigationGroups.find((group) => groupContainsPath(group, pathname))?.key;
 
   function renderLink(
@@ -204,8 +221,9 @@ export function DashboardFrame({
           "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
           nested && "ml-2 pl-4 text-[13px]",
           active
-            ? "bg-white/95 font-semibold text-[#132B68] shadow-sm"
-            : "text-white hover:bg-black/10"
+            ? activeLinkClass
+            : "text-white hover:bg-black/10",
+          isHome && homeStyles.sidebarItem
         )}
       >
         {Icon ? <Icon className="h-4 w-4 shrink-0" /> : <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-60" />}
@@ -227,7 +245,7 @@ export function DashboardFrame({
           <button
             type="button"
             onClick={() => toggleSubmenu(submenuKey)}
-            className="flex w-full items-center gap-2 px-4 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white transition-colors"
+            className={cn("flex w-full items-center gap-2 rounded-lg px-4 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white transition-colors", isHome && homeStyles.sidebarItem)}
             aria-expanded={submenuOpen}
           >
             <span className="flex-1 text-left">{entry.title}</span>
@@ -239,17 +257,17 @@ export function DashboardFrame({
     });
   }
 
-  const sidebarContent = (
+  const renderSidebarContent = (compact: boolean) => (
     <div className="flex h-full flex-col">
-      <div className="border-b border-white/10 px-4 py-4">
+      <div className={cn("border-b border-white/10 px-4 py-4", isHome && homeStyles.sidebarHeader)}>
         <div className="flex items-center justify-between gap-3">
-          <FacturomBrand collapsed={collapsed} />
+          <FacturomBrand collapsed={compact} />
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
             onClick={() => setCollapsed((value) => !value)}
-            className="hidden rounded-full text-white/65 hover:bg-white/10 hover:text-white lg:inline-flex"
+            className={cn("hidden rounded-full text-white/65 hover:bg-white/10 hover:text-white lg:inline-flex", isHome && compact && "lg:hidden")}
             aria-label={collapsed ? "Expandir sidebar" : "Contraer sidebar"}
           >
             {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
@@ -268,21 +286,24 @@ export function DashboardFrame({
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-4">
-        <nav className="space-y-1">
+        <nav className="space-y-1" aria-label={isHome ? "Navegación principal" : undefined}>
           {navigationGroups.map((group) => {
             const Icon = sidebarIcons[group.icon];
             const groupActive = activeGroupKey === group.key;
             const firstLink = findFirstLink(group.items);
 
-            if (collapsed) {
+            if (compact) {
               return firstLink ? (
                 <Link
                   key={group.key}
                   href={firstLink.href}
                   title={group.title}
+                  aria-label={isHome ? group.title : undefined}
+                  aria-current={isHome && groupActive ? "page" : undefined}
                   className={cn(
                     "flex items-center justify-center rounded-xl px-2 py-2.5 transition-colors",
-                    groupActive ? "bg-white/95 font-semibold text-[#132B68] shadow-sm" : "text-white hover:bg-black/10"
+                    groupActive ? activeLinkClass : "text-white hover:bg-black/10",
+                    isHome && homeStyles.sidebarItem
                   )}
                 >
                   <Icon className="h-5 w-5" />
@@ -295,9 +316,11 @@ export function DashboardFrame({
                 <Link
                   key={group.key}
                   href={firstLink.href}
+                  aria-current={isHome && groupActive ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                    groupActive ? "bg-white/95 font-semibold text-[#132B68] shadow-sm" : "text-white hover:bg-black/10"
+                    groupActive ? activeLinkClass : "text-white hover:bg-black/10",
+                    isHome && homeStyles.sidebarItem
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -314,7 +337,8 @@ export function DashboardFrame({
                   onClick={() => toggleGroup(group.key)}
                   className={cn(
                     "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                    groupActive ? "text-white" : "text-white hover:bg-black/10"
+                    groupActive ? "text-white" : "text-white hover:bg-black/10",
+                    isHome && homeStyles.sidebarItem
                   )}
                   aria-expanded={open}
                 >
@@ -336,14 +360,29 @@ export function DashboardFrame({
   );
 
   return (
-    <div className="min-h-screen bg-facturom-bg">
+    <div className={cn("min-h-screen bg-facturom-bg", isHome && homeStyles.frame)}>
       <div className="lg:flex">
         <div className="hidden lg:block">
-          <aside className={cn("sticky top-0 h-screen transition-[width] duration-300", sidebarWidth, sidebarBackground)}>
-            {sidebarContent}
+          <aside className={cn("sticky top-0 h-screen transition-[width] duration-300", sidebarWidth, isHome ? homeStyles.sidebar : sidebarBackground)}>
+            {renderSidebarContent(collapsed)}
           </aside>
         </div>
 
+        {isHome ? (
+          <Dialog.Root open={mobileOpen} onOpenChange={setMobileOpen}>
+            <Dialog.Portal>
+              <Dialog.Overlay className={cn(homeStyles.dialogOverlay, "lg:hidden")} />
+              <Dialog.Content
+                className={cn(homeStyles.frame, homeStyles.sidebar, homeStyles.mobileDrawer, "lg:hidden")}
+                aria-describedby={undefined}
+                onCloseAutoFocus={(event) => { event.preventDefault(); mobileMenuButton.current?.focus(); }}
+              >
+                <Dialog.Title className="sr-only">Menú de navegación</Dialog.Title>
+                {renderSidebarContent(false)}
+              </Dialog.Content>
+            </Dialog.Portal>
+          </Dialog.Root>
+        ) : <>
         {mobileOpen ? (
           <div className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} />
         ) : null}
@@ -355,11 +394,38 @@ export function DashboardFrame({
             mobileOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
-          {sidebarContent}
+          {renderSidebarContent(collapsed)}
         </aside>
+        </>}
 
         <div className="min-h-screen min-w-0 flex-1">
-          {hideTopbar ? null : (
+          {hideTopbar ? null : isHome ? (
+            <header className={homeStyles.topbar}>
+              <div className={homeStyles.topbarInner}>
+                <div className={homeStyles.topbarTenant}>
+                  <Button ref={mobileMenuButton} type="button" variant="outline" size="icon-sm" onClick={() => setMobileOpen(true)} className="shrink-0 rounded-xl border-[#E7E7EF] lg:hidden" aria-label="Abrir menú">
+                    <Menu className="h-4 w-4" />
+                  </Button>
+                  <Button type="button" variant="outline" size="icon-sm" onClick={() => setCollapsed((value) => !value)} className="hidden shrink-0 rounded-xl border-[#E7E7EF] lg:inline-flex" aria-label={collapsed ? "Expandir sidebar" : "Contraer sidebar"}>
+                    {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+                  </Button>
+                  <div className={homeStyles.tenantText}>
+                    <p>Empresa activa</p>
+                    <p title={tenantName}>{tenantName}</p>
+                  </div>
+                </div>
+                <div className={homeStyles.topbarAccount}>
+                  <div className={homeStyles.planGroup}>
+                    <span className={homeStyles.planPill}>Plan actual: <strong>{planName?.trim() || "Sin información"}</strong></span>
+                    <Link href={routes.billing} className={homeStyles.actionLink}>Planes</Link>
+                  </div>
+                  <span className={homeStyles.avatar} title={userName}>
+                    {clerkActive ? <UserButton appearance={{ elements: { avatarBox: "h-8 w-8" } }} /> : <LogoutButton />}
+                  </span>
+                </div>
+              </div>
+            </header>
+          ) : (
             <header className="sticky top-0 z-30 border-b border-facturom-border bg-white">
               <div className="flex min-h-16 items-center justify-between gap-4 px-4 py-3 sm:px-6">
                 <div className="flex min-w-0 items-center gap-3">

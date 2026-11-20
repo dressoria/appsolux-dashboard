@@ -32,6 +32,7 @@ export async function DashboardShell({
       userName={userName}
       tenantName={tenantName}
       modeLabel="Cuenta activa"
+      planName={tenantMode.planName}
       navigationGroups={navigationGroups}
       clerkActive={isClerkAuth()}
     >

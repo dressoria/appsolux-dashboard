@@ -4,28 +4,21 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   BadgeDollarSign,
-  BookOpen,
-  Building2,
   CircleDollarSign,
-  CreditCard,
   FileCheck2,
-  Package,
   ReceiptText,
-  Settings2,
-  ShieldCheck,
   ShoppingCart,
   Sparkles,
   Star,
   TrendingUp,
-  Users,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { SalesPeriodChart } from "@/components/appsolux/facturacion/sales-period-chart";
-import { HomeShortcutsEditor } from "@/components/appsolux/facturacion/home-shortcuts-editor";
+import { HomeQuickActions } from "@/components/appsolux/facturacion/home-quick-actions";
+import styles from "@/components/appsolux/facturacion/home.module.css";
 import { HomeTabs } from "@/components/appsolux/facturacion/home-tabs";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { routes } from "@/config/routes";
 import { getBasicReports } from "@/lib/core/lightweight-pos";
@@ -137,19 +130,6 @@ async function getDashboardData(tenantId: string) {
   };
 }
 
-const iconMap: Record<string, LucideIcon> = {
-  ReceiptText,
-  ShoppingCart,
-  BookOpen,
-  FileCheck2,
-  Package,
-  Users,
-  Wallet,
-  Building2,
-  ShieldCheck,
-  Settings2,
-};
-
 function FinancialCard({
   title,
   amount,
@@ -165,26 +145,20 @@ function FinancialCard({
   icon: LucideIcon;
   tone: "blue" | "orange" | "emerald" | "amber";
 }) {
-  const toneClasses = {
-    blue: { bg: "bg-blue-50/60", icon: "bg-[#EEF5FF] text-[#1769E0]", text: "text-[#1769E0]" },
-    orange: { bg: "bg-amber-50/40", icon: "bg-amber-50 text-amber-600", text: "text-amber-700" },
-    emerald: { bg: "bg-emerald-50/40", icon: "bg-emerald-50 text-emerald-600", text: "text-emerald-700" },
-    amber: { bg: "bg-amber-50/40", icon: "bg-amber-50 text-amber-600", text: "text-amber-700" },
-  };
-  const t = toneClasses[tone];
+  const toneClass = tone === "blue" || tone === "emerald" ? styles.metricNavy : styles.metricPink;
 
   return (
-    <Card className={`overflow-hidden rounded-xl border border-[#E4E9F0] shadow-sm ring-0 ${t.bg}`}>
+    <Card className={`overflow-hidden rounded-xl border border-[#E4E9F0] shadow-sm ring-0 ${toneClass}`}>
       <CardContent className="p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-[#667085]">{title}</p>
-            <p className={`mt-2 text-xl font-bold tracking-tight sm:text-2xl ${t.text}`}>
+            <p className={`mt-2 text-xl font-bold tracking-tight sm:text-2xl ${styles.metricAmount}`}>
               {amount}
             </p>
             <p className="mt-1 text-xs text-[#667085]">{subtitle}</p>
           </div>
-          <span className={`flex size-11 shrink-0 items-center justify-center rounded-2xl ${t.icon}`}>
+          <span className={`flex size-11 shrink-0 items-center justify-center rounded-2xl ${styles.metricIcon}`}>
             <Icon className="size-5" />
           </span>
         </div>
@@ -224,79 +198,24 @@ export default async function FacturacionPage() {
 
   /* ── Shortcuts tab ────────────────────────────────────────────────── */
   const shortcutsContent = (
-    <div className="space-y-6">
-      <section aria-labelledby="quick-actions-title">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2
-              id="quick-actions-title"
-              className="text-lg font-semibold text-[#172033]"
-            >
-              Acciones rápidas
-            </h2>
-            <p className="mt-1 text-sm text-[#667085]">
-              Lo que necesitas para seguir con tu día.
-            </p>
-          </div>
-          <HomeShortcutsEditor
-            initialKeys={shortcutKeys}
-            catalog={catalog}
-          />
-        </div>
-        <div className="mt-4 grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {shortcuts.map(({ key, title, description, icon, href, tone }) => {
-            const Icon = iconMap[icon] || FileCheck2;
-            return (
-              <Link
-                key={key}
-                href={href}
-                className={`group flex min-h-[140px] min-w-0 flex-col items-start rounded-2xl border border-[#E4E9F0] p-5 shadow-sm transition duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1769E0] ${
-                  tone === "orange"
-                    ? "bg-amber-50/20 hover:border-amber-300 hover:bg-amber-50/50 hover:shadow-md hover:shadow-amber-100/60"
-                    : "bg-blue-50/20 hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-md hover:shadow-blue-100/60"
-                }`}
-              >
-                <span
-                  className={`mb-4 flex size-11 shrink-0 items-center justify-center rounded-2xl ${tone === "orange" ? "bg-amber-50 text-amber-600" : "bg-blue-50 text-[#1769E0]"}`}
-                >
-                  <Icon className="size-5" aria-hidden="true" />
-                </span>
-                <span className="text-sm font-semibold text-[#172033]">
-                  {title}
-                </span>
-                <span className="mt-1 text-xs leading-5 text-[#667085]">
-                  {description}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-    </div>
+    <HomeQuickActions shortcuts={shortcuts} initialKeys={shortcutKeys} catalog={catalog} />
   );
 
   /* ── Summary tab ──────────────────────────────────────────────────── */
   const summaryContent = (
     <>
-      {/* Welcome banner */}
-      <div className="overflow-hidden rounded-xl bg-gradient-to-r from-[#0D3B8F] via-[#1E52F1] to-[#1E52F1] p-5 text-white shadow-sm sm:p-6">
-        <div className="flex items-start gap-3">
-          <Star className="mt-0.5 size-5 shrink-0 text-amber-300" />
-          <div>
-            <h2 className="text-lg font-semibold">
-              Bienvenido a Facturom{name ? `, ${name}` : ""} 👋
-            </h2>
-            <p className="mt-1 text-sm text-blue-100">
-              Tu aliado para facturar, controlar y hacer crecer tu negocio.
-            </p>
-          </div>
+      <div className={styles.summaryIntro}>
+        <Star className="size-5" aria-hidden="true" />
+        <div>
+          <h2>Tu negocio, de un vistazo</h2>
+          <p>Tu aliado para facturar, controlar y hacer crecer tu negocio.</p>
         </div>
       </div>
 
       {/* KPIs — compact single card */}
       <Card className="overflow-hidden rounded-xl border border-[#E4E9F0] shadow-sm ring-0">
         <CardContent className="p-4 sm:p-5">
-          <h3 className="mb-3 text-sm font-semibold text-[#172033]">Resumen rápido</h3>
+          <h3 className="mb-3 text-sm font-semibold text-[#000345]">Resumen rápido</h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KpiMetric
               label="Ventas del día"
@@ -330,28 +249,28 @@ export default async function FacturacionPage() {
       <section className="flex flex-wrap items-center gap-2">
         <Link
           href={routes.facturacionDocuments}
-          className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+          className="inline-flex items-center gap-2 rounded-lg border border-[#E7E7EF] bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
         >
           <span className="size-2 rounded-full bg-emerald-500" />
           Autorizados: {dashboard.documentCounts.authorized}
         </Link>
         <Link
           href={routes.facturacionDocuments}
-          className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100"
+          className="inline-flex items-center gap-2 rounded-lg border border-[#E7E7EF] bg-white px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100"
         >
           <span className="size-2 rounded-full bg-amber-500" />
           Pendientes: {dashboard.documentCounts.pending}
         </Link>
         <Link
           href={routes.facturacionDocuments}
-          className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50/60 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100"
+          className="inline-flex items-center gap-2 rounded-lg border border-[#E7E7EF] bg-white px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-100"
         >
           <span className="size-2 rounded-full bg-red-500" />
           Rechazados: {dashboard.documentCounts.rejected}
         </Link>
         <Link
           href={routes.facturacionDocuments}
-          className="ml-auto text-xs font-medium text-[#1769E0] hover:underline"
+          className="ml-auto text-xs font-medium text-[#000345] hover:underline"
         >
           Ver documentos →
         </Link>
@@ -359,7 +278,7 @@ export default async function FacturacionPage() {
 
       {/* Financial summary */}
       <section>
-        <h2 className="mb-3 text-lg font-semibold text-[#172033]">
+        <h2 className="mb-3 text-lg font-semibold text-[#000345]">
           Resumen financiero
         </h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -414,12 +333,12 @@ export default async function FacturacionPage() {
         <Card className="overflow-hidden rounded-xl border border-[#E4E9F0] bg-white shadow-sm ring-0">
           <div className="border-b border-[#E4E9F0] bg-[#F8FAFD] px-4 py-3 sm:px-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-[#172033]">
+              <h2 className="text-sm font-semibold text-[#000345]">
                 Actividad reciente
               </h2>
               <Link
                 href={routes.facturacionDocuments}
-                className="text-xs font-medium text-[#1769E0] hover:underline"
+                className="text-xs font-medium text-[#000345] hover:underline"
               >
                 Ver todos
               </Link>
@@ -435,11 +354,11 @@ export default async function FacturacionPage() {
                       key={doc.id}
                       className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-blue-50/30 sm:px-5"
                     >
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#EEF5FF] text-[#1769E0]">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#F2F2F8] text-[#000345]">
                         <ReceiptText className="size-3.5" />
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-[#172033]">
+                        <p className="text-sm font-medium text-[#000345]">
                           {doc.customerName}
                         </p>
                         <p className="text-xs text-[#667085]">
@@ -447,7 +366,7 @@ export default async function FacturacionPage() {
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
-                        <p className="text-sm font-semibold text-[#172033]">
+                        <p className="text-sm font-semibold text-[#000345]">
                           {formatMoney(doc.grandTotal)}
                         </p>
                         <span
@@ -473,34 +392,25 @@ export default async function FacturacionPage() {
 
   return (
     <DashboardShell
-      mainClassName="px-4 py-5 sm:px-6 sm:py-6"
+      mainClassName="px-4 py-6 sm:px-7 sm:py-8 xl:px-10"
       contentClassName="mx-auto max-w-[1440px]"
     >
-      <div className="min-w-0 space-y-6 pb-24">
+      <div className={styles.page}>
         {/* ── Header ── */}
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <header className={styles.hero}>
           <div className="min-w-0">
-            <h1 className="break-words text-2xl font-semibold tracking-tight text-[#172033]">
+            <span className={styles.eyebrow}>Inicio</span>
+            <h1>
               {name ? `Hola, ${name} 👋` : "Hola 👋"}
             </h1>
-            <p className="mt-1 text-sm text-[#667085]">
+            <p>
               Resumen general de tu empresa
             </p>
           </div>
-          <div className="flex items-center gap-2 sm:shrink-0">
-            <Button asChild variant="outline" size="lg" className="border-[#E4E9F0] font-medium text-[#172033] shadow-sm hover:border-[#1769E0] hover:text-[#1769E0]">
-              <Link href={routes.billing}>
-                <CreditCard className="size-4" />
-                Mi plan
-              </Link>
-            </Button>
-            <Button asChild size="lg" className="bg-[#F59E0B] font-semibold text-[#172033] shadow-sm hover:bg-[#D97706]">
-              <Link href={routes.facturacionPos}>
-                <ShoppingCart className="size-4" />
-                Nueva venta
-              </Link>
-            </Button>
-          </div>
+          <Link href={routes.facturacionPos} className={`${styles.actionLink} ${styles.primaryLink}`}>
+            <ShoppingCart className="size-4" aria-hidden="true" />
+            Nueva venta
+          </Link>
         </header>
 
         <HomeTabs shortcuts={shortcutsContent} summary={summaryContent} />
@@ -510,9 +420,9 @@ export default async function FacturacionPage() {
       {tenantMode.canAccessAiInvoicing && (
         <Link
           href={routes.facturacionAi}
-          className="fixed bottom-5 right-4 z-30 flex max-w-[calc(100vw_-_2rem)] items-center gap-2 rounded-full border border-amber-300 bg-white px-4 py-3 text-sm font-semibold text-amber-800 shadow-lg shadow-amber-950/10 transition-colors hover:bg-amber-50 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-600 sm:bottom-6 sm:right-6 sm:px-5"
+          className={`${styles.actionLink} ${styles.fab}`}
         >
-          <Sparkles className="size-4 shrink-0 text-amber-600" />
+          <Sparkles className="size-4 shrink-0" />
           Facturación inteligente
         </Link>
       )}
@@ -531,17 +441,16 @@ function KpiMetric({
   icon: LucideIcon;
   tone: "blue" | "amber";
 }) {
-  const colors = tone === "amber"
-    ? { icon: "bg-amber-50 text-amber-600", value: "text-amber-700" }
-    : { icon: "bg-[#EEF5FF] text-[#1769E0]", value: "text-[#1769E0]" };
+  const toneClass = tone === "amber" ? styles.metricPink : styles.metricNavy;
+
   return (
-    <div className="flex items-center gap-3">
-      <span className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${colors.icon}`}>
+    <div className={`flex items-center gap-3 ${toneClass}`}>
+      <span className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${styles.metricIcon}`}>
         <Icon className="size-4" />
       </span>
       <div className="min-w-0">
         <p className="text-xs text-[#667085]">{label}</p>
-        <p className={`text-lg font-bold tracking-tight ${colors.value}`}>{value}</p>
+        <p className={`text-lg font-bold tracking-tight ${styles.metricAmount}`}>{value}</p>
       </div>
     </div>
   );

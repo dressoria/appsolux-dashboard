@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   BookOpen,
   Building2,
@@ -22,6 +22,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BlobButton } from "@/components/ui/blob-button";
+import { Dialog } from "radix-ui";
+import styles from "./home.module.css";
 
 type ShortcutEntry = {
   key: string;
@@ -57,12 +60,13 @@ export function HomeShortcutsEditor({ initialKeys, catalog }: EditorProps) {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
 
-  useEffect(() => {
-    if (!open) {
+  function handleOpenChange(nextOpen: boolean) {
+    if (nextOpen) {
       setKeys(initialKeys);
       setDirty(false);
     }
-  }, [open, initialKeys]);
+    setOpen(nextOpen);
+  }
 
   const catalogMap = new Map(catalog.map((c) => [c.key, c]));
   const available = catalog.filter((c) => !keys.includes(c.key));
@@ -130,27 +134,24 @@ export function HomeShortcutsEditor({ initialKeys, catalog }: EditorProps) {
   };
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-[#E4E9F0] bg-white px-3 py-1.5 text-xs font-medium text-[#667085] shadow-sm transition-colors hover:border-[#1769E0] hover:text-[#1769E0]"
-        aria-label="Editar accesos rápidos"
-      >
+    <Dialog.Root open={open} onOpenChange={handleOpenChange}>
+      <Dialog.Trigger asChild>
+      <BlobButton variant="outline" className="shrink-0 px-4 text-xs" aria-label="Editar accesos rápidos">
         <Pencil className="size-3.5" />
         Editar
-      </button>
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
-          <div className="mx-4 w-full max-w-lg rounded-2xl border border-[#E4E9F0] bg-white shadow-2xl" role="dialog" aria-label="Personalizar accesos">
+      </BlobButton>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className={styles.dialogOverlay} />
+        <Dialog.Content className={`${styles.editor} ${styles.editorPosition}`}>
             <div className="flex items-center justify-between border-b border-[#E4E9F0] px-5 py-4">
-              <h3 className="text-base font-semibold text-[#172033]">Personalizar accesos</h3>
-              <button type="button" onClick={() => setOpen(false)} className="rounded-full p-1 text-[#667085] transition-colors hover:bg-slate-100 hover:text-[#172033]" aria-label="Cerrar">
+              <Dialog.Title className="text-base font-semibold text-[#000345]">Personalizar accesos</Dialog.Title>
+              <button type="button" onClick={() => setOpen(false)} className="rounded-full p-1 text-[#667085] transition-colors hover:bg-slate-100 hover:text-[#000345]" aria-label="Cerrar">
                 <X className="size-5" />
               </button>
             </div>
-            <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
-              <p className="mb-3 text-xs text-[#667085]">Tus accesos actuales — arrastra o usa los botones para reordenar.</p>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+              <Dialog.Description className="mb-3 text-xs text-[#667085]">Usa las flechas para ordenar tus accesos.</Dialog.Description>
               <ul className="space-y-1.5">
                 {keys.map((key, index) => {
                   const entry = catalogMap.get(key);
@@ -159,10 +160,10 @@ export function HomeShortcutsEditor({ initialKeys, catalog }: EditorProps) {
                   return (
                     <li key={key} className="flex items-center gap-2 rounded-lg border border-[#E4E9F0] bg-white px-3 py-2.5 transition-colors hover:bg-slate-50">
                       <GripVertical className="size-4 shrink-0 text-[#C4CAD4]" />
-                      <span className={`flex size-7 shrink-0 items-center justify-center rounded-lg ${entry.tone === "orange" ? "bg-amber-50 text-amber-600" : "bg-blue-50 text-[#1769E0]"}`}>
+                      <span className={styles.editorIcon}>
                         <Icon className="size-3.5" />
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#172033]">{entry.title}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#000345]">{entry.title}</span>
                       <button type="button" onClick={() => moveUp(index)} disabled={index === 0} className="rounded p-1 text-[#667085] transition-colors hover:bg-slate-100 disabled:opacity-30" aria-label="Subir">
                         <ChevronUp className="size-4" />
                       </button>
@@ -187,14 +188,14 @@ export function HomeShortcutsEditor({ initialKeys, catalog }: EditorProps) {
                           key={entry.key}
                           type="button"
                           onClick={() => add(entry.key)}
-                          className="flex w-full items-center gap-2 rounded-lg border border-dashed border-[#E4E9F0] px-3 py-2.5 text-left transition-colors hover:border-[#1769E0] hover:bg-blue-50/30"
+                          className={`flex w-full items-center gap-2 rounded-lg border border-dashed border-[#E4E9F0] px-3 py-2.5 text-left transition-colors ${styles.editorAdd}`}
                         >
-                          <Plus className="size-4 shrink-0 text-[#1769E0]" />
-                          <span className={`flex size-7 shrink-0 items-center justify-center rounded-lg ${entry.tone === "orange" ? "bg-amber-50 text-amber-600" : "bg-blue-50 text-[#1769E0]"}`}>
+                          <Plus className="size-4 shrink-0 text-[#B8006D]" />
+                          <span className={styles.editorIcon}>
                             <Icon className="size-3.5" />
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-medium text-[#172033]">{entry.title}</span>
+                            <span className="block truncate text-sm font-medium text-[#000345]">{entry.title}</span>
                             <span className="block truncate text-xs text-[#667085]">{entry.description}</span>
                           </span>
                         </button>
@@ -204,23 +205,22 @@ export function HomeShortcutsEditor({ initialKeys, catalog }: EditorProps) {
                 </div>
               )}
             </div>
-            <div className="flex items-center justify-between border-t border-[#E4E9F0] px-5 py-4">
-              <button type="button" onClick={restore} className="text-xs font-medium text-[#667085] underline-offset-2 hover:text-[#172033] hover:underline">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E4E9F0] px-5 py-4">
+              <button type="button" onClick={restore} className="text-xs font-medium text-[#667085] underline-offset-2 hover:text-[#000345] hover:underline">
                 Restaurar predeterminados
               </button>
-              <div className="flex items-center gap-2">
-                {feedback && <span className="text-xs font-medium text-emerald-600">{feedback}</span>}
+              <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+                {feedback && <span role="status" className="text-xs font-medium text-[#000345]">{feedback}</span>}
                 <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="button" size="sm" onClick={save} disabled={saving || !dirty} className="bg-[#1769E0] hover:bg-[#1E52F1]">
+                <BlobButton type="button" onClick={save} disabled={saving || !dirty} className="px-3 text-xs">
                   {saving ? "Guardando…" : "Guardar cambios"}
-                </Button>
+                </BlobButton>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-    </>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

@@ -99,8 +99,8 @@ export function SalesPeriodChart({ items }: { items: SalesPoint[] }) {
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-[#172033]">Ventas</h2>
-          <p className="mt-1 text-2xl font-bold tracking-tight text-[#172033]">
+          <h2 className="text-sm font-semibold text-[#000345]">Ventas</h2>
+          <p className="mt-1 text-2xl font-bold tracking-tight text-[#000345]">
             {moneyShort.format(total)}
           </p>
         </div>
@@ -115,11 +115,12 @@ export function SalesPeriodChart({ items }: { items: SalesPoint[] }) {
             <button
               key={option.key}
               type="button"
+              aria-pressed={period === option.key}
               onClick={() => {
                 setPeriod(option.key);
                 setHoverIndex(null);
               }}
-              className={`rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${period === option.key ? "bg-white text-[#1769E0] shadow-sm" : "text-[#667085] hover:text-[#172033]"}`}
+              className={`rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${period === option.key ? "bg-white text-[#000345] shadow-sm" : "text-[#667085] hover:text-[#000345]"}`}
             >
               {option.label}
             </button>
@@ -138,8 +139,8 @@ export function SalesPeriodChart({ items }: { items: SalesPoint[] }) {
         >
           <defs>
             <linearGradient id="salesAreaFill" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="#F59E0B" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#F59E0B" stopOpacity="0.02" />
+              <stop offset="0%" stopColor="#EC008C" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#EC008C" stopOpacity="0.02" />
             </linearGradient>
           </defs>
           {[0, 1, 2, 3].map((line) => (
@@ -159,7 +160,7 @@ export function SalesPeriodChart({ items }: { items: SalesPoint[] }) {
               <path
                 d={linePath}
                 fill="none"
-                stroke="#F59E0B"
+                stroke="#EC008C"
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -172,7 +173,7 @@ export function SalesPeriodChart({ items }: { items: SalesPoint[] }) {
               x2={hoverPoint.x}
               y1={top}
               y2={top + plotHeight}
-              stroke="#F59E0B"
+              stroke="#EC008C"
               strokeWidth="1"
               strokeDasharray="4 3"
               opacity="0.5"
@@ -185,10 +186,10 @@ export function SalesPeriodChart({ items }: { items: SalesPoint[] }) {
                   cx={point.x}
                   cy={point.y}
                   r={hoverIndex === index ? 5.5 : 3.5}
-                  fill={hoverIndex === index ? "#F59E0B" : "#fff"}
-                  stroke="#F59E0B"
+                  fill={hoverIndex === index ? "#EC008C" : "#fff"}
+                  stroke="#EC008C"
                   strokeWidth="2"
-                  className="transition-[r] duration-150"
+                  className="transition-[r] duration-150 motion-reduce:transition-none"
                 />
               )}
               {index === 0 ||
@@ -233,10 +234,10 @@ export function SalesPeriodChart({ items }: { items: SalesPoint[] }) {
               transform: "translate(-50%, -100%)",
             }}
           >
-            <p className="font-medium text-[#172033]">
+            <p className="font-medium text-[#000345]">
               {fullDateFmt.format(new Date(`${hoverPoint.date}T00:00:00Z`))}
             </p>
-            <p className="mt-0.5 font-semibold text-[#F59E0B]">
+            <p className="mt-0.5 font-semibold text-[#EC008C]">
               Ventas: {money.format(hoverPoint.value)}
             </p>
           </div>
