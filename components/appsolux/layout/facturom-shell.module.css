@@ -16,9 +16,9 @@
   isolation: isolate;
   overflow: hidden;
   color: white;
-  background-color: #0003452B;
+  background-color: transparent;
   border: 1px solid transparent;
-  transition: border-color 220ms ease, background-color 220ms ease, color 220ms ease;
+  transition: border-color 320ms cubic-bezier(.22,1,.36,1), background-color 320ms cubic-bezier(.22,1,.36,1), color 320ms cubic-bezier(.22,1,.36,1), box-shadow 320ms cubic-bezier(.22,1,.36,1);
 }
 .sidebarItem::before {
   position: absolute;
@@ -28,15 +28,15 @@
   border-radius: 45%;
   background: linear-gradient(110deg, #FFFFFF1A, #00034515);
   transform: translateX(-110%) rotate(-12deg);
-  transition: transform 480ms cubic-bezier(.22, 1, .36, 1);
+  transition: transform 560ms cubic-bezier(.22, 1, .36, 1);
 }
-.shell .sidebarItem:is(:hover, :focus-visible) { color: white; border-color: #FFFFFF18; background-color: #00034540; }
+.shell .sidebarItem:is(:hover, :focus-visible) { color: white; border-color: transparent; background-color: #FFFFFF18; }
 .sidebarItem:is(:hover, :focus-visible)::before { transform: translateX(0) rotate(-12deg); }
 .shell .sidebarItem[aria-current="page"] {
-  background: var(--shell-navy);
-  border-color: #FFFFFF29;
-  box-shadow: 0 3px 9px #0003451A;
-  color: white;
+  background: #FFFFFFEE;
+  border-color: #FFFFFF40;
+  box-shadow: 0 2px 12px #00034518;
+  color: var(--shell-navy);
 }
 .shell .sidebarItem:focus-visible { outline: 2px solid var(--shell-navy); outline-offset: 2px; }
 .topbar { position: sticky; top: 0; z-index: 30; color: var(--shell-navy); border-bottom: 1px solid var(--shell-border); background: #FFFFFFF5; backdrop-filter: blur(12px); }
@@ -44,8 +44,8 @@
 .topbarTenant, .topbarAccount, .planGroup { display: flex; align-items: center; gap: .85rem; min-width: 0; }
 .topbarTenant { flex: 1; }
 .tenantText { min-width: 0; }
-.tenantText > p:first-child { color: var(--shell-muted); font-size: .68rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
-.tenantText > p:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; font-weight: 650; }
+.tenantText > p:first-child { color: var(--shell-navy); font-size: .95rem; font-weight: 650; letter-spacing: -.01em; }
+.tenantText > p:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .78rem; font-weight: 500; color: var(--shell-muted); }
 .planPill { display: inline-flex; align-items: center; gap: .4rem; max-width: 20rem; border: 1px solid #FF00991A; border-radius: 999px; padding: .55rem .9rem; font-size: .75rem; background: #FFF5FB; color: var(--shell-muted); }
 .planPill strong { color: var(--shell-navy); font-weight: 650; overflow-wrap: anywhere; }
 .planPill::before { content: ""; width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--shell-pink); }

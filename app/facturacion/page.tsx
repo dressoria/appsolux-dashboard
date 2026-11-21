@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { SalesPeriodChart } from "@/components/appsolux/facturacion/sales-period-chart";
 import { HomeQuickActions } from "@/components/appsolux/facturacion/home-quick-actions";
+import { HomeShortcutsEditor } from "@/components/appsolux/facturacion/home-shortcuts-editor";
 import styles from "@/components/appsolux/facturacion/home.module.css";
 import { HomeTabs } from "@/components/appsolux/facturacion/home-tabs";
 import { DashboardShell } from "@/components/appsolux/layout/dashboard-shell";
@@ -189,7 +190,6 @@ export default async function FacturacionPage() {
       getUserShortcutKeys(user.id, tenant.id),
       getFinancialSummary(tenant.id),
     ]);
-  const name = user.name?.trim();
   const shortcuts = resolveShortcuts(shortcutKeys);
   const catalog = getShortcutCatalog();
 
@@ -198,7 +198,7 @@ export default async function FacturacionPage() {
 
   /* ── Shortcuts tab ────────────────────────────────────────────────── */
   const shortcutsContent = (
-    <HomeQuickActions shortcuts={shortcuts} initialKeys={shortcutKeys} catalog={catalog} />
+    <HomeQuickActions shortcuts={shortcuts} />
   );
 
   /* ── Summary tab ──────────────────────────────────────────────────── */
@@ -402,19 +402,27 @@ export default async function FacturacionPage() {
           <div className="min-w-0">
             <span className={styles.eyebrow}>Inicio</span>
             <h1>
-              {name ? `Hola, ${name} 👋` : "Hola 👋"}
+              Resumen general
             </h1>
             <p>
-              Resumen general de tu empresa
+              Todo lo que necesitas para gestionar tu negocio, en un solo lugar.
             </p>
           </div>
-          <Link href={routes.facturacionPos} className={`${styles.actionLink} ${styles.primaryLink}`}>
-            <ShoppingCart className="size-4" aria-hidden="true" />
-            Nueva venta
-          </Link>
         </header>
 
-        <HomeTabs shortcuts={shortcutsContent} summary={summaryContent} />
+        <HomeTabs
+          shortcuts={shortcutsContent}
+          summary={summaryContent}
+          actions={
+            <>
+              <Link href={routes.facturacionPos} className={`${styles.actionLink} ${styles.primaryLink}`}>
+                <ShoppingCart className="size-4" aria-hidden="true" />
+                Nueva venta
+              </Link>
+              <HomeShortcutsEditor initialKeys={shortcutKeys} catalog={catalog} />
+            </>
+          }
+        />
       </div>
 
       {/* ── AI invoicing FAB ── */}

@@ -390,8 +390,17 @@ export function DashboardFrame({
                     {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
                   </Button>
                   <div className={shellStyles.tenantText}>
-                    <p>Empresa activa</p>
-                    <p title={tenantName}>{tenantName}</p>
+                    {isHome ? (
+                      <>
+                        <p>Hola, {userName} 👋</p>
+                        <p title={tenantName}>Empresa activa: {tenantName}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p>Empresa activa</p>
+                        <p title={tenantName}>{tenantName}</p>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className={shellStyles.topbarAccount}>

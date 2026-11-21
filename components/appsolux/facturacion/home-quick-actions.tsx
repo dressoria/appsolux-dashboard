@@ -5,7 +5,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ShortcutEntry } from "@/lib/core/home-preferences";
-import { HomeShortcutsEditor } from "./home-shortcuts-editor";
 import { BlobFill } from "@/components/ui/blob-fill";
 import blobStyles from "@/components/ui/animated-controls.module.css";
 import styles from "./home.module.css";
@@ -15,10 +14,8 @@ const icons: Record<string, LucideIcon> = {
   Users, Wallet, Building2, ShieldCheck, Settings2,
 };
 
-export function HomeQuickActions({ shortcuts, initialKeys, catalog }: {
+export function HomeQuickActions({ shortcuts }: {
   shortcuts: ShortcutEntry[];
-  initialKeys: string[];
-  catalog: ShortcutEntry[];
 }) {
   return (
     <section aria-labelledby="quick-actions-title" className={styles.quickActions}>
@@ -27,7 +24,6 @@ export function HomeQuickActions({ shortcuts, initialKeys, catalog }: {
           <h2 id="quick-actions-title">Acciones rápidas</h2>
           <p>Lo que necesitas para seguir con tu día.</p>
         </div>
-        <HomeShortcutsEditor initialKeys={initialKeys} catalog={catalog} />
       </div>
       <div className={styles.shortcutGrid}>
         {shortcuts.map(({ key, title, description, icon, href }) => {
