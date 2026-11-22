@@ -1,0 +1,368 @@
+/* Legal document page layout */
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #fff;
+  color: #1a1a2e;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #f0f0f5;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(8px);
+  padding: 0 1.5rem;
+  height: 3.5rem;
+}
+
+.headerInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+/* Main content area */
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+}
+
+@media (min-width: 1024px) {
+  .main {
+    grid-template-columns: 14rem 1fr;
+    gap: 3rem;
+    padding-top: 3rem;
+  }
+}
+
+/* Table of contents sidebar */
+.toc {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .toc {
+    display: block;
+    position: sticky;
+    top: 5rem;
+    align-self: start;
+    max-height: calc(100vh - 7rem);
+    overflow-y: auto;
+    padding-right: 0.5rem;
+  }
+}
+
+.tocTitle {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #000345;
+  margin-bottom: 0.75rem;
+}
+
+.tocList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.tocLink {
+  display: block;
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: #667085;
+  text-decoration: none;
+  transition: color 0.15s, background 0.15s;
+}
+
+.tocLink:hover {
+  color: #000345;
+  background: rgba(0, 3, 69, 0.04);
+}
+
+/* Article body */
+.article {
+  min-width: 0;
+  max-width: 48rem;
+}
+
+.draftBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 0, 153, 0.2);
+  background: linear-gradient(135deg, rgba(255, 0, 153, 0.04), rgba(0, 3, 69, 0.03));
+  margin-bottom: 2rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #000345;
+}
+
+.draftBanner strong {
+  font-weight: 700;
+}
+
+.articleTitle {
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #000345;
+  line-height: 1.15;
+  margin-bottom: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .articleTitle {
+    font-size: 2.5rem;
+  }
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  font-size: 0.8125rem;
+  color: #667085;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #f0f0f5;
+}
+
+/* Rendered content */
+.content {
+  font-size: 0.9375rem;
+  line-height: 1.8;
+  color: #333;
+}
+
+.content h2 {
+  font-size: 1.375rem;
+  font-weight: 800;
+  color: #000345;
+  margin-top: 2.5rem;
+  margin-bottom: 0.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #f0f0f5;
+  scroll-margin-top: 5rem;
+}
+
+.content h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #000345;
+  margin-top: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.content p {
+  margin-bottom: 1rem;
+}
+
+.content ul,
+.content ol {
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+}
+
+.content li {
+  margin-bottom: 0.375rem;
+}
+
+.content strong {
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.content a {
+  color: #1769e0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.content a:hover {
+  color: #000345;
+}
+
+/* Placeholder info box */
+.content .infobox {
+  padding: 1rem 1.25rem;
+  border-radius: 0.5rem;
+  background: rgba(23, 105, 224, 0.05);
+  border-left: 3px solid #1769e0;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+/* Hash/integrity footer */
+.integrity {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #f0f0f5;
+  font-size: 0.75rem;
+  color: #667085;
+  word-break: break-all;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
+
+/* Cross-links nav */
+.crossLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #f0f0f5;
+}
+
+.crossLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.875rem;
+  border-radius: 9999px;
+  border: 1px solid #e4e9f0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #000345;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.crossLink:hover {
+  background: rgba(0, 3, 69, 0.04);
+  border-color: #000345;
+}
+
+.crossLinkActive {
+  background: rgba(0, 3, 69, 0.06);
+  border-color: #000345;
+  font-weight: 700;
+}
+
+/* Mobile TOC dropdown */
+.mobileToc {
+  margin-bottom: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .mobileToc {
+    display: none;
+  }
+}
+
+.mobileTocButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e4e9f0;
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #000345;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.mobileTocButton:hover {
+  background: rgba(0, 3, 69, 0.03);
+}
+
+.mobileTocList {
+  list-style: none;
+  padding: 0.5rem 0;
+  margin: 0.5rem 0 0;
+  border: 1px solid #e4e9f0;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.mobileTocLink {
+  display: block;
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  color: #667085;
+  text-decoration: none;
+}
+
+.mobileTocLink:hover {
+  color: #000345;
+  background: rgba(0, 3, 69, 0.03);
+}
+
+/* Pending state */
+.pendingBox {
+  padding: 2.5rem 2rem;
+  border-radius: 1rem;
+  border: 1px solid #e4e9f0;
+  background: linear-gradient(135deg, rgba(0, 3, 69, 0.02), rgba(23, 105, 224, 0.03));
+  text-align: center;
+  max-width: 32rem;
+  margin: 2rem auto;
+}
+
+.pendingTitle {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #000345;
+  margin-bottom: 0.75rem;
+}
+
+.pendingText {
+  font-size: 0.9375rem;
+  color: #667085;
+  line-height: 1.6;
+}
+
+.pendingContact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 1.25rem;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e4e9f0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #000345;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.pendingContact:hover {
+  background: rgba(0, 3, 69, 0.04);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crossLink,
+  .tocLink,
+  .mobileTocButton {
+    transition: none;
+  }
+}

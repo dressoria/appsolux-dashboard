@@ -3,11 +3,20 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { getAccountTree, createAccount } from "@/lib/core/accounting-accounts";
 import { getActivePlan } from "@/lib/core/accounting-plan";
+import { requireModuleApiAccess, getModuleAccessErrorResponse } from "@/lib/core/capabilities";
 
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
   const tenant = await getCurrentTenant(user);
+
+  try {
+    await requireModuleApiAccess(tenant.id, "accounting");
+  } catch (err) {
+    const gateResponse = getModuleAccessErrorResponse(err);
+    if (gateResponse) return NextResponse.json(gateResponse.body, { status: gateResponse.status });
+    throw err;
+  }
 
   const plan = await getActivePlan(tenant.id);
   if (!plan) return NextResponse.json({ error: "No hay plan de cuentas activo." }, { status: 404 });
@@ -20,6 +29,14 @@ export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
   const tenant = await getCurrentTenant(user);
+
+  try {
+    await requireModuleApiAccess(tenant.id, "accounting");
+  } catch (err) {
+    const gateResponse = getModuleAccessErrorResponse(err);
+    if (gateResponse) return NextResponse.json(gateResponse.body, { status: gateResponse.status });
+    throw err;
+  }
 
   const plan = await getActivePlan(tenant.id);
   if (!plan) return NextResponse.json({ error: "No hay plan de cuentas activo." }, { status: 404 });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
+import { gateModuleApiAccess } from "@/lib/core/capabilities";
 import { parseReceivedTxt, isValidAccessKey } from "@/lib/core/sri-received-txt-parser";
 import { fetchAuthorizedXml } from "@/lib/core/sri-soap-client";
 import { importPurchaseXml } from "@/lib/core/purchase-xml-import";
@@ -14,6 +15,8 @@ function sleep(ms: number) {
 
 export async function POST(req: NextRequest) {
   const { user, tenant } = await requireDashboardSession();
+  const gate = await gateModuleApiAccess(tenant.id, "purchases");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
 
   const contentType = req.headers.get("content-type") ?? "";
 

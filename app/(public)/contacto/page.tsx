@@ -65,7 +65,7 @@ export default async function ContactoPage({ searchParams }: ContactoPageProps) 
   const email =
     process.env.NEXT_PUBLIC_SUPPORT_EMAIL ??
     process.env.SUPPORT_EMAIL ??
-    "soporte@facturom.com";
+    "facturomecuador@gmail.com";
   const whatsappMessage = selectedIntent?.message ?? "Hola, quiero información sobre Facturom.";
   const whatsappHref = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
 

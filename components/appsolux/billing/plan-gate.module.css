@@ -1,0 +1,72 @@
+.container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 2rem;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 28rem;
+  padding: 3rem 2rem;
+  border: 1px solid #E7E7EF;
+  border-radius: 1.5rem;
+  background: white;
+  box-shadow: 0 4px 24px #00034508;
+}
+.iconWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 1rem;
+  background: #FFF0F8;
+  color: #FF0099;
+  margin-bottom: 1.5rem;
+}
+.title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #000345;
+  letter-spacing: -.02em;
+  margin-bottom: .75rem;
+}
+.description {
+  font-size: .875rem;
+  color: #65687B;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+.planNote {
+  font-size: .875rem;
+  color: #000345;
+  margin-bottom: 2rem;
+}
+.planNote strong {
+  color: #FF0099;
+  font-weight: 700;
+}
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .75rem 1.5rem;
+  background: #000345;
+  color: white;
+  border-radius: .85rem;
+  font-size: .875rem;
+  font-weight: 650;
+  transition: background-color 220ms ease, transform 220ms ease;
+}
+.cta:hover {
+  background: #FF0099;
+  transform: translateY(-1px);
+}
+.cta:focus-visible {
+  outline: 2px solid #FF0099;
+  outline-offset: 3px;
+}

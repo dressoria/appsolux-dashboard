@@ -1,0 +1,65 @@
+## Ámbito de aplicación
+
+Esta Política de Reembolsos regula las condiciones en las que Facturom puede procesar devoluciones de pagos realizados por suscripciones al servicio. Es complementaria a los Términos y Condiciones y a las Condiciones de Pagos y Suscripciones.
+
+## Principios generales
+
+Los reembolsos se evalúan caso por caso, conforme a los derechos del consumidor establecidos en la Ley Orgánica de Defensa del Consumidor del Ecuador y la normativa aplicable. Facturom no establece una prohibición absoluta de reembolsos ni una garantía comercial de devolución automática.
+
+## Supuestos de reembolso
+
+### Pagos duplicados
+
+Si se detecta o reporta un pago duplicado, Facturom reembolsará el monto duplicado tras verificar la duplicidad en el sistema del procesador de pagos.
+
+### Cobros incorrectos
+
+Si se produce un cobro por un monto incorrecto, superior al correspondiente al plan y período contratado, Facturom reembolsará la diferencia tras la verificación.
+
+### Cancelación dentro del período de reflexión
+
+Si la normativa de protección al consumidor aplicable otorga un período de reflexión, el cliente podrá solicitar el reembolso conforme a los plazos y condiciones legales. {{CONFIRMAR_PERIODO_REFLEXION_APLICABLE}}
+
+### Incumplimiento del servicio
+
+Si Facturom no presta el servicio contratado de manera sustancial e injustificada durante un período prolongado, el cliente podrá solicitar un reembolso proporcional al tiempo no utilizado, sin perjuicio de otros derechos que le asistan conforme a la ley.
+
+## Supuestos en los que no procede el reembolso
+
+No procede el reembolso en los siguientes casos, salvo que la ley disponga lo contrario:
+
+- Cancelación voluntaria de la suscripción cuando el servicio se ha prestado normalmente durante el período facturado. El acceso permanece disponible hasta el final del período pagado.
+- Falta de uso del servicio por decisión del cliente, cuando el servicio ha estado disponible.
+- Funcionalidades que dependen de terceros (como la disponibilidad del SRI) y cuya interrupción no es atribuible a Facturom.
+- Cambio a un plan inferior, que se aplica al siguiente período de facturación sin devolución del período actual.
+
+## Procedimiento de solicitud
+
+Para solicitar un reembolso, el cliente debe contactar al equipo de soporte de Facturom:
+
+- Correo electrónico: facturomecuador@gmail.com
+- Indicar: nombre de la empresa, correo electrónico de la cuenta, descripción del motivo, fecha y monto del pago.
+
+Facturom revisará la solicitud y responderá en un plazo máximo de quince (15) días hábiles.
+
+## Proceso según el método de pago
+
+### Pagos procesados por Paddle
+
+Los reembolsos de pagos realizados a través de Paddle se procesan mediante la plataforma de Paddle. El tiempo de acreditación depende de Paddle y de la entidad financiera del cliente.
+
+### Transferencias bancarias
+
+Los reembolsos de pagos realizados por transferencia bancaria se coordinan directamente con el cliente. Facturom solicitará los datos bancarios necesarios para realizar la devolución. El tiempo de acreditación depende de los tiempos de procesamiento bancario.
+
+## Plazos
+
+Facturom procesará los reembolsos aprobados en un plazo razonable. Los plazos de acreditación dependen del procesador de pagos y de la entidad financiera del cliente.
+
+Conforme a la normativa ecuatoriana, el cliente puede presentar reclamaciones ante la autoridad de defensa del consumidor si considera que sus derechos no han sido respetados.
+
+## Contacto
+
+Para consultas sobre reembolsos: facturomecuador@gmail.com
+
+Última actualización: {{LEGAL_EFFECTIVE_DATE}}

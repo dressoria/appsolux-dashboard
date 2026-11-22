@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
 import { getProducts, createProduct } from "@/lib/core/inventory-products";
 import { createMovement } from "@/lib/core/inventory-movements";
+import { checkPlanLimit, planLimitErrorResponse } from "@/lib/core/plan-limits";
 import { Decimal } from "@prisma/client/runtime/library";
 
 export async function GET(req: NextRequest) {
@@ -33,6 +34,12 @@ export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ code: "AUTH_REQUIRED", message: "Sesión requerida." }, { status: 401 });
   const tenant = await getCurrentTenant(user);
+
+  const limitCheck = await checkPlanLimit(tenant.id, "products");
+  if (!limitCheck.allowed) {
+    const err = planLimitErrorResponse(limitCheck);
+    return NextResponse.json(err.body, { status: err.status });
+  }
 
   try {
     const body = await req.json();

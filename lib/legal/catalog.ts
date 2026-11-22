@@ -4,6 +4,7 @@ export const legalDocuments = [
   { type: "payments", slug: "pagos-y-suscripciones", title: "Condiciones de Pagos y Suscripciones", action: "ACCEPTED" },
   { type: "dpa", slug: "acuerdo-tratamiento-datos", title: "Acuerdo de Tratamiento de Datos", action: "ACCEPTED" },
   { type: "cookies", slug: "politica-de-cookies", title: "Política de Cookies", action: "ACKNOWLEDGED" },
+  { type: "refunds", slug: "politica-de-reembolsos", title: "Política de Reembolsos", action: "ACKNOWLEDGED" },
 ] as const;
 
 export type LegalProof = { accepted: boolean; authorizedRepresentative: boolean; releaseId: string; releaseHash: string };

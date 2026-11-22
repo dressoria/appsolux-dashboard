@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
+import { gateModuleApiAccess } from "@/lib/core/capabilities";
 import {
   listPurchaseDocuments,
   createPurchaseDocument,
@@ -8,6 +9,8 @@ import { isValidTaxSupportCombination } from "@/lib/core/tax-support-catalog";
 
 export async function GET(req: NextRequest) {
   const { tenant } = await requireDashboardSession();
+  const gate = await gateModuleApiAccess(tenant.id, "purchases");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
 
   const sp = req.nextUrl.searchParams;
   const result = await listPurchaseDocuments(tenant.id, {
@@ -27,6 +30,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const { user, tenant } = await requireDashboardSession();
+  const gate = await gateModuleApiAccess(tenant.id, "purchases");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
 
   try {
     const body = await req.json();

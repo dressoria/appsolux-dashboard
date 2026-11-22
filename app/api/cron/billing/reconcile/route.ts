@@ -1,15 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
+import { NextResponse } from "next/server";
 
 import { reconcileExpiredSubscriptions } from "@/lib/core/billing/subscription-expiry";
 
 export const runtime = "nodejs";
 
-export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
+export async function POST(request: Request) {
+  const secret = process.env.CRON_SECRET?.trim();
+  if (!secret) return NextResponse.json({ ok: false }, { status: 503 });
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const received = Buffer.from(request.headers.get("authorization") ?? "");
+  const expected = Buffer.from(`Bearer ${secret}`);
+  if (
+    received.length !== expected.length ||
+    !timingSafeEqual(received, expected)
+  ) {
+    return NextResponse.json({ ok: false }, { status: 401 });
   }
 
   const result = await reconcileExpiredSubscriptions();

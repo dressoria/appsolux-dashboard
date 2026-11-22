@@ -97,6 +97,16 @@ export async function previewImport(tenantId: string, rows: ImportRow[], db: Imp
 }
 
 export async function confirmImport(tenantId: string, rows: ImportRow[], userId: string) {
+  const { checkPlanLimit } = await import("./plan-limits");
+  const limitCheck = await checkPlanLimit(tenantId, "products", rows.length);
+  if (!limitCheck.allowed) {
+    throw new ProductInputError(
+      `Has alcanzado el límite de productos de tu plan (${limitCheck.current}/${limitCheck.limit}). Mejora tu plan para importar.`,
+      "rows",
+      "PLAN_LIMIT_REACHED",
+      403,
+    );
+  }
   const prisma = getPrismaClient();
   return prisma.$transaction(async (tx) => {
     // Confirmation independently validates current tenant data; preview is never trusted.

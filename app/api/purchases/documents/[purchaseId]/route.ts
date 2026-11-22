@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { gateModuleApiAccess } from "@/lib/core/capabilities";
 import {
   getPurchaseDocumentById,
   cancelPurchaseDocument,
@@ -14,6 +15,8 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
   const tenant = await getCurrentTenant(user);
+  const gate = await gateModuleApiAccess(tenant.id, "purchases");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
   const { purchaseId } = await params;
 
   const doc = await getPurchaseDocumentById(tenant.id, purchaseId);
@@ -26,6 +29,8 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
   const tenant = await getCurrentTenant(user);
+  const gate = await gateModuleApiAccess(tenant.id, "purchases");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
   const { purchaseId } = await params;
 
   const body = await req.json();

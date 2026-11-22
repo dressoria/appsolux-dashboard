@@ -1,7 +1,6 @@
 import { TREASURY_NAVIGATION } from "@/config/treasury-navigation";
 import { SRI_TAX_NAVIGATION, SRI_SALES_NAVIGATION, SRI_PURCHASES_NAVIGATION } from "@/config/sri-tax-navigation";
 import { routes } from "@/config/routes";
-import { getFacturomAccess } from "@/lib/core/facturom-access";
 import type { TenantModeState } from "@/lib/core/tenant-mode";
 
 export type SidebarIconName =
@@ -57,7 +56,6 @@ const link = (
 export function buildSidebarNavigation(
   tenantMode: TenantModeState,
 ): NavGroup[] {
-  const access = getFacturomAccess();
   const groups: NavGroup[] = [
     {
       key: "dashboard",
@@ -229,15 +227,5 @@ export function buildSidebarNavigation(
     },
   ];
 
-  return groups.filter((group) => {
-    if (group.key === "transactions")
-      return access.invoicing || access.purchases;
-    if (group.key === "sri") return access.sri;
-    if (group.key === "treasury") return access.treasury;
-    if (group.key === "inventory") return access.inventory;
-    if (group.key === "accounting") return access.accounting;
-    if (group.key === "reports") return access.reports;
-    if (group.key === "security") return access.usersAndPermissions;
-    return access.fullAccess;
-  });
+  return groups;
 }

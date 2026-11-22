@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { gateModuleApiAccess } from "@/lib/core/capabilities";
 import { getWarehouseById, updateWarehouse } from "@/lib/core/inventory-warehouses";
 
 export async function GET(
@@ -10,6 +11,8 @@ export async function GET(
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
   const tenant = await getCurrentTenant(user);
+  const gate = await gateModuleApiAccess(tenant.id, "advanced_inventory");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
   const { warehouseId } = await params;
   const warehouse = await getWarehouseById(tenant.id, warehouseId);
   if (!warehouse) return NextResponse.json({ error: "Bodega no encontrada." }, { status: 404 });
@@ -23,6 +26,8 @@ export async function PATCH(
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
   const tenant = await getCurrentTenant(user);
+  const gate = await gateModuleApiAccess(tenant.id, "advanced_inventory");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
   const { warehouseId } = await params;
   const body = await req.json();
   const warehouse = await updateWarehouse(tenant.id, warehouseId, body);

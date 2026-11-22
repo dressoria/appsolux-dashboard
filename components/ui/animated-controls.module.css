@@ -108,12 +108,12 @@
   border-radius: 50%;
   background: var(--blob-fill, var(--facturom-action-strong));
   transform: translateY(110%) scale(0.6);
-  transition: transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 800ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .blob:nth-child(1) { left: -8%; }
-.blob:nth-child(2) { left: 18%; transition-delay: 50ms; }
-.blob:nth-child(3) { left: 44%; transition-delay: 100ms; }
-.blob:nth-child(4) { left: 70%; transition-delay: 150ms; }
+.blob:nth-child(2) { left: 18%; transition-delay: 80ms; }
+.blob:nth-child(3) { left: 44%; transition-delay: 170ms; }
+.blob:nth-child(4) { left: 70%; transition-delay: 260ms; }
 .blobHost:is(:hover, :focus-visible):not(:disabled) .blob { transform: translateY(15%) scale(1.9); }
 .buttonLabel { position: relative; display: inline-flex; align-items: center; gap: 0.5rem; }
 

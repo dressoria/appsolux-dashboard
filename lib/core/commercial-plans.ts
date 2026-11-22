@@ -73,6 +73,11 @@ export function getDefaultFeaturesForPlan(plan: CommercialPlan): TenantFeatureMa
         "reports_basic",
         "sri_invoicing",
         "sri_configuration",
+        "inventory_advanced",
+        "purchases",
+        "warehouses",
+        "kardex",
+        "advanced_reports",
       ]);
     case "ADVANCED":
       return buildFeatureMap([
@@ -118,6 +123,8 @@ export function getDefaultFeaturesForPlan(plan: CommercialPlan): TenantFeatureMa
         "sales_basic",
         "customers_basic",
         "reports_basic",
+        "sri_invoicing",
+        "sri_configuration",
       ]);
   }
 }

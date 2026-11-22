@@ -5,6 +5,7 @@ import {
   type SupplierInput,
 } from "@/lib/core/lightweight-suppliers";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { gateModuleApiAccess } from "@/lib/core/capabilities";
 import {
   validateTenantMembership,
   validateRelatedSupplier,
@@ -21,6 +22,8 @@ export async function PATCH(request: Request, context: Context) {
         { status: 401 },
       );
     const tenant = await getCurrentTenant(user);
+    const gate = await gateModuleApiAccess(tenant.id, "suppliers");
+    if (gate) return NextResponse.json(gate.body, { status: gate.status });
     const { supplierId } = await context.params;
     const body = (await request.json()) as Omit<
       SupplierInput,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { gateModuleApiAccess } from "@/lib/core/capabilities";
 import {
   listClassificationRules,
   createClassificationRule,
@@ -11,6 +12,8 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
   const tenant = await getCurrentTenant(user);
+  const gate = await gateModuleApiAccess(tenant.id, "purchases");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
 
   const rules = await listClassificationRules(tenant.id);
   return NextResponse.json(rules);
@@ -20,6 +23,8 @@ export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
   const tenant = await getCurrentTenant(user);
+  const gate = await gateModuleApiAccess(tenant.id, "purchases");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
 
   const body = await req.json();
   if (!body.field || !body.value || !body.categoryId) {
@@ -40,6 +45,8 @@ export async function DELETE(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
   const tenant = await getCurrentTenant(user);
+  const gate = await gateModuleApiAccess(tenant.id, "purchases");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
 
   const body = await req.json();
   if (!body.id) return NextResponse.json({ error: "ID requerido." }, { status: 400 });

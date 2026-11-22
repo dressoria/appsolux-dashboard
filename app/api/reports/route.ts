@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { buildReportsDashboardData } from "@/lib/api/erpnext/reports";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { gateModuleApiAccess } from "@/lib/core/capabilities";
 import type { ReportDateRange } from "@/types/reports";
 
 function getDateRange(request: Request): ReportDateRange {
@@ -33,6 +34,8 @@ export async function GET(request: Request) {
     }
 
     const tenant = await getCurrentTenant(user);
+    const gate = await gateModuleApiAccess(tenant.id, "advanced_reports");
+    if (gate) return NextResponse.json(gate.body, { status: gate.status });
     const reports = await buildReportsDashboardData(getDateRange(request));
 
     return NextResponse.json({

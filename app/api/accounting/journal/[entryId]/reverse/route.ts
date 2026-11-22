@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { gateModuleApiAccess } from "@/lib/core/capabilities";
 import { reverseJournalEntry } from "@/lib/core/accounting-journal";
 
 export async function POST(
@@ -10,6 +11,8 @@ export async function POST(
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
   const tenant = await getCurrentTenant(user);
+  const gate = await gateModuleApiAccess(tenant.id, "accounting");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
   const { entryId } = await params;
 
   const body = await req.json();

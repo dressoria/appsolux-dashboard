@@ -1,0 +1,90 @@
+## Objeto del acuerdo
+
+Este Acuerdo de Tratamiento de Datos establece las obligaciones de Facturom como encargado de tratamiento cuando procesa datos personales por cuenta de empresas clientes (responsables de tratamiento), conforme a la Ley Orgánica de Protección de Datos Personales del Ecuador (LOPDP) y su Reglamento General.
+
+## Definiciones
+
+- Responsable: la empresa cliente que utiliza Facturom y determina los fines y medios del tratamiento de los datos personales de sus propios clientes, proveedores y empleados.
+- Encargado: Facturom, que trata datos personales por cuenta del responsable para prestar el servicio contratado.
+- Datos del responsable: datos personales de clientes, proveedores u otras personas ingresados en Facturom por la empresa cliente.
+
+## Alcance del tratamiento
+
+Facturom trata datos del responsable exclusivamente para:
+
+- Almacenar y gestionar la información de clientes y proveedores ingresada por la empresa cliente.
+- Generar y procesar comprobantes electrónicos ante el SRI por instrucción de la empresa cliente.
+- Gestionar inventario, tesorería y contabilidad según las funciones del plan contratado.
+- Mantener la integridad y disponibilidad de los datos dentro de la plataforma.
+
+Facturom no trata los datos del responsable para fines propios ni los comparte con terceros distintos de los subencargados descritos en este acuerdo.
+
+## Obligaciones de Facturom como encargado
+
+Facturom se compromete a:
+
+- Tratar los datos únicamente conforme a las instrucciones de la empresa cliente y para los fines descritos en este acuerdo.
+- No comunicar datos a terceros salvo los subencargados necesarios para prestar el servicio o por obligación legal.
+- Implementar medidas técnicas y organizativas adecuadas para proteger los datos.
+- Garantizar que el personal autorizado para acceder a datos del responsable esté sujeto a obligaciones de confidencialidad.
+- Notificar a la empresa cliente sobre incidentes de seguridad que afecten sus datos, sin demora injustificada.
+- Colaborar con la empresa cliente para atender solicitudes de derechos de los titulares que se dirijan al responsable.
+- Al finalizar la relación contractual, conservar los datos durante los plazos legales aplicables y, una vez cumplidos, eliminarlos conforme a las instrucciones del responsable.
+
+## Obligaciones de la empresa cliente como responsable
+
+La empresa cliente se compromete a:
+
+- Garantizar que tiene base legal para el tratamiento de los datos personales que ingresa en Facturom.
+- Informar adecuadamente a sus titulares de datos sobre el tratamiento realizado a través de Facturom.
+- Obtener los consentimientos necesarios cuando la base legal lo requiera.
+- Responder a las solicitudes de derechos de sus propios titulares de datos.
+
+## Subencargados
+
+Facturom puede utilizar subencargados para prestar el servicio. Los subencargados actuales incluyen:
+
+- Proveedor de infraestructura en la nube: {{CONFIRMAR_PROVEEDOR_CLOUD}} — alojamiento de aplicación y bases de datos.
+- Clerk: autenticación de usuarios.
+- Servicio de Rentas Internas (SRI): autorización de comprobantes electrónicos, conforme a la normativa tributaria.
+
+Facturom notificará a las empresas clientes sobre cambios en subencargados con antelación razonable. Si una empresa cliente se opone justificadamente a un nuevo subencargado, las partes buscarán una solución. Si no es posible, la empresa cliente podrá cancelar su suscripción.
+
+## Medidas de seguridad
+
+Facturom implementa las siguientes medidas de seguridad para proteger los datos del responsable:
+
+- Cifrado de comunicaciones mediante HTTPS/TLS.
+- Separación lógica de datos entre empresas clientes (arquitectura multitenant).
+- Control de acceso basado en la pertenencia al tenant y rol del usuario.
+- Almacenamiento cifrado de firmas electrónicas.
+- Verificación de integridad de documentos legales.
+- Respaldos periódicos de bases de datos.
+
+{{CONFIRMAR_MEDIDAS_SEGURIDAD_ADICIONALES}}
+
+## Transferencias internacionales
+
+Algunos subencargados pueden encontrarse fuera de Ecuador. Las transferencias internacionales se realizan conforme a las disposiciones del Capítulo VII de la LOPDP y se basan en las garantías contractuales establecidas con cada subencargado.
+
+## Derechos de auditoría
+
+La empresa cliente tiene derecho a verificar el cumplimiento de este acuerdo por parte de Facturom, mediante solicitud razonable por escrito. Facturom proporcionará la información necesaria para demostrar el cumplimiento de sus obligaciones como encargado.
+
+## Incidentes de seguridad
+
+En caso de un incidente de seguridad que afecte datos del responsable, Facturom:
+
+- Notificará a la empresa cliente sin demora injustificada.
+- Proporcionará la información disponible sobre la naturaleza del incidente.
+- Colaborará con las medidas de mitigación y con las notificaciones que el responsable deba realizar.
+
+## Vigencia
+
+Este acuerdo tiene la misma vigencia que la relación contractual entre la empresa cliente y Facturom. Las obligaciones de confidencialidad y conservación de datos subsisten tras su terminación, conforme a los plazos legales aplicables.
+
+## Legislación aplicable
+
+Este acuerdo se rige por la LOPDP del Ecuador, su Reglamento General y las directrices de la SPDP.
+
+Última actualización: {{LEGAL_EFFECTIVE_DATE}}

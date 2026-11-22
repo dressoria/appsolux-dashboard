@@ -1,0 +1,172 @@
+/* Plan card blob hover animation */
+.card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 120% 80% at 50% 110%,
+    var(--blob-color, transparent) 0%,
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 20px 40px -20px var(--blob-shadow, rgba(0, 0, 0, 0.08)),
+    0 0 0 1px var(--blob-border, transparent);
+}
+
+.cardBasic {
+  --blob-color: rgba(23, 105, 224, 0.06);
+  --blob-shadow: rgba(23, 105, 224, 0.12);
+  --blob-border: rgba(23, 105, 224, 0.1);
+}
+
+.cardHighlighted {
+  --blob-color: rgba(255, 0, 153, 0.08);
+  --blob-shadow: rgba(255, 0, 153, 0.18);
+  --blob-border: rgba(255, 0, 153, 0.25);
+}
+
+.cardEnterprise {
+  --blob-color: rgba(0, 3, 69, 0.06);
+  --blob-shadow: rgba(0, 3, 69, 0.12);
+  --blob-border: rgba(0, 3, 69, 0.1);
+}
+
+.cardContent {
+  position: relative;
+  z-index: 1;
+}
+
+/* Collapsible comparison */
+.comparisonToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--facturom-border, #e4e9f0);
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--facturom-text, #172033);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.comparisonToggle:hover {
+  background: var(--facturom-primary-soft, #eaf3ff);
+  border-color: var(--facturom-primary, #1769e0);
+}
+
+.comparisonChevron {
+  width: 1rem;
+  height: 1rem;
+  transition: transform 0.3s ease;
+}
+
+.comparisonChevronOpen {
+  transform: rotate(180deg);
+}
+
+.comparisonBody {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.4s ease;
+}
+
+.comparisonBodyOpen {
+  grid-template-rows: 1fr;
+}
+
+.comparisonInner {
+  overflow: hidden;
+}
+
+/* Category header in comparison table */
+.categoryHeader {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--facturom-primary, #1769e0);
+  background: var(--facturom-primary-soft, #eaf3ff);
+}
+
+/* Badge */
+.badge {
+  position: absolute;
+  top: -0.75rem;
+  left: 1.5rem;
+  padding: 0.25rem 0.875rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #fff;
+  background: linear-gradient(135deg, #ff0099 0%, #ec008c 100%);
+  box-shadow: 0 4px 12px -2px rgba(255, 0, 153, 0.35);
+}
+
+.currentBadge {
+  position: absolute;
+  top: -0.75rem;
+  right: 1.5rem;
+  padding: 0.25rem 0.875rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--facturom-brand-navy, #000345);
+  background: linear-gradient(135deg, #eaf3ff 0%, #dcebff 100%);
+  box-shadow: 0 2px 8px -2px rgba(0, 3, 69, 0.15);
+}
+
+/* Unlimited banner */
+.unlimitedBanner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, rgba(255, 0, 153, 0.08) 0%, rgba(23, 105, 224, 0.08) 100%);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--facturom-brand-navy, #000345);
+}
+
+/* Price note */
+.priceNote {
+  font-size: 0.75rem;
+  color: var(--facturom-text-muted, #667085);
+  margin-top: 0.25rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card::before,
+  .comparisonChevron,
+  .comparisonBody {
+    transition: none;
+  }
+
+  .card:hover {
+    transform: none;
+  }
+}

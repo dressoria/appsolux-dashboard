@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { gateModuleApiAccess } from "@/lib/core/capabilities";
 import { getClosingPreview } from "@/lib/core/accounting-closing";
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
   const tenant = await getCurrentTenant(user);
+  const gate = await gateModuleApiAccess(tenant.id, "accounting");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
 
   const year = req.nextUrl.searchParams.get("year");
   if (!year) return NextResponse.json({ error: "Año requerido." }, { status: 400 });

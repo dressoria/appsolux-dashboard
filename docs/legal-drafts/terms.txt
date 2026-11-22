@@ -1,0 +1,146 @@
+## Identificación del prestador
+
+Facturom es operado por BICODEX SYSTEMS S.A.S., con RUC 1793242481001, domiciliada en {{LEGAL_OPERATOR_DOMICILE}}, Ecuador.
+
+Correo de notificaciones legales: {{LEGAL_NOTICES_EMAIL}}
+Correo de soporte: facturomecuador@gmail.com
+Sitio web: https://facturom.com
+
+## Descripción del servicio
+
+Facturom es una plataforma de software como servicio (SaaS) que permite a negocios en Ecuador gestionar facturación electrónica, punto de venta, inventario, clientes, proveedores, tesorería, contabilidad y reportes, según el plan contratado.
+
+Facturom facilita la emisión de comprobantes electrónicos ante el Servicio de Rentas Internas (SRI), pero no garantiza la autorización de los documentos por parte del SRI, ya que esta depende del cumplimiento de los requisitos tributarios por parte del contribuyente, del estado de su firma electrónica y de la disponibilidad de los servicios del SRI.
+
+## Registro de cuentas
+
+Para utilizar Facturom es necesario crear una cuenta proporcionando un correo electrónico válido y verificado. El registro se realiza a través de Clerk, el proveedor de autenticación. Posteriormente, el usuario debe registrar su empresa proporcionando los datos requeridos.
+
+El usuario declara que la información proporcionada durante el registro es veraz, actual y completa. Es responsabilidad del usuario mantener actualizada su información.
+
+## Uso permitido
+
+El cliente se compromete a utilizar Facturom exclusivamente para los fines previstos: gestión empresarial, facturación electrónica y operaciones comerciales legítimas conforme a la legislación ecuatoriana.
+
+Queda prohibido:
+
+- Utilizar Facturom para actividades ilícitas o fraudulentas.
+- Emitir comprobantes electrónicos con información falsa o engañosa.
+- Intentar acceder a datos de otras empresas o usuarios.
+- Realizar ingeniería inversa, descompilar o alterar el software.
+- Sobrecargar intencionalmente la infraestructura del servicio.
+- Compartir credenciales de acceso con terceros no autorizados.
+- Utilizar la plataforma para almacenar o distribuir contenido malicioso.
+
+## Obligaciones del cliente
+
+El cliente es responsable de:
+
+- La veracidad de los datos ingresados en la plataforma, incluyendo datos de clientes, proveedores y comprobantes electrónicos.
+- El cumplimiento de sus obligaciones tributarias ante el SRI.
+- La custodia de su firma electrónica y credenciales de acceso.
+- El uso correcto de los comprobantes electrónicos conforme a la normativa tributaria vigente.
+- La gestión de los usuarios autorizados dentro de su empresa.
+- La obtención de los consentimientos necesarios respecto de los datos personales que ingrese en la plataforma.
+
+## Suscripciones y planes
+
+Facturom ofrece los siguientes planes comerciales:
+
+### Plan Básico
+- Precio: $6.99 USD/mes o $69 USD/año.
+- Incluye facturación electrónica ilimitada, punto de venta, gestión básica de inventario, clientes y productos.
+- 1 usuario, 1 punto de emisión, hasta 200 productos.
+
+### Plan Negocio
+- Precio: $12.99 USD/mes o $129 USD/año.
+- Incluye todas las funciones del plan Básico más compras y proveedores, inventario avanzado, cuentas por cobrar y pagar.
+- Hasta 5 usuarios, 3 puntos de emisión, hasta 5.000 productos.
+
+### Plan Empresarial
+- Precio: $29.99 USD/mes o $299 USD/año.
+- Incluye todas las funciones del plan Negocio más contabilidad completa, reportes avanzados y gestión de usuarios.
+- Hasta 100 usuarios, 50 puntos de emisión, hasta 100.000 productos.
+
+Los precios indicados son antes de impuestos. El IVA se calcula por separado según la normativa ecuatoriana vigente.
+
+Los límites indicados representan la configuración comercial del plan. Facturom se reserva el derecho de implementar controles técnicos para hacer cumplir estos límites.
+
+## Activación y pago
+
+La suscripción se activa tras la confirmación del pago. Los métodos de pago disponibles son:
+
+- Pago en línea mediante tarjeta de crédito o débito, procesado por Paddle como merchant of record.
+- Transferencia bancaria, sujeta a verificación y aprobación manual por parte de Facturom.
+
+No se acreditan pagos automáticamente. Las transferencias bancarias requieren aprobación administrativa.
+
+## Renovación
+
+Las suscripciones se renuevan al finalizar el período contratado (mensual o anual). La renovación se procesa a través del procesador de pagos configurado. {{CONFIRMAR_POLITICA_RENOVACION_AUTOMATICA}}
+
+## Cancelación
+
+El cliente puede solicitar la cancelación de su suscripción en cualquier momento. La cancelación no genera devolución automática del período en curso. Las condiciones de reembolso se detallan en la Política de Reembolsos.
+
+Tras la cancelación, el acceso al servicio permanece disponible hasta el final del período pagado. Una vez finalizado, la cuenta pasa a modo de solo lectura; los datos se conservan según las políticas de retención aplicables.
+
+## Cambios de plan
+
+Los cambios de plan están disponibles según las opciones que ofrece el procesador de pagos configurado. Un cambio de plan superior se aplica de manera inmediata. Los cambios de plan inferior se aplican al inicio del siguiente período de facturación.
+
+## Suspensiones
+
+Facturom puede suspender temporal o definitivamente una cuenta en los siguientes casos:
+
+- Falta de pago tras el vencimiento del período contratado.
+- Uso indebido de la plataforma conforme a la sección de uso permitido.
+- Requerimiento de autoridad competente.
+
+La suspensión por falta de pago no elimina los datos del cliente; la cuenta pasa a modo de solo lectura hasta su regularización o hasta que se cumpla el plazo de retención aplicable.
+
+## Protección de cuentas
+
+La seguridad de las credenciales de acceso es responsabilidad del usuario. Facturom recomienda utilizar contraseñas seguras y, cuando esté disponible, la verificación en dos pasos. Facturom no solicita contraseñas por correo electrónico ni por otros medios fuera de la plataforma.
+
+## Disponibilidad del servicio
+
+Facturom se esfuerza por mantener la disponibilidad continua del servicio, pero no garantiza un tiempo de actividad del 100%. Las interrupciones pueden ocurrir por mantenimiento programado, actualizaciones o circunstancias fuera del control de Facturom, incluyendo la indisponibilidad de los servicios del SRI.
+
+Facturom no es responsable de las interrupciones del servicio del SRI ni de sus efectos sobre la emisión de comprobantes electrónicos.
+
+## Soporte
+
+El soporte técnico está disponible a través de los canales indicados en la plataforma. Los tiempos de respuesta dependen del plan contratado y de la naturaleza de la consulta.
+
+## Propiedad intelectual
+
+Facturom, su código fuente, diseño, marca, logotipos y contenido son propiedad de BICODEX SYSTEMS S.A.S. o de sus licenciantes. El cliente recibe una licencia limitada, no exclusiva y revocable para utilizar la plataforma durante la vigencia de su suscripción.
+
+Los datos ingresados por el cliente en la plataforma son propiedad del cliente. Facturom no adquiere derechos sobre el contenido generado por el cliente.
+
+## Limitación de responsabilidad
+
+Facturom proporciona el servicio "tal como está" y "según disponibilidad". Sin perjuicio de los derechos irrenunciables del consumidor conforme a la Ley Orgánica de Defensa del Consumidor del Ecuador:
+
+- Facturom no garantiza que el servicio sea ininterrumpido, libre de errores o que satisfaga todos los requisitos del cliente.
+- Facturom no es responsable de la veracidad ni de las consecuencias de los datos ingresados por el cliente.
+- La responsabilidad total de Facturom por cualquier reclamación no excederá el monto pagado por el cliente durante los doce (12) meses anteriores al evento que origina la reclamación.
+
+## Tratamiento de incidentes
+
+En caso de un incidente de seguridad que afecte datos personales, Facturom notificará a los usuarios afectados y, cuando corresponda, a la Superintendencia de Protección de Datos Personales, conforme a los plazos y requisitos de la LOPDP.
+
+## Modificación de los términos
+
+Facturom puede modificar estos Términos y Condiciones. Las modificaciones se notificarán con antelación razonable y entrarán en vigencia en la fecha indicada. El uso continuado del servicio después de la fecha de vigencia constituye la aceptación de los nuevos términos. El sistema de aceptación contractual permite verificar la versión aceptada por cada empresa.
+
+## Solución de controversias
+
+Las controversias derivadas de estos Términos se resolverán conforme a la legislación ecuatoriana. Las partes intentarán resolver cualquier controversia de manera amistosa. En caso de no alcanzar un acuerdo, se someterán a la jurisdicción de los tribunales competentes de {{LEGAL_OPERATOR_DOMICILE}}, Ecuador.
+
+## Legislación aplicable
+
+Estos Términos y Condiciones se rigen por las leyes de la República del Ecuador, en particular por el Código de Comercio, la Ley Orgánica de Defensa del Consumidor, la Ley de Comercio Electrónico, Firmas y Mensajes de Datos, y la Ley Orgánica de Protección de Datos Personales.
+
+Última actualización: {{LEGAL_EFFECTIVE_DATE}}

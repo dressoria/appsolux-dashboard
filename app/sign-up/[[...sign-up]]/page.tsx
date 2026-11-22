@@ -81,6 +81,11 @@ export default function SignUpPage() {
               Contactar soporte
             </Link>
           </div>
+
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+            <Link href="/terminos-y-condiciones" className="underline transition-colors hover:text-gray-400">Términos</Link>
+            <Link href="/politica-de-privacidad" className="underline transition-colors hover:text-gray-400">Privacidad</Link>
+          </div>
         </div>
 
         <div className="relative z-10">
@@ -105,6 +110,18 @@ export default function SignUpPage() {
           </div>
 
           <SignUp />
+
+          <p className="max-w-sm text-center text-xs leading-relaxed text-gray-500">
+            Al crear tu cuenta aceptas los{" "}
+            <Link href="/terminos-y-condiciones" className="underline hover:text-gray-700">
+              Términos y Condiciones
+            </Link>{" "}
+            y reconoces nuestra{" "}
+            <Link href="/politica-de-privacidad" className="underline hover:text-gray-700">
+              Política de Privacidad
+            </Link>
+            .
+          </p>
         </div>
       </div>
     </main>

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { gateModuleApiAccess } from "@/lib/core/capabilities";
 import { generatePdfTable } from "@/lib/core/pdf-table";
 
 const BRAND_HEX = "1E52F1";
@@ -12,6 +13,8 @@ export async function GET(request: Request) {
   if (!user)
     return NextResponse.json({ message: "Sesión requerida." }, { status: 401 });
   const tenant = await getCurrentTenant(user);
+  const gate = await gateModuleApiAccess(tenant.id, "suppliers");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
   const params = new URL(request.url).searchParams;
   const q = params.get("q")?.trim();
   const status = params.get("status");

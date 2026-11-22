@@ -1,0 +1,86 @@
+## Ámbito de aplicación
+
+Estas Condiciones regulan los pagos, suscripciones, renovaciones y cancelaciones del servicio Facturom. Son complementarias a los Términos y Condiciones generales.
+
+## Planes y precios
+
+Facturom ofrece tres planes comerciales:
+
+- Plan Básico: $6.99 USD/mes o $69 USD/año.
+- Plan Negocio: $12.99 USD/mes o $129 USD/año.
+- Plan Empresarial: $29.99 USD/mes o $299 USD/año.
+
+Todos los planes incluyen facturación electrónica ilimitada. Los precios indicados son antes de impuestos. El IVA se calcula por separado según la normativa ecuatoriana vigente.
+
+Facturom se reserva el derecho de modificar los precios con notificación previa de al menos treinta (30) días. Los cambios de precio no afectan a suscripciones vigentes hasta su próximo período de renovación.
+
+## Métodos de pago
+
+### Pago en línea
+
+Los pagos en línea se procesan a través de Paddle, que actúa como merchant of record. Paddle acepta tarjetas de crédito y débito de las marcas soportadas por su plataforma. Los datos de pago son gestionados directamente por Paddle; Facturom no almacena ni procesa datos de tarjetas.
+
+Paddle aplica los impuestos correspondientes durante el proceso de checkout, conforme a la normativa del país del comprador.
+
+### Transferencia bancaria
+
+El pago por transferencia bancaria está disponible para todos los planes. El cliente debe:
+
+- Seleccionar el plan y el intervalo de pago.
+- Realizar la transferencia al número de cuenta indicado en la plataforma.
+- Subir el comprobante de transferencia a través de la plataforma.
+
+La activación del plan mediante transferencia bancaria requiere la verificación y aprobación manual por parte de un administrador de Facturom. No se acreditan pagos automáticamente a partir de comprobantes. El tiempo de verificación depende del horario de atención del equipo administrativo.
+
+## Activación del servicio
+
+- Pago en línea: la suscripción se activa inmediatamente tras la confirmación del pago por parte de Paddle.
+- Transferencia bancaria: la suscripción se activa tras la aprobación manual del comprobante por parte de un administrador.
+
+## Período de facturación
+
+Las suscripciones se facturan por adelantado según el intervalo seleccionado (mensual o anual). El período de facturación comienza en la fecha de activación.
+
+## Renovación
+
+{{CONFIRMAR_POLITICA_RENOVACION_AUTOMATICA}}
+
+El procesador de pagos gestionará los intentos de cobro conforme a su política de reintentos. Facturom notificará al cliente sobre fallos de pago según la información disponible.
+
+## Cambios de plan
+
+- Cambio a plan superior: se aplica inmediatamente. El procesador de pagos calcula el prorrateo según el saldo del período vigente.
+- Cambio a plan inferior: se aplica al inicio del siguiente período de facturación. Las funciones del plan superior permanecen disponibles hasta ese momento.
+
+Los cambios de plan mediante transferencia bancaria requieren coordinación con el equipo de soporte.
+
+## Cancelación
+
+El cliente puede solicitar la cancelación de su suscripción:
+
+- Desde la sección de facturación de la plataforma, cuando el pago se gestiona a través de Paddle.
+- Contactando a soporte para suscripciones gestionadas por transferencia bancaria.
+
+Tras la cancelación:
+
+- El servicio permanece activo hasta el final del período pagado.
+- Al finalizar el período, la cuenta pasa a modo de solo lectura.
+- Los datos se conservan según las políticas de retención aplicables.
+
+## Suspensión por impago
+
+Si el pago no se confirma al vencimiento del período, la cuenta se suspende y pasa a modo de solo lectura. Los datos del cliente no se eliminan durante la suspensión. La reactivación requiere la regularización del pago.
+
+## Moneda
+
+Todos los precios están expresados en dólares estadounidenses (USD). Los pagos se procesan en USD.
+
+## Facturación
+
+Los comprobantes de los pagos procesados por Paddle son emitidos por Paddle conforme a su calidad de merchant of record. Facturom puede proporcionar documentación adicional según la normativa tributaria ecuatoriana aplicable.
+
+## Contacto
+
+Para consultas sobre pagos, suscripciones o facturación: facturomecuador@gmail.com
+
+Última actualización: {{LEGAL_EFFECTIVE_DATE}}

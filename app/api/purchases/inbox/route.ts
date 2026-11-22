@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getCurrentTenant } from "@/lib/tenant/current-tenant";
+import { gateModuleApiAccess } from "@/lib/core/capabilities";
 import { getPrismaClient } from "@/lib/db/prisma";
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
   const tenant = await getCurrentTenant(user);
+  const gate = await gateModuleApiAccess(tenant.id, "purchases");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
   const prisma = getPrismaClient();
 
   const sp = req.nextUrl.searchParams;
@@ -28,6 +31,8 @@ export async function PATCH(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Sesión requerida." }, { status: 401 });
   const tenant = await getCurrentTenant(user);
+  const gate = await gateModuleApiAccess(tenant.id, "purchases");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
   const prisma = getPrismaClient();
 
   const body = await req.json();

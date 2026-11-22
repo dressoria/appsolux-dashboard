@@ -3,7 +3,7 @@
   --home-pink: var(--facturom-brand-pink);
   --facturom-action: var(--home-pink);
   --facturom-action-strong: #B8006E;
-  --blob-fill: var(--home-pink);
+  --blob-fill: linear-gradient(to bottom, #FF0099 0%, #D92336 100%);
   --blob-shadow: 0 4px 12px #FF009924;
   --home-pink-ink: #B8006E;
   --home-muted: #65687B;
@@ -55,17 +55,17 @@
 .sectionHeader h2 { font-size: 1.12rem; font-weight: 650; letter-spacing: -.025em; }
 .sectionHeader p { color: var(--home-muted); font-size: .82rem; margin-top: .35rem; }
 .shortcutGrid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 1rem; }
-.shortcut { position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; min-width: 0; min-height: 188px; padding: 1.35rem; border: 1px solid var(--home-border); border-radius: 1.2rem; background: white; box-shadow: 0 3px 14px #00034503; transition: transform 420ms cubic-bezier(.22,1,.36,1), border-color 420ms cubic-bezier(.22,1,.36,1), box-shadow 420ms cubic-bezier(.22,1,.36,1); }
+.shortcut { position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; min-width: 0; min-height: 188px; padding: 1.35rem; border: 1px solid var(--home-border); border-radius: 1.2rem; background: white; box-shadow: 0 3px 14px #00034503; transition: transform 420ms cubic-bezier(.22,1,.36,1), border-color 420ms cubic-bezier(.22,1,.36,1), box-shadow 420ms cubic-bezier(.22,1,.36,1), color 600ms cubic-bezier(.22,1,.36,1); }
 .shortcut { --blob-size: max(38%, 17rem); }
-.shortcut:is(:hover, :focus-visible) { transform: translateY(-2px); border-color: var(--home-pink); box-shadow: 0 14px 30px #0003450A; }
-.shortcut:is(:hover, :focus-visible) .shortcutDescription { color: var(--home-navy); }
+.shortcut:is(:hover, :focus-visible) { transform: translateY(-2px); border-color: #FFFFFF40; box-shadow: 0 14px 30px #0003450A; color: white; }
+.shortcut:is(:hover, :focus-visible) .shortcutDescription { color: #FFFFFFCC; }
 .shortcutTop { display: flex; width: 100%; justify-content: space-between; align-items: flex-start; margin-bottom: 1.35rem; }
-.shortcutIcon { display: inline-flex; align-items: center; justify-content: center; height: 48px; width: 48px; border: 1px solid #00034508; border-radius: .95rem; background: #F5F5FA; color: var(--home-navy); transition: transform 460ms cubic-bezier(.22,1,.36,1), background-color 400ms cubic-bezier(.22,1,.36,1), color 400ms cubic-bezier(.22,1,.36,1); }
-.shortcut:is(:hover, :focus-visible) .shortcutIcon { color: var(--home-navy); background: #FFFFFFBF; border-color: #FF00991A; transform: translateY(-2px) rotate(-5deg); }
-.shortcutArrow { color: #9496AA; padding-top: .3rem; transition: transform 400ms cubic-bezier(.22,1,.36,1), color 400ms cubic-bezier(.22,1,.36,1); }
-.shortcut:is(:hover, :focus-visible) .shortcutArrow { color: var(--home-navy); transform: translate(2px,-2px); }
-.shortcutTitle { font-size: .92rem; font-weight: 650; letter-spacing: -.015em; line-height: 1.4; }
-.shortcutDescription { color: var(--home-muted); font-size: .76rem; margin-top: .35rem; line-height: 1.7; }
+.shortcutIcon { display: inline-flex; align-items: center; justify-content: center; height: 48px; width: 48px; border: 1px solid #00034508; border-radius: .95rem; background: #F5F5FA; color: var(--home-navy); transition: transform 460ms cubic-bezier(.22,1,.36,1), background-color 600ms cubic-bezier(.22,1,.36,1), color 600ms cubic-bezier(.22,1,.36,1); }
+.shortcut:is(:hover, :focus-visible) .shortcutIcon { color: white; background: #FFFFFF30; border-color: #FFFFFF40; transform: translateY(-2px) rotate(-5deg); }
+.shortcutArrow { color: #9496AA; padding-top: .3rem; transition: transform 400ms cubic-bezier(.22,1,.36,1), color 600ms cubic-bezier(.22,1,.36,1); }
+.shortcut:is(:hover, :focus-visible) .shortcutArrow { color: white; transform: translate(2px,-2px); }
+.shortcutTitle { font-size: .92rem; font-weight: 650; letter-spacing: -.015em; line-height: 1.4; transition: color 600ms cubic-bezier(.22,1,.36,1); }
+.shortcutDescription { color: var(--home-muted); font-size: .76rem; margin-top: .35rem; line-height: 1.7; transition: color 600ms cubic-bezier(.22,1,.36,1); }
 .summaryIntro { display: flex; align-items: flex-start; gap: .8rem; border: 1px solid var(--home-border); border-left: 3px solid var(--home-pink); border-radius: 1rem; background: white; padding: 1.3rem; }
 .summaryIntro h2 { font-size: 1rem; font-weight: 650; }
 .summaryIntro p { margin-top: .3rem; color: var(--home-muted); font-size: .85rem; }

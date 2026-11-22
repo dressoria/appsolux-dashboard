@@ -42,6 +42,7 @@ import {
 import { allocateNewPayment, linkNewPurchasePayable } from "./integration";
 import { id, pageParams, dec, money, TreasuryError } from "./domain";
 import type { Actor } from "./db";
+import { gateModuleApiAccess } from "@/lib/core/capabilities";
 
 const dependencies = {
   authorize: async (): Promise<Actor | null> => {
@@ -67,6 +68,19 @@ const headers = { "Cache-Control": "private, no-store, max-age=0" };
 function json(data: unknown, status = 200) {
   return NextResponse.json(data, { status, headers });
 }
+const BASIC_TREASURY_PATHS = new Set([
+  "summary",
+  "options",
+  "cash/accounts",
+  "cash/movements",
+  "cash/sessions",
+  "sources",
+  "sources/allocate",
+]);
+function isBasicTreasuryPath(path: string): boolean {
+  return BASIC_TREASURY_PATHS.has(path);
+}
+
 export async function treasuryApi(
   request: NextRequest,
   path: string,
@@ -76,6 +90,10 @@ export async function treasuryApi(
   try {
     const actor = await services.authorize();
     if (!actor) return json({ error: "Sesión requerida." }, 401);
+    if (!isBasicTreasuryPath(path)) {
+      const gate = await gateModuleApiAccess(actor.tenantId, "treasury");
+      if (gate) return NextResponse.json(gate.body, { status: gate.status });
+    }
     const params = request.nextUrl.searchParams;
     if (request.method === "GET") {
       if (path === "summary")

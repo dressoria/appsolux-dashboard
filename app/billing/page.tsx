@@ -82,7 +82,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
 
         <section className="space-y-3 text-center">
           <h2 className="text-3xl font-black tracking-tight">Elige el plan para tu negocio</h2>
-          <p className="mx-auto max-w-2xl text-muted-foreground">Tres opciones claras, todas con facturas electrónicas ilimitadas y soporte para Ecuador.</p>
+          <p className="mx-auto max-w-2xl text-muted-foreground">Tres opciones claras diseñadas para cada etapa de tu operación.</p>
         </section>
 
         <CommercialPlanCatalog

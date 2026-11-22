@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
+import { gateModuleApiAccess } from "@/lib/core/capabilities";
 import { importPurchaseXml, parsePurchaseXml } from "@/lib/core/purchase-xml-import";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { receivedXmlInputError } from "@/lib/core/sri-tax/received-import-input";
 
 export async function POST(req: NextRequest) {
   const { user, tenant } = await requireDashboardSession();
+  const gate = await gateModuleApiAccess(tenant.id, "purchases");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
 
   const contentType = req.headers.get("content-type") ?? "";
 

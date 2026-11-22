@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
+import { gateModuleApiAccess } from "@/lib/core/capabilities";
 import { getPrismaClient } from "@/lib/db/prisma";
 import { fetchAuthorizedXml } from "@/lib/core/sri-soap-client";
 
@@ -7,6 +8,8 @@ type RouteParams = { params: Promise<{ purchaseId: string }> };
 
 export async function GET(_req: NextRequest, { params }: RouteParams) {
   const { tenant } = await requireDashboardSession();
+  const gate = await gateModuleApiAccess(tenant.id, "purchases");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
   const { purchaseId } = await params;
   const prisma = getPrismaClient();
 

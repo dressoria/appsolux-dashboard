@@ -25,7 +25,7 @@ export async function approveLegalDraft(id: string, expectedHash: string, review
     await tx.$queryRaw`SELECT id FROM "LegalRelease" WHERE id = ${id} FOR UPDATE`;
     const release = await tx.legalRelease.findUniqueOrThrow({ where: { id }, include: { documents: true } });
     if (release.status !== "DRAFT" || release.hash !== expectedHash || bundleHash(release.documents) !== expectedHash || Object.entries(getLegalOperator()).some(([key, value]) => (release.operator as Record<string, unknown>)[key] !== value)) throw new Error("Borrador o identidad distintos de los revisados.");
-    if (release.documents.length !== 5 || release.documents.some((doc) => doc.hash !== contentHash(doc.content) || /\{\{|\[PENDIENTE|TODO|BORRADOR NO PUBLICAR/.test(doc.content))) throw new Error("Contenido incompleto o alterado.");
+    if (release.documents.length !== legalDocuments.length || release.documents.some((doc) => doc.hash !== contentHash(doc.content) || /\{\{|\[PENDIENTE|TODO|BORRADOR NO PUBLICAR/.test(doc.content))) throw new Error("Contenido incompleto o alterado.");
     await tx.legalDocumentVersion.updateMany({ where: { releaseId: id, status: "DRAFT" }, data: { status: "APPROVED" } });
     return tx.legalRelease.update({ where: { id }, data: { status: "APPROVED", reviewReference: reviewReference.trim() } });
   });

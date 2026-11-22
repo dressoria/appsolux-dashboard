@@ -1,0 +1,69 @@
+## Qué son las cookies y tecnologías similares
+
+Las cookies son pequeños archivos de texto que un sitio web almacena en el navegador del usuario. Facturom también utiliza tecnologías de almacenamiento local del navegador (localStorage) para funciones similares. Esta política cubre ambas tecnologías.
+
+## Tecnologías utilizadas por Facturom
+
+Facturom utiliza las siguientes tecnologías de almacenamiento:
+
+### Cookies necesarias
+
+Estas son esenciales para el funcionamiento seguro de la plataforma y no requieren consentimiento:
+
+- Cookies de sesión de Clerk: gestionan la autenticación del usuario, el inicio de sesión y la verificación de identidad. Son establecidas por Clerk, el proveedor de autenticación. Su duración y gestión dependen de la configuración de Clerk.
+- Cookies de sesión de Paddle: se utilizan durante el proceso de pago en línea para mantener la sesión del checkout. Son establecidas por Paddle cuando el usuario inicia un proceso de pago.
+- Cookie de preferencias de cookies (facturom.cookie-preferences.v1): almacena la decisión del usuario sobre cookies funcionales opcionales. Se guarda en localStorage. No expira automáticamente.
+
+### Almacenamiento funcional opcional
+
+Estas tecnologías solo se activan cuando el usuario las habilita expresamente desde las Preferencias de cookies:
+
+- facturom.sidebar.collapsed: recuerda si el menú lateral está colapsado o expandido.
+- facturom.sidebar.open-groups: recuerda qué grupos del menú están abiertos.
+- facturom.sidebar.open-submenus: recuerda qué submenús están abiertos.
+- billing-sidebar-open: recuerda el estado del panel de facturación.
+- billing-sidebar-collapsed: recuerda si el panel de facturación está colapsado.
+
+Todas estas preferencias se almacenan en localStorage del navegador y no se transmiten a servidores de Facturom.
+
+### Cookies analíticas
+
+En su versión actual, Facturom no incorpora herramientas de analítica web ni cookies de seguimiento de terceros. No se utilizan Google Analytics, PostHog, Mixpanel, Hotjar, Clarity ni servicios similares.
+
+### Cookies de marketing y publicidad
+
+Facturom no utiliza cookies de marketing ni de publicidad.
+
+## Gestión de preferencias
+
+El usuario puede gestionar sus preferencias de cookies en cualquier momento mediante el botón "Preferencias de cookies" disponible en la esquina inferior izquierda de la plataforma.
+
+Desde este panel el usuario puede:
+
+- Habilitar el almacenamiento funcional opcional (preferencias del menú).
+- Rechazar el almacenamiento funcional opcional.
+- Cambiar su decisión en cualquier momento.
+
+Al rechazar las cookies funcionales opcionales, Facturom elimina automáticamente los datos de preferencias de menú almacenados en el navegador. Esto no afecta la autenticación ni el funcionamiento general de la plataforma.
+
+## Cookies de terceros
+
+Clerk y Paddle pueden establecer sus propias cookies durante la autenticación y el proceso de pago, respectivamente. Facturom no controla directamente estas cookies. Los usuarios pueden consultar las políticas de privacidad de estos servicios:
+
+- Clerk: su política de privacidad está disponible en su sitio web.
+- Paddle: su política de privacidad está disponible en su sitio web.
+
+## Bloqueo de cookies desde el navegador
+
+Los usuarios pueden configurar su navegador para bloquear o eliminar cookies. Sin embargo, bloquear las cookies necesarias de Clerk impedirá el inicio de sesión en la plataforma. Las cookies funcionales opcionales pueden bloquearse sin afectar la funcionalidad principal.
+
+## Base legal
+
+- Cookies necesarias: se basan en interés legítimo para garantizar la seguridad y el funcionamiento de la plataforma.
+- Cookies funcionales opcionales: se basan en el consentimiento del usuario, otorgado mediante el panel de Preferencias de cookies.
+
+## Actualizaciones
+
+Si Facturom incorpora nuevas tecnologías de seguimiento o modifica las existentes, esta política será actualizada. Los cambios sustanciales se comunicarán a los usuarios.
+
+Última actualización: {{LEGAL_EFFECTIVE_DATE}}

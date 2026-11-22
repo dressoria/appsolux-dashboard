@@ -1,0 +1,143 @@
+## Identidad del responsable
+
+Facturom es operado por BICODEX SYSTEMS S.A.S., con RUC 1793242481001, domiciliada en {{LEGAL_OPERATOR_DOMICILE}}, Ecuador.
+
+Correo de privacidad: {{LEGAL_PRIVACY_EMAIL}}
+Correo de soporte: facturomecuador@gmail.com
+Sitio web: https://facturom.com
+
+Facturom actúa como responsable de tratamiento respecto de los datos personales de sus usuarios. Cuando una empresa cliente utiliza Facturom para gestionar datos de sus propios clientes, proveedores o empleados, dicha empresa es el responsable de esos tratamientos y Facturom actúa como encargado conforme al Acuerdo de Tratamiento de Datos.
+
+## Normativa aplicable
+
+Esta política se elabora conforme a la Ley Orgánica de Protección de Datos Personales del Ecuador (LOPDP), su Reglamento General y las directrices de la Superintendencia de Protección de Datos Personales (SPDP).
+
+## Categorías de datos personales
+
+Facturom trata las siguientes categorías de datos personales:
+
+- Datos de registro: nombre, apellido, correo electrónico, teléfono (opcional), contraseña (almacenada como hash por el proveedor de autenticación).
+- Datos de empresa: razón social, nombre comercial, RUC o cédula, dirección, provincia, ciudad, teléfono de contacto.
+- Datos de representación: declaración del usuario sobre su autorización para contratar en nombre de la empresa.
+- Datos tributarios: información de establecimientos, puntos de emisión, firma electrónica (certificado P12 almacenado con cifrado), comprobantes electrónicos emitidos y recibidos.
+- Datos de clientes y proveedores de la empresa: identificación, nombre, dirección, correo electrónico, teléfono, según lo ingresado por la empresa cliente.
+- Datos de facturación y suscripción: plan contratado, intervalo de facturación, historial de pagos, identificadores del procesador de pagos.
+- Datos técnicos de sesión: dirección IP (almacenada como hash cuando se configura la retención técnica), agente de usuario del navegador, marcas de tiempo de acceso.
+- Preferencias de interfaz: configuración del menú lateral y preferencias visuales (almacenadas localmente en el navegador del usuario, con su consentimiento).
+
+## Finalidades del tratamiento
+
+Facturom trata datos personales para las siguientes finalidades:
+
+- Crear y administrar cuentas de usuario y empresas.
+- Prestar el servicio de facturación electrónica y emisión de comprobantes ante el SRI.
+- Gestionar inventario, clientes, proveedores, tesorería y contabilidad según el plan contratado.
+- Procesar suscripciones y pagos.
+- Verificar la identidad del representante autorizado.
+- Comunicar avisos de servicio, cambios contractuales y actualizaciones relevantes.
+- Cumplir obligaciones legales y tributarias aplicables.
+- Mantener la seguridad e integridad de la plataforma.
+- Atender solicitudes de soporte.
+
+## Bases legales
+
+Los tratamientos de datos se fundamentan en las siguientes bases legales conforme a la LOPDP:
+
+- Ejecución contractual: para prestar el servicio contratado y gestionar la relación comercial.
+- Obligación legal: para cumplir normativas tributarias y de conservación documental del SRI.
+- Interés legítimo: para mantener la seguridad de la plataforma y prevenir fraudes.
+- Consentimiento: para el almacenamiento de preferencias de interfaz en el navegador (cookies funcionales opcionales).
+
+## Servicios de autenticación
+
+Facturom utiliza Clerk como proveedor de autenticación. Clerk gestiona el registro, inicio de sesión, verificación de correo electrónico y sesiones. Los datos de autenticación (credenciales, tokens de sesión) son tratados por Clerk conforme a su propia política de privacidad. Facturom no almacena contraseñas en texto claro.
+
+## Procesamiento de pagos
+
+Los pagos en línea se procesan a través de Paddle, que actúa como merchant of record. Paddle recibe los datos necesarios para procesar la transacción (correo electrónico, datos de tarjeta) y aplica los impuestos correspondientes. Facturom no almacena datos de tarjetas de pago. Para transferencias bancarias, Facturom recibe comprobantes de pago que son revisados manualmente por personal autorizado.
+
+## Proveedores tecnológicos y destinatarios
+
+Facturom puede compartir datos con los siguientes destinatarios en la medida necesaria para prestar el servicio:
+
+- Clerk (autenticación): Estados Unidos.
+- Paddle (procesamiento de pagos): Reino Unido / Unión Europea.
+- Servicio de Rentas Internas (SRI): Ecuador — para la autorización de comprobantes electrónicos.
+- Proveedor de infraestructura en la nube: {{CONFIRMAR_PROVEEDOR_CLOUD}} — para alojamiento de la aplicación y bases de datos.
+- Proveedor de base de datos: PostgreSQL gestionado en {{CONFIRMAR_REGION_DB}}.
+
+Facturom no vende ni comparte datos personales con terceros para fines publicitarios.
+
+## Transferencias internacionales
+
+Algunos proveedores de Facturom se encuentran fuera de Ecuador. Las transferencias internacionales de datos se realizan conforme a las disposiciones del Capítulo VII de la LOPDP, basándose en las garantías contractuales con cada proveedor y en que los países de destino cuenten con niveles adecuados de protección según la evaluación de la SPDP.
+
+## Conservación y eliminación
+
+Los datos personales se conservan durante la vigencia de la relación contractual y, una vez finalizada, por los plazos requeridos por la legislación aplicable:
+
+- Comprobantes electrónicos y datos tributarios: conforme a los plazos de conservación establecidos por el SRI y la normativa tributaria ecuatoriana (mínimo 7 años desde la emisión).
+- Datos contractuales y de aceptación legal: durante la vigencia del contrato y los plazos de prescripción aplicables.
+- Datos de sesión técnicos: por el período configurado en la plataforma (máximo 365 días), cuando la retención técnica está habilitada.
+- Datos de cuenta: hasta la solicitud de eliminación por parte del titular de la empresa, sujeto a las obligaciones de conservación legales.
+
+## Seguridad de la información
+
+Facturom implementa medidas técnicas y organizativas para proteger los datos personales, incluyendo:
+
+- Cifrado de comunicaciones mediante HTTPS/TLS.
+- Almacenamiento cifrado de firmas electrónicas.
+- Hash de contraseñas gestionado por Clerk.
+- Verificación de integridad de documentos legales mediante SHA-256.
+- Separación lógica de datos entre empresas clientes (arquitectura multitenant).
+- Control de acceso basado en roles y pertenencia al tenant.
+
+{{CONFIRMAR_MEDIDAS_SEGURIDAD_ADICIONALES}}
+
+## Derechos de los titulares
+
+Conforme a la LOPDP, los titulares de datos personales tienen derecho a:
+
+- Acceso: conocer qué datos personales trata Facturom.
+- Rectificación: solicitar la corrección de datos inexactos.
+- Eliminación: solicitar la supresión de datos, sujeto a obligaciones legales de conservación.
+- Oposición: oponerse al tratamiento basado en interés legítimo.
+- Portabilidad: obtener una copia de sus datos en formato estructurado.
+- Limitación del tratamiento en circunstancias específicas.
+
+## Procedimiento para solicitudes
+
+Para ejercer cualquier derecho de protección de datos, envía una solicitud a {{LEGAL_PRIVACY_EMAIL}} indicando:
+
+- Tu nombre completo.
+- El correo electrónico asociado a tu cuenta de Facturom.
+- El derecho que deseas ejercer.
+- Descripción de tu solicitud.
+- Documento de identidad para verificación.
+
+Facturom responderá en un plazo máximo de quince (15) días hábiles conforme a la LOPDP.
+
+## Revocación de consentimientos
+
+Los consentimientos otorgados para tratamientos opcionales pueden revocarse en cualquier momento:
+
+- Preferencias de cookies: mediante el botón "Preferencias de cookies" disponible en la plataforma.
+- Otros consentimientos opcionales: enviando una solicitud a {{LEGAL_PRIVACY_EMAIL}}.
+
+La revocación no afecta la licitud del tratamiento realizado antes de la revocación.
+
+## Decisiones automatizadas
+
+En su estado actual, Facturom no utiliza sistemas de decisiones automatizadas ni perfilado que produzcan efectos jurídicos sobre los titulares. Los procesos automatizados se limitan a la generación y autorización de comprobantes electrónicos ante el SRI según los datos ingresados por el usuario.
+
+## Autoridad competente
+
+Los titulares pueden presentar reclamaciones ante la Superintendencia de Protección de Datos Personales del Ecuador (SPDP).
+
+Sitio web: https://www.spdp.gob.ec
+
+## Actualizaciones de esta política
+
+Facturom puede actualizar esta política para reflejar cambios en sus prácticas o en la normativa aplicable. Las modificaciones entran en vigencia tras su publicación en la plataforma. Se notificará a los usuarios sobre cambios sustanciales mediante aviso en la plataforma o por correo electrónico.
+
+Última actualización: {{LEGAL_EFFECTIVE_DATE}}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireDashboardSession } from "@/lib/core/require-dashboard-session";
+import { gateModuleApiAccess } from "@/lib/core/capabilities";
 import {
   listPurchaseDocuments,
   getPurchaseConsolidatedTotals,
@@ -7,6 +8,8 @@ import {
 
 export async function GET(req: NextRequest) {
   const { tenant } = await requireDashboardSession();
+  const gate = await gateModuleApiAccess(tenant.id, "purchases");
+  if (gate) return NextResponse.json(gate.body, { status: gate.status });
   const sp = req.nextUrl.searchParams;
 
   const from = sp.get("from") ?? undefined;

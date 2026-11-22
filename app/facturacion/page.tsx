@@ -9,7 +9,6 @@ import {
   ReceiptText,
   ShoppingCart,
   Sparkles,
-  Star,
   TrendingUp,
   Wallet,
   type LucideIcon,
@@ -204,14 +203,6 @@ export default async function FacturacionPage() {
   /* ── Summary tab ──────────────────────────────────────────────────── */
   const summaryContent = (
     <>
-      <div className={styles.summaryIntro}>
-        <Star className="size-5" aria-hidden="true" />
-        <div>
-          <h2>Tu negocio, de un vistazo</h2>
-          <p>Tu aliado para facturar, controlar y hacer crecer tu negocio.</p>
-        </div>
-      </div>
-
       {/* KPIs — compact single card */}
       <Card className="overflow-hidden rounded-xl border border-[#E4E9F0] shadow-sm ring-0">
         <CardContent className="p-4 sm:p-5">
@@ -397,19 +388,6 @@ export default async function FacturacionPage() {
       contentClassName="mx-auto max-w-[1440px]"
     >
       <div className={styles.page}>
-        {/* ── Header ── */}
-        <header className={styles.hero}>
-          <div className="min-w-0">
-            <span className={styles.eyebrow}>Inicio</span>
-            <h1>
-              Resumen general
-            </h1>
-            <p>
-              Todo lo que necesitas para gestionar tu negocio, en un solo lugar.
-            </p>
-          </div>
-        </header>
-
         <HomeTabs
           shortcuts={shortcutsContent}
           summary={summaryContent}
